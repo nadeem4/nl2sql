@@ -1,6 +1,7 @@
 from fastapi import Depends, Request
 
 from nl2sql import NL2SQL
+from nl2sql_api.jobs import Jobs
 from nl2sql_api.services import (
     DatasourceService,
     QueryService,
@@ -12,6 +13,10 @@ from nl2sql_api.services import (
 
 def get_engine(request: Request) -> NL2SQL:
     return request.app.state.engine
+
+
+def get_jobs(request: Request) -> Jobs:
+    return request.app.state.jobs
 
 
 def get_datasource_service(

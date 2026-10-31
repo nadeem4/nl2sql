@@ -13,6 +13,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from nl2sql import NL2SQL, configure_logging, load_env_file
 from nl2sql_api import errors
+from nl2sql_api.jobs import Jobs
 
 logger = logging.getLogger("nl2sql_api")
 
@@ -20,7 +21,7 @@ logger = logging.getLogger("nl2sql_api")
 # namespace's file, never here; web serves the page at / and the rest are under /api/v1. datasource, indexing and
 # llm hold the routes of datasources, index and settings until their rows move them.
 NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "workspaces", "datasources",
-              "datasource", "index", "indexing", "knowledge", "evals", "settings", "llm", "web")
+              "datasource", "index", "indexing", "knowledge", "evals", "settings", "llm", "jobs", "web")
 
 
 def _lifespan(config_path: Optional[str]):
@@ -42,6 +43,8 @@ def _lifespan(config_path: Optional[str]):
             engine.close()
             raise
         app.state.engine = engine
+        # One worker thread for the app's lifetime: the queue lives in this process (D206).
+        app.state.jobs = Jobs()
         # Retention: once now, then once a day while the API serves.
         await asyncio.to_thread(_purge, engine)
         purging = asyncio.create_task(purge_daily(engine))
@@ -53,6 +56,7 @@ def _lifespan(config_path: Optional[str]):
         for task in (purging, scheduling):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        await asyncio.to_thread(app.state.jobs.close)
         engine.close()
     return lifespan
 

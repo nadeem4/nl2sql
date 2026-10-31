@@ -130,10 +130,15 @@ def caller(request: Request, engine: NL2SQL = Depends(get_engine)) -> UserContex
     return _operator(request, engine)
 
 
+def is_admin(user: UserContext, engine: NL2SQL) -> bool:
+    """Whether ``user`` holds a role in ``policies.admin_roles``."""
+    return bool(set(user.roles) & set(engine.config.policies.admin_roles))
+
+
 def admin(user: UserContext = Depends(caller), engine: NL2SQL = Depends(get_engine)) -> UserContext:
     """As ``caller``, and the caller must hold one of ``policies.admin_roles``; 403 otherwise."""
     policies = engine.config.policies
-    if not set(user.roles) & set(policies.admin_roles):
+    if not is_admin(user, engine):
         raise RequestRefused(
             403, "FORBIDDEN", "This route needs an admin role.",
             fix=f"Give the caller one of policies.admin_roles ({', '.join(policies.admin_roles) or 'none defined'}).")

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from nl2sql import UserContext
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
+from nl2sql_api.jobs import Jobs
 from nl2sql_api.main import app
 from nl2sql.testing.config import make_config
 
@@ -73,6 +74,7 @@ def api_client(tmp_path):
         engine = StubEngine(run_query_result, config=make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
         app.state.engine = engine
+        app.state.jobs = Jobs(poll_s=0.01)
         if authenticated:
             app.dependency_overrides[identity.caller] = lambda: UserContext(roles=["admin"])
             app.dependency_overrides[identity.admin] = lambda: UserContext(roles=["admin"])
@@ -83,6 +85,9 @@ def api_client(tmp_path):
     yield _make
 
     app.dependency_overrides.clear()
+    if hasattr(app.state, "jobs"):
+        app.state.jobs.close()
+        del app.state.jobs
     if hasattr(app.state, "engine"):
         del app.state.engine
     for client in clients:

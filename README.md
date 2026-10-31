@@ -407,6 +407,10 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
 | `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller |
 | `GET` | `/api/v1/about` | What the engine is: version and pipeline steps |
+| `GET` | `/api/v1/jobs` | The caller's background jobs, newest first (an admin sees all) |
+| `GET` | `/api/v1/jobs/{job_id}` | One job: status, progress, result or error |
+| `DELETE` | `/api/v1/jobs/{job_id}` | Cancel a queued or running job |
+| `GET` | `/api/v1/jobs/{job_id}/events` | A job's progress as Server-Sent Events, ending with `job.finished` |
 | `GET` | `/api/v1/datasource-types` | The adapters the engine can name, installed or not, each with its connection schema (the Connect a database form) |
 | `POST` | `/api/v1/datasource/test` | Connect to a datasource that is not added and report the stage that failed and the fix; registers nothing |
 | `POST` | `/api/v1/datasource` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...). `save: true` also writes `datasources/<id>.yaml`, with every secret as a reference. A body that does not validate is a 422 listing each problem by path |

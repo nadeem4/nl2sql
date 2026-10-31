@@ -312,6 +312,178 @@
         "title": "CaseWhen",
         "type": "object"
       },
+      "ChartData": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "result_id": {
+            "title": "Result Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "trace_id",
+          "result_id",
+          "columns",
+          "rows",
+          "truncated"
+        ],
+        "title": "ChartData",
+        "type": "object"
+      },
+      "ChartPlan": {
+        "additionalProperties": false,
+        "description": "The typed plan behind a chart: a whole run (its decomposition and a plan per sub-query), or a\nverified query. Exactly one; shaped on ``PinnedRun`` (A1).",
+        "properties": {
+          "decomposition": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decomposition"
+          },
+          "plans": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Plans",
+            "type": "object"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifiedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verified_datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Datasource Id"
+          }
+        },
+        "title": "ChartPlan",
+        "type": "object"
+      },
+      "ChartSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChartData"
+          },
+          "kind": {
+            "enum": [
+              "line",
+              "bar",
+              "big_number",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Encoding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "takeaway": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Takeaway"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Encoding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "x": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Encoding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "y": {
+            "items": {
+              "$ref": "#/components/schemas/Encoding"
+            },
+            "title": "Y",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "data",
+          "reason"
+        ],
+        "title": "ChartSpec",
+        "type": "object"
+      },
       "ClarificationOption": {
         "description": "One reading of the question: ``a`` is the default, each with a validated plan.",
         "properties": {
@@ -489,6 +661,272 @@
         "title": "CombineInput",
         "type": "object"
       },
+      "Dashboard": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardFilter"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Schedule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "saved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "tiles": {
+            "items": {
+              "$ref": "#/components/schemas/Tile"
+            },
+            "title": "Tiles",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "workspace_id",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "number",
+              "text",
+              "temporal",
+              "boolean",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "in",
+              "between"
+            ],
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "column",
+          "kind",
+          "op"
+        ],
+        "title": "DashboardFilter",
+        "type": "object"
+      },
+      "DashboardJob": {
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "max_tiles": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tiles"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "datasource_id"
+        ],
+        "title": "DashboardJob",
+        "type": "object"
+      },
+      "DashboardJobResult": {
+        "description": "What ``engine.dashboards.generate`` returns, as a model (not the engine's ``DashboardGenerated`` event).",
+        "properties": {
+          "dashboard": {
+            "$ref": "#/components/schemas/Dashboard"
+          },
+          "run": {
+            "$ref": "#/components/schemas/DashboardRun"
+          }
+        },
+        "required": [
+          "dashboard",
+          "run"
+        ],
+        "title": "DashboardJobResult",
+        "type": "object"
+      },
+      "DashboardRun": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "dashboard_id": {
+            "title": "Dashboard Id",
+            "type": "string"
+          },
+          "filters": {
+            "additionalProperties": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Filters",
+            "type": "object"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedTile"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "tiles": {
+            "items": {
+              "$ref": "#/components/schemas/TileRun"
+            },
+            "title": "Tiles",
+            "type": "array"
+          },
+          "trigger": {
+            "enum": [
+              "generate",
+              "open",
+              "manual",
+              "schedule"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/QuestionUsage"
+          }
+        },
+        "required": [
+          "dashboard_id",
+          "at",
+          "trigger"
+        ],
+        "title": "DashboardRun",
+        "type": "object"
+      },
       "DatasourceResponse": {
         "properties": {
           "datasource_id": {
@@ -572,6 +1010,37 @@
         "title": "DecomposerResponse",
         "type": "object"
       },
+      "Encoding": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "number",
+              "text",
+              "temporal",
+              "boolean",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "kind",
+          "title"
+        ],
+        "title": "Encoding",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "error": {
@@ -618,6 +1087,199 @@
           "source"
         ],
         "title": "Estimate",
+        "type": "object"
+      },
+      "EvalJob": {
+        "properties": {
+          "cases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cases"
+          },
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          },
+          "mode": {
+            "default": "full",
+            "enum": [
+              "full",
+              "plans",
+              "retrieval"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "suites": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suites"
+          }
+        },
+        "title": "EvalJob",
+        "type": "object"
+      },
+      "EvalReport": {
+        "description": "What ``engine.evals.run`` returns. ``configs`` maps each LLM config's name to its board.",
+        "properties": {
+          "clarify": {
+            "default": false,
+            "title": "Clarify",
+            "type": "boolean"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison"
+          },
+          "configs": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Configs",
+            "type": "object"
+          },
+          "curated": {
+            "default": false,
+            "title": "Curated",
+            "type": "boolean"
+          },
+          "database": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database"
+          },
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "passes": {
+            "default": 1,
+            "title": "Passes",
+            "type": "integer"
+          },
+          "prices_checked_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices Checked On"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roles"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          },
+          "skipped": {
+            "default": 0,
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "spent": {
+            "default": 0.0,
+            "title": "Spent",
+            "type": "number"
+          },
+          "stopped": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped"
+          },
+          "suites": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Suites",
+            "type": "array"
+          },
+          "unknown_cost_calls": {
+            "default": 0,
+            "title": "Unknown Cost Calls",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "EvalReport",
         "type": "object"
       },
       "ExpectedColumn": {
@@ -1078,6 +1740,236 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IndexJob": {
+        "properties": {
+          "datasource_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Ids"
+          }
+        },
+        "title": "IndexJob",
+        "type": "object"
+      },
+      "IndexResult": {
+        "description": "What an index build did. ``failed`` names the datasources that kept their previous index; the reason is in the\nserver log, where a connection string cannot reach a client.",
+        "properties": {
+          "empty": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Empty",
+            "type": "array"
+          },
+          "failed": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "stats": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Stats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "IndexResult",
+        "type": "object"
+      },
+      "Job": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApiError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "index",
+              "profile",
+              "eval",
+              "dashboard"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndexJob"
+              },
+              {
+                "$ref": "#/components/schemas/ProfileJob"
+              },
+              {
+                "$ref": "#/components/schemas/EvalJob"
+              },
+              {
+                "$ref": "#/components/schemas/DashboardJob"
+              }
+            ],
+            "title": "Params"
+          },
+          "progress": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JobProgress"
+            },
+            "title": "Progress",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndexResult"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProfileReport"
+                },
+                "type": "array"
+              },
+              {
+                "$ref": "#/components/schemas/EvalReport"
+              },
+              {
+                "$ref": "#/components/schemas/DashboardJobResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "params",
+          "created_at"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobProgress": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "at",
+          "step",
+          "done"
+        ],
+        "title": "JobProgress",
         "type": "object"
       },
       "JoinKeyPair": {
@@ -1566,6 +2458,117 @@
         "title": "PostCombineOp",
         "type": "object"
       },
+      "ProfileJob": {
+        "properties": {
+          "datasource_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Ids"
+          },
+          "draft": {
+            "default": false,
+            "title": "Draft",
+            "type": "boolean"
+          },
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          }
+        },
+        "title": "ProfileJob",
+        "type": "object"
+      },
+      "ProfileReport": {
+        "description": "One datasource's profile: the proposals it filed and how far its bounds let it go.",
+        "properties": {
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "drafted": {
+            "default": 0,
+            "title": "Drafted",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "probes": {
+            "default": 0,
+            "title": "Probes",
+            "type": "integer"
+          },
+          "proposals": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Proposals",
+            "type": "object"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          },
+          "skipped_by_budget": {
+            "default": 0,
+            "title": "Skipped By Budget",
+            "type": "integer"
+          },
+          "stopped_by": {
+            "default": "done",
+            "enum": [
+              "done",
+              "time_budget",
+              "max_probes",
+              "cost_cap"
+            ],
+            "title": "Stopped By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "schema_version",
+          "seconds"
+        ],
+        "title": "ProfileReport",
+        "type": "object"
+      },
       "QueryRequest": {
         "properties": {
           "datasource_id": {
@@ -2020,6 +3023,101 @@
         "title": "RunWarning",
         "type": "object"
       },
+      "Schedule": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "every_minutes": {
+            "minimum": 1.0,
+            "title": "Every Minutes",
+            "type": "integer"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/ScheduleIdentity"
+          },
+          "next_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next At"
+          },
+          "set_at": {
+            "format": "date-time",
+            "title": "Set At",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "stopped"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "every_minutes",
+          "identity",
+          "set_at",
+          "state"
+        ],
+        "title": "Schedule",
+        "type": "object"
+      },
+      "ScheduleIdentity": {
+        "additionalProperties": false,
+        "description": "D134: the owner, as they were when they set the schedule. Stored only on the schedule.",
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "title": "ScheduleIdentity",
+        "type": "object"
+      },
       "SelectItem": {
         "additionalProperties": false,
         "description": "Represents an item in the SELECT clause.\n\nAttributes:\n    expr (Expr): The expression to select.\n    alias (Optional[str]): The alias for the selected expression.",
@@ -2043,6 +3141,30 @@
           "expr"
         ],
         "title": "SelectItem",
+        "type": "object"
+      },
+      "SkippedTile": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "status",
+          "reason"
+        ],
+        "title": "SkippedTile",
         "type": "object"
       },
       "SubQuery": {
@@ -2401,6 +3523,191 @@
           "source"
         ],
         "title": "TermUse",
+        "type": "object"
+      },
+      "Tile": {
+        "additionalProperties": false,
+        "properties": {
+          "chart": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "line",
+              "bar",
+              "big_number",
+              "table"
+            ],
+            "title": "Chart",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/TileLayout"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ChartPlan"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "question",
+          "plan",
+          "layout"
+        ],
+        "title": "Tile",
+        "type": "object"
+      },
+      "TileLayout": {
+        "additionalProperties": false,
+        "description": "A place on a 4-column grid.",
+        "properties": {
+          "h": {
+            "minimum": 1.0,
+            "title": "H",
+            "type": "integer"
+          },
+          "w": {
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "W",
+            "type": "integer"
+          },
+          "x": {
+            "exclusiveMaximum": 4.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "integer"
+          },
+          "y": {
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "TileLayout",
+        "type": "object"
+      },
+      "TileRun": {
+        "additionalProperties": false,
+        "description": "The last result of a chart; stored with a timestamp.",
+        "properties": {
+          "approvals_needed": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRequest"
+            },
+            "title": "Approvals Needed",
+            "type": "array"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "chart": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChartSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "column_kinds": {
+            "additionalProperties": {
+              "enum": [
+                "number",
+                "text",
+                "temporal",
+                "boolean",
+                "other"
+              ],
+              "type": "string"
+            },
+            "title": "Column Kinds",
+            "type": "object"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          },
+          "filtered": {
+            "default": false,
+            "title": "Filtered",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty",
+              "needs_fixing",
+              "denied",
+              "needs_approval",
+              "stopped",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tile_id": {
+            "title": "Tile Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "tile_id",
+          "at",
+          "status"
+        ],
+        "title": "TileRun",
         "type": "object"
       },
       "UnmappedSubQuery": {
@@ -3230,6 +4537,225 @@
         "summary": "Index one datasource",
         "tags": [
           "indexing"
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "description": "The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's.",
+        "operationId": "list_jobs_api_v1_jobs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Job"
+                  },
+                  "title": "Response List Jobs Api V1 Jobs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          }
+        },
+        "summary": "List jobs",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "delete": {
+        "description": "A queued job is removed; a running one has its token cancelled and stops between items (datasources,\ncases, tiles). Returns the job as it is now; a finished job is returned unchanged.",
+        "operationId": "cancel_job_api_v1_jobs__job_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such job for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel a job",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "get": {
+        "description": "One job: its `status`, `progress` so far, and `result` or `error` once it finished. Another user's job is\na 404.",
+        "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such job for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/events": {
+      "get": {
+        "description": "The job's progress as Server-Sent Events. These are the API's events, not the engine's.",
+        "operationId": "job_events_api_v1_jobs__job_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-Sent Events: one `job.progress` (a `JobProgress`) for every step so far, then for each new one, then `job.finished` (the `Job`) and the stream ends. A `: keep-alive` comment every 15 seconds."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such job for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Follow a job",
+        "tags": [
+          "jobs"
         ]
       }
     },
