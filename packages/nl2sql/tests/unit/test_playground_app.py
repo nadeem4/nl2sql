@@ -685,7 +685,7 @@ def test_the_served_page_s_icon_is_the_mark():
 
 
 def test_the_bundle_and_its_source_carry_the_same_icon():
-    source = (REPO / "web" / "playground" / "index.html").read_text(encoding="utf-8")
+    source = (REPO / "nl2sql-ui" / "index.html").read_text(encoding="utf-8")
     bundle = (REPO / "packages" / "nl2sql" / "src" / "nl2sql" / "cli" / "demo"
               / "playground" / "static" / "index.html").read_text(encoding="utf-8")
 

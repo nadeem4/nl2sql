@@ -148,7 +148,7 @@ export function createRouter(win) {
     const next = routeFromHash(win.location.hash);
     if (next.page === route.page && next.param === route.param) return;
     route = next;
-    listeners.forEach((listener) => listener(route.page));
+    listeners.forEach((listener) => listener(route));
   };
 
   win.addEventListener("hashchange", onHashChange);

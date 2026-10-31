@@ -3,7 +3,7 @@
 // wrong provider.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keyMismatch, keyTail, providerCards } from "./hostedKey.js";
+import { keyMismatch, keyTail, providerCards } from "../lib/hostedKey.js";
 
 test("keyTail shows the last four characters only, never the prefix", () => {
   assert.equal(keyTail("sk-proj-abcdefghijklmnop0f3a"), "…0f3a");

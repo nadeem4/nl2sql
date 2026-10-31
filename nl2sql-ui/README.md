@@ -52,7 +52,7 @@ is marked `off`; opening it is how you read the reason
 page that is off. Settings keeps its nav item unmarked and shows two blocks
 that write only to this tab's `sessionStorage`, never to the server:
 
-- `#hosted-key-heading`, one key per provider (`src/pages/hostedKey.js`), in a
+- `#hosted-key-heading`, one key per provider (`src/lib/hostedKey.js`), in a
   raised card: a provider choice (OpenAI, Anthropic, OpenRouter, each saying
   "key set" or "none"), a 44px mono `#hosted-key` and **Use this key**. A pasted
   key is kept under the provider its own prefix names, even when another card
@@ -65,7 +65,7 @@ that write only to this tab's `sessionStorage`, never to the server:
   `X-NL2SQL-Api-Key-<provider>` header on `/api/ask`. With exactly one key the
   bare `X-NL2SQL-Api-Key` goes too, so the simple path is byte for byte what it
   was.
-- `#hosted-models`, **Model for each step** (`src/pages/hostedModels.js`), a
+- `#hosted-models`, **Model for each step** (`src/lib/hostedModels.js`), a
   `<details>` card, open from the start at 1060px and wider (where it sits
   beside the key card) and shut on a narrower window; its summary says what the
   steps will use. Each
@@ -95,7 +95,7 @@ when there are recordings and open when there are none: a provider choice,
 only, **Sent** in a header with each question, **Never** written to disk, logs
 or traces). The provider follows the key's own prefix once one is typed, as the
 server reads it, and the key is kept exactly as the Settings form keeps it
-(`writeKeyFor` in `src/pages/hostedKey.js`); the keyboard then moves to `#question`.
+(`writeKeyFor` in `src/lib/hostedKey.js`); the keyboard then moves to `#question`.
 **Nothing is disabled** (`lockControls`): a recorded guided question answers
 from its recording, and the answer header carries a **Recorded run** badge
 (`#recorded-badge`, `recordedBadge`) whose title says it was not run just now;
@@ -495,7 +495,7 @@ sentence it stands for),
 databases the switcher offers, whether it is a segmented control or a select,
 and which one a run was answered from), `src/pages/pipelinePhases.js` (the Pipeline
 page's three phases, each step's state and the waterfall bars),
-`src/pages/railFade.js` (which edges of the rail fade), `src/pages/hostedKey.js` (also the
+`src/pages/railFade.js` (which edges of the rail fade), `src/lib/hostedKey.js` (also the
 key's masked tail, the provider cards and a key pasted under the wrong
 provider), `src/components/indexHealth.js` (also the rail's one-line index summary and
 when it opens itself),

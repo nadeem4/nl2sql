@@ -50,3 +50,10 @@ test("an event with no data line is dropped, and an unfinished frame never fires
   parser.end();
   assert.deepEqual(frames, []);
 });
+
+test("a CRLF split across two chunks keeps the event name", () => {
+  const { frames, parser } = collect();
+  parser.push("event: a\r");
+  parser.push("\ndata: 1\r\n\r\n");
+  assert.deepEqual(frames, [{ event: "a", data: "1" }]);
+});

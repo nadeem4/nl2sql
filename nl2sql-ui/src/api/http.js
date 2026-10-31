@@ -6,8 +6,8 @@
 //     `none` there is no key and nothing is sent);
 //   * `X-NL2SQL-Api-Key-<provider>` and `X-NL2SQL-Models`, from the keys and step models the tab holds (D210).
 // A failure is always an `ApiError`, whether the server sent its error envelope, sent something else, or sent nothing.
-import { askHeaders, readKeys } from "../pages/hostedKey.js";
-import { readModels } from "../pages/hostedModels.js";
+import { askHeaders, readKeys } from "../lib/hostedKey.js";
+import { readModels } from "../lib/hostedModels.js";
 import { createSseParser } from "./sse.js";
 
 export const BASE = "/api/v1";

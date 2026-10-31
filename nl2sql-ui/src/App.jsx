@@ -15,10 +15,10 @@ import { needsKey } from "./pages/firstRun.js";
 import { AskDock, Elapsed, FirstRun, Suggestions } from "./AskParts.jsx";
 import { STOP_AFTER_MS, askButton, runScroll } from "./lib/runState.js";
 import { modeStatus } from "./pages/status.js";
-import { askHeaders, readKeys, writeKeyFor } from "./pages/hostedKey.js";
-import { readModels, writeModel } from "./pages/hostedModels.js";
+import { askHeaders, readKeys, writeKeyFor } from "./lib/hostedKey.js";
+import { readModels, writeModel } from "./lib/hostedModels.js";
 import {
-  createRouter, hashFor, indicatorTransform, navItems, pageFor, pageFromHash, swapView,
+  createRouter, hashFor, indicatorTransform, navItems, pageFor, routeFromHash, swapView,
 } from "./router.js";
 import { deniedTables, planTables } from "./components/run.js";
 import { EMPTY_PROGRESS, StreamUnavailable, progressOf, streamAsk } from "./stream.js";
@@ -75,19 +75,19 @@ const reducedMotion = () =>
 // view transition where the browser has one (router.js, `swapView`); flushSync
 // puts the new page in the DOM inside the transition's callback.
 function useRoute() {
-  const [page, setPage] = useState(() => pageFromHash(window.location.hash));
+  const [route, setRoute] = useState(() => routeFromHash(window.location.hash));
   useEffect(() => {
     const router = createRouter(window);
     // The hash can change between the first render and this effect.
-    setPage(router.page());
+    setRoute(router.route());
     const drop = router.subscribe((next) =>
-      swapView(document, () => flushSync(() => setPage(next)), { reduce: reducedMotion() }));
+      swapView(document, () => flushSync(() => setRoute(next)), { reduce: reducedMotion() }));
     return () => {
       drop();
       router.stop();
     };
   }, []);
-  return page;
+  return route;
 }
 
 // One underline for the whole nav, slid under the current tab (styles/ask-run.css,
@@ -131,7 +131,7 @@ function focusById(id) {
 }
 
 export default function App() {
-  const page = useRoute();
+  const { page, param } = useRoute();
   const { navRef, indRef } = useNavIndicator(page);
   const [meta, setMeta] = useState(null);
   const [schema, setSchema] = useState(null);
@@ -565,7 +565,7 @@ export default function App() {
 
         {STUB_PAGES[page] && (
           <Suspense fallback={null}>
-            {React.createElement(STUB_PAGES[page])}
+            {React.createElement(STUB_PAGES[page], { param })}
           </Suspense>
         )}
       </main>

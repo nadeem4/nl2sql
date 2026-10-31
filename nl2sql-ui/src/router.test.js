@@ -79,7 +79,7 @@ test("back and forward move between pages", () => {
   const win = fakeWindow("#/");
   const router = createRouter(win);
   const seen = [];
-  router.subscribe((page) => seen.push(page));
+  router.subscribe(({ page }) => seen.push(page));
 
   assert.equal(router.page(), "home");
   win.go("#/ask");
@@ -107,7 +107,7 @@ test("a bare fragment lands on the question and answer view, so Back always move
   const win = fakeWindow("#/settings");
   const router = createRouter(win);
   const seen = [];
-  router.subscribe((page) => seen.push(page));
+  router.subscribe(({ page }) => seen.push(page));
 
   win.go("#run");
   win.go("#index-rebuild");
@@ -123,7 +123,7 @@ test("moving to another page and back keeps the run: the router touches nothing 
   const win = fakeWindow("#/ask");
   const router = createRouter(win);
   const seen = [];
-  router.subscribe((page) => seen.push(page));
+  router.subscribe(({ page }) => seen.push(page));
 
   win.go("#/settings");
   win.go("#/ask");
@@ -138,7 +138,7 @@ test("leaving stops listening, so a stale page hears nothing", () => {
   const win = fakeWindow("#/");
   const router = createRouter(win);
   const seen = [];
-  const drop = router.subscribe((page) => seen.push(page));
+  const drop = router.subscribe(({ page }) => seen.push(page));
 
   drop();
   win.go("#/settings");
@@ -240,10 +240,10 @@ test("moving between two ids of one page is a change the router reports", () => 
   const win = fakeWindow("#/chat/a");
   const router = createRouter(win);
   const seen = [];
-  router.subscribe((page) => seen.push([page, router.route().param]));
+  router.subscribe((route) => seen.push(route));
   assert.deepEqual(router.route(), { page: "chat", param: "a" });
   win.go("#/chat/b");
   win.go("#/chat/b");
   win.go("#/chat");
-  assert.deepEqual(seen, [["chat", "b"], ["chat", null]]);
+  assert.deepEqual(seen, [{ page: "chat", param: "b" }, { page: "chat", param: null }]);
 });

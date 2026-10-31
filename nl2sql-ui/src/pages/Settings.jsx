@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PROVIDER_NAMES, changedModels, choicesFrom, modelGroups, variableModels } from "../lib/settings.js";
-import { keyMismatch, keyTail, looksLikeKey, providerCards, providerForKey } from "./hostedKey.js";
-import { providersNeeded } from "./hostedModels.js";
+import { keyMismatch, keyTail, looksLikeKey, providerCards, providerForKey } from "../lib/hostedKey.js";
+import { providersNeeded } from "../lib/hostedModels.js";
 
 // Settings: the key and the model each step runs on, as two raised cards side
 // by side on a wide window. Each card says what it holds in one line, and how

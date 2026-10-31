@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { KEY_PROVIDERS, looksLikeKey, providerForKey } from "./pages/hostedKey.js";
+import { KEY_PROVIDERS, looksLikeKey, providerForKey } from "./lib/hostedKey.js";
 import { firstRunCopy, isRecorded } from "./pages/firstRun.js";
 import { providerName } from "./lib/settings.js";
 import { chipRow, elapsedLabel } from "./lib/runState.js";

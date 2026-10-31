@@ -64,7 +64,7 @@ The owner set them for the redesign, and they rank above everything below:
   sample databases with recorded answers and no key; your-data mode is the
   caller's `nl2sql.yaml`.
 - **The UI must not look AI-generated.** The playground's "Porcelain" design
-  system (`web/playground/src/styles.css` today, `nl2sql-ui/src/styles.css` after D0b: its tokens, type scale, the run
+  system (`web/playground/src/styles.css` before D0b, `nl2sql-ui/src/styles/*.css` since: its tokens, type scale, the run
   spine, the raised card, the 44px controls) is the baseline for every new
   page. No component library, no gradient, no icon font.
 
@@ -652,7 +652,7 @@ recordings: null        # null: the recordings packaged with the engine (nl2sql/
 D210 makes one rule for every mode: a key typed into the browser lives in
 that tab's `sessionStorage` and is sent with each request; the model per
 step likewise. The hosted page already works this way
-(`web/playground/src/hostedKey.js`, `hostedModels.js`); the local page's
+(`nl2sql-ui/src/lib/hostedKey.js`, `hostedModels.js`); the local page's
 "save key to `.env`" and "write models to `llm.yaml`" go. The cost is that
 a local user types the key once per tab (or puts it in `.env` once);
 `getting_started/demo.md` says so.
@@ -819,7 +819,7 @@ flowchart LR
 
 | Rule | Detail |
 |---|---|
-| **Where** | `nl2sql-ui/` at the repository root (D225; renamed from `web/playground/` by D0b, which leaves no `web/` folder). The API's Docker image builds it in a Node stage and `nl2sql-api` serves the result (D226). `npm run build` writes `packages/api/src/nl2sql_api/web/static/`, which the image and the wheel both carry (D226), so `pip install nl2sql-api` needs no Node. The single-file plugin goes (D214): the build is `index.html` plus hashed chunks, and Mermaid is its own chunk. Until X1a, `nl2sql demo` keeps serving the page already committed in the engine. |
+| **Where** | `nl2sql-ui/` at the repository root (D225; renamed from `web/playground/` by D0b, which leaves no `web/` folder). The API's Docker image builds it in a Node stage and `nl2sql-api` serves the result (D226). `npm run build` writes `packages/api/src/nl2sql_api/web/static/`, which the image and the wheel both carry (D226), so `pip install nl2sql-api` needs no Node. The single-file plugin goes (D214): the build is `index.html` plus hashed chunks, and Mermaid is its own chunk. Until X1b, `nl2sql demo` keeps serving the page already committed in the engine. |
 | **One build, every mode** | Demo, playground and real use are the same code (D225). The mode and what follows from it (the start screen, the hosted limits, whether a visitor may bring a key) arrive in `GET /meta`; the page reads no environment variable and no build flag. The server derives the mode from the project's config and, in Compose, from environment variables (`mode:` in the config, `NL2SQL_MODE` in Compose, D229). |
 | **Transport** | `src/api/http.js` (D0b): `request(method, path, body)` adds the identity header (a bearer key held in the tab under `api_keys`), the key and model headers (D210), and parses the envelope into an `ApiError`; `stream(path, body, onEvent)` reads SSE from a `fetch` body. |
 | **Client** | One file per area, each owned by the W-PR for that area: `src/api/chat.js` (W1), `outputs.js` (W2a) and `dashboards.js` (W2b), `connect.js` and `knowledge.js` (W3), `evals.js` and `settings.js` (W4a), `meta.js` (W4b). `src/api/routes.test.js` reads every `src/api/*.js` file's paths. |
@@ -843,7 +843,7 @@ no W-PR deletes a file another imports:
 | `AskParts.jsx`, `Panes.jsx`, `stream.js` | kept until W1 | W1 replaces and deletes them |
 | `RowsTable.jsx`, `results.js` | `src/outputs/` | W2a |
 | `SchemaPanel.jsx`, `datasources.js` | `src/connect/` | W3 |
-| `Home.jsx`, `home.js`, `Clip.jsx`, `Pipeline.jsx`, `pipeline.js`, `pipelinePhases.js`, `Retrieval.jsx`, `retrieval.js`, `Settings.jsx`, `hostedKey.js`, `hostedModels.js`, `firstRun.js`, `status.js`, `faults.js`, `questions.js`, `railFade.js` | `src/pages/` and beside them | W4a (`Settings.jsx`, `hostedKey.js`, `hostedModels.js`) and W4b (the rest) |
+| `Home.jsx`, `home.js`, `Clip.jsx`, `Pipeline.jsx`, `pipeline.js`, `pipelinePhases.js`, `Retrieval.jsx`, `retrieval.js`, `Settings.jsx`, `firstRun.js`, `status.js`, `faults.js`, `questions.js`, `railFade.js` | `src/pages/` and beside them | W4a (`Settings.jsx`) and W4b (the rest) |
 | `Feedback.jsx`, `feedback.js` | `src/chat/` | W1 |
 
 ### Pages
@@ -1202,7 +1202,7 @@ flowchart TD
 | W2a | **Outputs and charts.** Files: `src/outputs/` (`Output.jsx` filled, `Chart.jsx`, `chart.js`, `Mermaid.jsx`, `Report.jsx`, `markdown.js`, `RowsTable.jsx` and `results.js` moved), `src/api/outputs.js`, `styles/outputs.css`, `package.json` (`mermaid`). | A1, A2a, D0b | `chart.test.js` (from fixtures: scales, a line per series, bars in the spec's order, big number formatting, truncated said), `markdown.test.js`, `mermaid.test.js` (theme follows the page) | `apps/web.md` (charts, diagrams, reports) |
 | W2b | **Dashboards page,** for the revised Wave C: workspaces, open with stored results, arrange, edit, filters, schedule, pin, move, delete. Files: `src/pages/Dashboards.jsx`, `src/dashboards/` (`Workspaces.jsx`, `Grid.jsx`, `Tile.jsx`, `Edit.jsx`, `Filters.jsx`, `Schedule.jsx`, `layout.js`), `src/api/dashboards.js`, `styles/dashboards.css`. | A2b, W2a, D0b | `layout.test.js` (the 4-column grid from `TileLayout`, arrange bodies of `TileArrangement`s), `filters.test.js` (`in` and `between` values to the refresh body), `tile.test.js` (from the `DashboardView` fixture: "refreshed" age, `needs_fixing`, `denied`, `needs_approval`), `edit.test.js` (rename, chart type and remove bodies), `workspaces.test.js` (create, rename, delete, move) | `apps/web.md` (dashboards, workspaces) |
 | W3 | **Connect, Knowledge, review, drift.** Files: `src/pages/Connect.jsx`, `src/connect/` (`SchemaForm.jsx`, `schemaForm.js`, `Steps.jsx`, `SchemaPanel.jsx` and `datasources.js` moved), `src/pages/Knowledge.jsx`, `src/knowledge/` (`Glossary.jsx`, `Proposals.jsx`, `Drift.jsx`), `src/api/connect.js`, `src/api/knowledge.js`, `styles/connect.css`, `styles/knowledge.css`. | A3, D0b | `schemaForm.test.js` (each JSON Schema type, `format: password` hidden, required fields, defaults, enums), `proposals.test.js` (an accept body for several ids with edits, from the `Proposal` fixture), `drift.test.js` (from the `DriftReport` fixture), `datasources.test.js` (moved) | `apps/web.md` (Connect, review) |
-| W4a | **Evals and Settings.** Files: `src/pages/Evals.jsx`, `src/evals/report.js`, `src/pages/Settings.jsx` (per-tab keys and models, the tab's API key, server LLM, API keys), `hostedKey.js` and `hostedModels.js` (moved beside it), `src/api/evals.js`, `settings.js`, `styles/settings.css`, `styles/evals.css`. | A4a, D0b | `report.test.js` (from the `EvalReport` fixture), `hostedKey.test.js` and `hostedModels.test.js` (kept, now every mode) | `apps/web.md` (evals, settings) |
+| W4a | **Evals and Settings.** Files: `src/pages/Evals.jsx`, `src/evals/report.js`, `src/pages/Settings.jsx` (per-tab keys and models, the tab's API key, server LLM, API keys), `hostedKey.js` and `hostedModels.js` (already in `src/lib/` since D0b), `src/api/evals.js`, `settings.js`, `styles/settings.css`, `styles/evals.css`. | A4a, D0b | `report.test.js` (from the `EvalReport` fixture), `hostedKey.test.js` and `hostedModels.test.js` (kept, now every mode) | `apps/web.md` (evals, settings) |
 | W4b | **Home (with the start screen of section 4 and `/meta`'s `start`), Pipeline, Retrieval, hosted first run.** Files: `src/pages/Home.jsx`, `Pipeline.jsx`, `Retrieval.jsx` and the modules beside them (section 5's table, except W4a's), `src/api/meta.js`, `styles/home.css`. | A4b, W4a, D0b | `startScreen.test.js` (the three `start` values from `/meta` fixtures; hosted "Connect" shows the run-it-yourself steps and calls no route; "Try the demo" calls `POST /jobs/demo`), a route test that an empty project's `/meta` says `choose`, `firstRun.test.js` (recorded from the `usage` provider), `status.test.js` (modes from the `/meta` fixture), `home.test.js` (kept) | `apps/web.md` (Home, the start screen), the `getting_started/` pages that show the playground |
 | CL0a | **CLI on the facade only: config and init.** Done in place, before the move, so CL1 is a rename. The commands that deal with configuration, init and checks stop importing the engine's internals: `commands/config_check.py`, `init.py`, `doctor.py`, `install.py`, `cli/config.py`, `cli/common/engine.py` and the matching parts of `main.py`. Each internal import becomes a facade method or export (the list is in section 17): `init_project` and `prepare_demo` (G2b), `engine.llm.providers()` (G2a), `engine.check` (G3b), and the `nl2sql.config` helpers the commands need. The architecture test is widened to the whole CLI, with a named list of the files CL0b still has to fix (it shrinks, like `STILL_IMPORTED_FROM_INSIDE`). Files: those commands, `public_api.py`, `nl2sql/__init__.py`, `tests/architecture/test_boundaries.py`. | G2a, G2b, G3b | `test_the_cli_imports_only_the_public_nl2sql` (the whole CLI, with the named list), one test per new facade method | `invariants.md` (the CLI rule), `CLAUDE.md` |
 | CL0b | **CLI on the facade only: the rest.** The other commands (`eval.py`, `launch.py`, `mcp.py`, `knowledge.py`, `profile.py`, `review.py`, `trace.py`, `feedback.py`, `keys.py`, `demo.py`, `reporting.py` and the rest): the MCP server's start (D232), the model types the commands print, the provider catalogue. Empties the named list, so the rule has no exception. Files: those commands, `public_api.py`, `nl2sql/__init__.py`, `tests/architecture/test_boundaries.py`. Sized to one PR; split further if the audit passes 1,000 changed lines. | CL0a | `test_the_cli_imports_only_the_public_nl2sql` (no list left), one test per new facade method | `invariants.md` (the CLI rule), `CLAUDE.md` |
@@ -1293,14 +1293,14 @@ Approvals and Trace, W2b Dashboards, W3 Connect and Knowledge, W4a Evals). `AskP
 `ApiError` (`status`, `code`, `message`, `fix`, `details`, `requestId`; status 0 and code `NETWORK` when the server is
 unreachable, code `HTTP_<status>` when the answer is not the envelope), and `readApiKey`/`writeApiKey` (the bearer key,
 `sessionStorage` under `nl2sql.ui.apiKey`). Every call also sends the tab's `X-NL2SQL-Api-Key-<provider>` and
-`X-NL2SQL-Models` headers, read with the existing `hostedKey.js` and `hostedModels.js`. `stream` is a GET without a
+`X-NL2SQL-Models` headers, read with `src/lib/hostedKey.js` and `hostedModels.js` (moved there from `src/pages/` so the transport does not import a page). `stream` is a GET without a
 body and a POST with one; `onEvent({event, data})` gets `data` parsed as JSON when it is. `src/api/sse.js` is the frame
 parser (`createSseParser`), `src/api/jobs.js` the shared job calls (`getJob`, `cancelJob`, `followJob(id, onProgress,
 signal)` over `job.progress` and `job.finished`). `src/api/routes.test.js` checks every `request("METHOD", path)` and
-every `stream(path, ...) // METHOD` in `src/api/*.js` against `packages/api/openapi.json`. **Router:** the new routes
+every `stream(path, ...) // METHOD` in `src/api/*.js` (and fails on a call it cannot read) against `packages/api/openapi.json`. **Router:** the new routes
 `chat`, `dashboards` (optional id), `connect`, `knowledge`, `approvals`, `evals`, `trace` (required id) are `stub: true`
 pages, left out of the nav until their row removes the flag; `routeFromHash` returns `{page, param}` and
-`router.route()` the current one. **Styles:** `src/styles.css` became `src/styles/` (`index.css` lists the files in
+`router.route()` the current one; `subscribe` listeners and `useRoute` get the whole `{page, param}` (so a move from `#/chat/a` to `#/chat/b` notifies), and a page component receives `{param}`. **Styles:** `src/styles.css` became `src/styles/` (`index.css` lists the files in
 cascade order; `base.css` holds the tokens; the rest are `ask-run`, `settings`, `retrieval`, `responsive`, `pages`,
 `artifacts`, `ask-page`, `home`), rules moved verbatim and `styles.test.js` reads them as before. **Build:** `vite build`
 writes `index.html` and hashed chunks (no single-file plugin) to `packages/api/src/nl2sql_api/web/static/`, ignored by

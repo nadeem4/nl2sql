@@ -173,6 +173,5 @@ include = ["nl2sql*"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed single-page build of the old playground (its source is now nl2sql-ui/, whose build goes to nl2sql-api): the wheel must carry the finished
 # page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain. The card
-# the link preview names sits beside it rather than in `static/`, which the
-# Vite build empties on every run.
+# the link preview names sits beside it rather than in `static/`.
 "nl2sql.cli.demo.playground" = ["static/*", "assets/*", "assets/clips/*"]

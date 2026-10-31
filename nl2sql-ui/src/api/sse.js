@@ -27,8 +27,10 @@ export function createSseParser(onFrame) {
   return {
     push(chunk) {
       pending += chunk;
-      const lines = pending.split(/\r\n|\n|\r/);
-      pending = lines.pop();
+      // A trailing "\r" may be half of a CRLF; hold it back until the next chunk says.
+      const held = pending.endsWith("\r") ? "\r" : "";
+      const lines = pending.slice(0, pending.length - held.length).split(/\r\n|\n|\r/);
+      pending = lines.pop() + held;
       lines.forEach(line);
     },
     // The connection ended: whatever is half-read is dropped.

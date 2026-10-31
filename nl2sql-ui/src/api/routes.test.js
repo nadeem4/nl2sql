@@ -38,7 +38,28 @@ test("the contract's paths are written under /api/v1", () => {
   assert.ok(contractPaths.has(`${BASE}/jobs/{}`));
 });
 
-for (const file of readdirSync(folder).filter((f) => f.endsWith(".js") && !f.endsWith(".test.js"))) {
+// Every request( or stream( call in a source text, whether callsIn could read it or not.
+const callCount = (source) => (source.match(/\b(request|stream)\(/g) || []).length;
+
+test("callCount sees a call callsIn cannot read", () => {
+  const source = 'request("GET", path);\nstream(`/a`, undefined, f);';
+  assert.equal(callCount(source), 2);
+  assert.equal(callsIn(source).length, 0);
+});
+
+const clients = readdirSync(folder).filter((f) => f.endsWith(".js") && !f.endsWith(".test.js") && f !== "http.js");
+
+for (const file of clients) {
+  test(`${file}: every request( and stream( call is checked`, () => {
+    const source = readFileSync(new URL(file, folder), "utf8");
+    assert.equal(
+      callsIn(source).length, callCount(source),
+      `${file} has a request( or stream( call with a non-literal path, or a stream( with no // GET or // POST comment`,
+    );
+  });
+}
+
+for (const file of clients) {
   for (const [method, path] of callsIn(readFileSync(new URL(file, folder), "utf8"))) {
     test(`${file}: ${method} ${path} is a route of the API`, () => {
       const operations = contractPaths.get(`${BASE}${path}`);
