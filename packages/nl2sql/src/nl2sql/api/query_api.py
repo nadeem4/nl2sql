@@ -566,7 +566,7 @@ class QueryAPI:
                 approvals, or ``choice`` comes with a ``plan`` or a ``pinned``.
             MissingProviderKey: ``llm_override`` puts a step on a provider it sent no key for.
         """
-        with use_llm_override(llm_override):
+        with use_llm_override(llm_override, getattr(self._ctx, "registry", None)):
             return self._run_query(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                                    cancellation_token=cancellation_token, scope=scope, plan=plan,
                                    approvals=approvals, pinned=pinned, clarify=clarify, choice=choice, answer=answer)
@@ -718,7 +718,8 @@ class QueryAPI:
         ``llm_override`` is as for :meth:`run_query`; it is bound in the run's own thread, and a model chosen
         without its provider's key is refused at the call.
         """
-        llms = RequestLLMs.from_override(llm_override) if llm_override is not None else None
+        llms = (RequestLLMs.from_override(llm_override, getattr(self._ctx, "registry", None))
+                if llm_override is not None and not llm_override.empty else None)
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
         pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)

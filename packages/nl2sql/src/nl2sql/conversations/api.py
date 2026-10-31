@@ -133,13 +133,13 @@ class Conversations:
             llm_override: Optional[LLMOverride] = None) -> Turn:
         kind, shown = self._prepare(self.get(conversation_id, user_context=user_context), text, choice)
         body = self._by_choice if kind == "choice" else self._by_model
-        with use_llm_override(llm_override):  # the whole turn: the model's steps and every run it asks for
+        with use_llm_override(llm_override, getattr(self._ctx, "registry", None)):  # the whole turn: the model's steps and every run it asks for
             return self._turn(conversation_id, user_context, kind, shown, execute,
                               cancellation_token or CancellationToken(), lambda run: body(run, choice))
 
     def retry(self, conversation_id: str, *, user_context: UserContext,
               approvals: Sequence[Approval] = (), llm_override: Optional[LLMOverride] = None) -> Turn:
-        with use_llm_override(llm_override):
+        with use_llm_override(llm_override, getattr(self._ctx, "registry", None)):
             return self._retry(conversation_id, user_context, approvals)
 
     def _retry(self, conversation_id: str, user_context: UserContext, approvals: Sequence[Approval]) -> Turn:
@@ -197,7 +197,8 @@ class Conversations:
                llm_override: Optional[LLMOverride] = None) -> Iterator[Event]:
         """As ``ask``, as events. Ownership, the arguments and ``llm_override`` are checked now; a busy conversation
         raises ``ConversationBusy`` from the first ``next``."""
-        llms = RequestLLMs.from_override(llm_override) if llm_override is not None else None
+        llms = (RequestLLMs.from_override(llm_override, getattr(self._ctx, "registry", None))
+                if llm_override is not None and not llm_override.empty else None)
         kind, shown = self._prepare(self.get(conversation_id, user_context=user_context), text, choice)
         return self._stream(conversation_id, user_context, kind, shown, execute, choice, llms)
 

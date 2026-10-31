@@ -245,7 +245,7 @@ def describe_providers(registry: Any) -> List[Dict[str, Any]]:
     """Each LLM provider ``registry`` can load: its name, label, key variable, verified models and key shape.
 
     ``key_present`` says whether the key variable is set. ``models`` are the models whose parameters have been
-    checked (``VERIFIED_MODELS``; empty for a provider with none, such as ``ollama``). ``key_shape`` is the
+    checked (``VERIFIED_MODELS``; empty for a provider with none, such as ``ollama``). ``key_shape`` (None for a provider with no key variable) is the
     ``pattern`` every key matches, its ``min_length`` and the ``prefix`` the provider's keys start with, or None.
 
     A provider whose client library is not installed is left out. Never the
@@ -260,7 +260,7 @@ def describe_providers(registry: Any) -> List[Dict[str, Any]]:
         variable = getattr(provider, "api_key_env", None)
         described.append({"name": name, "label": getattr(provider, "label", None) or name,
                           "key_variable": variable, "key_present": bool(variable and os.environ.get(variable)),
-                          "models": list(VERIFIED_MODELS.get(name, {})), "key_shape": _key_shape(name)})
+                          "models": list(VERIFIED_MODELS.get(name, {})), "key_shape": _key_shape(name) if variable else None})
     return described
 
 
