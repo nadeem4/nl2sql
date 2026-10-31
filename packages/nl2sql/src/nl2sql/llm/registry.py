@@ -422,7 +422,10 @@ class LLMRegistry:
 
         provider, model, key = request.resolve(name, agent.provider)
         if provider is None:
-            return LLMRegistry._for_key(agent, key), key
+            moved = LLMRegistry._for_key(agent, key)
+            # The caller's key never rides to the operator's endpoint or headers, even
+            # on the configured provider (where _for_key returns the agent as it is).
+            return moved.model_copy(update={"base_url": None, "api_key": None, "headers": {}}), key
         # A model off the verified list sends no temperature at all, which
         # every model accepts; the caller's choice is checked before it gets here.
         temperature = VERIFIED_MODELS.get(provider, {}).get(model)

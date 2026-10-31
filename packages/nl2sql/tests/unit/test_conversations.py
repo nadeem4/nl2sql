@@ -987,9 +987,11 @@ def _record_override(runs):
     return bound
 
 
-def test_ask_stream_and_retry_bind_the_override_for_the_whole_turn(engine, model, runs):
+def test_ask_stream_and_retry_bind_the_override_for_the_whole_turn(engine, model, runs, server, monkeypatch):
     from nl2sql.llm.request_key import current_request_llms
 
+    # The caller's key never rides to the operator's endpoint, so the fake server is reached through the SDK's own variable.
+    monkeypatch.setenv("OPENAI_BASE_URL", server.base_url)
     bound = _record_override(runs)
     conversation = started(engine)
     model.say(ask("q"), reply("one"), ask("q"), reply("two"))
