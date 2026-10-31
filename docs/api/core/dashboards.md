@@ -76,7 +76,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   that no longer validates or parses; the refiner is never asked), `denied`, `needs_approval` (its requests in
   `approvals_needed`; the stored result is kept), `stopped` (a cap; the remaining charts are `stopped` and keep
   theirs) and `error` (returned, not stored: the chart keeps its last good result). It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
-  edited, and `ValueError` for a `tile_id` the dashboard does not have.
+  edited, `ApprovalNotFound` for a request id in `approvals` that is unknown, waiting, denied or expired (nothing runs), and `ValueError` for a `tile_id` the dashboard does not have.
 - **`filters`** maps filter ids to values (D117): `refresh(dashboard_id, filters={"country": ["Brazil"]})`. Each
   value is checked against the filter's kind first (`number`, `temporal` as `YYYY-MM-DD` or
   `YYYY-MM-DDTHH:MM[:SS[.ffffff]]` with an optional `Z` or `+HH:MM`, `boolean`, `text`; `in` takes 1 to 100 values,
@@ -127,7 +127,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 | `dashboards.pin(dashboard_id, *, user_context, workspace_id=None, title=None)`, `move(dashboard_id, workspace_id, *, user_context)` | D1 |
 | `dashboards.edit(dashboard_id, edits, *, user_context)` and the named edits `rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule` | D1 |
 | `dashboards.open(dashboard_id, *, user_context, refresh_due=True) -> DashboardView` | D2 |
-| `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2, `filters` D2b |
+| `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2, `filters` D2b; `approvals` are `Approval` objects or granted request ids (D236) |
 | `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100) -> list` | D2b |
 | `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` | D2 |
 | `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)` | D3, `on_tile` and `cancellation_token` G3b |

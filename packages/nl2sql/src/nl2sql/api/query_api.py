@@ -12,7 +12,7 @@ import queue
 import threading
 from contextlib import nullcontext
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence, Tuple
+from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence, Tuple, Union
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
@@ -22,6 +22,7 @@ from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
 from nl2sql_sdk.events import Event
+from nl2sql.approvals.api import Approvals
 from nl2sql.hooks import hooks_of
 from nl2sql.hooks.approval import Approval, ApprovalRequest
 from nl2sql.limits import Budget, RunStop
@@ -509,7 +510,7 @@ class QueryAPI:
         cancellation_token: Optional[CancellationToken] = None,
         scope: Optional[RunScope] = None,
         plan: Optional[SuppliedPlan] = None,
-        approvals: Optional[Sequence[Approval]] = None,
+        approvals: Optional[Sequence[Union[Approval, str]]] = None,
         pinned: Optional[PinnedRun] = None,
         clarify: bool = True,
         choice: Optional[ClarificationChoice] = None,
@@ -533,7 +534,9 @@ class QueryAPI:
                 the resolver, the decomposer and the planner, and validates,
                 generates and runs it under ``user_context``'s scope.
             approvals: Approvals for what an earlier run of the question asked
-                (its ``approvals_needed``); the first that is this run's, by a
+                (its ``approvals_needed``), as ``Approval`` objects or as request ids
+                (``engine.approvals``, D215): an id that is unknown, waiting, denied or
+                expired ends the run ``APPROVAL_NOT_GRANTED``. The first that is this run's, by a
                 holder of the hook's approver roles, pins its decomposition
                 and plan.
             pinned: (internal) a pin of another source, such as Wave B's
@@ -573,10 +576,12 @@ class QueryAPI:
 
     def _run_query(self, question: str, *, datasource_id: Optional[str], execute: bool,
                    user_context: Optional[UserContext], cancellation_token: Optional[CancellationToken],
-                   scope: Optional[RunScope], plan: Optional[SuppliedPlan], approvals: Optional[Sequence[Approval]],
+                   scope: Optional[RunScope], plan: Optional[SuppliedPlan], approvals: Optional[Sequence[Union[Approval, str]]],
                    pinned: Optional[PinnedRun], clarify: bool, choice: Optional[ClarificationChoice],
                    answer: bool) -> QueryResult:
-        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
+        approvals, refusal = self._granted(approvals, user_context)
+        if refusal is None:
+            pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                          user_context=user_context)
         # Entered here too, not only in the graph's worker, so every log line of the run carries its trace_id.
@@ -601,12 +606,30 @@ class QueryAPI:
                     knowledge=caller_knowledge(self._ctx, state),
                     question=question,
                 )
+                self._store_requests(result)
             except BaseException as exc:
                 # A KeyboardInterrupt too: every scope ends with a terminal event.
                 scope.fail(f"The run failed: {exc or type(exc).__name__}", ErrorCode.UNKNOWN_ERROR)
                 raise
             self.close_scope(scope, result)
         return result
+
+    def _granted(self, approvals: Optional[Sequence[Union[Approval, str]]], user: Optional[UserContext],
+                 ) -> Tuple[Optional[List[Approval]], Optional[PipelineError]]:
+        """``approvals`` with each request id replaced by its grant, and, for an id that cannot run, the error that
+        ends the run before the graph (``APPROVAL_NOT_GRANTED``)."""
+        if not approvals or not any(isinstance(a, str) for a in approvals):
+            return approvals, None
+        resolved, problem = Approvals(self._ctx).resolve(approvals, user=user)
+        if problem is not None:
+            return None, PipelineError(node="approvals", message=problem, severity=ErrorSeverity.CRITICAL,
+                                       error_code=ErrorCode.APPROVAL_NOT_GRANTED)
+        return resolved, None
+
+    def _store_requests(self, result: "QueryResult") -> None:
+        """A run that ended ``needs_approval`` keeps its requests for an approver to grant by id (D215)."""
+        if result.approvals_needed:
+            Approvals(self._ctx).submit(result.approvals_needed)
 
     def _pin_choice(self, question: str, choice: Optional[ClarificationChoice], plan: Optional[SuppliedPlan],
                     pinned: Optional[PinnedRun], approvals: Optional[Sequence[Approval]],
@@ -681,7 +704,7 @@ class QueryAPI:
         scope: Optional[RunScope] = None,
         names: Iterable[str] = STREAM_EVENTS,
         plan: Optional[SuppliedPlan] = None,
-        approvals: Optional[Sequence[Approval]] = None,
+        approvals: Optional[Sequence[Union[Approval, str]]] = None,
         pinned: Optional[PinnedRun] = None,
         clarify: bool = True,
         choice: Optional[ClarificationChoice] = None,
@@ -722,7 +745,9 @@ class QueryAPI:
                 if llm_override is not None and not llm_override.empty else None)
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
-        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
+        approvals, refusal = self._granted(approvals, user_context)
+        if refusal is None:
+            pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                             token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
                             pinned=pinned, approvals=approvals, clarify=clarify, answer=answer, refusal=refusal,
@@ -768,6 +793,7 @@ class QueryAPI:
                     result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None),
                                                knowledge=caller_knowledge(self._ctx, state),
                                                question=question)
+                    self._store_requests(result)
                     finished = self.close_scope(scope, result)
                 if finished is not None and "run.finished" in allowed:
                     deliver(finished.model_copy(update={

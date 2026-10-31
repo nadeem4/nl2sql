@@ -15,7 +15,7 @@ import time
 from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Union
 
 from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.api.results_api import ResultsAPI
@@ -138,11 +138,11 @@ class Conversations:
                               cancellation_token or CancellationToken(), lambda run: body(run, choice))
 
     def retry(self, conversation_id: str, *, user_context: UserContext,
-              approvals: Sequence[Approval] = (), llm_override: Optional[LLMOverride] = None) -> Turn:
+              approvals: Sequence[Union[Approval, str]] = (), llm_override: Optional[LLMOverride] = None) -> Turn:
         with use_llm_override(llm_override, getattr(self._ctx, "registry", None)):
             return self._retry(conversation_id, user_context, approvals)
 
-    def _retry(self, conversation_id: str, user_context: UserContext, approvals: Sequence[Approval]) -> Turn:
+    def _retry(self, conversation_id: str, user_context: UserContext, approvals: Sequence[Union[Approval, str]]) -> Turn:
         conversation = self.get(conversation_id, user_context=user_context)
         question = next((s.question for t in reversed(conversation.turns) for s in reversed(t.steps)
                          if s.call.name == "ask" and s.question), None)
@@ -333,7 +333,7 @@ class Conversations:
         if run.token.is_cancelled() and not run.keep_cancelled:
             raise _Dropped("The stream was closed.")
 
-    def _ask(self, run: _Run, call: ToolCall, *, approvals: Sequence[Approval] = ()) -> ToolStep:
+    def _ask(self, run: _Run, call: ToolCall, *, approvals: Sequence[Union[Approval, str]] = ()) -> ToolStep:
         """One ``ask`` step: a run through ``run_query`` as the caller, recorded and announced."""
         conversation = run.conversation
         args = AskArgs.model_validate(call.args)

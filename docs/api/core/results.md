@@ -20,6 +20,12 @@ Readable only by the caller who asked the run.
 
 The first three are described with `run_query` in [Query API](query.md).
 
+The run's trace is bound to the same asker: it records `owner` (the same `ResultOwner`), and
+`engine.traces.get(trace_id, *, user_context=None)` answers only that asker, with `None` for any other
+caller's run. No `user_context` is the trusted in-process operator (`nl2sql trace`), which reads any run.
+`engine.feedback.record(trace_id, rating, *, user_context)` reads the run's trace as the caller and raises
+`TraceNotFound` for another caller's run ([Feedback](../../observability/feedback.md)).
+
 ## Who can read a run
 
 Every run writes `manifest.json` beside its results, and the manifest records who asked: a `ResultOwner`, the

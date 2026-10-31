@@ -165,7 +165,7 @@ def correct_command(
             proposal = engine.feedback.correct(
                 trace_id, sql=fix if sql is not None else None,
                 plan=yaml.safe_load(fix) if plan is not None else None,
-                question=question, note=note, user_context=who)
+                question=question, note=note, user_context=who, as_operator=True)
         except (ValueError, yaml.YAMLError) as error:
             console.print(f"[bold red]Refused:[/bold red] {escape(str(error))}", soft_wrap=True)
             raise typer.Exit(1)
