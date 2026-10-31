@@ -63,6 +63,11 @@ def _close(iterator, pending) -> None:
     if close is None:
         return
     if pending is not None and not pending.done():
-        pending.add_done_callback(lambda task: (task.cancelled() or task.exception(), close()))
+        pending.add_done_callback(lambda task: (task.cancelled() or task.exception(), _off_loop(close)))
     else:
-        close()
+        _off_loop(close)
+
+
+def _off_loop(close) -> None:
+    """Run the iterator's cleanup in the thread pool: a ``finally`` that joins a thread must not stall the event loop."""
+    asyncio.get_running_loop().run_in_executor(None, close)

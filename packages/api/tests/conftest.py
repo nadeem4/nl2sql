@@ -74,6 +74,8 @@ def api_client(tmp_path):
         engine = StubEngine(run_query_result, config=make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
         app.state.engine = engine
+        if hasattr(app.state, "jobs"):
+            app.state.jobs.close()  # a second engine in one test replaces the first's queue
         app.state.jobs = Jobs(poll_s=0.01)
         if authenticated:
             app.dependency_overrides[identity.caller] = lambda: UserContext(roles=["admin"])

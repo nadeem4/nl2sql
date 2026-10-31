@@ -21,7 +21,7 @@ from nl2sql_api.sse import KEEP_ALIVE, frame
 
 logger = logging.getLogger("nl2sql_api")
 
-JobKind = Literal["index", "profile", "eval", "dashboard"]
+JobKind = Literal["index", "profile", "eval", "dashboard", "demo"]
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
@@ -114,9 +114,14 @@ def _owner(user: UserContext) -> Tuple[Optional[str], Optional[str]]:
     return (user.tenant_id, user.user_id)
 
 
+_INTERNAL = ApiError(code="INTERNAL", message="The job failed.",
+                     fix="The cause is in the server log, under this job's id.")
+
+
 class _Entry:
     def __init__(self, job: Job, owner: Tuple[Optional[str], Optional[str]], run: Runner):
         self.job, self.owner, self.run, self.token = job, owner, run, CancellationToken()
+        self.returned = False  # the runner is done: a cancel after this is too late
 
 
 class Jobs:
@@ -168,7 +173,7 @@ class Jobs:
             entry = self._visible(job_id, user, admin)
             if entry.job.status == "queued":
                 entry.job.status, entry.job.finished_at = "cancelled", self._clock()
-            elif entry.job.status == "running":
+            elif entry.job.status == "running" and not entry.returned:
                 entry.token.cancel()
             return entry.job.model_copy(deep=True)
 
@@ -239,16 +244,25 @@ class Jobs:
         result, error = None, None
         try:
             result = entry.run(JobContext(entry.token, report))
+        except RequestRefused as exc:
+            error = ApiError(code=exc.code, message=exc.message, fix=exc.fix, details=exc.details)
         except NL2SQLError as exc:
-            error = ApiError(code=exc.code, message=exc.message, fix=exc.fix)
+            if exc.status >= 500:  # its text may hold a connection string: the log has it, the job does not
+                logger.exception("Job %s (%s) failed", entry.job.id, entry.job.kind)
+                error = _INTERNAL
+            else:
+                error = ApiError(code=exc.code, message=exc.message, fix=exc.fix, details=getattr(exc, "details", []))
         except Exception:
             logger.exception("Job %s (%s) failed", entry.job.id, entry.job.kind)
-            error = ApiError(code="INTERNAL", message="The job failed.",
-                             fix="The cause is in the server log, under this job's id.")
+            error = _INTERNAL
+        with self._lock:
+            entry.returned = True  # from here a cancel changes nothing
+            cancelled = entry.token.is_cancelled()
+        finished_at = self._clock()
         with self._lock:
             job = entry.job
-            job.finished_at = self._clock()
-            if entry.token.is_cancelled():
+            job.finished_at = finished_at
+            if cancelled:
                 job.status = "cancelled"
             elif error is not None:
                 job.status, job.error = "failed", error

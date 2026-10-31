@@ -76,7 +76,7 @@ class AdminEngine:
 def make_client(tmp_path):
     clients = []
 
-    def _make(host="testclient", **sections):
+    def _make(host="127.0.0.1", **sections):
         engine = AdminEngine(make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
         client = TestClient(app, base_url="http://localhost", client=(host, 50000), raise_server_exceptions=False)

@@ -6,8 +6,9 @@
 * ``proxy``: the user, tenant and roles headers of a proxy that connects from ``api.proxy.trusted_from``.
 * ``static``: one role (``api.static_role``) for every request.
 * ``none`` (the default): the local operator, only for a loopback request. ``serve`` refuses to bind any other host
-  (:func:`check_bind`), and a request whose ``Host`` is not loopback or that was forwarded is refused, so neither a
-  same-host reverse proxy nor a DNS-rebinding page passes for the operator.
+  (:func:`check_bind`), and a request whose connecting peer or ``Host`` is not loopback, or that was forwarded, is
+  refused, so neither a published container port, a same-host reverse proxy nor a DNS-rebinding page passes for the
+  operator.
 
 ``caller`` is the dependency a route takes for the request's ``UserContext``; ``admin`` adds the check that one of its
 roles is in ``policies.admin_roles``. Neither ever reads the request body.
@@ -110,7 +111,9 @@ def _static(engine: NL2SQL) -> UserContext:
 
 
 def _operator(request: Request, engine: NL2SQL) -> UserContext:
-    if _request_host(request) not in LOOPBACK_HOSTS or any(h in request.headers for h in FORWARDING_HEADERS):
+    peer = request.client.host if request.client else ""
+    if (not _is_loopback(peer) or _request_host(request) not in LOOPBACK_HOSTS
+            or any(h in request.headers for h in FORWARDING_HEADERS)):
         raise RequestRefused(
             403, "FORBIDDEN", "api.auth is none, which answers only requests made directly to localhost.",
             fix="Set api.auth to api_keys, proxy or static in nl2sql.yaml to serve anyone else.")

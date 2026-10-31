@@ -45,6 +45,11 @@ def test_a_model_on_a_provider_with_no_request_key_is_refused():
     assert (refused.value.agent, refused.value.provider, refused.value.status) == ("ast_planner", "anthropic", 422)
 
 
+def test_model_providers_are_lowercased_like_the_key_headers():
+    headers = {"X-NL2SQL-Api-Key-anthropic": KEY, MODELS: '{"ast_planner": "Anthropic:claude-opus-5"}'}
+    assert parse_override(headers, request_llm=True).models == {"ast_planner": ("anthropic", "claude-opus-5")}
+
+
 @pytest.mark.parametrize("value", ["not json", "[1]", '{"ast_planner": 3}', '{"ast_planner": "no-colon"}'])
 def test_a_malformed_models_header_is_422(value):
     with pytest.raises(RequestRefused) as refused:

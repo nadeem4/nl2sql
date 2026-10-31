@@ -52,6 +52,7 @@ def parse_override(headers: Mapping[str, str], *, request_llm: bool) -> Optional
             provider, _, model = value.partition(":") if isinstance(value, str) else ("", "", "")
             if not provider or not model:
                 raise _invalid(f'{MODELS_HEADER} must give "provider:model" for each agent.')
+            provider = provider.lower()
             if provider not in keys:
                 raise MissingProviderKey(agent, provider)
             models[agent] = (provider, model)
