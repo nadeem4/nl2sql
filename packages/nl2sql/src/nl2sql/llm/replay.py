@@ -120,8 +120,10 @@ class ReplayStore:
             self._recordings[existing] = recording
 
     def discard(self, question: str) -> None:
-        """Drops every recording made for ``question``; catch-alls (``when=None``) stay."""
-        self._recordings = [r for r in self._recordings if r.when != question]
+        """Drops every recording made for ``question``, a conversation step for it included; catch-alls (``when=None``) stay."""
+        turn = json.dumps(question, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + " (turn "
+        self._recordings = [r for r in self._recordings
+                            if r.when != question and not (r.when or "").startswith(turn)]
         self._index = {(r.name, r.when): i for i, r in enumerate(self._recordings)}
 
     def covered(self, questions: Iterable[str]) -> List[str]:

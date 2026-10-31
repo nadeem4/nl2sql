@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from typing import Any, Dict, List, Sequence, Tuple, Type
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
 
 from pydantic import BaseModel, ValidationError
 
@@ -80,13 +80,13 @@ class DatasourceService:
         """Every adapter the engine can name, installed or not, with its connection schema."""
         return [asdict(kind) for kind in self.engine.datasources.types()]
 
-    def list_datasources(self) -> List[Dict[str, Any]]:
-        """Every configured datasource, with its status; connections masked."""
-        return [asdict(info) for info in self.engine.datasources.list()]
+    def list_datasources(self, user: Optional[UserContext] = None) -> List[Dict[str, Any]]:
+        """The datasources ``user`` reaches (all, without one), with their status; connections masked."""
+        return [asdict(info) for info in self.engine.datasources.list(user_context=user)]
 
-    def get_datasource(self, datasource_id: str) -> Dict[str, Any]:
-        """One datasource, its connection masked; ``ValueError`` for an unknown id."""
-        return asdict(self.engine.datasources.get(datasource_id))
+    def get_datasource(self, datasource_id: str, user: Optional[UserContext] = None) -> Dict[str, Any]:
+        """One datasource, its connection masked; ``ValueError`` for an unknown id or one ``user`` cannot reach."""
+        return asdict(self.engine.datasources.get(datasource_id, user_context=user))
 
     def remove_datasource(self, datasource_id: str) -> Dict[str, Any]:
         """Remove a datasource from the engine; ``ValueError`` for an unknown id."""

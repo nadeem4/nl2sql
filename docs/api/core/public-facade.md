@@ -28,7 +28,7 @@ Names in it (`type: postgres`, `provider: anthropic`) are resolved through a
 | --- | --- |
 | `NL2SQL(config, *, registry=None)` | Loads and validates: resolves every name, imports only the components the config uses, checks interface versions and driver modules, builds the secret manager, the adapters (not connected), the LLM settings (no model call), the embedder and the stores under `storage.path`. Raises one `ConfigError` listing every problem. **It never connects** to a datasource or calls a model. |
 | `NL2SQL.from_config(path=None, *, registry=None)` | `NL2SQL(load_config(path), registry=registry)`. `path` defaults to `$NL2SQL_CONFIG`, then `./nl2sql.yaml`. |
-| `engine.add_demo(*, user_context=None, on_datasource=None)` | Try the demo on an existing engine: adds the sample databases and the demo glossary, then indexes them; returns the build's `RebuildResult`. See [`datasources.add_demo`](datasource.md). |
+| `engine.add_demo(*, user_context=None, on_datasource=None)` | Try the demo on an existing engine: adds the sample databases, their verified queries and the demo glossary, then indexes them (the provider is not changed); returns the build's `RebuildResult`. See [`datasources.add_demo`](datasource.md). |
 | `NL2SQL.demo(*, llm=None, path=".nl2sql-demo")` | The demo: the three bundled SQLite databases, opened read-only from the installed package, with the demo roles and verified queries. Without `llm`, the first provider whose key variable is set is used with its default model; with none set, a `ConfigError` names the variables. |
 
 ```python

@@ -117,3 +117,50 @@ def test_record_script_writes_the_store(tmp_path):
     saved = ReplayStore.load(out)
     assert [(r.name, r.when) for r in saved._recordings] == [("Thing", good)]
     assert (saved.provider, saved.model) == ("anthropic", "claude-opus-5")
+
+
+class _Turn:
+    def __init__(self, status, steps=()):
+        self.status, self.steps = status, list(steps)
+
+
+def test_record_script_keeps_only_the_conversation_messages_that_were_answered(tmp_path):
+    """A turn that ends answered or asking which reading keeps its model steps; a failed one loses them."""
+    from nl2sql.llm.replay import Recorder, Recording, ReplayProvider, ReplayStore
+
+    module = _load()
+    good, bad, clarify = "Who spends most?", "And the rest?", "Which customers are best?"
+    store = ReplayStore([Recording("ModelStep", f'"{m}" (turn 1, step 1)', {"reply": "x"}) for m in (good, bad, clarify)])
+    recorder = Recorder(ReplayProvider(store), provider="anthropic")
+    recorder.store.add(Recording("ModelStep", f'"{good}" (turn 1, step 1)', {"reply": "x"}))
+    recorder.store.add(Recording("ModelStep", f'"{bad}" (turn 1, step 1)', {"reply": "x"}))
+    recorder.store.add(Recording("ModelStep", f'"{clarify}" (turn 1, step 1)', {"reply": "x"}))
+
+    statuses = {good: "answered", bad: "error", clarify: "needs_clarification"}
+
+    class Conversations:
+        def start(self, user_context=None):
+            return type("C", (), {"id": "c1"})()
+
+        def ask(self, conversation_id, text, user_context=None):
+            return _Turn(statuses[text])
+
+    class Engine:
+        conversations = Conversations()
+
+    kept = module.record_conversations(Engine(), recorder, [[good], [bad], [clarify]])
+
+    assert kept == [good, clarify]
+    assert [r.when for r in recorder.store._recordings] == [f'"{good}" (turn 1, step 1)',
+                                                           f'"{clarify}" (turn 1, step 1)']
+
+
+def test_the_chat_scripts_are_the_guided_questions_the_follow_ups_and_one_clarification():
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
+
+    module = _load()
+    scripts = module.chat_scripts(list(DEMO_QUESTIONS))
+
+    assert scripts[: len(DEMO_QUESTIONS)] == [[q] for q in DEMO_QUESTIONS]
+    assert [s for s in scripts if len(s) == 2] == [list(p) for p in module.FOLLOW_UPS]
+    assert scripts[-1] == [module.CLARIFICATION_QUESTION]

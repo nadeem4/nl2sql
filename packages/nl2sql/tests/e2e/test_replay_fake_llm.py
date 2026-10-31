@@ -58,3 +58,27 @@ def test_recorded_follow_up_replays_the_models_steps(demo_project, tmp_path):
     [step] = turn.steps
     assert step.status == "ok" and step.question == CHINOOK_QUESTIONS[0]
     assert step.result.status == "success"
+
+
+@pytest.mark.e2e
+def test_every_recorded_question_replays_after_add_demo(tmp_path):
+    """Try the demo on an empty project: whatever ``llm.recorded`` lists must run, with no REPLAY_MISS (D237)."""
+    from nl2sql.config import Embeddings, default_llm, starter_config
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
+    from nl2sql.llm.replay import REPLAY
+
+    registry = Registry.default()
+    registry.add_llm("replay", REPLAY)
+    config = starter_config(llm=default_llm("replay"), path=tmp_path / "store").model_copy(
+        update={"knowledge": [], "embeddings": Embeddings(provider="local")})
+    with NL2SQL(config, registry=registry) as engine:
+        engine.add_demo(user_context=ADMIN)
+        listed = engine.llm.recorded(DEMO_QUESTIONS)
+        assert listed
+        failed = {}
+        for question in listed:
+            result = engine.run_query(question, user_context=ADMIN)
+            if result.status != "success":
+                failed[question] = [e.get("error_code") for e in result.errors]
+
+    assert failed == {}

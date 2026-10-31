@@ -94,6 +94,48 @@ def record_answers(engine, recorder, questions: List[str], *, user_context=None)
     return recorded
 
 
+# The conversations recorded for Chat: each guided Chinook question on its own, the scripted follow-ups
+# (a second turn that leans on the first) and one question that is ambiguous on purpose.
+FOLLOW_UPS = [
+    ("Who are the top 5 customers by total spend?", "And the top 10?"),
+    ("Which genre sells the most tracks?", "Show that by year instead."),
+    ("Which artist has the most albums?", "And which has the fewest?"),
+]
+CLARIFICATION_QUESTION = "Which customers are our best?"
+KEPT = ("answered", "needs_clarification")
+
+
+def chat_scripts(questions: List[str]) -> List[List[str]]:
+    """Each script is the messages of one conversation, in order."""
+    return [*[[q] for q in questions], *[list(pair) for pair in FOLLOW_UPS], [CLARIFICATION_QUESTION]]
+
+
+def record_conversations(engine, recorder, scripts: List[List[str]], *, user_context=None) -> List[str]:
+    """Plays each script as a conversation; returns the messages whose turn ended answered or asking which reading.
+
+    A message whose turn failed (or stopped) loses its model steps and every pipeline run it asked for, as a
+    failed ``run_query`` does, and ends that conversation: its later messages would lean on a turn that is gone.
+    """
+    kept = []
+    for script in scripts:
+        conversation = engine.conversations.start(user_context=user_context)
+        for message in script:
+            try:
+                turn = engine.conversations.ask(conversation.id, message, user_context=user_context)
+            except Exception as exc:  # one conversation failing must not lose the others
+                print(f"  failed: {message} ({type(exc).__name__})", file=sys.stderr)
+                recorder.store.discard(message)
+                break
+            if turn.status in KEPT:
+                kept.append(message)
+                continue
+            recorder.store.discard(message)
+            for step in turn.steps:
+                recorder.store.discard(getattr(step, "question", None) or message)
+            break
+    return kept
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse(argv)
     key = recording_key(args.env_file)
@@ -131,8 +173,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             temperature=default_temperature_for("anthropic"))})
         with NL2SQL(config, registry=registry) as engine:
             engine.check()
-            recorded = record_answers(engine, recorder, list(DEMO_QUESTIONS),
-                                      user_context=UserContext(user_id="recorder", roles=["admin"]))
+            caller = UserContext(user_id="recorder", roles=["admin"])
+            recorded = record_answers(engine, recorder, list(DEMO_QUESTIONS), user_context=caller)
+            chatted = record_conversations(engine, recorder, chat_scripts(list(DEMO_QUESTIONS)), user_context=caller)
     finally:
         if scratch:
             shutil.rmtree(scratch, ignore_errors=True)
@@ -140,7 +183,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     recorder.store.save(args.out)
     missing = [q for q in DEMO_QUESTIONS if q not in recorder.store.covered(DEMO_QUESTIONS)]
-    print(f"Recorded {len(recorded)} of {len(DEMO_QUESTIONS)} guided questions to {args.out}")
+    print(f"Recorded {len(recorded)} of {len(DEMO_QUESTIONS)} guided questions and "
+          f"{len(chatted)} chat messages to {args.out}")
     for question in missing:
         print(f"  not recorded: {question}")
     return 0 if not missing else 1

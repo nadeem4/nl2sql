@@ -29,6 +29,7 @@ __all__ = [
     "LLM_PROVIDERS",
     "OLLAMA",
     "OLLAMA_BASE_URL",
+    "ollama_models",
     "OPENAI",
     "OPENAI_COMPATIBLE",
     "OPENROUTER",
@@ -104,6 +105,22 @@ UPSTREAMS: Dict[str, str] = {
 
 # Where a local Ollama daemon answers, from its preset.
 OLLAMA_BASE_URL: str = PROVIDER_PRESETS["ollama"].base_url
+# Ollama's own API sits next to the OpenAI-compatible /v1 its preset names.
+OLLAMA_TAGS_URL: str = OLLAMA_BASE_URL.rsplit("/v1", 1)[0] + "/api/tags"
+
+
+def ollama_models() -> List[str]:
+    """The models a local Ollama daemon has pulled, in its order; ``[]`` when none answers within a second."""
+    import json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(OLLAMA_TAGS_URL, timeout=1.0) as response:
+            if response.status != 200:
+                return []
+            return [m["name"] for m in json.load(response).get("models", []) if m.get("name")]
+    except Exception:
+        return []
 
 # Where Anthropic's Messages API is reached; the client appends /v1/messages.
 # The recording proxy forwards Claude's calls here when the demo's answers are

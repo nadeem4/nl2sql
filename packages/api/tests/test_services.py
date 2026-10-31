@@ -12,7 +12,7 @@ class FakeDatasources:
     def add(self, datasource):
         self._ids.append(datasource.id)
 
-    def list(self):
+    def list(self, user_context=None):
         return [DatasourceInfo(id=i, type="sqlite", description=None, status="unchecked") for i in self._ids]
 
 

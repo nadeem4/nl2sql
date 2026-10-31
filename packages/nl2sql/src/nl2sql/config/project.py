@@ -72,6 +72,14 @@ def default_llm(provider: str) -> LLM:
 
     if provider == "replay":  # answers from the recordings packaged with the engine; the model name is a label
         return LLM(provider="replay", model="recorded")
+    if provider == "ollama":  # no default model: whatever the local daemon has pulled
+        from nl2sql.llm.providers import ollama_models
+
+        pulled = ollama_models()
+        if not pulled:
+            raise ValueError("Ollama has no model to start a config with: start the daemon and pull one "
+                             "(`ollama pull <model>`).")
+        return LLM(provider="ollama", model=pulled[0])
     if provider not in DEFAULT_MODELS:
         raise ValueError(f"'{provider}' has no default model to start a config with. "
                          f"Choose one of: {', '.join(sorted(DEFAULT_MODELS))}.")
@@ -178,7 +186,8 @@ def prepare_demo(folder: PathLike, *, provider: Optional[str] = None) -> Path:
 
     A folder that already holds an ``nl2sql.yaml`` is used as it is. A new one
     is written by ``init_project(demo=True)`` with ``provider``, by default the
-    first provider whose key variable is set, else ``replay``: a demo with no
+    first provider whose key variable is set, else Ollama when a local daemon has a model pulled,
+    else ``replay``: a demo with no
     key answers its guided questions from the recordings that ship with the
     engine. Indexing calls no model.
     """
@@ -191,9 +200,10 @@ def prepare_demo(folder: PathLike, *, provider: Optional[str] = None) -> Path:
 
 
 def _demo_provider() -> str:
-    from nl2sql.llm.providers import DEFAULT_MODELS, KEYED_PROVIDERS, api_key_from_env
+    from nl2sql.llm.providers import DEFAULT_MODELS, KEYED_PROVIDERS, api_key_from_env, ollama_models
 
-    return next((name for name in KEYED_PROVIDERS if name in DEFAULT_MODELS and api_key_from_env(name)), "replay")
+    keyed = next((name for name in KEYED_PROVIDERS if name in DEFAULT_MODELS and api_key_from_env(name)), None)
+    return keyed or ("ollama" if ollama_models() else "replay")
 
 
 def _index_if_missing(config_path: Path) -> None:

@@ -1377,22 +1377,27 @@ differently at each step of a turn). The system prompt says to ignore that line.
 `ModelStep` recording's `when` is that line, `"<text>" (turn 1, step 1)`, `"<text>" (turn 1, step 2)`, and so on.
 
 **Datasources.** `DatasourceInfo.sample_questions` is the datasource's own `sample_questions` followed by the accepted
-glossary `examples` not already there. It is not caller-scoped: the A3 route filters the list by the caller's reach.
+glossary `examples` not already there. `datasources.list(*, user_context=None)` and `get(id, *, user_context=None)` drop the datasources the caller's roles do not reach (`policies.scope`), so the existing `GET /datasource` routes pass the caller and A3, `/meta` and `nl2sql chat` share the one filter.
 `nl2sql.prepare_demo(folder, *, provider=None) -> Path` (and `nl2sql.init_project`, both top-level exports) writes the
-demo project once, with `provider` or the first provider whose key variable is set, else `replay`, and builds the index
+demo project once, with `provider` or the first provider whose key variable is set, else Ollama when `llm.providers.ollama_models()` finds a pulled model (the check moved out of `cli/commands/demo.py`, which keeps its own copy until X1b), else `replay`, and builds the index
 when it is missing (indexing calls no model); it returns `nl2sql.yaml`. The Ollama check of today's `nl2sql demo` stays in
 `cli/commands/demo.py` until X1b deletes it. `engine.add_demo(*, user_context=None, on_datasource=None)` (D237; also
-`engine.datasources.add_demo`) adds the three sample databases (read-only, from the installed package) and the demo
-glossary (a `yaml` knowledge source) as ordinary datasources and knowledge, skipping any already there, then calls
+`engine.datasources.add_demo`) adds the three sample databases (read-only, from the installed package), Chinook's verified queries (`replace_curated`) and the demo
+glossary (copied to `demo-glossary.yaml` in the project folder, else the storage folder, and added as a `yaml` knowledge source, so an accept never writes into the installed package) as ordinary datasources and knowledge, skipping any already there, then calls
 `index.build(demo ids, on_datasource=)` and returns its `RebuildResult` (the design said `IndexResult`; the build returns
-`RebuildResult`). With `user_context` it needs an admin role (`PermissionError`). A4a's `POST /jobs/demo` passes
+`RebuildResult`). With `user_context` it needs an admin role (`NotAuthorized`). A demo id (`chinook`, `support`, `web_analytics`) already configured with another database raises `DatasourceExists` (409) before anything is added. When the engine was loaded from a config with a `datasources/` folder each added datasource is saved there (the same write as `datasources.save`, without its caller check) and survives a restart; the verified queries and the glossary source are this engine's only, so A4a's `POST /jobs/demo` is idempotent but a restart needs `add_demo` again for them. It keeps the engine's provider. A4a's `POST /jobs/demo` passes
 `ctx.token` as `cancellation_token` through a new keyword when it wants cancel: `add_demo` has none yet.
 
 **Recording.** `scripts/record_demo_answers.py` no longer starts `nl2sql demo --record`: it builds a demo project with
 `prepare_demo(provider="replay")`, registers `nl2sql.llm.replay.Recorder` (an LLM provider wrapping the Anthropic one;
 a callback writes each model answer into its `ReplayStore`) and asks every guided question through a real engine, keeping
 only the questions whose run succeeded. `RecordingProxy` and `nl2sql demo --record` stay until X1b. `test_replay_covered`
-(`tests/unit/test_demo_prepare.py`) asserts the packaged store covers every `DEMO_QUESTIONS` entry.
+(`tests/unit/test_demo_prepare.py`) asserts the packaged store covers every `DEMO_QUESTIONS` entry, and
+`test_every_recorded_question_replays_after_add_demo` (e2e) runs every question `llm.recorded` lists after `add_demo` with no `REPLAY_MISS`.
+The script also plays each guided question, the scripted follow-ups (`FOLLOW_UPS`) and one ambiguous question
+(`CLARIFICATION_QUESTION`) as conversations and keeps their `ModelStep` recordings when the turn ends answered or
+asking which reading. **The packaged `chinook.json` has no chat steps until R1 re-records it with a real key**, so
+keyless Chat misses until then.
 
 ### Session batches
 

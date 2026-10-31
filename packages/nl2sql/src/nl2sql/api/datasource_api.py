@@ -31,20 +31,29 @@ class DatasourcesAPI:
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
-    def list(self) -> List[DatasourceInfo]:
-        """Every configured datasource, in config order, failed ones included (``status == "failed"``)."""
-        return [self._info(datasource) for datasource in self._ctx.config.datasources]
+    def list(self, *, user_context: Optional[UserContext] = None) -> List[DatasourceInfo]:
+        """Every configured datasource, in config order, failed ones included (``status == "failed"``).
 
-    def get(self, datasource_id: str) -> DatasourceInfo:
+        With ``user_context``, only the datasources its roles reach (``policies.scope``), so the sample
+        questions and examples of one it may not use are not shown. Without it, all of them.
+        """
+        return [self._info(d) for d in self._ctx.config.datasources if self._reaches(user_context, d.id)]
+
+    def get(self, datasource_id: str, *, user_context: Optional[UserContext] = None) -> DatasourceInfo:
         """One configured datasource, its connection masked.
 
         Raises:
-            DatasourceNotFound: it is not configured (a ``ValueError``).
+            DatasourceNotFound: it is not configured, or ``user_context`` does not reach it (a ``ValueError``).
         """
         for datasource in self._ctx.config.datasources:
-            if datasource.id == datasource_id:
+            if datasource.id == datasource_id and self._reaches(user_context, datasource_id):
                 return self._info(datasource)
         raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
+
+    def _reaches(self, user_context: Optional[UserContext], datasource_id: str) -> bool:
+        if user_context is None:
+            return True
+        return self._ctx.policy_engine.scope(user_context, datasource_id).reaches_datasource()
 
     def add(self, datasource: Datasource) -> None:
         """Add ``datasource``: its adapter is built, not connected, and it joins ``engine.config``.
@@ -62,35 +71,71 @@ class DatasourcesAPI:
 
     def add_demo(self, *, user_context: Optional[UserContext] = None,
                  on_datasource: Optional[Callable[[Any], None]] = None):
-        """Add the three sample databases and the demo glossary as ordinary datasources, then index them.
+        """Add the three sample databases, their verified queries and the demo glossary, then index them.
 
         The databases are opened read-only from the folder the package installed
-        them in. One already configured is left as it is, so a second call
-        indexes again and adds nothing. ``on_datasource`` goes to
-        ``index.build`` (an ``IndexProgress`` per datasource). With
-        ``user_context`` the caller needs an admin role.
+        them in. The glossary is copied to ``demo-glossary.yaml`` in the project
+        folder (the engine's storage folder when it was built in code), so
+        accepting a proposal later writes to the project, never to the installed
+        package. A second call adds nothing and indexes again. When the engine was
+        loaded from a ``nl2sql.yaml`` with a ``datasources/`` folder, each datasource
+        added is also saved there and survives a restart; the verified queries and
+        the glossary source are added to this engine only. It keeps the engine's
+        LLM provider: with no key, ``provider: replay`` answers the guided questions.
+        ``on_datasource`` goes to ``index.build`` (an ``IndexProgress`` per
+        datasource). With ``user_context`` the caller needs an admin role.
 
         Returns:
             The ``RebuildResult`` of the build over the demo's datasources.
 
         Raises:
-            PermissionError: ``user_context`` has no admin role.
+            NotAuthorized: ``user_context`` has no admin role.
+            DatasourceExists: a datasource has a demo id but is not the demo's database; nothing is added.
         """
-        from nl2sql.api.indexing_api import IndexAPI
-        from nl2sql.config import KnowledgeSourceConfig, demo_config
-        from nl2sql.datasets import DEMO_GLOSSARY_PATH
+        import shutil
 
-        if user_context is not None:
-            self._admin(user_context)
+        from nl2sql.api.indexing_api import IndexAPI
+        from nl2sql.common.errors import DatasourceExists, NotAuthorized
+        from nl2sql.config import Curated, KnowledgeSourceConfig, demo_config
+        from nl2sql.datasets import DEMO_GLOSSARY_PATH
+        from nl2sql.datasets.demo import DEMO_CURATED
+
+        policies = self._ctx.config.policies
+        if user_context is not None and not (policies.allow_all or set(user_context.roles) & set(policies.admin_roles)):
+            raise NotAuthorized(f"Adding the demo needs one of the admin roles "
+                                f"({', '.join(policies.admin_roles) or 'none defined'}).")
         demo = demo_config()
-        have = {d.id for d in self._ctx.config.datasources}
+        have = {d.id: d for d in self._ctx.config.datasources}
+        for datasource in demo.datasources:
+            existing = have.get(datasource.id)
+            if existing is not None and _database_name(existing) != _database_name(datasource):
+                raise DatasourceExists(
+                    f"A datasource with the id '{datasource.id}' is already configured and is not the demo's "
+                    "database. Rename or remove it before adding the demo.")
+        added = []
         for datasource in demo.datasources:
             if datasource.id not in have:
                 self._ctx.add_datasource(datasource)
-        glossary = KnowledgeSourceConfig(type="yaml", path=DEMO_GLOSSARY_PATH.as_posix())
-        if not any(getattr(k, "path", None) == glossary.model_dump().get("path")
-                   for k in self._ctx.config.knowledge):
-            self._ctx.add_knowledge_source(glossary)
+                added.append(datasource.id)
+        config = self._ctx.config
+        if config.datasources_folder is not None:
+            for datasource_id in added:
+                self._write(datasource_id, _who(user_context) if user_context else None, False)
+
+        curated = config.curated or Curated()
+        wanted = Curated(**DEMO_CURATED)
+        missing = {k: v for k, v in wanted.datasources.items() if k not in curated.datasources}
+        if missing:
+            self._ctx.replace_curated(Curated(datasources={**curated.datasources, **missing}),
+                                      sha256=self._ctx.curated_sha256)
+
+        folder = config.folder or Path(config.storage.path)
+        copy = Path(folder) / "demo-glossary.yaml"
+        if not any(getattr(k, "path", None) == copy.as_posix() for k in config.knowledge):
+            copy.parent.mkdir(parents=True, exist_ok=True)
+            if not copy.exists():
+                shutil.copyfile(DEMO_GLOSSARY_PATH, copy)
+            self._ctx.add_knowledge_source(KnowledgeSourceConfig(type="yaml", path=copy.as_posix()))
         return IndexAPI(self._ctx).build([d.id for d in demo.datasources], on_datasource=on_datasource)
 
     def remove(self, datasource_id: str) -> None:
@@ -232,12 +277,16 @@ class DatasourcesAPI:
             ReviewError: ``FILE_CHANGED``, the file changed on disk since the config was loaded (reload the
                 engine). Nothing is written.
         """
+        by = self._admin(by)
+        return self._write(datasource_id, _who(by), env_file)
+
+    def _write(self, datasource_id: str, who: Optional[str], env_file: bool) -> Path:
+        """``save`` without the caller check (``add_demo`` has done its own)."""
         from nl2sql.config.writer import (EnvSecrets, adapter_secret_fields, check_file_name, config_reserved_names,
                                           datasource_data, dump_yaml, file_sha256, reserved_names, write_atomic,
                                           write_env_values)
         from nl2sql.review.models import ReviewError, ReviewErrorCode
 
-        by = self._admin(by)
         config = self._ctx.config
         datasource = next((d for d in config.datasources if d.id == datasource_id), None)
         if datasource is None:
@@ -264,7 +313,7 @@ class DatasourcesAPI:
             write_atomic(target, data)
             config.record_datasource_file(name, hashlib.sha256(data).hexdigest())
         self._ctx.bus.publish("datasource.saved", {
-            "datasource_id": datasource_id, "file": f"{folder.name}/{name}", "by": _who(by)},
+            "datasource_id": datasource_id, "file": f"{folder.name}/{name}", "by": who},
             tenant_id=self._ctx.tenant_id)
         return target
 
@@ -327,6 +376,13 @@ def _secret_literals(connection: Any, secret_fields: Any = ()) -> List[str]:
     else:
         values = [v for k, v in (connection or {}).items() if is_secret_key(k) or k in secret_fields]
     return [v for v in values if isinstance(v, str) and v and not v.startswith("${")]
+
+
+def _database_name(datasource: Datasource) -> str:
+    """The file name of a SQLite datasource's database, which tells the demo's copy from someone else's."""
+    connection = datasource.connection
+    database = connection.get("database") if isinstance(connection, dict) else getattr(connection, "database", None)
+    return Path(str(database or "")).name
 
 
 def _who(by: UserContext) -> Optional[str]:
