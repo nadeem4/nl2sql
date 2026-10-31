@@ -1103,7 +1103,9 @@ def test_owned_and_privileged_methods_require_a_caller():
 
 
 # The writers of a file a person owns (D42, amended by Wave C's D123), and the only modules that may call each.
-# The glossary's and the curated section's are written by the review queue's accept alone. A new project is
+# The glossary's is written by the review queue's accept alone; so is the curated section's, except that
+# `add_demo` (api/datasource_api.py) writes the demo's verified queries into it, only the entries the file lacks, with the same
+# hash check. A new project is
 # written once, by `nl2sql init` (`init_project`) and `nl2sql launch` (new files only: `write_project` refuses
 # an existing one); the `.env` by `write_project` (for a literal secret, when its caller allows it), by
 # `nl2sql launch` and by `datasources.save(env_file=True)`. `datasources.save` is a method name too common to
@@ -1114,7 +1116,7 @@ _PROJECT = "nl2sql/src/nl2sql/config/project.py"
 _LAUNCH = "nl2sql/src/nl2sql/cli/commands/launch.py"
 PERSONS_FILE_WRITERS = {
     "write_glossary": {_ACCEPT},
-    "write_curated": {_ACCEPT},
+    "write_curated": {_ACCEPT, "nl2sql/src/nl2sql/api/datasource_api.py"},
     "write_project": {_PROJECT, _LAUNCH},
     "write_env_values": {_PROJECT, "nl2sql/src/nl2sql/api/datasource_api.py", _LAUNCH},
 }
@@ -1130,8 +1132,8 @@ def test_only_accept_writes_a_persons_file():
                 if name in PERSONS_FILE_WRITERS and _where(path) not in PERSONS_FILE_WRITERS[name]:
                     offenders.append(f"{_where(path)}:{node.lineno} calls {name}")
     assert not offenders, _broke(
-        "Only an accept writes a person's glossary or curated file (write_glossary and write_curated are "
-        "called from nl2sql/review/accept.py alone, under its lock, after its admin check and hash check, "
+        "Only an accept writes a person's glossary or curated file (write_glossary is called from "
+        "nl2sql/review/accept.py alone, write_curated from there and from add_demo, under the hash check, "
         "D42). write_project (new files only) and write_env_values (D123) are called from init_project, "
         "nl2sql launch and datasources.save, alone.", offenders)
 

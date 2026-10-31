@@ -181,6 +181,40 @@ question requires." See
 The playground's schema panel follows the **Ask as** role too: it lists only
 the tables that role may read (`engine.datasources.schema(..., user_context=)`).
 
+### Recorded answers, no key
+
+With no key anywhere and no local Ollama model, the project `nl2sql.prepare_demo(folder)`
+writes uses `provider: replay`: the demo's guided questions are answered by the
+real pipeline from the model output recorded with the engine
+([the `replay` provider](../configuration/llm.md#replay-recorded-answers-no-key)).
+Any other question fails with `REPLAY_MISS` until you add a key. A key in the
+environment is used first, then an Ollama daemon with a model pulled. The
+facade's `engine.add_demo()` does not touch the provider: it keeps the one the
+engine has, so a project answers the guided questions with no key only when its
+`llm` is `provider: replay`. From Python:
+
+```python
+from nl2sql import NL2SQL, load_config, prepare_demo
+
+config_path = prepare_demo("my-demo")   # written once, indexed when the index is missing
+engine = NL2SQL(load_config(config_path))
+```
+
+`engine.add_demo()` adds the three sample databases, their verified queries and the
+demo glossary (copied to `demo-glossary.yaml` in the project folder, so accepting a
+proposal writes into your project) to an engine you already have, then indexes them.
+When the engine was loaded from a `nl2sql.yaml` all of it is saved there and is still
+there after a restart: each database under `datasources/`, the verified queries in
+`curated.yaml` (with a `curated:` line in `nl2sql.yaml` if the project had none), and
+the glossary as a second source in `knowledge.yaml`. A section written inline in
+`nl2sql.yaml` is left alone. An engine built in code has no file, so for it the
+verified queries and the glossary are added to that engine only and `add_demo` has to
+run again after a restart. An id such as `chinook` that is already a database of
+yours (another file, even one named `chinook.db`) is refused with a `DatasourceExists`
+error and nothing is added;
+a second call changes nothing. A caller who is not an admin gets `NotAuthorized`.
+`engine.datasources.list()` shows each one's `sample_questions`.
+
 ### API keys in the demo
 
 `embeddings.yaml` says `provider: local`, so schema chunks are

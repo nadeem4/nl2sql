@@ -117,6 +117,7 @@ anthropic = "nl2sql.llm.providers:ANTHROPIC"
 openrouter = "nl2sql.llm.providers:OPENROUTER"
 ollama = "nl2sql.llm.providers:OLLAMA"
 openai_compatible = "nl2sql.llm.providers:OPENAI_COMPATIBLE"
+replay = "nl2sql.llm.replay:REPLAY"
 
 [project.entry-points."nl2sql.embeddings"]
 local = "nl2sql.embeddings.local:LOCAL"
@@ -167,8 +168,7 @@ include = ["nl2sql*"]
 
 [tool.setuptools.package-data]
 "*" = ["configs/*.yaml", ".env"]
-"nl2sql.cli.demo" = ["recordings/*.json"]
-"nl2sql.datasets" = ["*.sqlite", "*.yaml", "README.md"]
+"nl2sql.datasets" = ["*.sqlite", "*.yaml", "README.md", "recordings/*.json"]
 "nl2sql.evaluation" = ["suites/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed single-page build of the old playground (its source is now nl2sql-ui/, whose build goes to nl2sql-api): the wheel must carry the finished

@@ -312,6 +312,21 @@ class InvalidArgument(NL2SQLError, ValueError):
     code, status = "INVALID_ARGUMENT", 422
 
 
+class ReplayMiss(NL2SQLError):
+    """The ``replay`` provider has no recording for this question (D209).
+
+    Raised from inside a model call, so a node reports it as ``REPLAY_MISS``
+    and not as a crash. It is not a ``ValueError``: nothing a caller passed was invalid.
+    """
+
+    code, status = "REPLAY_MISS", 422
+
+    def __init__(self, schema: str, question: Optional[str] = None) -> None:
+        self.schema, self.question = schema, question
+        super().__init__("No recorded answer for this question. Add an API key to ask it live.",
+                         fix="Ask one of the recorded questions, or send an API key to ask it live.")
+
+
 class NotPinnable(InvalidArgument):
     """``pin`` of a dashboard that is already saved, or of an empty draft."""
 

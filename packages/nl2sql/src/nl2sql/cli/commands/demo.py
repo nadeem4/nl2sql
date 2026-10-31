@@ -88,7 +88,7 @@ from nl2sql.testing.fake_llm import FakeLLMServer
 # streams after its ``summary`` and holds the run open while it does.
 REPLAY_STREAM_DELAY = 0.012
 
-RECORDINGS = pathlib.Path(__file__).resolve().parent.parent / "demo" / "recordings"
+RECORDINGS = pathlib.Path(__file__).resolve().parent.parent.parent / "datasets" / "recordings"
 
 INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
 
