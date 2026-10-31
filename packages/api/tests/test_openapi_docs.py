@@ -2,14 +2,14 @@
 
 from fastapi.routing import APIRoute
 
-from nl2sql_api.routes import datasource, health, indexing, llm, query
+from nl2sql_api.routes import datasource, health, indexing, jobs, llm, query
 
 PREFIX = "/api/v1"
 
 
 def _routes():
     """Every (method, path) the routers declare, as main.py mounts them under /api/v1."""
-    return [(method, PREFIX + route.path) for module in (query, health, datasource, llm, indexing)
+    return [(method, PREFIX + route.path) for module in (query, health, datasource, llm, indexing, jobs)
             for route in module.router.routes if isinstance(route, APIRoute) for method in sorted(route.methods)]
 
 
