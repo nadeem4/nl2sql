@@ -55,6 +55,8 @@ def _named_exceptions():
         (errors.ConnectionInvalid, ValueError, 422, "CONNECTION_INVALID"),
         (MissingProviderKey, Exception, 422, "MISSING_PROVIDER_KEY"),
         (errors.NotAuthorized, PermissionError, 403, "NOT_AUTHORIZED"),
+        (errors.DatasourceNotFound, ValueError, 404, "NOT_FOUND"),
+        (errors.DatasourceExists, ValueError, 409, "CONFLICT"),
         (ReviewError, Exception, None, None),
     ]
 
@@ -98,6 +100,25 @@ def test_connection_invalid_and_review_error_keep_their_shapes():
 def test_new_error_codes_are_not_retried():
     for code in (errors.ErrorCode.REPLAY_MISS, errors.ErrorCode.APPROVAL_NOT_GRANTED):
         assert code in errors.FATAL_ERRORS
+
+
+def test_unknown_and_taken_datasource_ids_raise_named_errors(tmp_path):
+    config = _load(tmp_path)
+    shop = nl2sql.Datasource(id="shop", type="postgres")
+    added = config.with_datasource(shop)
+    with pytest.raises(nl2sql.DatasourceExists) as taken:
+        added.with_datasource(shop)
+    assert taken.value.status == 409 and isinstance(taken.value, ValueError)
+    with pytest.raises(nl2sql.DatasourceNotFound) as unknown:
+        config.without_datasource("nope")
+    assert unknown.value.status == 404 and isinstance(unknown.value, ValueError)
+
+
+def test_trusted_from_must_be_networks():
+    assert Api(proxy={"trusted_from": ["10.0.0.0/8", "::1", "192.168.1.5"]}).proxy.trusted_from
+    for bad in ("not-a-cidr", "10.0.0.0/33", ""):
+        with pytest.raises(ValidationError, match="trusted_from"):
+            Api(proxy={"trusted_from": [bad]})
 
 
 # ---------------------------------------------------------------- the api section

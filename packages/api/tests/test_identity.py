@@ -167,6 +167,13 @@ def test_none_refuses_foreign_host_header(make_client):
         assert response.status_code == 403, base_url
 
 
+def test_none_refuses_a_non_loopback_peer(make_client):
+    response = make_client(peer="203.0.113.7").get("/test/me", headers={"Host": "localhost"})
+    assert response.status_code == 403
+    assert _error(response)["code"] == "FORBIDDEN"
+    assert make_client(peer="::1").get("/test/me").status_code == 200
+
+
 # ---------------------------------------------------------------- the old settings are gone
 
 @pytest.mark.parametrize("field,value", [("trust_body_role", True), ("role_header", "X-Role"), ("role", "admin")])

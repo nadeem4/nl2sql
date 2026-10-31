@@ -158,15 +158,22 @@ def test_add_with_an_unknown_body_key_is_a_422(connect):
     assert "sav" in _problems(response)
 
 
-def test_add_with_a_taken_id_is_a_422(connect):
+def test_add_with_a_taken_id_is_a_409(connect):
     client, _, folder = connect()
     assert client.post("/api/v1/datasource", json={"config": _sqlite(folder)}).status_code == 200
 
     response = client.post("/api/v1/datasource", json={"config": _sqlite(folder)})
 
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "INVALID_REQUEST"
-    assert "shop.db" not in response.text, "the engine's own text is logged, not returned"
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CONFLICT"
+
+
+def test_get_and_remove_of_an_unknown_id_are_404(connect):
+    client, _, _ = connect()
+
+    for response in (client.get("/api/v1/datasource/nope"), client.delete("/api/v1/datasource/nope")):
+        assert response.status_code == 404, response.text
+        assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_add_without_save_writes_no_file(connect):

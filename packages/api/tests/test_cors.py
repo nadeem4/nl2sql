@@ -47,3 +47,20 @@ def test_unconfigured_origin_is_rejected_when_others_are_allowed(app_with_origin
     response = _preflight(client, "https://evil.example")
 
     assert response.headers.get("access-control-allow-origin") is None
+
+
+def test_a_500_carries_the_cors_headers(app_with_origins):
+    from nl2sql_api import identity
+    from nl2sql_api.main import app
+
+    client = app_with_origins(["https://bi.corp.example"])
+
+    def boom():
+        raise RuntimeError("boom")
+
+    app.dependency_overrides[identity.admin] = boom  # cleared by the api_client fixture
+
+    response = client.get("/api/v1/datasource-types", headers={"Origin": "https://bi.corp.example"})
+
+    assert response.status_code == 500
+    assert response.headers.get("access-control-allow-origin") == "https://bi.corp.example"

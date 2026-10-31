@@ -282,6 +282,18 @@ class ApprovalNotFound(NL2SQLError, LookupError):
     code, status = "NOT_FOUND", 404
 
 
+class DatasourceNotFound(NL2SQLError, ValueError):
+    """No datasource is configured with that id."""
+
+    code, status = "NOT_FOUND", 404
+
+
+class DatasourceExists(NL2SQLError, ValueError):
+    """A datasource with that id is already configured."""
+
+    code, status = "CONFLICT", 409
+
+
 class NotAuthorized(NL2SQLError, PermissionError):
     """The caller holds no role that may do this (an approver, an admin)."""
 

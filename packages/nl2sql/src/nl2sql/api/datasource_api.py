@@ -12,6 +12,7 @@ from pydantic import BaseModel, SecretStr
 
 from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
+from nl2sql.common.errors import DatasourceNotFound
 from nl2sql.common.planned import arrives_with
 from nl2sql.config import Datasource
 from nl2sql.config.models import is_secret_key
@@ -38,12 +39,12 @@ class DatasourcesAPI:
         """One configured datasource, its connection masked.
 
         Raises:
-            ValueError: it is not configured.
+            DatasourceNotFound: it is not configured (a ``ValueError``).
         """
         for datasource in self._ctx.config.datasources:
             if datasource.id == datasource_id:
                 return self._info(datasource)
-        raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
 
     def add(self, datasource: Datasource) -> None:
         """Add ``datasource``: its adapter is built, not connected, and it joins ``engine.config``.
@@ -53,7 +54,8 @@ class DatasourcesAPI:
         (``engine.index.build([datasource.id])``) so questions can reach it.
 
         Raises:
-            ValueError: its id is taken, its ``index`` or ``connection`` does
+            DatasourceExists: its id is taken (a ``ValueError``).
+            ValueError: its ``index`` or ``connection`` does
                 not validate (no value is shown), or its adapter cannot be built.
         """
         self._ctx.add_datasource(datasource)
@@ -64,7 +66,7 @@ class DatasourcesAPI:
         Its index entries stay until the next full ``index.build`` or ``index.clear``.
 
         Raises:
-            ValueError: it is not configured.
+            DatasourceNotFound: it is not configured (a ``ValueError``).
         """
         self._ctx.remove_datasource(datasource_id)
 

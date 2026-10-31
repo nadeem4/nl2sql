@@ -1251,9 +1251,11 @@ which the add-datasource route uses for the D122 `.env` decision. `admin` checks
 reload; it exits with a one-line message on a bad config or a refused bind); `server.py` is gone. `main.create_app`
 mounts one router module per namespace; `app = create_app()` stays for `uvicorn nl2sql_api.main:app` (and the existing
 Dockerfile, which K1 replaces). `routes/datasource.py`, `indexing.py` and `llm.py` keep their names (the row names them)
-beside the empty `datasources.py`, `index.py` and `settings.py`. The engine still raises a bare `ValueError` for an
-unknown or taken datasource id: the routes turn it into a 404 or a fixed-message 422 and log the text, and a later row
-should give the engine named exceptions for both. `QueryRequest.user_context` and `DatasourceTestRequest.user_context`
+beside the empty `datasources.py`, `index.py` and `settings.py`. The engine raises `DatasourceNotFound` (404) and `DatasourceExists` (409), both still `ValueError`s and exported from
+`nl2sql`, for an unknown or taken datasource id, so `routes/datasource.py` has no `except ValueError`; the writer's
+clashing env name and unusable file name are `InvalidArgument` (422). `api.proxy.trusted_from` entries are validated as
+IP networks (a bad one is a config error). Under `api.auth: none` the connecting peer must be loopback as well as the
+`Host`. A 500 from an unhandled exception carries the CORS headers of a configured origin. `QueryRequest.user_context` and `DatasourceTestRequest.user_context`
 are gone with `trust_body_role`. `/health` answers `{status, version: {engine, api}}`, `/meta` the mode, auth source and
 `request_llm`, `/about` `engine.about()`; `/ready` is unchanged. `packages/api/openapi.json` is the snapshot.
 

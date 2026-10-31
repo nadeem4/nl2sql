@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
 from nl2sql_sdk import ConnectionCheck, DatasourceCapability
 
 from nl2sql.check import DatasourceStatus
+from nl2sql.common.errors import DatasourceNotFound
 from nl2sql.common.logger import get_logger
 from nl2sql.config import Config, ConfigError
 from nl2sql.config.errors import Problem
@@ -484,7 +485,7 @@ class Runtime:
         datasources = self.config.datasources
         i = next((i for i, d in enumerate(datasources) if d.id == datasource_id), None)
         if i is None:
-            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+            raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
         datasource = datasources[i]
         adapter = self.ds_registry.all_adapters().get(datasource.id)
         try:

@@ -2767,7 +2767,7 @@
                 }
               }
             },
-            "description": "`save` found the datasource's file changed on disk since the engine loaded it."
+            "description": "The id is taken, or `save` found the datasource's file changed on disk."
           },
           "422": {
             "content": {
@@ -2972,6 +2972,16 @@
             },
             "description": "The caller holds no role in `policies.admin_roles`."
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No datasource has that id."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -3014,6 +3024,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No datasource has that id."
           },
           "422": {
             "content": {
