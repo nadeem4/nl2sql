@@ -242,8 +242,13 @@ def test_operator_endpoint_and_headers_never_follow_a_request_step(models):
     chosen, _ = LLMRegistry._for_request(agent, "ast_planner", request)
     keyed, _ = LLMRegistry._for_request(agent, "decomposer", RequestLLMs(keys={"openai": KEY}, fallback=KEY))
 
-    for config in (chosen, keyed):
+    # A key and no model choice, on the configured provider itself.
+    same_provider = agent.model_copy(update={"provider": "openai", "model": "gpt-4o"})
+    keys_only, _ = LLMRegistry._for_request(same_provider, "decomposer", RequestLLMs(keys={"openai": KEY}, fallback=KEY))
+
+    for config in (chosen, keyed, keys_only):
         assert config.headers == {} and config.base_url is None and config.api_key is None
+    assert keys_only.model == "gpt-4o", "the configured model is kept; only the operator's endpoint goes"
 
 
 def test_same_provider_model_choice_drops_operator_endpoint_and_headers():
