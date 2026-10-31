@@ -1257,6 +1257,23 @@ should give the engine named exceptions for both. `QueryRequest.user_context` an
 are gone with `trust_body_role`. `/health` answers `{status, version: {engine, api}}`, `/meta` the mode, auth source and
 `request_llm`, `/about` `engine.about()`; `/ready` is unchanged. `packages/api/openapi.json` is the snapshot.
 
+**D0a-3 (SSE, jobs, overrides, fixtures).** `sse.py`: `event_stream(open_events, request, *, token=None, heartbeat_s=15)`
+(the iterator runs in the thread pool; a `: keep-alive` comment while quiet; on disconnect it cancels `token` and closes
+the iterator), plus `frame(name, data)`, `KEEP_ALIVE` and `SSE_HEADERS`; `/query/stream` still has its own copy until A1
+moves it. `jobs.py`: `Jobs` (one daemon thread named `nl2sql-jobs`, the last 100 jobs, `submit(kind, params, user,
+runner)`, `get`, `list`, `cancel`, `stream`, `close`), `Job`, `JobProgress`, the four `*Job` parameter models,
+`IndexResult` (`ok`, `stats`, `empty`, `failed`: ids only, the reason stays in the log) and `DashboardJobResult`. A
+runner is `fn(JobContext)`: `ctx.progress(step, done, total)` and `ctx.token`. `app.state.jobs` is made in the lifespan;
+`dependencies.get_jobs` hands it out; `identity.is_admin(user, engine)` is new. `routes/jobs.py` has `GET /jobs`,
+`GET /jobs/{id}`, `DELETE /jobs/{id}` and `GET /jobs/{id}/events` (`job.progress`, then `job.finished`); the
+`POST /jobs/<kind>` routes belong to A2b (dashboard), A3 (index, profile) and A4a (eval, demo), each submitting a runner
+and adding its row's tests. The G3b callbacks and tokens are not built yet, so those rows pass `ctx.token` and
+`ctx.progress` into whatever the facade offers then. `overrides.py`: `parse_override(headers, request_llm=)` and the
+`llm_override` dependency (`X-NL2SQL-Api-Key-<provider>`, `X-NL2SQL-Models`; 403 when `api.request_llm` is off, 422
+for a malformed models header, `MissingProviderKey` for a model without the request's own key); A1 and A2a pass it as
+`llm_override=`. Golden files `ApiError.json` and `Job.json` live in `web/playground/src/api/fixtures/` (D0b moves
+them to `nl2sql-ui/src/api/fixtures/`); regenerate with `python packages/api/tests/test_web_fixtures.py`.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below
