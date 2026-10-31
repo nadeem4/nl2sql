@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from nl2sql.public_api import NL2SQL
     from nl2sql.common.cancellation import CancellationToken
     from nl2sql.hooks.approval import Approval
+    from nl2sql.llm.override import LLMOverride
     from nl2sql_sdk.events import Event
 
 
@@ -35,22 +36,28 @@ class ConversationsAPI:
 
     def ask(self, conversation_id: str, text: Optional[str] = None, *, user_context: UserContext,
             choice: Optional[str] = None, execute: bool = True,
-            cancellation_token: Optional["CancellationToken"] = None) -> Turn:
+            cancellation_token: Optional["CancellationToken"] = None,
+            llm_override: Optional["LLMOverride"] = None) -> Turn:
         """One turn: the model's loop, stored. ``choice`` is an option id of the pending clarification, given
-        instead of ``text``; it re-asks with no model call."""
+        instead of ``text``; it re-asks with no model call. ``llm_override`` (D210) puts the whole turn, the
+        model's own steps and every run it asks for, on the caller's keys and models; it is never stored."""
         return self._service.ask(conversation_id, text, user_context=user_context, choice=choice, execute=execute,
-                                  cancellation_token=cancellation_token)
+                                  cancellation_token=cancellation_token, llm_override=llm_override)
 
     def stream(self, conversation_id: str, text: Optional[str] = None, *, user_context: UserContext,
-               choice: Optional[str] = None, execute: bool = True) -> Iterator["Event"]:
+               choice: Optional[str] = None, execute: bool = True,
+               llm_override: Optional["LLMOverride"] = None) -> Iterator["Event"]:
         """As ``ask``, yielding the caller-safe run events of each ``ask`` step, with ``conversation.step``
         after each step and ``conversation.turn`` as the terminal event."""
-        return self._service.stream(conversation_id, text, user_context=user_context, choice=choice, execute=execute)
+        return self._service.stream(conversation_id, text, user_context=user_context, choice=choice, execute=execute,
+                                    llm_override=llm_override)
 
     def retry(self, conversation_id: str, *, user_context: UserContext,
-              approvals: Sequence["Approval"] = ()) -> Turn:
-        """Re-runs the last ``ask`` step's question as a new turn of kind ``retry``, with no model call."""
-        return self._service.retry(conversation_id, user_context=user_context, approvals=approvals)
+              approvals: Sequence["Approval"] = (), llm_override: Optional["LLMOverride"] = None) -> Turn:
+        """Re-runs the last ``ask`` step's question as a new turn of kind ``retry``, with no model call of the
+        conversation's own (the run's steps use ``llm_override`` when given)."""
+        return self._service.retry(conversation_id, user_context=user_context, approvals=approvals,
+                                   llm_override=llm_override)
 
     def tool(self, conversation_id: str, name: str, args: Optional[Dict[str, Any]] = None, *,
              user_context: UserContext) -> Turn:

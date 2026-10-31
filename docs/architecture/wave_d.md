@@ -1309,6 +1309,24 @@ unchanged: it serves the single page still committed under `packages/nl2sql/.../
 rebuilt, until X1b deletes it. `test.yml`'s `web` job and `CONTRIBUTING.md` use the new paths, and the fixtures test writes
 to `nl2sql-ui/src/api/fixtures/`.
 
+**G2a (per-request overrides, providers catalogue).** `llm_override: Optional[LLMOverride] = None` is the last keyword of
+`NL2SQL.run_query`, `stream_query`, `conversations.ask`, `stream` and `retry` (and of `QueryAPI.run_query` and
+`stream_query` under them). It runs through `llm/request_key.py`, which already held the machinery (D210 is the
+existing `RequestLLMs` and `use_request_llms`, not a model-profiles design): `RequestLLMs.from_override(override)`
+builds the bound value and enforces the key rule (a model on a provider with no key in `override.keys` raises
+`MissingProviderKey`, at the call, before anything runs; provider names are lower-cased), and
+`use_llm_override(override)` is the context manager (None binds nothing, so a conversation turn's override reaches
+every run it asks for). A stream binds in its own run thread (`stream_query`, the conversation stream's worker), and
+refuses at the call, not at the first `next()`. `LLMRegistry` was not changed: `get_llm` already builds each step's
+client from `current_request_llms()`, caches nothing, and a replay provider (G2b) sits behind the same call, so for G2b
+"an override key replaces replay for one call" is a matter of its provider honouring a bound key. Unknown agent names
+in `models` are ignored, as the registry always has. `engine.llm.providers()` entries gained `models` (the
+`VERIFIED_MODELS` names) and `key_shape` (`pattern`, `min_length`, `prefix`), computed in
+`llm/providers.describe_providers`. `nl2sql.provider_for_key` and the new `nl2sql.provider_keys_in_environment() ->
+dict[provider, key]` are top-level exports. The old playground (`cli/demo/playground/`) still imports `nl2sql.llm.*`
+directly; it is deleted by X1b, so it was not rewritten. Code on main wins over the row's file list: `api/llm_api.py`
+and `registry.py` needed no change beyond the docstring, and `api/types.py` was not touched.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below

@@ -25,7 +25,7 @@ Source:
 `packages/nl2sql/src/nl2sql/public_api.py`, `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True) -> QueryResult`
+`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True, llm_override: Optional[LLMOverride] = None) -> QueryResult`
 
 Every argument after the question is keyword-only. `run_query` passes the runtime's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
@@ -43,6 +43,7 @@ Parameters:
 | `clarify` | `bool` | no | Default `True`: a question the planner reads two or three ways ends `needs_clarification` with the options instead of running the most likely one. `False` runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See [Clarification](#clarification). |
 | `choice` | `Optional[ClarificationChoice]` | no | The caller's pick from an earlier run's `clarification` (`from nl2sql import ClarificationChoice`: `request`, `option_id`). Ask the same question as the same caller: the chosen option's plan runs through the validator and the generator without routing, decomposing or planning. See [Asking again](#asking-again). Not with `plan` or `approvals`. |
 | `answer` | `bool` | no | Default `True`. `False` skips the answer synthesizer: the run ends at the aggregator, `final_answer` is `None` and no model is called to write prose. With `plan=` that is a run with no model call at all, which is how a dashboard refresh re-runs a stored plan. The rows, the SQL and the explanation are the same. See [Running without an answer](#running-without-an-answer). |
+| `llm_override` | `Optional[LLMOverride]` | no | The caller's own keys and models for this one call (`from nl2sql import LLMOverride`: `keys`, a provider to the caller's key, and `models`, an agent name to `(provider, model)`). See [Per-request keys and models](../../configuration/llm.md#per-request-keys-and-models). A model whose provider has no key in `keys` raises `MissingProviderKey` before anything runs. |
 
 #### Running a plan you hold
 
@@ -404,7 +405,7 @@ Source:
 `packages/nl2sql/src/nl2sql/events/catalog.py`
 
 Signature:
-`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True) -> Iterator[Event]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True, llm_override: Optional[LLMOverride] = None) -> Iterator[Event]`
 
 The same run as `run_query`, with the same parameters, yielded as it happens:
 the run's own events on the engine's bus ([Events](../../observability/events.md)),

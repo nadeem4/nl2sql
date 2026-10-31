@@ -39,12 +39,15 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Dict, Iterator, Mapping, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterator, Mapping, NamedTuple, Optional, Tuple
 
 from nl2sql.common.errors import NL2SQLError
 
+if TYPE_CHECKING:
+    from .override import LLMOverride
+
 __all__ = ["MissingProviderKey", "RequestLLMs", "current_api_key", "current_api_keys",
-           "current_request_llms", "use_api_key", "use_request_llms"]
+           "current_request_llms", "use_api_key", "use_llm_override", "use_request_llms"]
 
 
 class MissingProviderKey(NL2SQLError):
@@ -99,6 +102,22 @@ class RequestLLMs(NamedTuple):
         if not clean:
             return cls()
         return cls(keys={provider_for_key(clean): clean}, models={}, fallback=clean)
+
+    @classmethod
+    def from_override(cls, override: "LLMOverride") -> "RequestLLMs":
+        """What an :class:`~nl2sql.LLMOverride` asks for, checked: a model runs only on a key the caller sent.
+
+        Raises:
+            MissingProviderKey: a step is put on a provider the override carries no key for. A caller's model
+                choice is never moved onto the operator's account (D210), so this is refused before anything runs.
+        """
+        keys = {provider.lower(): key.strip() for provider, key in override.keys.items() if key and key.strip()}
+        models = {}
+        for agent, (provider, model) in override.models.items():
+            if provider.lower() not in keys:
+                raise MissingProviderKey(agent, provider.lower())
+            models[agent] = (provider.lower(), model)
+        return cls(keys=keys, models=models)
 
     @property
     def empty(self) -> bool:
@@ -167,6 +186,20 @@ def use_request_llms(llms: Optional[RequestLLMs]) -> Iterator[None]:
 def use_api_key(key: Optional[str]) -> Iterator[None]:
     """Binds one key, with no per-step choices, for the duration of the block."""
     with use_request_llms(RequestLLMs.from_key(key)):
+        yield
+
+
+@contextmanager
+def use_llm_override(override: Optional["LLMOverride"]) -> Iterator[None]:
+    """Binds ``override`` for the block; with None it changes nothing, so a nested call keeps its caller's.
+
+    Raises:
+        MissingProviderKey: at once, before the block runs, when a model is chosen without its provider's key.
+    """
+    if override is None:
+        yield
+        return
+    with use_request_llms(RequestLLMs.from_override(override)):
         yield
 
 

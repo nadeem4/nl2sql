@@ -467,8 +467,8 @@ def test_llm_providers_lists_the_installed_providers_and_whether_each_key_is_set
 
     providers = {p["name"]: p for p in engine.llm.providers()}
 
-    assert providers["openai"] == {"name": "openai", "label": "OpenAI", "key_variable": "OPENAI_API_KEY",
-                                   "key_present": True}
+    assert {k: providers["openai"][k] for k in ("name", "label", "key_variable", "key_present")} == {
+        "name": "openai", "label": "OpenAI", "key_variable": "OPENAI_API_KEY", "key_present": True}
     assert providers["openrouter"]["key_present"] is False
     assert providers["ollama"]["key_variable"] is None
     assert "sk-test" not in str(providers)

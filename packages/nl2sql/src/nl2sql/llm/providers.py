@@ -58,6 +58,7 @@ __all__ = [
     "looks_like_api_key",
     "mask_key",
     "provider_for_key",
+    "provider_keys_in_environment",
 ]
 
 # Letters, digits, '-' and '_' only, and at least twenty of them. A key is
@@ -177,6 +178,20 @@ def provider_for_key(key: str) -> str:
     return next((provider for prefix, provider in _PREFIXES if (key or "").startswith(prefix)), "openai")
 
 
+def provider_keys_in_environment() -> Dict[str, str]:
+    """Each keyed provider whose own variable is set, mapped to the key in it, in preset order.
+
+    For an entry point choosing a provider from what the operator already has; the values are secrets, so
+    print only ``mask_key`` of one.
+    """
+    found = {}
+    for provider in KEYED_PROVIDERS:
+        key = api_key_from_env(provider)
+        if key:
+            found[provider] = key
+    return found
+
+
 def default_model_for(provider: str) -> str:
     """Returns the model a newly written config uses for ``provider``."""
     return DEFAULT_MODELS.get(provider, DEFAULT_OPENAI_MODEL)
@@ -220,8 +235,18 @@ def api_key_from_env(provider: str) -> Optional[str]:
     return os.environ.get(preset.api_key_env) if preset and preset.api_key_env else None
 
 
+def _key_shape(name: str) -> Dict[str, Any]:
+    """What a key for ``name`` looks like, so a form can check one before sending it: no secret in it."""
+    prefix = next((p for p, provider in _PREFIXES if provider == name), None)
+    return {"pattern": _KEY_SHAPE.pattern, "min_length": 20, "prefix": prefix}
+
+
 def describe_providers(registry: Any) -> List[Dict[str, Any]]:
-    """Each LLM provider ``registry`` can load: its name, label, key variable and whether that is set.
+    """Each LLM provider ``registry`` can load: its name, label, key variable, verified models and key shape.
+
+    ``key_present`` says whether the key variable is set. ``models`` are the models whose parameters have been
+    checked (``VERIFIED_MODELS``; empty for a provider with none, such as ``ollama``). ``key_shape`` is the
+    ``pattern`` every key matches, its ``min_length`` and the ``prefix`` the provider's keys start with, or None.
 
     A provider whose client library is not installed is left out. Never the
     key itself: ``key_present`` is all that is read from the environment.
@@ -234,7 +259,8 @@ def describe_providers(registry: Any) -> List[Dict[str, Any]]:
             continue
         variable = getattr(provider, "api_key_env", None)
         described.append({"name": name, "label": getattr(provider, "label", None) or name,
-                          "key_variable": variable, "key_present": bool(variable and os.environ.get(variable))})
+                          "key_variable": variable, "key_present": bool(variable and os.environ.get(variable)),
+                          "models": list(VERIFIED_MODELS.get(name, {})), "key_shape": _key_shape(name)})
     return described
 
 
