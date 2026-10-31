@@ -6372,12 +6372,12 @@ thumbs up and down are built on it. See
 </thead>
 <tbody>
 <tr>
-<td><code>record(result, *, question, role, rating, note=None) -&gt; dict</code></td>
-<td>Rate one run, <code>"up"</code> or <code>"down"</code>, with an optional note (cut to 280 characters). <code>result</code> is the run's <code>QueryResult</code> or its JSON. The stored row is built from it and from the run's trace when one was kept; never rows, the answer, error messages or keys, and a run refused for the role keeps no SQL. A later rating of the same run replaces the earlier one. A thumbs-up on a generated answer of one datasource with one read-only statement also files a <code>verified_query</code> proposal in the <a href="../../../configuration/review/">review queue</a>. Returns the row; raises <code>ValueError</code> for another rating or a result with no <code>trace_id</code>.</td>
-</tr>
-<tr>
 <td><code>list(limit=None) -&gt; list[dict]</code></td>
 <td>Every rating, newest first.</td>
+</tr>
+<tr>
+<td><code>record(trace_id, rating, *, user_context, note=None) -&gt; dict</code></td>
+<td>Rate one run, <code>"up"</code> or <code>"down"</code>, with an optional note (280 characters). The engine reads the run's own trace as <code>user_context</code>, so only the caller who asked the run can rate it; another caller's run, an unknown id or a run whose trace was not kept (<code>settings.traces.mode</code>) is <code>TraceNotFound</code> (a <code>LookupError</code>, 404). The stored row (question, roles, status, SQL, datasources, error codes, counters, models, engine version; never rows or the answer) comes from the trace. A thumbs-up on a qualifying answer also files a <code>verified_query</code> proposal. <code>TypeError</code> for a missing <code>user_context</code>.</td>
 </tr>
 <tr>
 <td><code>stats(*, traces=None) -&gt; dict</code></td>
@@ -6392,19 +6392,23 @@ thumbs up and down are built on it. See
 <td>Delete every rating; returns how many.</td>
 </tr>
 <tr>
-<td><code>correct(trace_id, *, sql=None, plan=None, question=None, note=None, user_context) -&gt; Proposal</code></td>
-<td>Correct a run with exactly one fix: <code>sql</code> (one read-only query) or <code>plan</code> (a <code>PlanModel</code> or its JSON). The run is rated <code>down</code> with <code>note</code> unless it already is; the fix is checked as <code>user_context</code> and filed in the <a href="../../../configuration/review/">review queue</a> as a <code>verified_query</code> proposal (origin <code>correction</code>). Raises <code>CorrectionRefused</code> (a <code>ValueError</code>, with <code>code</code> and <code>messages</code>) when a check fails. See <a href="../../../observability/feedback/#correcting-an-answer-nl2sql-feedback-correct">Correcting an answer</a>.</td>
+<td><code>correct(trace_id, *, sql=None, plan=None, question=None, note=None, user_context, as_operator=False) -&gt; Proposal</code></td>
+<td>Correct a run with exactly one fix: <code>sql</code> (one read-only query) or <code>plan</code> (a <code>PlanModel</code> or its JSON). The run is rated <code>down</code> with <code>note</code> unless it already is; the fix is checked as <code>user_context</code> and filed in the <a href="../../../configuration/review/">review queue</a> as a <code>verified_query</code> proposal (origin <code>correction</code>). Only the run's asker can correct it: another user's run is refused as <code>no_run</code>. <code>as_operator=True</code> (for operator tools such as <code>nl2sql feedback correct</code>; an app never passes it) reads any run, and still overwrites the asker's rating with <code>down</code>. Raises <code>CorrectionRefused</code> (a <code>ValueError</code>, with <code>code</code> and <code>messages</code>) when a check fails. See <a href="../../../observability/feedback/#correcting-an-answer-nl2sql-feedback-correct">Correcting an answer</a>.</td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"How many customers are there?"</span><span class="p">)</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">feedback</span><span class="o">.</span><span class="n">record</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">question</span><span class="o">=</span><span class="s2">"How many customers are there?"</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="s2">"admin"</span><span class="p">,</span> <span class="n">rating</span><span class="o">=</span><span class="s2">"up"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"How many customers are there?"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">feedback</span><span class="o">.</span><span class="n">record</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="s2">"up"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">feedback</span><span class="o">.</span><span class="n">stats</span><span class="p">()[</span><span class="s2">"feedback"</span><span class="p">]</span>   <span class="c1"># {'up': 1, 'down': 0, 'up_rate': 1.0, 'down_rate': 0.0}</span>
 </code></pre></div>
 <h3 id="traces">Traces</h3>
-<p><code>engine.traces.get(trace_id)</code> returns one recorded run's trace document, or
-<code>None</code> when none was kept (which runs are kept is <code>settings.traces.mode</code>, and
-for how long the trace store's <code>max_age_days</code>). It reads through the trace
+<p><code>engine.traces.get(trace_id, *, user_context=None)</code> returns one recorded run's trace document, or
+<code>None</code> when none was kept. A trace records who asked the run (<code>owner</code>, as a result manifest does);
+with a <code>user_context</code>, only that asker reads it, and another caller's run (or a trace with no
+recorded asker) is <code>None</code>. With no <code>user_context</code>, the caller is the trusted in-process operator
+and reads any run, as <code>nl2sql trace</code> does; the REST API, MCP and the terminal app always pass the caller.
+Which runs are kept is <code>settings.traces.mode</code>, and
+for how long the trace store's <code>max_age_days</code>. It reads through the trace
 store, <code>storage.traces</code> (the <code>files</code> store reads only <code>&lt;storage.path&gt;/traces</code>),
 and the id must be a plain token (letters, digits, <code>-</code> and <code>_</code>), so no id can
 name a file elsewhere: anything else raises <code>ValueError</code>, as does a file in
@@ -6438,7 +6442,7 @@ message names each one and why. <code>nl2sql trace replay</code> is built on it 
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
 submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,
 <code>AnswerSource</code>, <code>ResultSummary</code>, <code>ResultManifest</code>, <code>ResultPage</code>,
-<code>ResultNotFound</code>, <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>,
+<code>ResultNotFound</code>, <code>TraceNotFound</code>, <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>,
 <code>UserContext</code>, <code>CancellationToken</code>, <code>configure_logging</code>,
 <code>TraceContextFilter</code>, the event types (<code>Event</code>, <code>Observer</code>), a run's ending
 (<code>RunStop</code>, <code>ApprovalRequest</code>, <code>Approval</code>, <code>VerifiedRef</code>), what the namespaces

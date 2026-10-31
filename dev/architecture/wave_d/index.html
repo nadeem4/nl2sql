@@ -4339,8 +4339,8 @@ a manifest with no owner is refused for every caller
 with no <code>user_id</code> also has its sorted roles recorded and must match them, so
 an anonymous <code>viewer</code> cannot read an anonymous <code>admin</code> run. So the results
 half of the steps below (the <code>None</code> operator in 2 and 3, and the results
-part of 6) does not apply; traces (<code>engine.traces.get</code>) remain this
-section's.</p>
+part of 6) does not apply; traces (<code>engine.traces.get</code>) were this
+section's, built by G1.</p>
 <p>B13 is fixed in the engine (D204), so the facade, the API, MCP and the
 terminal app all get it:</p>
 <ol>
@@ -6686,6 +6686,33 @@ git; <code>packages/api/pyproject.toml</code> carries it as package data of <cod
 unchanged: it serves the single page still committed under <code>packages/nl2sql/.../playground/static/</code>, which is no longer
 rebuilt, until X1b deletes it. <code>test.yml</code>'s <code>web</code> job and <code>CONTRIBUTING.md</code> use the new paths, and the fixtures test writes
 to <code>nl2sql-ui/src/api/fixtures/</code>.</p>
+<p><strong>G1 (results bound to the user, ratings).</strong> The results half was built by Wave C's C-W2 (see the B13 note), so G1 is the
+trace and the rating. <code>build_trace(..., owner=)</code> records the asker as the top-level <code>owner</code> of the trace document, the same
+<code>ResultOwner</code> (<code>tenant_id</code>, <code>user_id</code>, sorted <code>roles</code> for an anonymous asker) that the manifest writer records, worked out by
+<code>ResultOwner.of</code> in <code>pipeline/runtime.py</code>'s <code>_done</code>. <code>engine.traces.get(trace_id, *, user_context=None)</code> returns the
+document only when <code>owner</code> equals the caller's (<code>ResultOwner.of(user_context, ctx.tenant_id)</code>); another caller's run, and a
+trace with no <code>owner</code> (written before this change), is <code>None</code> for a caller, and <code>user_context=None</code> is the operator that
+reads any run (<code>nl2sql trace</code> is unchanged). A <code>user_context</code> that is not a <code>UserContext</code> is a <code>TypeError</code>.
+<code>engine.feedback.record(trace_id, rating, *, user_context, note=None)</code> replaces <code>record(result, *, question, role, rating,
+note=None)</code>: it reads the trace as the caller and stores the same row as before (question from <code>request.question</code>, role
+the caller's roles joined by a comma, the rest from the trace's <code>result</code> and nodes); another caller's run, an unknown id, or
+a trace that was not kept (<code>settings.traces.mode</code> is <code>on_failure</code> or <code>off</code>) is the new <code>nl2sql.TraceNotFound</code>
+(<code>NL2SQLError</code>, <code>LookupError</code>, <code>NOT_FOUND</code>, 404); a missing or <code>None</code> <code>user_context</code> is a <code>TypeError</code>. The old result-based
+path is <code>FeedbackAPI._rate(result, *, question, role, rating, note)</code>, private, used by <code>correct</code> (which has already checked
+its caller) and by tests that need a rating row; nothing outside the engine calls it. Code on <code>main</code> wins over the doc
+here: the design says <code>traces.get</code> returns <code>None</code>; <code>record</code> raises <code>TraceNotFound</code> (design's <code>test_record_of_another_users_run_is_not_found</code>).
+The old engine playground's <code>/api/feedback</code> now remembers only each answered run's role and rates through <code>record</code>; its
+<code>/api/trace/{id}</code> still reads as the operator (it goes with X1b). <code>chart</code> and <code>dashboards</code> already passed the caller (C-W2),
+so no change there; <code>test_chart_with_another_users_trace_is_not_found</code> covers <code>chart</code> by trace id (Ann's result written
+first, Bob gets <code>ResultNotFound</code>, Ann does not). The design's <code>test_manifest_records_the_asker</code> and
+<code>test_another_users_result_is_not_found</code> are <code>test_the_manifest_records_who_asked</code> and
+<code>test_another_callers_trace_id_is_not_found</code> in <code>test_results_owner.py</code>. <code>engine.feedback.correct</code> follows the same owner
+rule (Opus review): it reads the trace through <code>TracesAPI.get</code> as <code>user_context</code>, so another caller's run is <code>no_run</code> and is
+never rated down, and the rating-row fallback exists only for the operator. <code>user_context=None</code> cannot be the operator here
+because the scope checks need a real <code>UserContext</code>, so <code>correct(..., as_operator=True)</code> is a separate keyword; <code>nl2sql
+feedback correct</code> passes it and keeps <code>--as</code> for the scope. <code>record</code> stores a rating but files no thumbs-up proposal when the
+trace's SQL carries the <code>[truncated]</code> marker (<code>TRUNCATED</code>). The <code>on_failure</code> default stays: only failed runs can be rated until
+<code>traces.mode: always</code> (said in <code>observability/feedback.md</code> and <code>configuration/curated.md</code>).</p>
 <p><strong>G3b (progress, cancellation, readiness).</strong> Every long facade call now reports its items and stops between them,
 so a job (D0a-3's <code>JobContext</code>: <code>ctx.progress(step, done, total)</code> and <code>ctx.token</code>) can pass <code>ctx.token</code> as
 <code>cancellation_token=</code> and a callback that calls <code>ctx.progress</code>. <strong>What a cancel does:</strong> the item in flight finishes, no

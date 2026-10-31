@@ -2853,6 +2853,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#results-belong-to-their-asker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results Belong to Their Asker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results Belong to Their Asker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9748,6 +9809,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#results-belong-to-their-asker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results Belong to Their Asker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results Belong to Their Asker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10281,11 +10403,26 @@ different <code>storage.path</code> values never share a store.</p>
 <h3 id="why-it-exists_30">Why It Exists</h3>
 <p>A conversation outlives the request that began it. If it carried the starter's roles, a person who lost access, or anyone who learned its id, would keep reading what the roles allowed.</p>
 <hr />
+<h2 id="results-belong-to-their-asker">Results Belong to Their Asker</h2>
+<h3 id="definition_31">Definition</h3>
+<p>A run records who asked it, <code>(tenant_id, user_id)</code> plus the sorted roles of an anonymous asker (<code>ResultOwner</code>), in its result manifest and in its trace (<code>owner</code>). Every read of the run's rows takes the caller as a required <code>user_context</code> and answers only that asker: <code>engine.results.manifest</code>, <code>page</code>, <code>csv</code> and <code>chart</code>. <code>engine.traces.get(trace_id, *, user_context=None)</code> answers only that asker too, with <code>None</code> for another caller's run (and for a trace that records no asker); <code>engine.feedback.record(trace_id, rating, *, user_context)</code> reads the trace as the caller and raises <code>TraceNotFound</code> for another caller's run. No <code>user_context</code> on <code>traces.get</code> is the trusted in-process operator, as <code>nl2sql trace</code> and <code>nl2sql run</code> need and as Wave A's approvals trust the context an in-process caller passes; the REST API, MCP and the terminal app always pass the caller. <code>engine.feedback.correct(..., user_context)</code> follows the same rule: it reads the run's trace as the caller, so another caller's run is <code>no_run</code> and is never rated down; only the in-process operator (<code>as_operator=True</code>, as <code>nl2sql feedback correct</code> passes) reads any run. A trace id appears in events, traces and logs, so it is never the access check.</p>
+<h3 id="enforcement-points_31">Enforcement Points</h3>
+<ul>
+<li><code>ResultOwner.of</code> in <code>nl2sql.execution.artifacts.results</code>: the one rule for who an owner is, used by the manifest writer, the results reader, the trace writer (<code>write_run_trace</code>) and <code>TracesAPI.get</code></li>
+<li><code>ResultReader</code> (manifest check on every read) and <code>TracesAPI.get</code> (owner check) behind <code>engine.results</code> and <code>engine.traces</code></li>
+<li><code>FeedbackAPI.record</code> and <code>feedback.corrections._find_run</code>: read the run through <code>TracesAPI.get</code> with the caller</li>
+<li><code>test_trace_records_the_asker</code>, <code>test_another_users_trace_is_not_found</code>, <code>test_cli_trace_reads_any_run</code>, <code>test_ownerless_trace_is_read_only_by_the_operator</code>, <code>test_record_of_another_users_run_is_not_found</code> and <code>test_record_requires_a_caller</code> in <code>packages/nl2sql/tests/unit/test_trace_owner.py</code>; <code>test_another_users_run_cannot_be_corrected_or_rated_down</code> in <code>packages/nl2sql/tests/unit/test_corrections.py</code>; <code>test_another_callers_trace_id_is_not_found</code> and <code>test_a_manifest_with_no_asker_recorded_is_refused</code> in <code>packages/nl2sql/tests/unit/test_results_owner.py</code></li>
+</ul>
+<h3 id="failure-behavior_31">Failure Behavior</h3>
+<p><code>ResultNotFound</code> for results, <code>None</code> from <code>traces.get</code> and <code>TraceNotFound</code> from <code>feedback.record</code>, the same as for a missing run, so nothing says the run exists. A trace written before the trace recorded its asker has none: only the operator reads it, and it cannot be rated through <code>record</code>.</p>
+<h3 id="why-it-exists_31">Why It Exists</h3>
+<p>Anyone who saw a trace id (it is in every event, log line and audit row) could otherwise read the rows, the SQL and the question of a run another user asked, or rate it.</p>
+<hr />
 <h2 id="categories">Categories</h2>
 <ul>
 <li><strong>State</strong>: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Execution</strong>: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded</li>
-<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller</li>
+<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller; Results Belong to Their Asker</li>
 <li><strong>Determinism</strong>: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed</li>
 <li><strong>Resource bounds</strong>: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Boundaries</strong>: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter</li>

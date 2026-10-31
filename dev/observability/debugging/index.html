@@ -6139,7 +6139,8 @@ Writing a trace never fails a run; a write error is logged as a warning.</p>
 <li><code>QueryResult.trace_path</code> (Python API) and <code>trace_path</code> in the REST <code>/query</code>
   response: the path, or <code>null</code> when no trace was written or the trace store is
   not the <code>files</code> store. <code>trace_id</code> is in the file name, and
-  <code>engine.traces.get(trace_id)</code> reads the trace from any store.</li>
+  <code>engine.traces.get(trace_id)</code> reads the trace from any store. A trace records its asker (<code>owner</code>); with a
+  <code>user_context</code> only that asker reads it, and with none the caller is the in-process operator (<code>nl2sql trace</code>).</li>
 <li><code>nl2sql run</code> prints <code>Trace written to &lt;path&gt;</code>.</li>
 <li>The playground shows a <strong>Download trace</strong> link under Cost &amp; time when Debug is on.</li>
 </ul>

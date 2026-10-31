@@ -6025,6 +6025,9 @@ produced. A run the playground did not answer is refused with <code>404</code>.<
 </tr>
 </tbody>
 </table>
+<p>A rating needs a kept trace (<code>engine.feedback.record</code> reads the run's own
+trace), so on the default <code>settings.traces.mode: on_failure</code> only failed runs
+can be rated; set <code>always</code> to rate successful ones.</p>
 <p>Feedback is available in the playground that <code>nl2sql demo</code> starts, and on by
 default. <code>settings.feedback.enabled: false</code> turns it off: the control then says so and
 <code>POST /api/feedback</code> answers <code>403</code>.</p>
@@ -6195,8 +6198,8 @@ draft:</p>
 </code></pre></div>
 <h2 id="proposing-verified-queries-the-review-queue">Proposing verified queries: the review queue</h2>
 <p>A thumbs-up on a <em>generated</em> answer also files a <code>verified_query</code> proposal in
-the <a href="../../configuration/review/">review queue</a>: <code>engine.feedback.record(...,
-rating="up")</code> keeps the rating and, when the run qualifies, proposes the
+the <a href="../../configuration/review/">review queue</a>: <code>engine.feedback.record(trace_id,
+"up", user_context=...)</code> keeps the rating and, when the run qualifies, proposes the
 question and the run's SQL for <code>curated.yaml</code>. Nothing is written until an
 admin accepts it:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--kind<span class="w"> </span>verified_query<span class="w"> </span>--as<span class="w"> </span>admin
@@ -6225,6 +6228,12 @@ right SQL or the right plan, and files it as a <code>verified_query</code> propo
 <p>The fix is checked as the corrector before anything is queued, and a check
 that fails raises <code>CorrectionRefused</code> (a <code>ValueError</code>) with a <code>code</code> and the
 check's own <code>messages</code>; the command prints them and exits 1.</p>
+<p>Only the caller who asked the run may correct it: <code>user_context</code> reads the
+trace as <code>engine.traces.get</code> does, so another caller's run is <code>no_run</code> and is
+never rated down, and a rating with no kept trace is not readable by a caller.
+<code>nl2sql feedback correct</code> is an operator tool and passes <code>as_operator=True</code>: it
+reads any run (and falls back to its rating), while <code>--as</code> still sets the scope
+the fix is checked against.</p>
 <table>
 <thead>
 <tr>

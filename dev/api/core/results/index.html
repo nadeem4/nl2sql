@@ -5965,6 +5965,11 @@ Readable only by the caller who asked the run.</p>
 </tbody>
 </table>
 <p>The first three are described with <code>run_query</code> in <a href="../query/">Query API</a>.</p>
+<p>The run's trace is bound to the same asker: it records <code>owner</code> (the same <code>ResultOwner</code>), and
+<code>engine.traces.get(trace_id, *, user_context=None)</code> answers only that asker, with <code>None</code> for any other
+caller's run. No <code>user_context</code> is the trusted in-process operator (<code>nl2sql trace</code>), which reads any run.
+<code>engine.feedback.record(trace_id, rating, *, user_context)</code> reads the run's trace as the caller and raises
+<code>TraceNotFound</code> for another caller's run (<a href="../../../observability/feedback/">Feedback</a>).</p>
 <h2 id="who-can-read-a-run">Who can read a run</h2>
 <p>Every run writes <code>manifest.json</code> beside its results, and the manifest records who asked: a <code>ResultOwner</code>, the
 caller's <code>tenant_id</code> (else the engine's <code>settings.tenant_id</code>) and <code>user_id</code>, and for an anonymous caller its

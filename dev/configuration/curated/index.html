@@ -6564,9 +6564,11 @@ data team, never by the package) the planner should reach for first. See
 <a href="../datasources/#preferred-tables">Datasources: preferred tables</a>.</p>
 <h2 id="from-feedback-to-verified-queries">From feedback to verified queries</h2>
 <p>A thumbs-up on a generated answer is a candidate verified query: a real
-question, and SQL a person said was right. <code>engine.feedback.record(...,
-rating="up")</code> files it in the <a href="../review/">review queue</a> as a <code>verified_query</code>
-proposal; it reaches the curated section only when an admin accepts it.</p>
+question, and SQL a person said was right. <code>engine.feedback.record(trace_id,
+"up", user_context=...)</code> files it in the <a href="../review/">review queue</a> as a <code>verified_query</code>
+proposal; it reaches the curated section only when an admin accepts it.
+Rating needs a kept trace, so on the default <code>settings.traces.mode: on_failure</code>
+only failed runs can be rated; set <code>always</code> to rate successful ones.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--kind<span class="w"> </span>verified_query<span class="w"> </span>--as<span class="w"> </span>admin
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>show<span class="w"> </span>&lt;id&gt;<span class="w"> </span>--as<span class="w"> </span>admin
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>accept<span class="w"> </span>&lt;id&gt;<span class="w"> </span>--as<span class="w"> </span>admin
