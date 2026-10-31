@@ -3401,7 +3401,7 @@ Space, so it works before the Space has built and while it is asleep.</p>
 <h3 id="regenerating-the-card">Regenerating the card</h3>
 <p>The card is rendered from <code>scripts/social_card.html</code>, which uses the
 playground's own colours and both of its typefaces. Edit that file, then:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>web/playground<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>../..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>nl2sql-ui<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
 <a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>python<span class="w"> </span>scripts/render_social_card.py
 </code></pre></div>
 <p>Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
@@ -3420,7 +3420,7 @@ as <code>image/png</code>.</p>
 root bar and stem with two indented steps, the typed plan the model writes, in
 outline. Its one copy is <code>docs/assets/favicon.svg</code>; the playground inlines it,
 this site uses it as its favicon, and the card redraws it in the light colours.
-See <a href="https://github.com/nadeem4/nl2sql/blob/main/web/playground/README.md#the-mark">the playground README</a> for where each copy lives.</p>
+See <a href="https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the-mark">the playground README</a> for where each copy lives.</p>
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>

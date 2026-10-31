@@ -3683,7 +3683,7 @@ the code and a Wave C page differ, the code wins.</p>
   sample databases with recorded answers and no key; your-data mode is the
   caller's <code>nl2sql.yaml</code>.</li>
 <li><strong>The UI must not look AI-generated.</strong> The playground's "Porcelain" design
-  system (<code>web/playground/src/styles.css</code> today, <code>nl2sql-ui/src/styles.css</code> after D0b: its tokens, type scale, the run
+  system (<code>web/playground/src/styles.css</code> before D0b, <code>nl2sql-ui/src/styles/*.css</code> since: its tokens, type scale, the run
   spine, the raised card, the 44px controls) is the baseline for every new
   page. No component library, no gradient, no icon font.</li>
 </ul>
@@ -5111,7 +5111,7 @@ use (D209):</p>
 <p>D210 makes one rule for every mode: a key typed into the browser lives in
 that tab's <code>sessionStorage</code> and is sent with each request; the model per
 step likewise. The hosted page already works this way
-(<code>web/playground/src/hostedKey.js</code>, <code>hostedModels.js</code>); the local page's
+(<code>nl2sql-ui/src/lib/hostedKey.js</code>, <code>hostedModels.js</code>); the local page's
 "save key to <code>.env</code>" and "write models to <code>llm.yaml</code>" go. The cost is that
 a local user types the key once per tab (or puts it in <code>.env</code> once);
 <code>getting_started/demo.md</code> says so.</p>
@@ -5395,7 +5395,7 @@ scratch Space before the release (<a href="#14-pr-plan">X1a</a>).</p>
 <tbody>
 <tr>
 <td><strong>Where</strong></td>
-<td><code>nl2sql-ui/</code> at the repository root (D225; renamed from <code>web/playground/</code> by D0b, which leaves no <code>web/</code> folder). The API's Docker image builds it in a Node stage and <code>nl2sql-api</code> serves the result (D226). <code>npm run build</code> writes <code>packages/api/src/nl2sql_api/web/static/</code>, which the image and the wheel both carry (D226), so <code>pip install nl2sql-api</code> needs no Node. The single-file plugin goes (D214): the build is <code>index.html</code> plus hashed chunks, and Mermaid is its own chunk. Until X1a, <code>nl2sql demo</code> keeps serving the page already committed in the engine.</td>
+<td><code>nl2sql-ui/</code> at the repository root (D225; renamed from <code>web/playground/</code> by D0b, which leaves no <code>web/</code> folder). The API's Docker image builds it in a Node stage and <code>nl2sql-api</code> serves the result (D226). <code>npm run build</code> writes <code>packages/api/src/nl2sql_api/web/static/</code>, which the image and the wheel both carry (D226), so <code>pip install nl2sql-api</code> needs no Node. The single-file plugin goes (D214): the build is <code>index.html</code> plus hashed chunks, and Mermaid is its own chunk. Until X1b, <code>nl2sql demo</code> keeps serving the page already committed in the engine.</td>
 </tr>
 <tr>
 <td><strong>One build, every mode</strong></td>
@@ -5479,9 +5479,9 @@ no W-PR deletes a file another imports:</p>
 <td>W3</td>
 </tr>
 <tr>
-<td><code>Home.jsx</code>, <code>home.js</code>, <code>Clip.jsx</code>, <code>Pipeline.jsx</code>, <code>pipeline.js</code>, <code>pipelinePhases.js</code>, <code>Retrieval.jsx</code>, <code>retrieval.js</code>, <code>Settings.jsx</code>, <code>hostedKey.js</code>, <code>hostedModels.js</code>, <code>firstRun.js</code>, <code>status.js</code>, <code>faults.js</code>, <code>questions.js</code>, <code>railFade.js</code></td>
+<td><code>Home.jsx</code>, <code>home.js</code>, <code>Clip.jsx</code>, <code>Pipeline.jsx</code>, <code>pipeline.js</code>, <code>pipelinePhases.js</code>, <code>Retrieval.jsx</code>, <code>retrieval.js</code>, <code>Settings.jsx</code>, <code>firstRun.js</code>, <code>status.js</code>, <code>faults.js</code>, <code>questions.js</code>, <code>railFade.js</code></td>
 <td><code>src/pages/</code> and beside them</td>
-<td>W4a (<code>Settings.jsx</code>, <code>hostedKey.js</code>, <code>hostedModels.js</code>) and W4b (the rest)</td>
+<td>W4a (<code>Settings.jsx</code>) and W4b (the rest)</td>
 </tr>
 <tr>
 <td><code>Feedback.jsx</code>, <code>feedback.js</code></td>
@@ -6519,7 +6519,7 @@ in exactly one part.</p>
 </tr>
 <tr>
 <td>W4a</td>
-<td><strong>Evals and Settings.</strong> Files: <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code>, <code>src/pages/Settings.jsx</code> (per-tab keys and models, the tab's API key, server LLM, API keys), <code>hostedKey.js</code> and <code>hostedModels.js</code> (moved beside it), <code>src/api/evals.js</code>, <code>settings.js</code>, <code>styles/settings.css</code>, <code>styles/evals.css</code>.</td>
+<td><strong>Evals and Settings.</strong> Files: <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code>, <code>src/pages/Settings.jsx</code> (per-tab keys and models, the tab's API key, server LLM, API keys), <code>hostedKey.js</code> and <code>hostedModels.js</code> (already in <code>src/lib/</code> since D0b), <code>src/api/evals.js</code>, <code>settings.js</code>, <code>styles/settings.css</code>, <code>styles/evals.css</code>.</td>
 <td>A4a, D0b</td>
 <td><code>report.test.js</code> (from the <code>EvalReport</code> fixture), <code>hostedKey.test.js</code> and <code>hostedModels.test.js</code> (kept, now every mode)</td>
 <td><code>apps/web.md</code> (evals, settings)</td>
@@ -6656,8 +6656,36 @@ and adding its row's tests. The G3b callbacks and tokens are not built yet, so t
 <code>ctx.progress</code> into whatever the facade offers then. <code>overrides.py</code>: <code>parse_override(headers, request_llm=)</code> and the
 <code>llm_override</code> dependency (<code>X-NL2SQL-Api-Key-&lt;provider&gt;</code>, <code>X-NL2SQL-Models</code>; 403 when <code>api.request_llm</code> is off, 422
 for a malformed models header, <code>MissingProviderKey</code> for a model without the request's own key); A1 and A2a pass it as
-<code>llm_override=</code>. Golden files <code>ApiError.json</code> and <code>Job.json</code> live in <code>web/playground/src/api/fixtures/</code> (D0b moves
-them to <code>nl2sql-ui/src/api/fixtures/</code>); regenerate with <code>python packages/api/tests/test_web_fixtures.py</code>.</p>
+<code>llm_override=</code>. Golden files <code>ApiError.json</code> and <code>Job.json</code> live in <code>nl2sql-ui/src/api/fixtures/</code> (D0b moved
+them there); regenerate with <code>python packages/api/tests/test_web_fixtures.py</code>.</p>
+<p><strong>D0b (web foundation).</strong> <code>web/playground</code> is now <code>nl2sql-ui</code> (D225; no <code>web/</code> folder is left). Shared code moved by
+the ownership table: <code>src/lib/</code> (<code>runState</code>, <code>sqlHighlight</code>, <code>settings</code>, <code>artifacts</code>, <code>plan</code>), <code>src/components/</code>
+(<code>IndexPanel</code>, <code>indexHealth</code>, <code>NodeInspector</code>, <code>run</code>, <code>SqlCard</code>, <code>Ledger</code>, and the new <code>JobProgress.jsx</code> with its
+<code>jobProgress.js</code>, <code>jobState(job)</code>, plus <code>PageStub.jsx</code>), <code>src/outputs/</code> (<code>RowsTable</code>, <code>results</code>, and the new <code>Output.jsx</code>
+stub with <code>output.js</code>, <code>rendererFor(output)</code>: chart, mermaid, markdown, json, else text), <code>src/connect/</code> (<code>SchemaPanel</code>,
+<code>datasources</code>), <code>src/chat/</code> (<code>Feedback</code>, <code>feedback</code>), <code>src/pages/</code> (Home, Clip, Pipeline, Retrieval, Settings and their
+helpers, plus <code>Chat</code>, <code>Dashboards</code>, <code>Connect</code>, <code>Knowledge</code>, <code>Approvals</code>, <code>Evals</code>, <code>Trace</code> as lazy stubs: W1 owns
+Approvals and Trace, W2b Dashboards, W3 Connect and Knowledge, W4a Evals). <code>AskParts</code>, <code>Panes</code>, <code>stream.js</code>, <code>App.jsx</code>,
+<code>router.js</code>, <code>main.jsx</code> stay. <strong>Transport:</strong> <code>src/api/http.js</code> exports <code>request(method, path, body)</code> and
+<code>stream(path, body, onEvent, signal)</code> (paths are relative to <code>/api/v1</code>), <code>createHttp({fetch, storage})</code> for tests,
+<code>ApiError</code> (<code>status</code>, <code>code</code>, <code>message</code>, <code>fix</code>, <code>details</code>, <code>requestId</code>; status 0 and code <code>NETWORK</code> when the server is
+unreachable, code <code>HTTP_&lt;status&gt;</code> when the answer is not the envelope), and <code>readApiKey</code>/<code>writeApiKey</code> (the bearer key,
+<code>sessionStorage</code> under <code>nl2sql.ui.apiKey</code>). Every call also sends the tab's <code>X-NL2SQL-Api-Key-&lt;provider&gt;</code> and
+<code>X-NL2SQL-Models</code> headers, read with <code>src/lib/hostedKey.js</code> and <code>hostedModels.js</code> (moved there from <code>src/pages/</code> so the transport does not import a page). <code>stream</code> is a GET without a
+body and a POST with one; <code>onEvent({event, data})</code> gets <code>data</code> parsed as JSON when it is. <code>src/api/sse.js</code> is the frame
+parser (<code>createSseParser</code>), <code>src/api/jobs.js</code> the shared job calls (<code>getJob</code>, <code>cancelJob</code>, <code>followJob(id, onProgress,
+signal)</code> over <code>job.progress</code> and <code>job.finished</code>). <code>src/api/routes.test.js</code> checks every <code>request("METHOD", path)</code> and
+every <code>stream(path, ...) // METHOD</code> in <code>src/api/*.js</code> (and fails on a call it cannot read) against <code>packages/api/openapi.json</code>. <strong>Router:</strong> the new routes
+<code>chat</code>, <code>dashboards</code> (optional id), <code>connect</code>, <code>knowledge</code>, <code>approvals</code>, <code>evals</code>, <code>trace</code> (required id) are <code>stub: true</code>
+pages, left out of the nav until their row removes the flag; <code>routeFromHash</code> returns <code>{page, param}</code> and
+<code>router.route()</code> the current one; <code>subscribe</code> listeners and <code>useRoute</code> get the whole <code>{page, param}</code> (so a move from <code>#/chat/a</code> to <code>#/chat/b</code> notifies), and a page component receives <code>{param}</code>. <strong>Styles:</strong> <code>src/styles.css</code> became <code>src/styles/</code> (<code>index.css</code> lists the files in
+cascade order; <code>base.css</code> holds the tokens; the rest are <code>ask-run</code>, <code>settings</code>, <code>retrieval</code>, <code>responsive</code>, <code>pages</code>,
+<code>artifacts</code>, <code>ask-page</code>, <code>home</code>), rules moved verbatim and <code>styles.test.js</code> reads them as before. <strong>Build:</strong> <code>vite build</code>
+writes <code>index.html</code> and hashed chunks (no single-file plugin) to <code>packages/api/src/nl2sql_api/web/static/</code>, ignored by
+git; <code>packages/api/pyproject.toml</code> carries it as package data of <code>nl2sql_api.web</code>. The old engine playground is
+unchanged: it serves the single page still committed under <code>packages/nl2sql/.../playground/static/</code>, which is no longer
+rebuilt, until X1b deletes it. <code>test.yml</code>'s <code>web</code> job and <code>CONTRIBUTING.md</code> use the new paths, and the fixtures test writes
+to <code>nl2sql-ui/src/api/fixtures/</code>.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at
