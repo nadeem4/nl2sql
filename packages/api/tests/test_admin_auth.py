@@ -79,7 +79,7 @@ def make_client(tmp_path):
     def _make(host="testclient", **sections):
         engine = AdminEngine(make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
-        client = TestClient(app, base_url="http://localhost", client=(host, 50000))
+        client = TestClient(app, base_url="http://localhost", client=(host, 50000), raise_server_exceptions=False)
         clients.append(client)
         return client, engine
 
@@ -138,7 +138,7 @@ def test_a_proxy_request_without_a_user_header_is_a_401(make_client):
 def test_the_admin_roles_come_from_the_policies(make_client, monkeypatch):
     # NL2SQL_API_ADMIN_ROLES is not read any more: policies.admin_roles is the list.
     monkeypatch.setenv("NL2SQL_API_ADMIN_ROLES", "admin")
-    client, _ = make_client(api=PROXY, policies={"allow_all": True, "admin_roles": ["ops", "owner"]})
+    client, _ = make_client(host="127.0.0.1", api=PROXY, policies={"allow_all": True, "admin_roles": ["ops", "owner"]})
     assert client.post("/api/v1/index-all", headers=_as("owner")).status_code == 200
     assert client.post("/api/v1/index-all", headers=_as("admin")).status_code == 403
 

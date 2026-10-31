@@ -222,8 +222,9 @@ def test_an_anonymous_run_is_readable_only_with_the_same_roles(monkeypatch, clie
 def test_the_routes_need_a_role_like_query_does(client):
     app.dependency_overrides.pop(identity.caller)
 
-    assert client.get("/api/v1/query/run-1/results/combine_g1").status_code == 401
-    assert client.get("/api/v1/query/run-1/results/combine_g1.csv").status_code == 401
+    # api.auth is none here and the client's Host is not localhost: not the local operator, so no identity.
+    assert client.get("/api/v1/query/run-1/results/combine_g1").status_code == 403
+    assert client.get("/api/v1/query/run-1/results/combine_g1.csv").status_code == 403
 
 
 def test_the_query_response_carries_the_result_manifest_not_rows(api_client):

@@ -1,0 +1,3698 @@
+{
+  "components": {
+    "schemas": {
+      "AnswerSource": {
+        "description": "Where an answer came from.\n\n``{\"type\": \"verified\", \"id\", \"datasource_id\", \"params\"}`` when a verified\nquery from ``curated.yaml`` answered, with the values it ran with;\n``{\"type\": \"generated\"}`` (the other fields None) when the pipeline\nplanned and generated the SQL.",
+        "properties": {
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "type": {
+            "default": "generated",
+            "enum": [
+              "verified",
+              "generated"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "AnswerSource",
+        "type": "object"
+      },
+      "ApiError": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Details",
+            "type": "array"
+          },
+          "fix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiError",
+        "type": "object"
+      },
+      "ApprovalRequest": {
+        "description": "What a person is asked to approve: one sub-query's SQL, bound to the asker.\n\nThe generated path pins the run's ``decomposition``, the ``sub_query`` the\nSQL answers and its validated ``plan``; the verified path pins the\n``verified`` query and its values. ``id`` is a SHA-256, in hex, over every\nfield but ``reason`` and ``approver_roles``, so the engine can tell an\nedited request. ``approver_roles`` is for display: the engine checks the\nhook's configured roles.",
+        "properties": {
+          "approver_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approver Roles",
+            "type": "array"
+          },
+          "asker_tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asker Tenant Id"
+          },
+          "asker_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asker User Id"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "decomposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecomposerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hook": {
+            "title": "Hook",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "point": {
+            "const": "execute.before",
+            "default": "execute.before",
+            "title": "Point",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "sql": {
+            "title": "Sql",
+            "type": "string"
+          },
+          "sql_sha256": {
+            "title": "Sql Sha256",
+            "type": "string"
+          },
+          "sub_query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifiedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "hook",
+          "datasource_id",
+          "sql",
+          "sql_sha256",
+          "reason"
+        ],
+        "title": "ApprovalRequest",
+        "type": "object"
+      },
+      "ArtifactRef": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "const": "parquet",
+            "title": "Format",
+            "type": "string"
+          },
+          "path_template": {
+            "title": "Path Template",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "sub_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Query Id"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri",
+          "format",
+          "row_count",
+          "columns",
+          "bytes",
+          "content_hash",
+          "created_at",
+          "path_template"
+        ],
+        "title": "ArtifactRef",
+        "type": "object"
+      },
+      "CaseWhen": {
+        "additionalProperties": false,
+        "description": "Represents a single WHEN ... THEN ... clause in a CASE expression.\n\nAttributes:\n    condition (Expr): The condition expression to evaluate.\n    result (Expr): The result expression if the condition is true.",
+        "properties": {
+          "condition": {
+            "$ref": "#/components/schemas/Expr"
+          },
+          "result": {
+            "$ref": "#/components/schemas/Expr"
+          }
+        },
+        "required": [
+          "condition",
+          "result"
+        ],
+        "title": "CaseWhen",
+        "type": "object"
+      },
+      "ClarificationOption": {
+        "description": "One reading of the question: ``a`` is the default, each with a validated plan.",
+        "properties": {
+          "explanation": {
+            "$ref": "#/components/schemas/ExplainedStep"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "title": "Plan",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "plan",
+          "explanation"
+        ],
+        "title": "ClarificationOption",
+        "type": "object"
+      },
+      "ClarificationRequest": {
+        "description": "What ``QueryResult.clarification`` carries when the run ends ``needs_clarification``.",
+        "properties": {
+          "asker_tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asker Tenant Id"
+          },
+          "asker_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asker User Id"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "knowledge_digest": {
+            "title": "Knowledge Digest",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ClarificationOption"
+            },
+            "maxItems": 3,
+            "minItems": 2,
+            "title": "Options",
+            "type": "array"
+          },
+          "phrase": {
+            "title": "Phrase",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sub_query": {
+            "additionalProperties": true,
+            "title": "Sub Query",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "phrase",
+          "datasource_id",
+          "schema_version",
+          "knowledge_digest",
+          "sub_query",
+          "options"
+        ],
+        "title": "ClarificationRequest",
+        "type": "object"
+      },
+      "CombineGroup": {
+        "properties": {
+          "group_id": {
+            "title": "Group Id",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/CombineInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "join_keys": {
+            "items": {
+              "$ref": "#/components/schemas/JoinKeyPair"
+            },
+            "title": "Join Keys",
+            "type": "array"
+          },
+          "operation": {
+            "enum": [
+              "standalone",
+              "compare",
+              "join",
+              "union"
+            ],
+            "title": "Operation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "operation",
+          "inputs"
+        ],
+        "title": "CombineGroup",
+        "type": "object"
+      },
+      "CombineInput": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "left",
+                  "right",
+                  "base",
+                  "compare",
+                  "primary",
+                  "secondary"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "subquery_id": {
+            "title": "Subquery Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subquery_id"
+        ],
+        "title": "CombineInput",
+        "type": "object"
+      },
+      "DatasourceResponse": {
+        "properties": {
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "DatasourceResponse",
+        "type": "object"
+      },
+      "DecomposerResponse": {
+        "description": "The question decomposed into semantic sub-queries and how to combine them.\n\nCall this tool with the decomposition itself as the arguments: sub_queries,\ncombine_groups, post_combine_ops and unmapped_subqueries at the top level.\nDo not wrap them in another object or under any other key.",
+        "properties": {
+          "combine_groups": {
+            "description": "How the sub-queries' results combine; a single sub-query is one standalone group.",
+            "items": {
+              "$ref": "#/components/schemas/CombineGroup"
+            },
+            "title": "Combine Groups",
+            "type": "array"
+          },
+          "post_combine_ops": {
+            "description": "Operations on a combined group's result. Empty when one sub-query answers the question.",
+            "items": {
+              "$ref": "#/components/schemas/PostCombineOp"
+            },
+            "title": "Post Combine Ops",
+            "type": "array"
+          },
+          "sub_queries": {
+            "description": "One semantic sub-query per datasource-level intent of the question.",
+            "items": {
+              "$ref": "#/components/schemas/SubQuery"
+            },
+            "title": "Sub Queries",
+            "type": "array"
+          },
+          "unmapped_subqueries": {
+            "description": "Intents no resolved datasource can answer.",
+            "items": {
+              "$ref": "#/components/schemas/UnmappedSubQuery"
+            },
+            "title": "Unmapped Subqueries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sub_queries",
+          "combine_groups"
+        ],
+        "title": "DecomposerResponse",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ApiError"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "Estimate": {
+        "description": "The database's estimate of a query, without running it (``EstimatingAdapterProtocol.estimate``).\n\n``rows`` is the rows the database expects to *read*, added up over the\nplan's scan operators (a full scan counts its table, not its filtered\noutput), so a ``LIMIT`` on the result does not hide a billion-row scan.\n``cost`` is the planner's own cost units, for display: comparable within\none database only, never with a limit. ``source`` says what was read, for\npeople. See docs/architecture/wave_b.md, section 9.",
+        "properties": {
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "Estimate",
+        "type": "object"
+      },
+      "ExpectedColumn": {
+        "properties": {
+          "dtype": {
+            "anyOf": [
+              {
+                "enum": [
+                  "string",
+                  "int",
+                  "float",
+                  "bool",
+                  "date",
+                  "datetime"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dtype"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ExpectedColumn",
+        "type": "object"
+      },
+      "ExplainedStep": {
+        "description": "One sub-query in plain English, rendered from its typed plan; the same plan always gives the same words.",
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "filters": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "groupings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Groupings",
+            "type": "array"
+          },
+          "joins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Joins",
+            "type": "array"
+          },
+          "measures": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Measures",
+            "type": "array"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "planner_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Note"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "generated",
+              "cache",
+              "supplied",
+              "approved",
+              "chosen",
+              "verified"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "sub_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Query Id"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/TermUse"
+            },
+            "title": "Terms",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "source",
+          "text"
+        ],
+        "title": "ExplainedStep",
+        "type": "object"
+      },
+      "Explanation": {
+        "description": "The run's plan in plain English: one step per sub-query, and how the steps were combined.",
+        "properties": {
+          "combined": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Combined"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ExplainedStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "title": "Explanation",
+        "type": "object"
+      },
+      "Expr": {
+        "additionalProperties": false,
+        "description": "Unified AST for deterministic SQL expressions.\n\nThe 'kind' attribute determines which fields must or may be populated.\nStrict validation rules are enforced in `model_post_init`.\n\nAttributes:\n    kind (Literal): The type of expression (literal, column, func, binary, unary, case).\n    value (Optional[Union[str, int, float, bool]]): Value for literal expressions.\n    is_null (bool): Whether the literal is a NULL value.\n    alias (Optional[str]): Table alias for column expressions.\n    column_name (Optional[str]): Name of the column.\n    func_name (Optional[str]): Name of the function.\n    args (List[Expr]): Arguments for function expressions.\n    is_aggregate (bool): Whether the function is an aggregate function.\n    distinct (bool): Apply the function to distinct argument values,\n        e.g. ``COUNT(DISTINCT x)``. Only valid when ``kind`` is ``func``.\n    op (Optional[str]): Operator for binary or unary expressions.\n        ``||`` concatenates strings in every dialect.\n    left (Optional[Expr]): Left operand for binary expressions.\n    right (Optional[Expr]): Right operand for binary expressions.\n    expr (Optional[Expr]): Operand for unary expressions.\n    whens (List[CaseWhen]): List of WHEN clauses for CASE expressions.\n    else_expr (Optional[Expr]): The ELSE expression for CASE expressions.",
+        "properties": {
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          },
+          "args": {
+            "items": {
+              "$ref": "#/components/schemas/Expr"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "column_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Name"
+          },
+          "distinct": {
+            "default": false,
+            "title": "Distinct",
+            "type": "boolean"
+          },
+          "else_expr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Expr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Expr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "func_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Func Name"
+          },
+          "is_aggregate": {
+            "default": false,
+            "title": "Is Aggregate",
+            "type": "boolean"
+          },
+          "is_null": {
+            "default": false,
+            "title": "Is Null",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "literal",
+              "column",
+              "func",
+              "binary",
+              "unary",
+              "case"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Expr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "op": {
+            "anyOf": [
+              {
+                "enum": [
+                  "=",
+                  "!=",
+                  ">",
+                  "<",
+                  ">=",
+                  "<=",
+                  "+",
+                  "-",
+                  "*",
+                  "/",
+                  "%",
+                  "||",
+                  "AND",
+                  "OR",
+                  "LIKE",
+                  "IN",
+                  "NOT",
+                  "IS",
+                  "IS NOT"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Op"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Expr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "whens": {
+            "items": {
+              "$ref": "#/components/schemas/CaseWhen"
+            },
+            "title": "Whens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "Expr",
+        "type": "object"
+      },
+      "FilterSpec": {
+        "properties": {
+          "attribute": {
+            "title": "Attribute",
+            "type": "string"
+          },
+          "operator": {
+            "enum": [
+              "=",
+              "!=",
+              ">",
+              ">=",
+              "<",
+              "<=",
+              "between",
+              "in",
+              "contains"
+            ],
+            "title": "Operator",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "attribute",
+          "operator",
+          "value"
+        ],
+        "title": "FilterSpec",
+        "type": "object"
+      },
+      "GroupByItem": {
+        "additionalProperties": false,
+        "description": "Represents an item in the GROUP BY clause.\n\nAttributes:\n    expr (Expr): The expression to group by.",
+        "properties": {
+          "expr": {
+            "$ref": "#/components/schemas/Expr"
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "title": "GroupByItem",
+        "type": "object"
+      },
+      "GroupBySpec": {
+        "properties": {
+          "attribute": {
+            "title": "Attribute",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attribute"
+        ],
+        "title": "GroupBySpec",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "JoinKeyPair": {
+        "properties": {
+          "left": {
+            "title": "Left",
+            "type": "string"
+          },
+          "right": {
+            "title": "Right",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "right"
+        ],
+        "title": "JoinKeyPair",
+        "type": "object"
+      },
+      "JoinSpec": {
+        "additionalProperties": false,
+        "description": "Specification for a table join.\n\nAttributes:\n    left_alias (str): Alias of the left table.\n    right_alias (str): Alias of the right table.\n    join_type (Literal): Type of join (inner, left, right, full).\n    condition (Expr): The join condition expression.",
+        "properties": {
+          "condition": {
+            "$ref": "#/components/schemas/Expr"
+          },
+          "join_type": {
+            "default": "inner",
+            "enum": [
+              "inner",
+              "left",
+              "right",
+              "full"
+            ],
+            "title": "Join Type",
+            "type": "string"
+          },
+          "left_alias": {
+            "title": "Left Alias",
+            "type": "string"
+          },
+          "right_alias": {
+            "title": "Right Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left_alias",
+          "right_alias",
+          "condition"
+        ],
+        "title": "JoinSpec",
+        "type": "object"
+      },
+      "KnowledgeUsed": {
+        "additionalProperties": false,
+        "description": "The knowledge one sub-query's prompt carried in ``[BUSINESS_CONTEXT]``, and what the block's cap dropped.",
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "dropped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleUse"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/TermMatch"
+            },
+            "title": "Terms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "digest"
+        ],
+        "title": "KnowledgeUsed",
+        "type": "object"
+      },
+      "LLMCallUsage": {
+        "description": "One model call: which node made it, on which model, and what it used (None: not reported).",
+        "properties": {
+          "cache_write_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Input Tokens"
+          },
+          "cached_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Input Tokens"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "latency_s": {
+            "default": 0.0,
+            "title": "Latency S",
+            "type": "number"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "reasoning_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "usage_reported": {
+            "default": true,
+            "title": "Usage Reported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "title": "LLMCallUsage",
+        "type": "object"
+      },
+      "MetricSpec": {
+        "properties": {
+          "aggregation": {
+            "anyOf": [
+              {
+                "enum": [
+                  "count",
+                  "sum",
+                  "avg",
+                  "min",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aggregation"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "MetricSpec",
+        "type": "object"
+      },
+      "OrderBySpec": {
+        "properties": {
+          "attribute": {
+            "title": "Attribute",
+            "type": "string"
+          },
+          "direction": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Direction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attribute"
+        ],
+        "title": "OrderBySpec",
+        "type": "object"
+      },
+      "OrderItem": {
+        "additionalProperties": false,
+        "description": "Represents an item in the ORDER BY clause.\n\nAttributes:\n    expr (Expr): The expression to order by.\n    direction (Literal): The sort direction (asc, desc).",
+        "properties": {
+          "direction": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "expr": {
+            "$ref": "#/components/schemas/Expr"
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "title": "OrderItem",
+        "type": "object"
+      },
+      "PlanModel": {
+        "additionalProperties": false,
+        "description": "Standardized representation of a SQL execution plan.\n\nEvery list is ordered by its own position: the first table is the ``FROM``\ntable, the first select item is the first column, and so on. JSON arrays\nkeep their order through structured output, so nothing in the plan restates\nit.\n\nAttributes:\n    query_type (Literal): The type of query (default: READ).\n    distinct (bool): Whether to select distinct rows.\n    tables (List[TableRef]): List of tables involved in the query.\n    joins (List[JoinSpec]): List of join specifications.\n    select_items (List[SelectItem]): List of items to select.\n    where (Optional[Expr]): The WHERE clause expression.\n    group_by (List[GroupByItem]): List of GROUP BY items.\n    having (Optional[Expr]): The HAVING clause expression.\n    order_by (List[OrderItem]): List of ORDER BY items.\n    limit (Optional[int]): The LIMIT count.\n    offset (Optional[int]): The OFFSET count.\n    reasoning (Optional[str]): Explanatory text for the plan generation.",
+        "properties": {
+          "distinct": {
+            "default": false,
+            "title": "Distinct",
+            "type": "boolean"
+          },
+          "group_by": {
+            "items": {
+              "$ref": "#/components/schemas/GroupByItem"
+            },
+            "title": "Group By",
+            "type": "array"
+          },
+          "having": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Expr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "joins": {
+            "items": {
+              "$ref": "#/components/schemas/JoinSpec"
+            },
+            "title": "Joins",
+            "type": "array"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset"
+          },
+          "order_by": {
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            },
+            "title": "Order By",
+            "type": "array"
+          },
+          "query_type": {
+            "const": "READ",
+            "default": "READ",
+            "title": "Query Type",
+            "type": "string"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "select_items": {
+            "items": {
+              "$ref": "#/components/schemas/SelectItem"
+            },
+            "title": "Select Items",
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableRef"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "where": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Expr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "PlanModel",
+        "type": "object"
+      },
+      "PostCombineOp": {
+        "properties": {
+          "expected_schema": {
+            "items": {
+              "$ref": "#/components/schemas/ExpectedColumn"
+            },
+            "title": "Expected Schema",
+            "type": "array"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterSpec"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "group_by": {
+            "items": {
+              "$ref": "#/components/schemas/GroupBySpec"
+            },
+            "title": "Group By",
+            "type": "array"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricSpec"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "op_id": {
+            "title": "Op Id",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "filter",
+              "aggregate",
+              "project",
+              "sort",
+              "limit"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "order_by": {
+            "items": {
+              "$ref": "#/components/schemas/OrderBySpec"
+            },
+            "title": "Order By",
+            "type": "array"
+          },
+          "target_group_id": {
+            "title": "Target Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op_id",
+          "target_group_id",
+          "operation"
+        ],
+        "title": "PostCombineOp",
+        "type": "object"
+      },
+      "QueryRequest": {
+        "properties": {
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "execute": {
+            "default": true,
+            "title": "Execute",
+            "type": "boolean"
+          },
+          "natural_language": {
+            "title": "Natural Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "natural_language"
+        ],
+        "title": "QueryRequest",
+        "type": "object"
+      },
+      "QueryResponse": {
+        "description": "The engine's ``QueryResult``, served as is.\n\nIt derives from ``nl2sql.QueryResult``, so the HTTP response cannot drift\nfrom what the engine returns. ``sub_queries[].rows`` carries a capped\nsample only; the full result set lives in artifact storage, addressable\nthrough ``artifact_refs``. ``trace_path`` is where the run's trace was\nwritten on the server, or None.",
+        "properties": {
+          "approvals_needed": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRequest"
+            },
+            "title": "Approvals Needed",
+            "type": "array"
+          },
+          "artifact_refs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ArtifactRef"
+            },
+            "title": "Artifact Refs",
+            "type": "object"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClarificationRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decomposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecomposerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Explanation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_answer": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer"
+          },
+          "reasoning": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Reasoning",
+            "type": "array"
+          },
+          "result_manifest": {
+            "items": {
+              "$ref": "#/components/schemas/ResultSummary"
+            },
+            "title": "Result Manifest",
+            "type": "array"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AnswerSource"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "success",
+                  "plan_only",
+                  "error",
+                  "needs_approval",
+                  "stopped",
+                  "needs_clarification"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunStop"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sub_queries": {
+            "items": {
+              "$ref": "#/components/schemas/SubQueryResponse"
+            },
+            "title": "Sub Queries",
+            "type": "array"
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Timings",
+            "type": "object"
+          },
+          "trace_id": {
+            "default": "",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "trace_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Path"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/QuestionUsage"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RunWarning"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "QueryResponse",
+        "type": "object"
+      },
+      "QuestionUsage": {
+        "description": "What one question cost: totals, per-node roll-ups and every call.\n\n``plan_cache_hits`` counts the sub-queries whose plan came from the plan\ncache; each one made no planner call, so it adds no tokens here.",
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/LLMCallUsage"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
+          "nodes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/UsageTotals"
+            },
+            "title": "Nodes",
+            "type": "object"
+          },
+          "plan_cache_hits": {
+            "default": 0,
+            "title": "Plan Cache Hits",
+            "type": "integer"
+          },
+          "total": {
+            "$ref": "#/components/schemas/UsageTotals"
+          }
+        },
+        "title": "QuestionUsage",
+        "type": "object"
+      },
+      "ResultPage": {
+        "description": "``rows[i]`` is row ``offset + i`` of the result, in ``columns`` order.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "limit": {
+            "default": 100,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "default": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "result_id": {
+            "title": "Result Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_rows": {
+            "default": 0,
+            "title": "Total Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id",
+          "result_id"
+        ],
+        "title": "ResultPage",
+        "type": "object"
+      },
+      "ResultSummary": {
+        "description": "One saved result of a run: what it is, never its rows.",
+        "properties": {
+          "column_kinds": {
+            "additionalProperties": {
+              "enum": [
+                "number",
+                "text",
+                "temporal",
+                "boolean",
+                "other"
+              ],
+              "type": "string"
+            },
+            "title": "Column Kinds",
+            "type": "object"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "row_count": {
+            "default": 0,
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "node_id"
+        ],
+        "title": "ResultSummary",
+        "type": "object"
+      },
+      "RowSample": {
+        "description": "A bounded window onto a sub-query's result set.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_rows": {
+            "default": 0,
+            "title": "Total Rows",
+            "type": "integer"
+          }
+        },
+        "title": "RowSample",
+        "type": "object"
+      },
+      "RuleUse": {
+        "additionalProperties": false,
+        "description": "A business rule sent with a sub-query.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "source"
+        ],
+        "title": "RuleUse",
+        "type": "object"
+      },
+      "RunStop": {
+        "description": "A run stopped at a limit: which one, its configured ``value``, and what was ``spent`` when it stopped.",
+        "properties": {
+          "limit": {
+            "enum": [
+              "max_cost_usd",
+              "max_llm_calls"
+            ],
+            "title": "Limit",
+            "type": "string"
+          },
+          "spent": {
+            "title": "Spent",
+            "type": "number"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "limit",
+          "value",
+          "spent"
+        ],
+        "title": "RunStop",
+        "type": "object"
+      },
+      "RunWarning": {
+        "additionalProperties": false,
+        "description": "Something a run's answer should say, without failing the run (``QueryResult.warnings``).\n\nNot ``Warning``, which is a Python builtin. ``code`` is an ``ErrorCode``\nvalue (``VALUE_NOT_FOUND``, ``JOIN_FAN_OUT``, ``ALL_NULL_COLUMN``,\n``JOIN_KEY_UNCONVERTED``, ``RESULT_TRUNCATED``, ...), ``node`` the node that\nfound it, ``message`` what the answer says, and ``sub_query_id`` the\nsub-query it is about, when it is about one. ``detail`` holds what a\nprogram may branch on; it never holds result rows or sample values.\n``detail[\"recovered\"]`` is True for an earlier attempt's error that a\nretry has since replaced: the trace of a retry, not something the answer\nsays.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "sub_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Query Id"
+          }
+        },
+        "required": [
+          "code",
+          "node",
+          "message"
+        ],
+        "title": "RunWarning",
+        "type": "object"
+      },
+      "SelectItem": {
+        "additionalProperties": false,
+        "description": "Represents an item in the SELECT clause.\n\nAttributes:\n    expr (Expr): The expression to select.\n    alias (Optional[str]): The alias for the selected expression.",
+        "properties": {
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          },
+          "expr": {
+            "$ref": "#/components/schemas/Expr"
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "title": "SelectItem",
+        "type": "object"
+      },
+      "SubQuery": {
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "expected_schema": {
+            "items": {
+              "$ref": "#/components/schemas/ExpectedColumn"
+            },
+            "title": "Expected Schema",
+            "type": "array"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterSpec"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "group_by": {
+            "items": {
+              "$ref": "#/components/schemas/GroupBySpec"
+            },
+            "title": "Group By",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "kind": {
+            "const": "scan",
+            "default": "scan",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricSpec"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "order_by": {
+            "items": {
+              "$ref": "#/components/schemas/OrderBySpec"
+            },
+            "title": "Order By",
+            "type": "array"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          }
+        },
+        "required": [
+          "id",
+          "datasource_id",
+          "intent"
+        ],
+        "title": "SubQuery",
+        "type": "object"
+      },
+      "SubQueryResponse": {
+        "description": "One decomposed sub-query: its plan, validation checks, SQL and row sample.",
+        "properties": {
+          "datasource_id": {
+            "default": "",
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Estimate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "intent": {
+            "default": "",
+            "title": "Intent",
+            "type": "string"
+          },
+          "knowledge_used": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnowledgeUsed"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "plan_source": {
+            "default": "llm",
+            "enum": [
+              "llm",
+              "cache",
+              "verified",
+              "supplied",
+              "approved",
+              "chosen"
+            ],
+            "title": "Plan Source",
+            "type": "string"
+          },
+          "retry_count": {
+            "default": 0,
+            "title": "Retry Count",
+            "type": "integer"
+          },
+          "row_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Cap"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowSample"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "default": "",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sql": {
+            "default": "",
+            "title": "Sql",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "validation": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheck"
+            },
+            "title": "Validation",
+            "type": "array"
+          }
+        },
+        "title": "SubQueryResponse",
+        "type": "object"
+      },
+      "SuccessResponse": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "title": "SuccessResponse",
+        "type": "object"
+      },
+      "TableRef": {
+        "additionalProperties": false,
+        "description": "Represents a reference to a database table.\n\nAttributes:\n    name (str): The name of the table.\n    schema_name (Optional[str]): The schema of the table.\n    database (Optional[str]): The database name.\n    alias (str): The alias used for the table in the query.",
+        "properties": {
+          "alias": {
+            "title": "Alias",
+            "type": "string"
+          },
+          "database": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name"
+          }
+        },
+        "required": [
+          "name",
+          "alias"
+        ],
+        "title": "TableRef",
+        "type": "object"
+      },
+      "TermMatch": {
+        "additionalProperties": false,
+        "description": "A glossary term sent with a sub-query: what it means, where it came from and how well it matched.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "source",
+          "score"
+        ],
+        "title": "TermMatch",
+        "type": "object"
+      },
+      "TermUse": {
+        "description": "A glossary term sent with a step whose columns the plan reads.",
+        "properties": {
+          "definition": {
+            "title": "Definition",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "definition",
+          "source"
+        ],
+        "title": "TermUse",
+        "type": "object"
+      },
+      "UnmappedSubQuery": {
+        "properties": {
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "no_datasource",
+              "restricted_datasource",
+              "unsupported_datasource"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intent",
+          "reason"
+        ],
+        "title": "UnmappedSubQuery",
+        "type": "object"
+      },
+      "UsageTotals": {
+        "description": "Token counts, LLM calls and LLM seconds for one node or one question.\n\n``latency_s`` is time spent waiting on the model, summed over calls; a\nnode's wall-clock time (which also covers its non-LLM work) is in\n``QueryResult.timings``. ``cost`` is null unless every call counted here\nhas a cost. A token count is the sum of what the calls reported, and\nnull when no call reported it.",
+        "properties": {
+          "cache_write_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Input Tokens"
+          },
+          "cached_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Input Tokens"
+          },
+          "calls": {
+            "default": 0,
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "latency_s": {
+            "default": 0.0,
+            "title": "Latency S",
+            "type": "number"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "reasoning_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "title": "UsageTotals",
+        "type": "object"
+      },
+      "ValidationCheck": {
+        "description": "One named validation gate and how it went.\n\n``errors`` records what failed; ``checks`` records what was checked at all,\nso a caller can render \"structure passed, policy denied\" instead of an\nempty list meaning success.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "passed",
+          "message"
+        ],
+        "title": "ValidationCheck",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VerifiedRef": {
+        "description": "A verified query from ``curated.yaml``, by id, with the values it was bound to.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "VerifiedRef",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "NL2SQL API"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/about": {
+      "get": {
+        "description": "`engine.about()`: the engine's version, and every step of a run with the model each model step runs on.\nNever a key.",
+        "operationId": "about_api_v1_about_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response About Api V1 About Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "The pipeline and its models",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/datasource": {
+      "get": {
+        "description": "Every configured datasource as `{\"datasources\": [...]}`: its `id`, `type`, `description`,\n`status` (`ready`, `failed` with a `reason`, or `unchecked`), `capabilities` and `connection`,\nwith every secret masked.",
+        "operationId": "list_datasources_api_v1_datasource_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Datasources Api V1 Datasource Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List datasources",
+        "tags": [
+          "datasources"
+        ]
+      },
+      "post": {
+        "description": "Register a datasource in this process from `config`, shaped like one entry of\n`datasources` in `nl2sql.yaml` (`id`, `type`, `connection`, ...). It is not indexed: call\n`POST /api/v1/index/{datasource_id}` next. Admin only.\n\nWith `\"save\": true` it is also written to `datasources/<id>.yaml` beside `nl2sql.yaml`, and `file` says\nwhere. A secret is never written into the YAML: a `${env:VAR}` or other reference is kept as it is, and a\nliteral is written to the `.env` as `${env:NL2SQL_...}` only when `api.auth` is `none` (the local operator);\nanywhere else it is a 422. A save that fails leaves nothing registered.\n\nA body that does not validate, a typo included, is a 422 listing each problem by its path, never a value.",
+        "operationId": "add_datasource_api_v1_datasource_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "postgres": {
+                  "value": {
+                    "config": {
+                      "connection": {
+                        "database": "sales",
+                        "host": "db.internal",
+                        "password": "${env:SALES_DB_PASSWORD}",
+                        "user": "nl2sql"
+                      },
+                      "description": "Orders and customers",
+                      "id": "sales",
+                      "type": "postgres"
+                    },
+                    "save": true
+                  }
+                }
+              },
+              "schema": {
+                "additionalProperties": false,
+                "description": "``POST /datasource``: the datasource, and whether to also write it to `datasources/<id>.yaml`.",
+                "properties": {
+                  "config": {
+                    "additionalProperties": true,
+                    "title": "Config",
+                    "type": "object"
+                  },
+                  "save": {
+                    "default": false,
+                    "title": "Save",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "config"
+                ],
+                "title": "DatasourceRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "`save` found the datasource's file changed on disk since the engine loaded it."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The body does not validate: `error.details` lists each problem as `{loc, msg}` (never a value)."
+          }
+        },
+        "summary": "Add a datasource",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasource-types": {
+      "get": {
+        "description": "Every adapter the engine can name, installed or not, as `{\"types\": [...]}`: its `name`, `title`,\n`installed`, an `install_hint` when a driver is missing and the JSON Schema of its connection\n(`connection_schema`), which is the Connect a database form: a secret field is `format: password`.\nAdmin only.",
+        "operationId": "datasource_types_api_v1_datasource_types_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Datasource Types Api V1 Datasource Types Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "List the datasource types",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasource/test": {
+      "post": {
+        "description": "Connect to the datasource in `config` and say whether it works: `{\"id\", \"status\": \"ready\"|\"failed\",\n\"stage\", \"reason\", \"fix\", \"warnings\"}`. A failure is a 200 with `status: failed`, its `stage` (`config`,\n`driver`, `network`, `auth`, `database`, `permission`) and what to do. Nothing is registered or written,\nand no value is echoed. Admin only.",
+        "operationId": "test_datasource_api_v1_datasource_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "postgres": {
+                  "value": {
+                    "config": {
+                      "connection": {
+                        "database": "sales",
+                        "host": "db.internal",
+                        "password": "${env:SALES_DB_PASSWORD}",
+                        "user": "nl2sql"
+                      },
+                      "description": "Orders and customers",
+                      "id": "sales",
+                      "type": "postgres"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "additionalProperties": false,
+                "description": "``POST /datasource/test``: one datasource, shaped like one entry of `datasources` in `nl2sql.yaml`.",
+                "properties": {
+                  "config": {
+                    "additionalProperties": true,
+                    "title": "Config",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "config"
+                ],
+                "title": "DatasourceTestRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Test Datasource Api V1 Datasource Test Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The body does not validate: `error.details` lists each problem as `{loc, msg}` (never a value)."
+          }
+        },
+        "summary": "Test a datasource",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasource/{datasource_id}": {
+      "delete": {
+        "description": "Take a datasource out of the engine and close its connections (404 for an unknown id). It is not\nremoved from the config file, and its index entries stay until the next full index. Admin only.",
+        "operationId": "remove_datasource_api_v1_datasource__datasource_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Remove Datasource Api V1 Datasource  Datasource Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove a datasource",
+        "tags": [
+          "datasources"
+        ]
+      },
+      "get": {
+        "description": "One configured datasource, as the list shows it, or 404 when it is not configured.",
+        "operationId": "get_datasource_api_v1_datasource__datasource_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Datasource Api V1 Datasource  Datasource Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a datasource",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Liveness, from process state only: `{\"status\": \"ok\", \"version\": {\"engine\", \"api\"}}`. Checks nothing else.",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Check Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/index": {
+      "delete": {
+        "description": "Remove every entry from the vector store. Questions need a re-index before they can be answered.\nAdmin only.",
+        "operationId": "clear_index_api_v1_index_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clear Index Api V1 Index Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "Clear the index",
+        "tags": [
+          "indexing"
+        ]
+      }
+    },
+    "/api/v1/index-all": {
+      "post": {
+        "description": "Index every configured datasource, one at a time. `success` is false when any failed: `errors`\nnames each one, and each keeps its previous entries. Admin only.",
+        "operationId": "index_all_datasources_api_v1_index_all_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Index All Datasources Api V1 Index All Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "Index every datasource",
+        "tags": [
+          "indexing"
+        ]
+      }
+    },
+    "/api/v1/index/status": {
+      "get": {
+        "description": "The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by\ntype, when it was built, the embedding model, one entry per registered datasource and any\nproblems found. Read from the live index; the same report the playground shows.",
+        "operationId": "get_index_status_api_v1_index_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Index Status Api V1 Index Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Index status",
+        "tags": [
+          "indexing"
+        ]
+      }
+    },
+    "/api/v1/index/{datasource_id}": {
+      "post": {
+        "description": "Index one datasource's schema into the vector store, beside its live entries, and switch to the new\nones when all are written; returns the indexing stats. A failure keeps its previous entries and is a\n500 `INDEX_FAILED` (the reason is in the server log). Admin only.",
+        "operationId": "index_datasource_api_v1_index__datasource_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Index Datasource Api V1 Index  Datasource Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Index one datasource",
+        "tags": [
+          "indexing"
+        ]
+      }
+    },
+    "/api/v1/llm": {
+      "get": {
+        "description": "Each agent (`default` first) with the provider, model and temperature it runs on, and\n`inherited` when it sets nothing of its own, as `{\"llms\": ...}`. Never a key.",
+        "operationId": "list_llms_api_v1_llm_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Llms Api V1 Llm Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List the agents' models",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/api/v1/llm/{agent}": {
+      "get": {
+        "description": "One agent's entry, by its name in the `llm` section (`default`, `ast_planner`, ...). 404 for\nan unknown agent.",
+        "operationId": "get_llm_api_v1_llm__agent__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent",
+            "required": true,
+            "schema": {
+              "title": "Agent",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Llm Api V1 Llm  Agent  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get one agent's model",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/api/v1/meta": {
+      "get": {
+        "description": "Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and\n`request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key.",
+        "operationId": "meta_api_v1_meta_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Meta Api V1 Meta Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "What this server is",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/query": {
+      "post": {
+        "description": "Run a natural-language question through the pipeline.\n\nReturns, per sub-query, the plan, the validation checks, the SQL and a capped row\nsample, plus the written answer, errors, timings and token usage. A pipeline\nfailure (a refusal included) comes back with status 200 and `status: \"error\"`.\n`execute: false` plans and validates without running SQL. The caller (user,\ntenant and roles) comes from the source `api.auth` names, never from the\nbody; no identity is a 401.",
+        "operationId": "execute_query_api_v1_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask a question",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/query/stream": {
+      "post": {
+        "description": "The same run as `POST /query`, reported as it happens, as Server-Sent Events.\n\nEach SSE `event` is the event's name and its `data` line the whole event as\nJSON (`name`, `at`, `trace_id`, `tenant_id`, `data`): `run.started`;\n`node.started` (`node`, `sub_query_id`) and `node.finished` (plus `seconds`,\n`ok`) per pipeline step; `result.manifest` (`results`) as soon as the results\nare saved, so a client can start paging them with the event's `trace_id`;\n`answer.delta` (`field`: `summary` or `content`, `text`) as the answer model\nwrites; `sanity.flagged` and `run.limit_reached`; then exactly one of\n`run.finished`, the run's summary whose `data.result` is the `/query`\nresponse, or `run.failed` (`message`, `error_code`, and the engine's `user_id` and `roles`) when the run could not\nfinish. A refusal or a provider error is a `run.finished` with\n`status: \"error\"`, as `/query` returns it. Same body and auth as `/query`;\nclosing the connection cancels the run before its next step.",
+        "operationId": "stream_query_api_v1_query_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-Sent Events, the engine's run events: `run.started`, `node.started`, `node.finished`, `result.manifest`, `answer.delta`, `sanity.flagged`, `run.limit_reached`, then one `run.finished` (its `data.result` is the `/query` response) or `run.failed`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask a question, streamed",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/query/{request_id}/results/{result_id}": {
+      "get": {
+        "description": "Rows `offset` to `offset + limit` of one saved result, read lazily from its\nparquet file. `request_id` is the run's `trace_id`; `result_id` is a `node_id`\nfrom the query response's `result_manifest`. `next_offset` is where the next page\nstarts, null at the end; a page past the end is empty. A run is readable only\nby the caller who asked it (the same user id and tenant): an unknown run,\nanother user's or another tenant's, or an id that is not a plain token is a 404.",
+        "operationId": "get_result_page_api_v1_query__request_id__results__result_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "result_id",
+            "required": true,
+            "schema": {
+              "title": "Result Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The first row to return, from 0.",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "The first row to return, from 0.",
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Rows per page; capped at 1,000.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Rows per page; capped at 1,000.",
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a page of a result",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/query/{request_id}/results/{result_id}.csv": {
+      "get": {
+        "description": "The whole of one saved result as CSV, streamed a slice at a time from its\nparquet file, never built in memory. `request_id` is the run's `trace_id`;\n`result_id` is a `node_id` from the query response's `result_manifest`. A run is\nreadable only by the caller who asked it (the same user id and tenant): an\nunknown run, another user's or another tenant's, or an id that is not a plain\ntoken is a 404.",
+        "operationId": "export_result_csv_api_v1_query__request_id__results__result_id__csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "result_id",
+            "required": true,
+            "schema": {
+              "title": "Result Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {}
+            },
+            "description": "The whole result, header first."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download a result as CSV",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "description": "Returns `success: true`. It does not yet check datasources, the LLM or the index.",
+        "operationId": "readiness_check_api_v1_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/settings/llm": {
+      "put": {
+        "description": "Replace the engine's whole `llm` section with the body: the section as JSON, the same shape as\n`llm.yaml`. It is checked exactly as the file is, and every agent's key must resolve; a bad section\nis a 422 whose `error.message` is the config error, and changes nothing. Runs in flight finish on the old\nLLM. The change is logged and audited, and not written to any file: a restart reads `llm.yaml`\nagain. Returns who changed it (`by`) and each agent whose provider or model changed, old and new.\nAdmin only.",
+        "operationId": "replace_llm_api_v1_settings_llm_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "openai": {
+                  "value": {
+                    "agents": {
+                      "ast_planner": {
+                        "model": "gpt-5.5"
+                      }
+                    },
+                    "api_key": "${env:OPENAI_API_KEY}",
+                    "model": "gpt-5.4",
+                    "provider": "openai"
+                  }
+                }
+              },
+              "schema": {
+                "additionalProperties": true,
+                "title": "Section",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Replace Llm Api V1 Settings Llm Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The section is not valid: `error.message` is the config error."
+          }
+        },
+        "summary": "Replace the LLM",
+        "tags": [
+          "llm"
+        ]
+      }
+    }
+  }
+}

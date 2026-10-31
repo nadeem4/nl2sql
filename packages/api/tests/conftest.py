@@ -76,7 +76,7 @@ def api_client(tmp_path):
         if authenticated:
             app.dependency_overrides[identity.caller] = lambda: UserContext(roles=["admin"])
             app.dependency_overrides[identity.admin] = lambda: UserContext(roles=["admin"])
-        client = TestClient(app)
+        client = TestClient(app, raise_server_exceptions=False)
         clients.append(client)
         return client, engine
 

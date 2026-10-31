@@ -147,10 +147,9 @@ def test_none_refuses_to_start_off_loopback():
 
 
 def test_none_loopback_request_is_the_operator(make_client):
-    for base_url in ("http://localhost:8000", "http://127.0.0.1:8000", "http://[::1]:8000", "http://localhost"):
-        client = make_client(base_url=base_url)
-        response = client.get("/test/admin-only")
-        assert response.status_code == 200, base_url
+    for host in ("localhost:8000", "127.0.0.1:8000", "[::1]:8000", "localhost"):
+        response = make_client().get("/test/admin-only", headers={"Host": host})
+        assert response.status_code == 200, host
         assert response.json() == {"user_id": "local", "tenant_id": None, "roles": ["admin"]}
 
 

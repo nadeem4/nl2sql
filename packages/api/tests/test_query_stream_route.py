@@ -55,7 +55,7 @@ def test_query_stream_route(api_client):
 
 
 def test_the_stream_needs_a_role_like_the_query_route(api_client):
-    client, engine = api_client(QueryResult(status="success"), authenticated=False)
+    client, engine = api_client(QueryResult(status="success"), authenticated=False, api={"auth": "static"})
 
     response = client.post("/api/v1/query/stream", json={"natural_language": "q"})
 
