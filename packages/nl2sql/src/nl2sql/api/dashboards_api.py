@@ -9,11 +9,12 @@ runs each dashboard as its stored owner (D134).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from nl2sql.api.types import TileProgress
+from nl2sql.approvals.api import Approvals
 from nl2sql.common.cancellation import CancellationToken
-from nl2sql.common.errors import NotIndexed
+from nl2sql.common.errors import ApprovalNotFound, NotIndexed
 from nl2sql.common.planned import arrives_with
 from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.api import Dashboards
@@ -31,6 +32,18 @@ from nl2sql.dashboards.roles import Source
 from nl2sql.hooks.approval import Approval
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
+
+
+def resolve_refresh_approvals(ctx: Runtime, approvals: Sequence[Union[Approval, str]],
+                              user: UserContext) -> List[Approval]:
+    """``approvals`` for a refresh, each request id replaced by its grant (D236). An id that cannot run is an
+    ``ApprovalNotFound`` before anything refreshes: one bad id must not fail every chart with the same error."""
+    if all(isinstance(a, Approval) for a in approvals):
+        return list(approvals)
+    resolved, problem = Approvals(ctx).resolve(approvals, user=user)
+    if problem is not None:
+        raise ApprovalNotFound(problem)
+    return resolved
 
 
 class DashboardsAPI:
@@ -154,13 +167,14 @@ class DashboardsAPI:
 
     def refresh(self, dashboard_id: str, *, user_context: UserContext, tile_id: Optional[str] = None,
                 filters: Optional[Dict[str, List[Any]]] = None,
-                approvals: Sequence[Approval] = ()) -> DashboardRun:
+                approvals: Sequence[Union[Approval, str]] = ()) -> DashboardRun:
         """Re-runs the stored plans of one chart (``tile_id``) or of all of them, in layout order, as the caller,
         and stores the results. No model call.
 
         A chart whose plan no longer validates is ``needs_fixing`` (no rows, the refiner is never asked); one the
         caller cannot read is ``denied``; one a hook wants approved is ``needs_approval`` with its requests in
-        ``approvals_needed`` and keeps its last result; pass an ``Approval`` for each in ``approvals`` to run it.
+        ``approvals_needed`` and keeps its last result; pass an ``Approval`` or a granted request id (``engine.approvals``,
+        D236) for each in ``approvals`` to run it.
         A chart whose run fails (``error``) keeps its last good result too. A chart stopped at a cap ends the
         refresh.
 
@@ -173,11 +187,12 @@ class DashboardsAPI:
         Raises:
             DashboardNotFound: it does not exist or is not the caller's.
             DashboardBusy: (a ``ValueError``) another caller or process is refreshing or editing it.
+            ApprovalNotFound: an id in ``approvals`` is unknown, waiting, denied or expired; nothing runs.
             ValueError: ``tile_id`` is not one of its charts, a filter id is not the dashboard's, or a value has
                 the wrong type or count (the message names the filter).
         """
         return self._service.refresh(dashboard_id, user_context=user_context, tile_id=tile_id, filters=filters,
-                                     approvals=approvals)
+                                     approvals=resolve_refresh_approvals(self._ctx, approvals, user_context))
 
     def filter_values(self, dashboard_id: str, filter_id: str, *, user_context: UserContext,
                       limit: int = 100) -> List[Any]:

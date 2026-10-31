@@ -25,7 +25,7 @@ earlier question.
 | `start(*, user_context, datasource_id=None, dashboard_id=None) -> Conversation` | C1 |
 | `ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None) -> Turn` | C1 |
 | `stream(conversation_id, text=None, *, user_context, choice=None, execute=True) -> Iterator[Event]` | C1 |
-| `retry(conversation_id, *, user_context, approvals=()) -> Turn` | C1 |
+| `retry(conversation_id, *, user_context, approvals=()) -> Turn` | C1; `approvals` are `Approval` objects or granted request ids (D215) |
 | `ask_only(conversation_id, question, *, user_context, choice=None) -> QueryResult` | C1 |
 | `get(conversation_id, *, user_context) -> Conversation` | C1 |
 | `list(*, user_context, limit=20) -> list[ConversationInfo]` | C1 |

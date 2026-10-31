@@ -5,7 +5,7 @@ method takes the caller keyword-only and required (D105, D130), so an app that f
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Union
 
 from nl2sql.conversations.api import Conversations
 from nl2sql.conversations.models import Conversation, ConversationInfo, Turn
@@ -48,8 +48,10 @@ class ConversationsAPI:
         return self._service.stream(conversation_id, text, user_context=user_context, choice=choice, execute=execute)
 
     def retry(self, conversation_id: str, *, user_context: UserContext,
-              approvals: Sequence["Approval"] = ()) -> Turn:
-        """Re-runs the last ``ask`` step's question as a new turn of kind ``retry``, with no model call."""
+              approvals: Sequence[Union["Approval", str]] = ()) -> Turn:
+        """Re-runs the last ``ask`` step's question as a new turn of kind ``retry``, with no model call.
+
+        ``approvals`` are ``Approval`` objects or request ids (``engine.approvals``, D215); ``run_query`` resolves them."""
         return self._service.retry(conversation_id, user_context=user_context, approvals=approvals)
 
     def tool(self, conversation_id: str, name: str, args: Optional[Dict[str, Any]] = None, *,

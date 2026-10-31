@@ -217,6 +217,13 @@ and the id must be a plain token (letters, digits, `-` and `_`), so no id can
 name a file elsewhere: anything else raises `ValueError`, as does a file in
 another trace format.
 
+### Approvals
+
+`engine.approvals` keeps the approval requests a `needs_approval` run raised and their grants:
+`list(*, user_context, status="pending")`, `grant(request_id, *, by)`, `deny(request_id, *, by,
+reason=None)`. The asker's re-run names a granted id in `approvals=` of `run_query`, `stream_query`,
+`conversations.retry` and `dashboards.refresh`. See [Query API → Approval](query.md#approval).
+
 ### Storage
 
 `engine.storage.info()` returns each store slot's `type` and `location` (and
@@ -224,8 +231,9 @@ another trace format.
 index `namespace`. `engine.storage.purge()` deletes the traces and results
 older than their store's `max_age_days`, and the audit observer's day files
 older than its own, and the review queue's decided proposals older than
-`settings.review.max_age_days`, and returns the counts,
-`{"traces": 3, "results": 12, "proposals": 4, "audit": 1}`, which it also publishes as
+`settings.review.max_age_days`, and the stored approvals older than
+`settings.approvals.max_age_hours`, and returns the counts,
+`{"traces": 3, "results": 12, "proposals": 4, "approvals": 0, "audit": 1}`, which it also publishes as
 `retention.purged`. See
 [Storage → Retention](../../configuration/storage.md#retention).
 
@@ -255,7 +263,7 @@ submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `ResultNotFound`, `TraceNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`,
 `UserContext`, `CancellationToken`, `configure_logging`,
 `TraceContextFilter`, the event types (`Event`, `Observer`), a run's ending
-(`RunStop`, `ApprovalRequest`, `Approval`, `VerifiedRef`), what the namespaces
+(`RunStop`, `ApprovalRequest`, `Approval`, `ApprovalRecord`, `VerifiedRef`), what the namespaces
 return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `TileProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
