@@ -14,7 +14,7 @@ PUBLIC_SURFACE = {
     # Saved results
     "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return
-    "DatasourceInfo", "DatasourceType", "IndexProgress", "LLMChange",
+    "DatasourceInfo", "DatasourceType", "IndexProgress", "TileProgress", "LLMChange",
     # Schema drift
     "DriftReport", "DriftImpact", "SchemaDiff", "SchemaVersionInfo",
     # Errors

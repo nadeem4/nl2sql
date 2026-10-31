@@ -97,6 +97,16 @@ that does not resolve), `index`, and `ok`, true when every datasource is
 ready, every key resolves and the index is built. `str(report)` is a readable
 summary.
 
+Two methods judge a report for a caller that serves traffic (`GET /ready`, `nl2sql doctor`):
+
+- `ready(*, keys_optional: bool) -> bool`: every `required` datasource is ready and at least one is, every key
+  resolves unless `keys_optional` (a caller brings its own key, or every agent is on `replay`), and the index is
+  `ok` or `stale` (a glossary changed since the build; it still answers). A failed optional datasource does not make
+  the engine not ready.
+- `problems() -> list[str]`: one line per failed datasource (its id and stage), per agent whose key does not
+  resolve, and the index status unless `ok` or `stale`. Safe to show an administrator: it never carries a
+  reason's text, which can echo a connection string or a key.
+
 Building an engine is cheap and has no side effects outside `storage.path`, so
 it suits tests and notebooks. Startup policy belongs to the entry point: call
 `check()` straight after building the engine, refuse to start on
@@ -242,7 +252,7 @@ submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `UserContext`, `CancellationToken`, `configure_logging`,
 `TraceContextFilter`, the event types (`Event`, `Observer`), a run's ending
 (`RunStop`, `ApprovalRequest`, `Approval`, `VerifiedRef`), what the namespaces
-return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `LLMChange`), the config (`Config`,
+return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `TileProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
 `Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`,

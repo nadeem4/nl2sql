@@ -9,6 +9,7 @@ from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 
 if TYPE_CHECKING:
+    from nl2sql.common.cancellation import CancellationToken
     from nl2sql.policies import Scope
     from nl2sql.schema.drift import DriftReport, SchemaVersionInfo
     from nl2sql_sdk.schema import SchemaDiff
@@ -31,6 +32,7 @@ class IndexAPI:
         *,
         on_progress: Optional[Callable[[str], None]] = None,
         on_datasource: Optional[Callable[[IndexProgress], None]] = None,
+        cancellation_token: Optional["CancellationToken"] = None,
     ):
         """Build the index for ``datasource_ids`` (every datasource when None), beside the live one.
 
@@ -44,9 +46,12 @@ class IndexAPI:
         ``on_progress`` gets a sentence before each step;
         ``on_datasource`` gets an :class:`IndexProgress` as each datasource
         starts, is done (with its entry counts) or fails (with the reason).
+        Cancel ``cancellation_token`` to stop between datasources: the one in
+        flight finishes, the rest are not touched, and the result has
+        ``cancelled`` set and ``ok`` false.
 
         Returns:
-            A ``RebuildResult``: ``ok``, ``stats``, ``empty`` and ``errors``.
+            A ``RebuildResult``: ``ok``, ``stats``, ``empty``, ``errors`` and ``cancelled``.
         """
         from nl2sql.indexing.rebuild import rebuild_index
 
@@ -55,6 +60,7 @@ class IndexAPI:
             datasource_ids=list(datasource_ids) if datasource_ids is not None else None,
             on_progress=on_progress,
             on_datasource=on_datasource,
+            cancellation_token=cancellation_token,
         )
 
     def refresh(

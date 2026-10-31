@@ -15,7 +15,7 @@ from .public_api import NL2SQL
 # import engine submodules.
 _EXPORTS = {
     "nl2sql.api.query_api": ("QueryResult", "AnswerSource", "SubQueryResult", "RowSample"),
-    "nl2sql.api.types": ("DatasourceInfo", "DatasourceType", "IndexProgress", "Candidate", "ApiKey"),
+    "nl2sql.api.types": ("DatasourceInfo", "DatasourceType", "IndexProgress", "TileProgress", "Candidate", "ApiKey"),
     # Schema drift (engine.index.check, versions, diff).
     "nl2sql.schema.drift": ("DriftReport", "SchemaVersionInfo"),
     "nl2sql.schema.impact": ("DriftImpact",),
@@ -150,6 +150,7 @@ __all__ = [
     "DatasourceInfo",
     "DatasourceType",
     "IndexProgress",
+    "TileProgress",
     "DriftReport",
     "DriftImpact",
     "SchemaDiff",

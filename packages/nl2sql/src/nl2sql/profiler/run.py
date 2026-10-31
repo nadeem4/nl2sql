@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from nl2sql_sdk.protocols import ProfilingAdapterProtocol
 from nl2sql_sdk.schema import ColumnRef, SchemaSnapshot
@@ -30,6 +30,7 @@ from nl2sql.profiler.roles import find_roles
 from nl2sql.review.queue import propose, table_names
 
 if TYPE_CHECKING:
+    from nl2sql.common.cancellation import CancellationToken
     from nl2sql.policies import UserContext
 
 
@@ -72,8 +73,12 @@ def _drafter(ctx: Any, max_cost_usd: Optional[float]) -> Drafter:
 
 
 def profile(ctx: Any, datasource_ids: Sequence[str], user: "UserContext", *, draft: bool = False,
-            max_cost_usd: Optional[float] = None) -> List[ProfileReport]:
+            max_cost_usd: Optional[float] = None, on_datasource: Optional[Callable[[ProfileReport], None]] = None,
+            cancellation_token: Optional["CancellationToken"] = None) -> List[ProfileReport]:
     """One report per datasource in ``datasource_ids`` the caller reaches.
+
+    ``on_datasource`` gets each report as its datasource finishes; a cancelled ``cancellation_token`` ends the
+    call before the next datasource, and the reports so far are returned.
 
     ``draft`` also drafts descriptions, under ``max_cost_usd`` (``settings.profiler.max_cost_usd`` when None)
     across the whole call.
@@ -87,8 +92,16 @@ def profile(ctx: Any, datasource_ids: Sequence[str], user: "UserContext", *, dra
     if max_cost_usd is not None and max_cost_usd <= 0:
         raise ValueError("max_cost_usd must be a positive number of dollars.")
     drafter = _drafter(ctx, max_cost_usd) if draft else None
-    reports = []
+    reports: List[ProfileReport] = []
+
+    def add(report: ProfileReport) -> None:
+        reports.append(report)
+        if on_datasource is not None:
+            on_datasource(report)
+
     for datasource_id in datasource_ids:
+        if cancellation_token is not None and cancellation_token.is_cancelled():
+            break
         scope = ctx.policy_engine.scope(user, datasource_id)
         if not scope.reaches_datasource():
             continue
@@ -96,7 +109,7 @@ def profile(ctx: Any, datasource_ids: Sequence[str], user: "UserContext", *, dra
         version = ctx.vector_store.schema_version(datasource_id)
         snapshot = ctx.vector_store.snapshot(datasource_id)
         if snapshot is None or version is None:
-            reports.append(ProfileReport(
+            add(ProfileReport(
                 datasource_id=datasource_id, schema_version="", seconds=0.0,
                 issues=[f"{datasource_id} is not indexed yet, so there is no schema to profile. "
                         f"Run `nl2sql index`, then profile again."]))
@@ -107,7 +120,7 @@ def profile(ctx: Any, datasource_ids: Sequence[str], user: "UserContext", *, dra
             "skipped_by_budget": report.skipped_by_budget, "drafted": report.drafted,
             "stopped_by": report.stopped_by, "cost": report.cost, "seconds": report.seconds},
             tenant_id=ctx.tenant_id)
-        reports.append(report)
+        add(report)
     return reports
 
 

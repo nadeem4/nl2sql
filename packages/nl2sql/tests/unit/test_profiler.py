@@ -6,6 +6,7 @@ SQLite database with a fake embedder, so nothing is downloaded and no model is c
 """
 from __future__ import annotations
 
+import shutil
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +16,7 @@ import pytest
 import yaml
 from langchain_core.embeddings import DeterministicFakeEmbedding
 
-from nl2sql import NL2SQL, Embeddings, UserContext
+from nl2sql import NL2SQL, CancellationToken, Embeddings, UserContext
 from nl2sql.profiler.joins import find_candidates
 from nl2sql.profiler.roles import find_roles
 from nl2sql.testing.config import make_config
@@ -313,20 +314,24 @@ def _database(folder: Path) -> None:
     connection.close()
 
 
-def _engine(folder: Path, *, index: bool = True, settings: Optional[dict] = None, **sections) -> NL2SQL:
+def _engine(folder: Path, *, index: bool = True, settings: Optional[dict] = None,
+            ids: tuple = ("shop",), **sections) -> NL2SQL:
     _database(folder)
+    for extra in ids[1:]:
+        shutil.copy(folder / "shop.db", folder / f"{extra}.db")
     config = make_config(
-        folder, datasources=[{"id": "shop", "type": "sqlite", "connection": {"database": "shop.db"}}],
+        folder, datasources=[{"id": i, "type": "sqlite", "connection": {"database": f"{i}.db"}} for i in ids],
         policies={"roles": ROLES}, **({"settings": settings} if settings else {}), **sections)
     engine = NL2SQL(config.model_copy(update={"embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8),
                                                                        dimension=8)}))
     if index:
         ctx = engine._runtime
-        adapter = ctx.ds_registry.get_adapter("shop")
-        version = ctx.state.put_snapshot(adapter.fetch_schema_snapshot(ctx.ds_registry.get_index_scope("shop")))
         ctx.index.open(ctx.namespace, 8)
-        ctx.index.set_pointers(ctx.namespace, {"shop": BuildPointer(
-            build_id="b1", schema_version=version, built_at=datetime.now(timezone.utc))})
+        for i in ids:
+            adapter = ctx.ds_registry.get_adapter(i)
+            version = ctx.state.put_snapshot(adapter.fetch_schema_snapshot(ctx.ds_registry.get_index_scope(i)))
+            ctx.index.set_pointers(ctx.namespace, {i: BuildPointer(
+                build_id="b1", schema_version=version, built_at=datetime.now(timezone.utc))})
     return engine
 
 
@@ -508,3 +513,23 @@ def test_profile_finished_is_published(engine):
     assert event.data["datasource_id"] == "shop" and event.data["probes"] == report.probes
     assert event.data["proposals"] == report.proposals and event.data["stopped_by"] == "done"
     assert "customers" not in str(event.data)  # counts only, never names or values
+
+
+# ---------------------------------------------------------------- progress and cancellation (G3b)
+
+def test_profile_reports_each_datasource(tmp_path):
+    seen = []
+    with _engine(tmp_path, ids=("shop", "shop2")) as engine:
+        reports = engine.knowledge.profile(user_context=ADMIN, on_datasource=seen.append)
+
+    assert [r.datasource_id for r in seen] == ["shop", "shop2"]
+    assert seen == reports
+
+
+def test_cancelled_profile_stops_between_datasources(tmp_path):
+    token = CancellationToken()
+    with _engine(tmp_path, ids=("shop", "shop2")) as engine:
+        reports = engine.knowledge.profile(user_context=ADMIN, on_datasource=lambda report: token.cancel(),
+                                           cancellation_token=token)
+
+    assert [r.datasource_id for r in reports] == ["shop"]

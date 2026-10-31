@@ -35,7 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from langchain_core.callbacks import BaseCallbackHandler
 
@@ -61,6 +61,9 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage
 
 # Every row is compared, so the sample is never the thing that caps a result.
 _ALL_ROWS = 100_000
+
+if TYPE_CHECKING:
+    from nl2sql.common.cancellation import CancellationToken
 
 logger = get_logger(__name__)
 
@@ -331,13 +334,15 @@ def run_evals(
     on_case: Optional[OnCase] = None,
     clarify: bool = False,
     prices: Optional[Mapping[str, Any]] = None,
+    cancellation_token: Optional["CancellationToken"] = None,
 ) -> EvalReport:
     """Runs every approved case of ``suites`` once per role in its ``outcome``, ``passes`` times.
 
     See the module docstring for the modes. ``scorers`` are registry names;
     those that cannot score ``mode`` are left out. ``on_case`` is called after
     each case with the config's name, the case record and the dollars spent
-    so far.
+    so far. Once ``cancellation_token`` is cancelled no further case starts: the case in flight finishes and the
+    report says ``stopped: "cancelled"``.
 
     Raises:
         ValueError: an unknown mode, a ``cases`` selector matching nothing, mode
@@ -360,20 +365,24 @@ def run_evals(
     if prices is None:
         prices = ctx.config.llm.prices
     if mode == "full":
-        records = _run_full(ctx, jobs, built, report, base, llm, passes, max_cost_usd, on_case, prices)
+        records = _run_full(ctx, jobs, built, report, base, llm, passes, max_cost_usd, on_case, prices,
+                            cancellation_token)
     elif mode == "plans":
-        records = {"plans": _run_plans(ctx.derive({**base, "curated": None}), jobs, built, passes, on_case)}
+        records = {"plans": _run_plans(ctx.derive({**base, "curated": None}), jobs, built, passes, on_case,
+                                         cancellation_token)}
     else:
         run = ctx.derive({**base, **retrieval_recall.RETRIEVAL_CHANGES, "curated": None})
         report.settings = {"retrieval": retrieval_recall.retrieval_settings(run)} if hasattr(run, "vector_store") \
             else {}
-        records = {"retrieval": _run_retrieval(run, jobs, built, passes, on_case)}
+        records = {"retrieval": _run_retrieval(run, jobs, built, passes, on_case, cancellation_token)}
 
     for name, recs in records.items():
         board = report.configs.setdefault(name, {})
         board.update(score_config(recs, passes))
         board.setdefault("planned_cases", len(jobs) * passes)
         board["completed_cases"] = len(recs)
+        if _cancelled(cancellation_token) and len(recs) < board["planned_cases"]:
+            report.stopped = report.stopped or "cancelled"
     if len(report.configs) > 1:
         report.comparison = compare(report.configs)
     bus = getattr(ctx, "bus", None)
@@ -392,8 +401,12 @@ def _finish(ctx: Any, name: str, record: Dict[str, Any], records: List[Dict[str,
         on_case(name, record, spent)
 
 
+def _cancelled(token: Optional["CancellationToken"]) -> bool:
+    return token is not None and token.is_cancelled()
+
+
 def _run_plans(run: Any, jobs: List[_Case], scorers: Dict[str, Scorer], passes: int,
-               on_case: Optional[OnCase]) -> List[Dict[str, Any]]:
+               on_case: Optional[OnCase], token: Optional["CancellationToken"] = None) -> List[Dict[str, Any]]:
     cases = {id(j.case): j.case for j in jobs}.values()
     missing = sorted({c.id for c in cases if c.sql is not None and not c.plan})
     if missing:
@@ -403,6 +416,8 @@ def _run_plans(run: Any, jobs: List[_Case], scorers: Dict[str, Scorer], passes: 
         run.llm_registry.replace_llms({"default": llm.agent_config()})
         for pass_no in range(1, passes + 1):
             for job in jobs:
+                if _cancelled(token):
+                    return records
                 llm.select(job.case)
                 record, _ = _one(run, job, "plans", scorers, pass_no)
                 _finish(run, "plans", record, records, 0.0, on_case)
@@ -410,10 +425,12 @@ def _run_plans(run: Any, jobs: List[_Case], scorers: Dict[str, Scorer], passes: 
 
 
 def _run_retrieval(run: Any, jobs: List[_Case], scorers: Dict[str, Scorer], passes: int,
-                   on_case: Optional[OnCase]) -> List[Dict[str, Any]]:
+                   on_case: Optional[OnCase], token: Optional["CancellationToken"] = None) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     for pass_no in range(1, passes + 1):
         for job in jobs:
+            if _cancelled(token):
+                return records
             t0 = time.perf_counter()
             # Under a run scope of its own, as every case: run.started, then run.finished.
             api = QueryAPI(run)
@@ -468,7 +485,7 @@ def _count_unknown(report: EvalReport, result: Optional[QueryResult]) -> None:
 
 def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: EvalReport, base: Dict[str, Any],
               llm: LLMConfigs, passes: int, max_cost_usd: Optional[float], on_case: Optional[OnCase],
-              prices: Mapping[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+              prices: Mapping[str, Any], token: Optional["CancellationToken"] = None) -> Dict[str, List[Dict[str, Any]]]:
     if not max_cost_usd or max_cost_usd <= 0:
         raise ValueError("Mode full spends money: it needs a positive max_cost_usd (dollars), "
                          "in evals.yaml or as an argument.")
@@ -489,6 +506,9 @@ def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: E
             "planned_cases": len(jobs) * passes}
         for pass_no in range(1, passes + 1):
             for job in jobs:
+                if _cancelled(token):
+                    report.stopped = "cancelled"
+                    break
                 if spent + dearest > max_cost_usd:
                     report.stopped = "max_cost"
                     break

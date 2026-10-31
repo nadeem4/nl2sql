@@ -16,9 +16,10 @@ from nl2sql_sdk.schema import (
     SchemaSnapshot, TableContract, TableMetadata, TableRef,
 )
 
-from nl2sql import NL2SQL, SuppliedPlan, UserContext
+from nl2sql import NL2SQL, CancellationToken, SuppliedPlan, TileProgress, UserContext
 from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.api.results_api import ResultsAPI
+from nl2sql.common.cancellation import RunCancelled
 from nl2sql.charts.spec import ChartData, ChartSpec, Encoding
 from nl2sql.common.errors import DashboardNotFound, NoTiles, NotIndexed
 from nl2sql.dashboards.layout import arrange
@@ -582,3 +583,28 @@ def test_every_template_plan_validates_and_renders_without_a_star(dialect):
             assert not made.get("errors"), (candidate.title, made["errors"])
             sql = made["generator_response"].sql_draft
             assert sql and '"*"' not in sql and "[*]" not in sql and "`*`" not in sql, (dialect, sql)
+
+# ------------------------------------------------------------------ progress and cancellation (G3b)
+
+def test_generate_reports_each_tile(engine, runs):
+    runs.respond = lambda call: failed() if "total" in call["question"].lower() else good()
+    seen = []
+
+    dashboard, run = engine.dashboards.generate("ds1", user_context=ANA, on_tile=seen.append)
+
+    assert [p.done for p in seen] == list(range(1, len(seen) + 1))
+    assert {p.total for p in seen} == {len(seen)} and len(seen) == len(dashboard.tiles) + len(run.skipped)
+    assert {p.status for p in seen} >= {"ok"}
+    assert all(isinstance(p, TileProgress) and p.title for p in seen)
+
+
+def test_cancelled_generate_stops_between_tiles_and_leaves_nothing(engine, runs):
+    token = CancellationToken()
+    runs.respond = lambda call: (token.cancel(), good())[1]
+
+    with pytest.raises(RunCancelled):
+        engine.dashboards.generate("ds1", user_context=ANA, cancellation_token=token)
+
+    assert len(runs.executed()) == 1
+    assert engine.dashboards.list(user_context=ANA) == [] and engine.dashboards.list(user_context=ANA, status="draft") == []
+    assert engine.workspaces.list(user_context=ANA) == []

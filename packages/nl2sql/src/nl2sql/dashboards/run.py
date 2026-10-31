@@ -12,11 +12,12 @@ from __future__ import annotations
 from collections import Counter
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.api.results_api import ResultsAPI
 from nl2sql.charts.spec import ChartSpec, ColumnKind
+from nl2sql.common.cancellation import CancellationToken, RunCancelled
 from nl2sql.common.errors import ErrorCode, NL2SQLError
 from nl2sql.dashboards.filters import Active, plain, supply, values_plan
 from nl2sql.dashboards.models import Dashboard, DashboardFilter, DashboardRun, Tile, TileRun, TileStatus
@@ -179,20 +180,27 @@ class Refresher:
         return {tile.id: self._runner.run(tile, user, execute=False, draw=False) for tile in tiles}
 
     def run(self, dashboard: Dashboard, tiles: Sequence[Tile], user: UserContext, trigger: str,
-            approvals: Sequence[Approval] = (), announce: bool = True, active: Sequence[Active] = ()) -> DashboardRun:
+            approvals: Sequence[Approval] = (), announce: bool = True, active: Sequence[Active] = (),
+            on_tile: Optional[Callable[[Tile, TileRun], None]] = None,
+            token: Optional[CancellationToken] = None) -> DashboardRun:
         """Refresh ``tiles`` in layout order as ``user``; call it under the lock. A chart that needs approval or
         fails keeps its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too.
         A run with ``active`` filters (D117) is a view for whoever asked: it is returned and never stored, so the
-        stored results stay the dashboard's own."""
+        stored results stay the dashboard's own. ``on_tile`` is called after each chart; a cancelled ``token`` raises
+        ``RunCancelled`` before the next chart starts, and nothing of this run is stored."""
         runs: List[TileRun] = []
         stopped = False
         for tile in tiles:
+            if token is not None and token.is_cancelled():
+                raise RunCancelled("The dashboard run was cancelled.")
             if stopped:
                 run = TileRun(tile_id=tile.id, at=datetime.now(timezone.utc), status="stopped")
             else:
                 run = self._runner.run(tile, user, approvals=approvals, active=active)
                 stopped = run.status == "stopped"
             runs.append(run)
+            if on_tile is not None:
+                on_tile(tile, run)
         if not active:
             self._store.put_runs(dashboard.id, [r for r in runs if r.status not in KEEPS_LAST])
         done = DashboardRun(dashboard_id=dashboard.id, at=datetime.now(timezone.utc), trigger=trigger, tiles=runs,

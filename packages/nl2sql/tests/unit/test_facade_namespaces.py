@@ -16,6 +16,7 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from nl2sql import (
     LLM,
     NL2SQL,
+    CancellationToken,
     ConfigError,
     Datasource,
     DatasourceInfo,
@@ -154,6 +155,23 @@ def test_index_build_reports_each_datasource_as_it_goes(engine):
     assert [(p.datasource_id, p.state) for p in progress] == [("shop", "started"), ("shop", "done")]
     assert all(isinstance(p, IndexProgress) for p in progress)
     assert progress[-1].counts and all(isinstance(v, int) for v in progress[-1].counts.values())
+
+
+def test_cancelled_index_build_stops_between_datasources(tmp_path):
+    _shop(tmp_path / "other.db")
+    other = {"id": "other", "type": "sqlite", "connection": {"database": "other.db"}}
+    token = CancellationToken()
+    progress = []
+    with _engine(tmp_path, datasources=[SHOP, other]) as engine:
+        def seen(step):
+            progress.append((step.datasource_id, step.state))
+            if step.state == "done":
+                token.cancel()
+
+        result = engine.index.build(on_datasource=seen, cancellation_token=token)
+
+    assert progress == [("shop", "started"), ("shop", "done")]
+    assert result.cancelled and not result.ok and [s["datasource_id"] for s in result.stats] == ["shop"]
 
 
 def test_index_build_reports_a_failed_datasource_with_its_reason(engine):
