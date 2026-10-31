@@ -426,15 +426,10 @@ class LLMRegistry:
         # A model off the verified list sends no temperature at all, which
         # every model accepts; the caller's choice is checked before it gets here.
         temperature = VERIFIED_MODELS.get(provider, {}).get(model)
-        if provider == agent.provider:
-            if model == agent.model:
-                return agent, key
-            # The same provider: only the model and its temperature change, so
-            # a configured endpoint (and a test's fake one) stays in force.
-            return agent.model_copy(update={"model": model, "temperature": temperature}), key
-        return agent.model_copy(update={"provider": provider, "model": model,
-                                        "temperature": temperature,
-                                        "base_url": None, "api_key": None}), key
+        # The caller's own choice runs on the caller's key at the provider's own endpoint: the operator's
+        # endpoint and headers (which may carry a credential) never follow it.
+        return agent.model_copy(update={"provider": provider, "model": model, "temperature": temperature,
+                                        "base_url": None, "api_key": None, "headers": {}}), key
 
     @staticmethod
     def _for_key(agent: AgentConfig, key: str) -> AgentConfig:
@@ -454,7 +449,7 @@ class LLMRegistry:
             return agent
         return agent.model_copy(update={"provider": provider, "model": default_model_for(provider),
                                         "temperature": default_temperature_for(provider),
-                                        "base_url": None, "api_key": None})
+                                        "base_url": None, "api_key": None, "headers": {}})
 
     def _build_client(self, agent: AgentConfig, api_key: Optional[str] = None) -> BaseChatModel:
         """Builds the client for one agent through its provider in ``LLM_PROVIDERS``.

@@ -515,6 +515,10 @@ on `run_query`, `stream_query`, and a conversation's `ask`, `stream` and
 `retry`. `keys` maps a provider to the caller's key; `models` maps an agent
 name (the node name, such as `ast_planner`) to `(provider, model)`.
 
+- **Only providers that read an API key can be chosen.** A key or a model for a provider with no key variable
+  (`ollama`, `openai_compatible`, a plugin whose `api_key_env` is unset) raises `InvalidArgument`: those are
+  reached by the operator's endpoint and credentials, which a caller may not borrow. A caller's model also
+  never inherits the operator's `base_url` or `headers`, even on the configured provider.
 - **A model runs only on a key the caller sent.** A step the override puts on
   a provider with no key in `keys` raises `MissingProviderKey` at the call,
   before anything runs, so a caller's choice never lands on the operator's

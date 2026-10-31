@@ -15,3 +15,8 @@ class LLMOverride:
 
     keys: Mapping[str, str] = field(default_factory=dict, repr=False)
     models: Mapping[str, Tuple[str, str]] = field(default_factory=dict)
+
+    @property
+    def empty(self) -> bool:
+        """True when it carries no key and no model, so it asks for nothing."""
+        return not self.keys and not self.models

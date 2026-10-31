@@ -28,8 +28,10 @@ OVERRIDE = LLMOverride(keys={"openai": KEY, "anthropic": ANTHROPIC_KEY},
                        models={"ast_planner": ("anthropic", "claude-opus-5")})
 
 
-def _graph(seen):
+def _graph(seen, barrier=None):
     def decomposer(state):
+        if barrier is not None:
+            barrier.wait(timeout=10)  # both runs are inside their decomposer at once
         bound = current_request_llms()
         seen.append({"keys": dict(bound.keys) if bound else None, "models": dict(bound.models) if bound else None,
                      "secrets": collect_secrets(None), "environ": dict(os.environ)})
@@ -53,9 +55,11 @@ def _graph(seen):
 @pytest.fixture
 def api(monkeypatch):
     seen = []
-    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _graph(seen))
+    barrier = {"b": None}
+    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _graph(seen, barrier["b"]))
     query = QueryAPI(fake_runtime(artifact_store=None))
     query.seen = seen
+    query.barrier = barrier
     return query
 
 
@@ -129,6 +133,7 @@ def test_providers_carry_labels_and_key_shape():
     assert "gpt-5.4" in openai["models"] and "claude-opus-5" in providers["anthropic"]["models"]
     assert providers["ollama"]["models"] == [] and providers["ollama"]["key_variable"] is None
     assert openai["key_shape"] == {"pattern": r"^[A-Za-z0-9_-]{20,}$", "min_length": 20, "prefix": None}
+    assert providers["ollama"]["key_shape"] is None and providers["openai_compatible"]["key_shape"] is None
     assert providers["anthropic"]["key_shape"]["prefix"] == "sk-ant-"
     assert KEY not in json.dumps(list(providers.values()))
 
@@ -151,3 +156,106 @@ def test_provider_for_key_and_environment_keys_are_exported(monkeypatch):
     assert nl2sql.provider_for_key(ANTHROPIC_KEY) == "anthropic"
     assert nl2sql.provider_for_key(KEY) == "openai"
     assert nl2sql.provider_keys_in_environment() == {"anthropic": ANTHROPIC_KEY}
+
+
+OTHER_KEY = "-".join(["sk", "proj", "otheroverride" + "c" * 24 + "1a2b"])
+
+
+def test_two_concurrent_streams_each_see_only_their_own_keys(api):
+    import threading
+
+    api.barrier["b"] = threading.Barrier(2)
+    done = {}
+
+    def run(name, key):
+        done[name] = list(api.stream_query("q", llm_override=LLMOverride(keys={"openai": key})))
+
+    threads = [threading.Thread(target=run, args=(n, k)) for n, k in (("a", KEY), ("b", OTHER_KEY))]
+    [t.start() for t in threads]
+    [t.join(timeout=20) for t in threads]
+
+    assert sorted(tuple(s["keys"].values()) for s in api.seen) == sorted([(KEY,), (OTHER_KEY,)])
+    for seen in api.seen:
+        assert len(seen["keys"]) == 1
+    assert all(events[-1].name == "run.finished" for events in done.values())
+
+
+def test_an_empty_override_keeps_the_outer_binding(api):
+    from nl2sql.llm.request_key import use_llm_override
+
+    with use_llm_override(LLMOverride(keys={"openai": KEY})):
+        api.run_query("q", llm_override=LLMOverride())
+        list(api.stream_query("q", llm_override=LLMOverride()))
+
+    assert [s["keys"] for s in api.seen] == [{"openai": KEY}] * 2
+
+
+@pytest.mark.parametrize("override", [
+    LLMOverride(keys={"ollama": "x" * 24}, models={"ast_planner": ("ollama", "llama3")}),
+    LLMOverride(keys={"openai_compatible": "x" * 24}, models={"ast_planner": ("openai_compatible", "gpt-other")}),
+    LLMOverride(keys={"ollama": "x" * 24}),
+])
+def test_a_provider_with_no_key_variable_cannot_be_chosen(api, override):
+    from nl2sql import InvalidArgument
+
+    with pytest.raises(InvalidArgument):
+        api.run_query("q", llm_override=override)
+    with pytest.raises(InvalidArgument):
+        api.stream_query("q", llm_override=override)
+    assert api.seen == []
+
+
+def test_a_plugin_provider_is_keyed_only_by_its_own_key_variable():
+    from nl2sql import InvalidArgument
+    from nl2sql.llm.request_key import RequestLLMs
+    from nl2sql.registry import Registry
+
+    class Keyless:
+        interface_version = 2
+        api_key_env = None
+
+    class Keyed(Keyless):
+        api_key_env = "PLUGIN_API_KEY"
+
+    registry = Registry.default()
+    registry.add_llm("keyless_plugin", Keyless())
+    registry.add_llm("keyed_plugin", Keyed())
+
+    with pytest.raises(InvalidArgument):
+        RequestLLMs.from_override(LLMOverride(keys={"keyless_plugin": KEY},
+                                              models={"ast_planner": ("keyless_plugin", "m")}), registry)
+    chosen = RequestLLMs.from_override(LLMOverride(keys={"keyed_plugin": KEY},
+                                                   models={"ast_planner": ("keyed_plugin", "m")}), registry)
+    assert chosen.models == {"ast_planner": ("keyed_plugin", "m")}
+
+
+@pytest.mark.parametrize("models", [{"ast_planner": ("openai", "gpt-5.4")}, {"ast_planner": ("openai_compatible", "gpt-other")}])
+def test_operator_endpoint_and_headers_never_follow_a_request_step(models):
+    from nl2sql.llm.models import AgentConfig
+    from nl2sql.llm.registry import LLMRegistry
+    from nl2sql.llm.request_key import RequestLLMs
+
+    agent = AgentConfig(provider="openai_compatible", model="gw", base_url="https://gateway.corp/v1",
+                        headers={"api-key": "operator-secret-value"}, api_key="x" * 24, name="default")
+    request = RequestLLMs(keys={"openai": KEY, "openai_compatible": KEY}, models=models)
+
+    chosen, _ = LLMRegistry._for_request(agent, "ast_planner", request)
+    keyed, _ = LLMRegistry._for_request(agent, "decomposer", RequestLLMs(keys={"openai": KEY}, fallback=KEY))
+
+    for config in (chosen, keyed):
+        assert config.headers == {} and config.base_url is None and config.api_key is None
+
+
+def test_same_provider_model_choice_drops_operator_endpoint_and_headers():
+    from nl2sql.llm.models import AgentConfig
+    from nl2sql.llm.registry import LLMRegistry
+    from nl2sql.llm.request_key import RequestLLMs
+
+    agent = AgentConfig(provider="openai", model="gpt-4o", base_url="https://gateway.corp/v1",
+                        headers={"api-key": "operator-secret-value"}, name="default")
+
+    chosen, key = LLMRegistry._for_request(
+        agent, "ast_planner", RequestLLMs(keys={"openai": KEY}, models={"ast_planner": ("openai", "gpt-5.4")}))
+
+    assert (chosen.model, key) == ("gpt-5.4", KEY)
+    assert chosen.headers == {} and chosen.base_url is None

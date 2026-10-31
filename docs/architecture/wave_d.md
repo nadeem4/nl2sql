@@ -1347,7 +1347,7 @@ every run it asks for). A stream binds in its own run thread (`stream_query`, th
 refuses at the call, not at the first `next()`. `LLMRegistry` was not changed: `get_llm` already builds each step's
 client from `current_request_llms()`, caches nothing, and a replay provider (G2b) sits behind the same call, so for G2b
 "an override key replaces replay for one call" is a matter of its provider honouring a bound key. Unknown agent names
-in `models` are ignored, as the registry always has. `engine.llm.providers()` entries gained `models` (the
+in `models` are ignored, as the registry always has. A provider with no `api_key_env` (the built-ins, else the engine's registry) in `keys` or `models` raises `InvalidArgument`; a caller's model drops the operator's `base_url` and `headers`; an empty `LLMOverride` binds nothing; `key_shape` is `None` for a provider with no key variable. `engine.llm.providers()` entries gained `models` (the
 `VERIFIED_MODELS` names) and `key_shape` (`pattern`, `min_length`, `prefix`), computed in
 `llm/providers.describe_providers`. `nl2sql.provider_for_key` and the new `nl2sql.provider_keys_in_environment() ->
 dict[provider, key]` are top-level exports. The old playground (`cli/demo/playground/`) still imports `nl2sql.llm.*`
