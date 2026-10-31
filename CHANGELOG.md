@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.10.0](https://github.com/nadeem4/nl2sql/compare/v0.9.1...v0.10.0) (2026-10-31)
+
+
+### Features
+
+* **api:** error envelope, identity, serve and app factory (D0a-2) ([#404](https://github.com/nadeem4/nl2sql/issues/404)) ([0854faa](https://github.com/nadeem4/nl2sql/commit/0854faa8eba8ec6368ff09b76f7cfb566dd560fa))
+* **api:** sse, background jobs and request overrides (D0a-3) ([#405](https://github.com/nadeem4/nl2sql/issues/405)) ([e632e91](https://github.com/nadeem4/nl2sql/commit/e632e917a1302c49a41dd5bf613d752bd92803f6))
+* **approvals:** stored approval grants with request ids (G3a) ([#410](https://github.com/nadeem4/nl2sql/issues/410)) ([d2340e6](https://github.com/nadeem4/nl2sql/commit/d2340e6b89ff81a139be1b36c921ec2bf0f28df4))
+* **engine:** error parents, approval store, api and mode config (D0a-1) ([#403](https://github.com/nadeem4/nl2sql/issues/403)) ([c1f36e1](https://github.com/nadeem4/nl2sql/commit/c1f36e15a186b0a08e1d6c2bf312bd8b21eaaab0))
+* **engine:** progress, cancellation and readiness (G3b) ([#409](https://github.com/nadeem4/nl2sql/issues/409)) ([4295d5c](https://github.com/nadeem4/nl2sql/commit/4295d5c4a3a0b7b692f8e0efb9acef4a63ff17b0))
+* **llm:** per-request llm overrides and providers catalogue (G2a) ([#408](https://github.com/nadeem4/nl2sql/issues/408)) ([fb7942d](https://github.com/nadeem4/nl2sql/commit/fb7942de375d39080e167edd65fff319422f6d6f))
+* **ui:** move the playground to nl2sql-ui with http client (D0b) ([#406](https://github.com/nadeem4/nl2sql/issues/406)) ([e897735](https://github.com/nadeem4/nl2sql/commit/e897735023fd43622ad96df2a836bd308c379384))
+
+
+### Bug Fixes
+
+* **accuracy:** group by keys, exact figures, rank ordinals (C-W8) ([#399](https://github.com/nadeem4/nl2sql/issues/399)) ([3a6bab7](https://github.com/nadeem4/nl2sql/commit/3a6bab7752bf009ef64c4a0e6c54ec954be34b39))
+* **planner:** list the allowed joins in the planner prompt (C-LT4) ([#397](https://github.com/nadeem4/nl2sql/issues/397)) ([c34db81](https://github.com/nadeem4/nl2sql/commit/c34db812a8ec1fdbed5a0e841f61907f148ea90c))
+* **results:** traces and ratings bound to the asker (G1) ([#407](https://github.com/nadeem4/nl2sql/issues/407)) ([2e5af8a](https://github.com/nadeem4/nl2sql/commit/2e5af8aa1e7cbbe5d6e0c2b3596de447482c34cb))
+
+
+### Documentation
+
+* **wave-d:** one UI in nl2sql-ui, CLI app on the engine ([#400](https://github.com/nadeem4/nl2sql/issues/400)) ([a7f8676](https://github.com/nadeem4/nl2sql/commit/a7f8676f1c90d61d6e80fc11e3b1661074b9844b))
+* **wave-d:** split rows into session batches, wave c dashboards (D-W0) ([#402](https://github.com/nadeem4/nl2sql/issues/402)) ([e4c4e13](https://github.com/nadeem4/nl2sql/commit/e4c4e13e80e8fd9fcb63e9a7379f2f82468f0f27))
+
 ## [0.9.1](https://github.com/nadeem4/nl2sql/compare/v0.9.0...v0.9.1) (2026-10-30)
 
 
