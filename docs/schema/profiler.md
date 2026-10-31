@@ -22,8 +22,10 @@ datasources. From Python:
 reports = engine.knowledge.profile(user_context=UserContext(roles=["admin"]))
 ```
 
-`profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None)`
-returns one `ProfileReport` per datasource the caller reaches:
+`profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None, on_datasource=None, cancellation_token=None)`
+returns one `ProfileReport` per datasource the caller reaches. `on_datasource` is called with each report as its
+datasource finishes, and cancelling `cancellation_token` stops before the next datasource (the one in flight
+finishes) and returns the reports so far:
 
 | Field | Meaning |
 | --- | --- |

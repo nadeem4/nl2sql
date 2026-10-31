@@ -286,3 +286,17 @@ def test_job_routes_are_in_the_openapi_contract():
     paths = create_app().openapi()["paths"]
     assert set(paths["/api/v1/jobs/{job_id}"]) == {"get", "delete"}
     assert "get" in paths["/api/v1/jobs"] and "get" in paths["/api/v1/jobs/{job_id}/events"]
+
+
+def test_a_run_cancelled_error_ends_the_job_cancelled_without_a_traceback(jobs, caplog):
+    from nl2sql import RunCancelled
+
+    def run(ctx):
+        ctx.token.cancel()
+        raise RunCancelled("stopped")
+
+    job = _index(jobs, ANN, run)
+    wait_for(lambda: jobs.get(job.id, ANN).status == "cancelled")
+
+    assert jobs.get(job.id, ANN).error is None
+    assert "failed" not in caplog.text

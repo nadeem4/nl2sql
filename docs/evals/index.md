@@ -47,7 +47,7 @@ print(report.accuracy, report.accuracy_generated)
 | Method | What it does |
 | --- | --- |
 | `engine.evals.load(path=None)` | The suites `evals.yaml` names, or the one file at `path`, as `EvalSuite`s |
-| `engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)` | Runs every approved case once per role in its `outcome` map, `passes` times, and returns an `EvalReport` |
+| `engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False, cancellation_token=None)` | Runs every approved case once per role in its `outcome` map, `passes` times, and returns an `EvalReport`. Cancelling `cancellation_token` stops before the next case and the report says `stopped: "cancelled"` |
 | `engine.evals.gate(report, baseline)` | The regression gate: `report` against a baseline report, record or `benchmarks/` folder, with `evals.yaml`'s `gate` settings. Returns a `GateResult` ([The gate](#the-regression-gate)) |
 | `engine.evals.regenerate(path, *, allow_packaged=False)` | Runs each approved case's `sql` and `alt_sql` through its datasource's adapter and writes `rows` and `alt_rows` ([Regenerating rows](cases.md#regenerating-rows)). A suite the package ships is refused unless `allow_packaged` |
 | `engine.evals.seed(datasource_id, *, count=20, out, user_context, max_cost_usd=None)` | Drafts up to `count` cases from the datasource's schema, as `user_context` sees it, and appends them to `out` as `status: draft`. Returns a `SeedReport` ([Benchmark your own database](seeding.md)) |

@@ -24,11 +24,14 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional
 
 from nl2sql.api.types import IndexProgress
 from nl2sql.common.logger import get_logger
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
+
+if TYPE_CHECKING:
+    from nl2sql.common.cancellation import CancellationToken
 
 logger = get_logger("indexing_rebuild")
 
@@ -42,13 +45,15 @@ INDEX_LOCK_TTL_S = 3600
 class RebuildResult:
     """What a rebuild did.
 
-    ``ok`` is True only when every requested datasource's new entries are live.
+    ``ok`` is True only when every requested datasource's new entries are live. ``cancelled`` is True when
+    the caller's token stopped the build between datasources: the ones before it are live, the rest untouched.
     """
 
     stats: List[Dict[str, Any]] = field(default_factory=list)
     empty: List[str] = field(default_factory=list)
     errors: List[Dict[str, str]] = field(default_factory=list)
     ok: bool = False
+    cancelled: bool = False
 
 
 def rebuild_index(
@@ -57,6 +62,7 @@ def rebuild_index(
     on_progress: Optional[Callable[[str], None]] = None,
     on_datasource: Optional[Callable[["IndexProgress"], None]] = None,
     refresh: bool = False,
+    cancellation_token: Optional["CancellationToken"] = None,
 ) -> RebuildResult:
     """Builds the index of each datasource, and switches each one's pointer as it succeeds.
 
@@ -70,6 +76,8 @@ def rebuild_index(
         refresh: Write each datasource's entries again from its stored
             snapshot, the verified queries and the knowledge, with no schema
             read and no model call; only changed entries are embedded.
+        cancellation_token: Checked before each datasource; once cancelled, the
+            rest are left alone and the result says ``cancelled``.
 
     Returns:
         A :class:`RebuildResult`.
@@ -114,14 +122,18 @@ def rebuild_index(
                 result.errors.append({"datasource_id": adapter.datasource_id, "error": reason})
                 tell(IndexProgress(adapter.datasource_id, "failed", reason=reason))
             return result
-        _build(ctx, adapters, result, refresh=refresh, say=say, tell=tell)
+        _build(ctx, adapters, result, refresh=refresh, say=say, tell=tell, token=cancellation_token)
 
-    result.ok = not result.errors and bool(result.stats)
+    result.ok = not result.errors and bool(result.stats) and not result.cancelled
     return result
 
 
 def _build(ctx, adapters, result: RebuildResult, *, refresh: bool,
-           say: Callable[[str], None], tell: Callable[["IndexProgress"], None]) -> None:
+           say: Callable[[str], None], tell: Callable[["IndexProgress"], None],
+           token: Optional["CancellationToken"] = None) -> None:
+    if token is not None and token.is_cancelled():  # before the slow first-run model download
+        result.cancelled = True
+        return
     say(MODEL_STEP)
     # Embeddings load lazily; warming them here puts the one slow,
     # first-run-only download under its own step.
@@ -129,6 +141,9 @@ def _build(ctx, adapters, result: RebuildResult, *, refresh: bool,
 
     orchestrator = IndexingOrchestrator(ctx)
     for adapter in adapters:
+        if token is not None and token.is_cancelled():
+            result.cancelled = True
+            return
         ds_id = adapter.datasource_id
         tell(IndexProgress(ds_id, "started"))
         try:
