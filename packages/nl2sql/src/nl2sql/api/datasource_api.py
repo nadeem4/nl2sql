@@ -8,6 +8,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import yaml
 from pydantic import BaseModel, SecretStr
 
 from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
@@ -78,9 +79,14 @@ class DatasourcesAPI:
         folder (the engine's storage folder when it was built in code), so
         accepting a proposal later writes to the project, never to the installed
         package. A second call adds nothing and indexes again. When the engine was
-        loaded from a ``nl2sql.yaml`` with a ``datasources/`` folder, each datasource
-        added is also saved there and survives a restart; the verified queries and
-        the glossary source are added to this engine only. It keeps the engine's
+        loaded from a ``nl2sql.yaml``, the demo is saved there and survives a
+        restart: each datasource added goes to the ``datasources/`` folder, the
+        verified queries to the ``curated`` section's file (``curated.yaml``, with
+        a ``curated:`` line in ``nl2sql.yaml`` when the project had none), and the
+        glossary as a source in the ``knowledge`` section's file. A section written
+        inline in ``nl2sql.yaml`` is left alone, and an engine built in code has no
+        file: for those the verified queries and the glossary source are added to
+        that engine only. It keeps the engine's
         LLM provider: with no key, ``provider: replay`` answers the guided questions.
         ``on_datasource`` goes to ``index.build`` (an ``IndexProgress`` per
         datasource). With ``user_context`` the caller needs an admin role.
@@ -92,8 +98,6 @@ class DatasourcesAPI:
             NotAuthorized: ``user_context`` has no admin role.
             DatasourceExists: a datasource has a demo id but is not the demo's database; nothing is added.
         """
-        import shutil
-
         from nl2sql.api.indexing_api import IndexAPI
         from nl2sql.common.errors import DatasourceExists, NotAuthorized
         from nl2sql.config import Curated, KnowledgeSourceConfig, demo_config
@@ -108,7 +112,7 @@ class DatasourcesAPI:
         have = {d.id: d for d in self._ctx.config.datasources}
         for datasource in demo.datasources:
             existing = have.get(datasource.id)
-            if existing is not None and _database_name(existing) != _database_name(datasource):
+            if existing is not None and not _is_demos_database(existing, datasource, self._ctx.config.folder):
                 raise DatasourceExists(
                     f"A datasource with the id '{datasource.id}' is already configured and is not the demo's "
                     "database. Rename or remove it before adding the demo.")
@@ -122,21 +126,64 @@ class DatasourcesAPI:
             for datasource_id in added:
                 self._write(datasource_id, _who(user_context) if user_context else None, False)
 
-        curated = config.curated or Curated()
-        wanted = Curated(**DEMO_CURATED)
-        missing = {k: v for k, v in wanted.datasources.items() if k not in curated.datasources}
-        if missing:
-            self._ctx.replace_curated(Curated(datasources={**curated.datasources, **missing}),
-                                      sha256=self._ctx.curated_sha256)
-
-        folder = config.folder or Path(config.storage.path)
-        copy = Path(folder) / "demo-glossary.yaml"
-        if not any(getattr(k, "path", None) == copy.as_posix() for k in config.knowledge):
-            copy.parent.mkdir(parents=True, exist_ok=True)
-            if not copy.exists():
-                shutil.copyfile(DEMO_GLOSSARY_PATH, copy)
-            self._ctx.add_knowledge_source(KnowledgeSourceConfig(type="yaml", path=copy.as_posix()))
+        self._add_demo_curated(Curated, DEMO_CURATED)
+        self._add_demo_glossary(KnowledgeSourceConfig, DEMO_GLOSSARY_PATH)
         return IndexAPI(self._ctx).build([d.id for d in demo.datasources], on_datasource=on_datasource)
+
+    def _add_demo_curated(self, Curated: Any, demo_curated: Dict[str, Any]) -> None:
+        """Merge the demo's verified queries into ``curated``: written to the section's file when the engine has one."""
+        from nl2sql.config.writer import write_atomic
+        from nl2sql.review.curated_file import curated_path, write_curated
+
+        config = self._ctx.config
+        curated = config.curated or Curated()
+        missing = {k: v for k, v in Curated(**demo_curated).datasources.items() if k not in curated.datasources}
+        if not missing:
+            return
+        merged = Curated(datasources={**curated.datasources, **missing})
+        sha256 = self._ctx.curated_sha256
+        toc = Path(config.folder) / "nl2sql.yaml" if config.folder is not None else None
+        path = curated_path(config)
+        if path is None and config.curated is None and toc is not None and toc.is_file():
+            path = Path(config.folder) / "curated.yaml"  # a project with no curated section yet: give it one
+            sha256 = write_curated(path, merged, None)
+            text = toc.read_text(encoding="utf-8")
+            addition = "curated:     { file: curated.yaml }\n"
+            write_atomic(toc, (text if text.endswith("\n") else text + "\n").encode("utf-8") + addition.encode("utf-8"))
+        elif path is not None:
+            sha256 = write_curated(path, merged, sha256)
+        self._ctx.replace_curated(merged, sha256=sha256)
+
+    def _add_demo_glossary(self, KnowledgeSourceConfig: Any, packaged: Path) -> None:
+        """Copy the demo glossary into the project and add it as a ``yaml`` source: listed in the ``knowledge``
+        section's file when the engine has one, so a restart keeps it."""
+        import shutil
+
+        from nl2sql.config.writer import dump_yaml, write_atomic
+
+        config = self._ctx.config
+        folder = Path(config.folder or config.storage.path)
+        copy = folder / "demo-glossary.yaml"
+
+        def reads_the_copy(source: Any) -> bool:
+            path = getattr(source, "path", None)
+            return path is not None and (folder / path).resolve() == copy.resolve()
+
+        if any(reads_the_copy(k) for k in config.knowledge):
+            return
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        if not copy.exists():
+            shutil.copyfile(packaged, copy)
+        file = config.locate("knowledge")[0] if config.folder is not None else "nl2sql.yaml"
+        target = folder / file
+        if file != "nl2sql.yaml" and target.is_file():
+            text = target.read_text(encoding="utf-8")
+            entries = yaml.safe_load(text) or []
+            comments = "".join(line + "\n" for line in text.splitlines() if line.startswith("#"))
+            write_atomic(target, (comments + dump_yaml([*entries, {"type": "yaml", "path": copy.name}])).encode("utf-8"))
+            self._ctx.add_knowledge_source(KnowledgeSourceConfig(type="yaml", path=copy.name))
+        else:
+            self._ctx.add_knowledge_source(KnowledgeSourceConfig(type="yaml", path=copy.as_posix()))
 
     def remove(self, datasource_id: str) -> None:
         """Take a datasource out of routing and out of ``engine.config``, and close its pool.
@@ -378,11 +425,19 @@ def _secret_literals(connection: Any, secret_fields: Any = ()) -> List[str]:
     return [v for v in values if isinstance(v, str) and v and not v.startswith("${")]
 
 
-def _database_name(datasource: Datasource) -> str:
-    """The file name of a SQLite datasource's database, which tells the demo's copy from someone else's."""
+def _database_file(datasource: Datasource, base: Optional[Path]) -> Path:
+    """The SQLite database a datasource opens, as a full path (a relative one is read against ``base``, else the working folder)."""
     connection = datasource.connection
     database = connection.get("database") if isinstance(connection, dict) else getattr(connection, "database", None)
-    return Path(str(database or "")).name
+    return (Path(base or ".") / str(database or "")).resolve()
+
+
+def _is_demos_database(existing: Datasource, demo: Datasource, project: Optional[Path]) -> bool:
+    """Whether ``existing`` opens the demo database ``demo`` names: the packaged file, or the copy ``init_project(demo=True)``
+    puts in the project's ``data/`` folder. Another file of the same name is someone's own database."""
+    opened = _database_file(existing, project)
+    packaged = _database_file(demo, None)
+    return opened == packaged or (project is not None and opened == (Path(project) / "data" / packaged.name).resolve())
 
 
 def _who(by: UserContext) -> Optional[str]:

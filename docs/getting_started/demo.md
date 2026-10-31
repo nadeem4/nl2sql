@@ -203,10 +203,15 @@ engine = NL2SQL(load_config(config_path))
 `engine.add_demo()` adds the three sample databases, their verified queries and the
 demo glossary (copied to `demo-glossary.yaml` in the project folder, so accepting a
 proposal writes into your project) to an engine you already have, then indexes them.
-Each database is also saved under `datasources/` when the engine was loaded from a
-`nl2sql.yaml`, so it is there after a restart; the verified queries and the glossary
-source are added to the running engine only. An id such as `chinook` that is already
-your own database is refused with a `DatasourceExists` error and nothing is added;
+When the engine was loaded from a `nl2sql.yaml` all of it is saved there and is still
+there after a restart: each database under `datasources/`, the verified queries in
+`curated.yaml` (with a `curated:` line in `nl2sql.yaml` if the project had none), and
+the glossary as a second source in `knowledge.yaml`. A section written inline in
+`nl2sql.yaml` is left alone. An engine built in code has no file, so for it the
+verified queries and the glossary are added to that engine only and `add_demo` has to
+run again after a restart. An id such as `chinook` that is already a database of
+yours (another file, even one named `chinook.db`) is refused with a `DatasourceExists`
+error and nothing is added;
 a second call changes nothing. A caller who is not an admin gets `NotAuthorized`.
 `engine.datasources.list()` shows each one's `sample_questions`.
 

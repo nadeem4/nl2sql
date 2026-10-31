@@ -255,6 +255,67 @@ def test_add_demo_saves_the_added_datasources_where_the_config_keeps_them(tmp_pa
         assert set(DEMO_QUESTIONS_BY_DATASOURCE) <= {d.id for d in engine.datasources.list()}
 
 
+def _project_engine(folder):
+    """An engine loaded from a ``nl2sql.yaml`` in ``folder`` (``replay`` added by hand, as an install's entry point does)."""
+    from nl2sql.llm.replay import REPLAY
+    from nl2sql.registry import Registry
+
+    registry = Registry.default()
+    registry.add_llm("replay", REPLAY)
+    return nl2sql.NL2SQL(nl2sql.load_config(folder / "nl2sql.yaml"), registry=registry)
+
+
+def test_add_demo_persists_the_verified_queries_and_the_glossary_source(tmp_path, monkeypatch):
+    _no_build(monkeypatch)
+    project = tmp_path / "p"
+    nl2sql.config.init_project(project, demo=False, provider="replay")
+    with _project_engine(project) as engine:
+        engine.add_demo()
+    saved = {name: (project / name).read_bytes() for name in ("nl2sql.yaml", "curated.yaml", "knowledge.yaml")}
+
+    with _project_engine(project) as engine:  # a restart
+        config = engine._runtime.config
+        assert config.curated.datasources["chinook"].verified_queries
+        assert [Path(k.path).name for k in config.knowledge] == ["glossary.yaml", "demo-glossary.yaml"]
+        assert (project / "demo-glossary.yaml").is_file()
+        engine.add_demo()  # idempotent: no second copy of anything
+
+    assert {name: (project / name).read_bytes() for name in saved} == saved
+    with _project_engine(project) as engine:
+        assert len(engine._runtime.config.knowledge) == 2
+
+
+def test_add_demo_on_a_demo_project_accepts_its_own_copies_and_leaves_curated_alone(tmp_path, monkeypatch):
+    _no_build(monkeypatch)
+    nl2sql.config.init_project(tmp_path / "p", demo=True, provider="replay")  # has curated.yaml and data/*.db
+    before = (tmp_path / "p" / "curated.yaml").read_bytes()
+    with _project_engine(tmp_path / "p") as engine:
+        engine.add_demo()  # the project's own demo databases are the demo's: no DatasourceExists
+        assert len(engine._runtime.config.datasources) == 3
+    assert (tmp_path / "p" / "curated.yaml").read_bytes() == before
+
+
+def test_add_demo_on_a_code_built_engine_writes_no_project_file(tmp_path, monkeypatch):
+    _no_build(monkeypatch)
+    with _engine(tmp_path / "project") as engine:
+        engine.add_demo()
+        assert engine._runtime.config.curated.datasources["chinook"].verified_queries
+    written = {p.name for p in (tmp_path / "project").rglob("*") if p.is_file()}
+    assert "demo-glossary.yaml" in written and not written & {"curated.yaml", "nl2sql.yaml", "knowledge.yaml"}
+
+
+def test_add_demo_refuses_a_users_own_copy_of_a_demo_database_with_the_same_file_name(tmp_path, monkeypatch):
+    from nl2sql.common.errors import DatasourceExists
+    from nl2sql.config import Datasource
+
+    _no_build(monkeypatch)
+    mine = Datasource(id="chinook", type="sqlite", connection={"database": str(tmp_path / "elsewhere" / "chinook.db")})
+    with _engine(tmp_path, datasources=[mine]) as engine:
+        with pytest.raises(DatasourceExists, match="chinook"):
+            engine.add_demo()
+        assert engine._runtime.config.knowledge == []
+
+
 def test_datasources_list_and_get_show_only_what_the_caller_reaches(tmp_path):
     from nl2sql.common.errors import DatasourceNotFound
     from nl2sql.config import Datasource, Policies, Role

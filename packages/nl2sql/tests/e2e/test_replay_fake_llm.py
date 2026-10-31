@@ -82,3 +82,29 @@ def test_every_recorded_question_replays_after_add_demo(tmp_path):
                 failed[question] = [e.get("error_code") for e in result.errors]
 
     assert failed == {}
+
+
+@pytest.mark.e2e
+def test_every_recorded_question_still_replays_after_a_restart(tmp_path):
+    """Try the demo on a project, then a new engine from the same folder: the queries and glossary came back (D237)."""
+    from nl2sql.config import init_project, load_config
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
+    from nl2sql.llm.replay import REPLAY
+
+    init_project(tmp_path, provider="replay")
+    registry = Registry.default()
+    registry.add_llm("replay", REPLAY)
+    with NL2SQL(load_config(tmp_path / "nl2sql.yaml"), registry=registry) as engine:
+        engine.add_demo(user_context=ADMIN)
+
+    with NL2SQL(load_config(tmp_path / "nl2sql.yaml"), registry=registry) as engine:
+        assert any(str(k.path).endswith("demo-glossary.yaml") for k in engine._runtime.config.knowledge)
+        listed = engine.llm.recorded(DEMO_QUESTIONS)
+        assert listed
+        failed = {}
+        for question in listed:
+            result = engine.run_query(question, user_context=ADMIN)
+            if result.status != "success":
+                failed[question] = [e.get("error_code") for e in result.errors]
+
+    assert failed == {}
