@@ -952,6 +952,19 @@
       
     </span>
 </a>
+<nav aria-label="14. PR plan" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#session-batches">
+<span class="md-ellipsis">
+      
+        Session batches
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#15-release">
@@ -1027,10 +1040,10 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#what-becomes-a-facade-method-cl0">
+<a class="md-nav__link" href="#what-becomes-a-facade-method-cl0a-and-cl0b">
 <span class="md-ellipsis">
       
-        What becomes a facade method (CL0)
+        What becomes a facade method (CL0a and CL0b)
       
     </span>
 </a>
@@ -3445,6 +3458,19 @@
       
     </span>
 </a>
+<nav aria-label="14. PR plan" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#session-batches">
+<span class="md-ellipsis">
+      
+        Session batches
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#15-release">
@@ -3520,10 +3546,10 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#what-becomes-a-facade-method-cl0">
+<a class="md-nav__link" href="#what-becomes-a-facade-method-cl0a-and-cl0b">
 <span class="md-ellipsis">
       
-        What becomes a facade method (CL0)
+        What becomes a facade method (CL0a and CL0b)
       
     </span>
 </a>
@@ -3580,21 +3606,20 @@ Below, a path that describes the planned layout is corrected
 <code>nl2sql-cli/</code>); a path that describes today's code (<code>web/playground</code>,
 <code>nl2sql/cli/demo/</code>) keeps its name.</p>
 </div>
-<div class="admonition warning">
-<p class="admonition-title">Wave C was revised on 2026-10-28; this page has not been updated to match</p>
-<p><a href="../wave_c/">Wave C</a> now has a model-led chat (the model calls tools in
-a bounded loop; <code>conversation.step</code> replaces <code>conversation.rewritten</code>),
-dashboards that are artifacts pinned whole (several sub-queries per
-chart; <code>needs_fixing</code> replaces <code>stale</code>; no single-tile pin), workspaces,
-manual dashboard edits with chat parity, refresh with stored results and
-schedules, and one access rule for every entry point. Wave D's dashboard
-and chat routes, its Dashboards and Chat pages, D224 and the job and
-fixture tables still describe the first draft and need a pass. The rows
-below that name a changed Wave C item are corrected; the rest are listed
-here, not rewritten: the Chat tool buttons (<strong>Pin</strong> becomes pinning the
-whole dashboard), <code>POST /dashboards/pin</code> and the tile routes, the
-Dashboards page (workspaces, arrange, edit, schedule, "refreshed 2 h
-ago", <code>needs_fixing</code>), and the dashboard job.</p>
+<div class="admonition note">
+<p class="admonition-title">Wave C as revised on 2026-10-28, and as built</p>
+<p><a href="../wave_c/">Wave C</a> was revised after the first draft of this page: a
+model-led chat (the model calls tools in a bounded loop;
+<code>conversation.step</code> replaces <code>conversation.rewritten</code>), dashboards that are
+artifacts pinned whole (several sub-queries per chart; <code>needs_fixing</code>
+replaces <code>stale</code>; no single-tile pin), workspaces, manual dashboard edits
+with chat parity, refresh with stored results and schedules, and one
+access rule for every entry point. Wave D's chat and dashboard routes, its
+Chat and Dashboards pages, D224 and the job and fixture tables follow that
+revision, with the names checked against the code on <code>main</code>
+(<code>nl2sql/dashboards/api.py</code>, <code>nl2sql/api/dashboards_api.py</code>,
+<code>workspaces_api.py</code>, <code>conversations_api.py</code>, <code>common/errors.py</code>). Where
+the code and a Wave C page differ, the code wins.</p>
 </div>
 <p>The owner set them for the redesign, and they rank above everything below:</p>
 <ul>
@@ -3701,13 +3726,13 @@ D13 to D16</strong> and records how each is applied.</p>
 <tr>
 <td>D210</td>
 <td><strong>A key typed into the web app stays in the browser tab</strong> and travels with each request as a per-call <code>LLMOverride</code> (<code>llm_override=</code> on the facade), in every mode. The web app never writes a key to disk. <strong>A model the caller chooses runs only on a key the caller sent:</strong> <code>X-NL2SQL-Models</code> is honoured only for providers the same request carries a key for, so a caller can never move a step onto the operator's account. Callers may bring a key only where <code>api.request_llm: true</code>; the demo sets it, the default is off.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td>decided by owner 2026-10-30</td>
 <td><a href="#keys-and-models-in-the-web-app">Keys and models</a></td>
 </tr>
 <tr>
 <td>D211</td>
 <td><strong>Final-design D13, applied with one change.</strong> The web app ships inside <code>nl2sql-api</code> as package data, served by <code>nl2sql-api serve</code>. It adds no dependency to <code>nl2sql-api</code>, so there is no <code>web</code> extra there; instead the <code>demo</code> extra becomes <code>nl2sql-api</code> (first written on the engine, so <code>pip install "nl2sql-engine[demo]"</code> was the one install line; since D227 it belongs to <code>nl2sql-cli</code>, whose <code>web</code> extra is <code>nl2sql-api</code> (D231), so the line is <code>pip install "nl2sql-cli[web]"</code> and the engine and the API no longer depend on each other). <code>nl2sql demo</code> is a launcher that runs <code>python -m nl2sql_api serve --demo</code> in a child process; the engine never imports <code>nl2sql_api</code>. The playground server (<code>nl2sql/cli/demo/</code>) is deleted. The wheel keeps carrying the built page (D226).</td>
-<td>decided overnight, amended after review, owner to confirm; install line and launcher's home amended by D227</td>
+<td>decided by owner 2026-10-30; install line and launcher's home amended by D227</td>
 <td><a href="#4-serving-the-web-app-and-nl2sql-demo">Serving</a></td>
 </tr>
 <tr>
@@ -3731,7 +3756,7 @@ D13 to D16</strong> and records how each is applied.</p>
 <tr>
 <td>D215</td>
 <td><strong>Approval grants are stored by the engine</strong> (<code>engine.approvals</code>), amending Wave A's D10 and D24 and Wave C's D107. Over HTTP the approver and the asker are two callers at different times: the asker cannot prove a grant, and the approver must not run the question as the asker, so the approver grants a request by id and the asker's re-run names the id. A grant is reusable until it expires (24 hours), as an <code>Approval</code> is.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td>decided by owner 2026-10-30</td>
 <td><a href="#approvals-over-rest">Approvals</a></td>
 </tr>
 <tr>
@@ -3767,7 +3792,7 @@ D13 to D16</strong> and records how each is applied.</p>
 <tr>
 <td>D221</td>
 <td><strong>The hosted demo serves the user's side of the web app:</strong> chat, tools, charts, diagrams, reports, dashboards and the knowledge view, keyless from recordings or with the visitor's key. Admin work (Connect, review, index, profile, evals, drift, LLM settings, keys) is off because a hosted visitor is never admin, not by a hosted switch. Jobs, streams and questions are capped per session.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td>decided by owner 2026-10-30</td>
 <td><a href="#the-hosted-demo">The hosted demo</a></td>
 </tr>
 <tr>
@@ -3778,14 +3803,14 @@ D13 to D16</strong> and records how each is applied.</p>
 </tr>
 <tr>
 <td>D223</td>
-<td><strong>The foundation is three PRs, not one:</strong> the CI web job first (bug B202, needs nothing), then the API foundation with every engine shape the gaps need, and the web foundation (shell, shared helpers, the client's transport, the CSS split, the build output) beside it, so the parallel PRs never edit the same file.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td><strong>The foundation is five PRs, not one:</strong> the CI web job first (CI0, bug B202, needs nothing), then the API foundation with every engine shape the gaps need, in three parts (D0a-1 engine shapes and the <code>mode:</code> key; D0a-2 errors, identity and the app factory; D0a-3 streams, jobs and overrides), and the web foundation (D0b) (shell, shared helpers, the client's transport, the CSS split, the build output) beside it, so the parallel PRs never edit the same file.</td>
+<td>decided by owner 2026-10-30; the API foundation is three PRs (D0a-1 to D0a-3)</td>
 <td><a href="#14-pr-plan">PR plan</a></td>
 </tr>
 <tr>
 <td>D224</td>
-<td><strong>Dashboards are Wave C's surface and no more:</strong> whatever Wave C's <code>engine.dashboards</code> and <code>engine.workspaces</code> offer (open, refresh, edit, arrange, filters, schedule, pin, move, delete, workspaces), as thin routes. Wave C (revised 2026-10-28) builds editing and workspaces in the package; this page's route table has not yet been revised to expose them.</td>
-<td>decided after review, owner to confirm; superseded in part by Wave C's D116, D131 and D133</td>
+<td><strong>Dashboards are Wave C's surface and no more:</strong> whatever Wave C's <code>engine.dashboards</code> and <code>engine.workspaces</code> offer (open, refresh, edit, arrange, filters, schedule, pin, move, delete, workspaces), as thin routes. Wave C (revised 2026-10-28) builds editing and workspaces in the package, and <a href="#the-routes">the routes</a> expose them.</td>
+<td>decided by owner 2026-10-30; follows Wave C as revised 2026-10-28 (its D116, D131 and D133)</td>
 <td><a href="#the-routes">Routes</a></td>
 </tr>
 <tr>
@@ -3826,7 +3851,7 @@ D13 to D16</strong> and records how each is applied.</p>
 </tr>
 <tr>
 <td>D231</td>
-<td><strong>Names and dependencies of the CLI.</strong> PyPI distribution <code>nl2sql-cli</code>, import package <code>nl2sql_cli</code>, console command <code>nl2sql</code>. The CLI sits on the engine only: its one dependency is <code>nl2sql-engine</code>, plus Textual as a plain dependency (the terminal app) and the <code>demo</code> command itself, which move in. Commands that need the web server (<code>nl2sql demo</code>, <code>serve</code>) need <code>nl2sql-api</code>, which is the optional <code>web</code> extra: <code>pip install "nl2sql-cli[web]"</code>. Those commands <strong>shell out</strong> (<code>python -m nl2sql_api serve ...</code> as a child process, found with <code>importlib.util.find_spec</code>), so <code>nl2sql_cli</code> never imports <code>nl2sql_api</code>, lazily or otherwise; shelling out is the least code and keeps the boundary test absolute. Without the extra they print the install line and exit 1. The API image installs <code>nl2sql-cli</code> beside <code>nl2sql-api</code>, so every command works there. The CLI moves after the cutover: CL1 follows X1.</td>
+<td><strong>Names and dependencies of the CLI.</strong> PyPI distribution <code>nl2sql-cli</code>, import package <code>nl2sql_cli</code>, console command <code>nl2sql</code>. The CLI sits on the engine only: its one dependency is <code>nl2sql-engine</code>, plus Textual as a plain dependency (the terminal app) and the <code>demo</code> command itself, which move in. Commands that need the web server (<code>nl2sql demo</code>, <code>serve</code>) need <code>nl2sql-api</code>, which is the optional <code>web</code> extra: <code>pip install "nl2sql-cli[web]"</code>. Those commands <strong>shell out</strong> (<code>python -m nl2sql_api serve ...</code> as a child process, found with <code>importlib.util.find_spec</code>), so <code>nl2sql_cli</code> never imports <code>nl2sql_api</code>, lazily or otherwise; shelling out is the least code and keeps the boundary test absolute. Without the extra they print the install line and exit 1. The API image installs <code>nl2sql-cli</code> beside <code>nl2sql-api</code>, so every command works there. The CLI moves after the cutover: CL1 follows X1b.</td>
 <td>decided by owner 2026-10-30; the <code>web</code> extra and the shell-out are the coordinator's correction of the same day</td>
 <td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
 </tr>
@@ -3841,6 +3866,30 @@ D13 to D16</strong> and records how each is applied.</p>
 <td><strong>One two-stage Dockerfile at the repository root:</strong> stage one builds <code>nl2sql-ui</code>, stage two is the API image. It moves from <code>packages/api/Dockerfile</code>; the three workflows that name it change with it. The Space's <code>deploy/huggingface/Dockerfile</code> stays its own file.</td>
 <td>decided by owner 2026-10-30</td>
 <td><a href="#the-image">Image</a></td>
+</tr>
+<tr>
+<td>D234</td>
+<td><strong>Opening a dashboard only reads.</strong> <code>GET /dashboards/{id}</code> never refreshes (it calls <code>open(refresh_due=False)</code>); the page then calls <code>POST /dashboards/{id}/refresh</code> for the tiles that are due. A GET runs no query and stores nothing.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#the-routes">Routes</a></td>
+</tr>
+<tr>
+<td>D235</td>
+<td><strong>Dashboard edits are <code>PUT</code> on sub-resources, one per facade method:</strong> <code>PUT /dashboards/{id}/title</code>, <code>/chart</code> (under a tile), <code>/layout</code>, <code>/filters</code>, <code>/schedule</code>, and the workspace rename is <code>PUT /workspaces/{id}/name</code>, the same style.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#the-routes">Routes</a></td>
+</tr>
+<tr>
+<td>D236</td>
+<td><strong>A refresh takes request ids like a query does:</strong> G3a adds request ids to <code>dashboards.refresh</code>, as it does for <code>run_query</code>, <code>stream_query</code> and <code>conversations.retry</code> (D215), so the route's <code>approval_ids</code> have something to resolve against. A2b depends on G3a.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#the-routes">Routes</a></td>
+</tr>
+<tr>
+<td>D237</td>
+<td><strong>Try the demo is a facade method and a job route:</strong> G2b adds <code>engine.add_demo()</code> (it adds the three sample databases and the demo glossary to the project, then indexes them); A4a exposes it as <code>POST /jobs/demo</code> (admin; a job because it indexes); W4b's start screen calls it. A4a depends on G2b.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#the-start-screen">The start screen</a></td>
 </tr>
 </tbody>
 </table>
@@ -3951,7 +4000,7 @@ describe them.</p>
 </tr>
 <tr>
 <td><strong>No exceptions left</strong></td>
-<td><code>STILL_IMPORTED_FROM_INSIDE</code> is empty and deleted, and the whole CLI, not only the demo command, imports only the top-level <code>nl2sql</code> (CL0).</td>
+<td><code>STILL_IMPORTED_FROM_INSIDE</code> is empty and deleted, and the whole CLI, not only the demo command, imports only the top-level <code>nl2sql</code> (CL0a, CL0b).</td>
 </tr>
 </tbody>
 </table>
@@ -4012,27 +4061,40 @@ describe them.</p>
 </table>
 <h2 id="2-order-of-work">2. Order of work</h2>
 <pre class="mermaid"><code>flowchart LR
+  DW0["D-W0. Design gaps fixed"]
   CI["CI0. Web tests in CI"]
-  CI --&gt; DB["D0b. Web foundation"]
-  DA["D0a. API foundation&lt;br/&gt;and engine shapes"]
-  DA --&gt; G["Engine gaps&lt;br/&gt;G1 B13 and ratings&lt;br/&gt;G2 overrides, replay, demo&lt;br/&gt;G3 approvals, progress, readiness"]
+  DA["D0a-1 to D0a-3. API foundation&lt;br/&gt;and engine shapes"]
+  DB["D0b. Web foundation"]
+  G["Engine gaps&lt;br/&gt;G1 B13 and ratings&lt;br/&gt;G2a, G2b overrides, replay, demo&lt;br/&gt;G3a, G3b approvals, progress, readiness"]
+  A["API routes&lt;br/&gt;A1, A2a, A2b, A3, A4a, A4b"]
+  W["Web app&lt;br/&gt;W1, W2a, W2b, W3, W4a, W4b"]
+  CL0["CL0a, CL0b. CLI on the facade only"]
+  K["K1. Image and Compose"]
+  X["X1a, X1b. Cutover, rehearsed&lt;br/&gt;on a scratch Space"]
+  DW0 --&gt; DA
+  CI --&gt; DB
   DA --&gt; DB
-  G --&gt; A["API routes&lt;br/&gt;A1 to A4, one router each"]
-  A --&gt; W["Web app&lt;br/&gt;W1 to W4, one area each"]
+  DA --&gt; G
+  G --&gt; A
+  A --&gt; W
   DB --&gt; W
-  G --&gt; CL0["CL0. CLI on the facade only"]
-  X1 --&gt; CL1["CL1. CLI extracted&lt;br/&gt;to nl2sql-cli"]
-  CL0 --&gt; CL1
-  CL1 --&gt; CL2["CL2. CLI release and CI"]
-  CL1 --&gt; T["T1. Terminal app"]
-  G --&gt; T
-  DA --&gt; K["K1. Image and Compose"]
-  W --&gt; X["X1. Cutover, rehearsed&lt;br/&gt;on a scratch Space"]
+  G --&gt; CL0
+  DA --&gt; K
+  DB --&gt; K
+  W --&gt; X
   K --&gt; X
   X --&gt; R["R1. Owner re-records,&lt;br/&gt;rehearses again"]
+  X --&gt; CL1["CL1. CLI extracted&lt;br/&gt;to nl2sql-cli"]
+  CL0 --&gt; CL1
+  CL1 --&gt; CL2["CL2. CLI release, CI,&lt;br/&gt;image installs the CLI"]
+  CL1 --&gt; T["T1. Terminal app"]
+  G --&gt; T
   R --&gt; REL["Release"]
   T --&gt; REL
   CL2 --&gt; REL</code></pre>
+<p>The graph is the order, not the batches: the PRs are built in
+<a href="#session-batches">session batches</a>, and the full dependency graph is in
+<a href="#14-pr-plan">section 14</a>.</p>
 <h2 id="3-the-api-apiv1-at-parity">3. The API: <code>/api/v1</code> at parity</h2>
 <h3 id="route-conventions">Route conventions</h3>
 <table>
@@ -4109,17 +4171,17 @@ LookupError</code> still works:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>ConversationNotFound</code>, <code>DashboardNotFound</code> (Wave C), <code>ResultNotFound</code>, <code>JobNotFound</code>, <code>DatasourceNotFound</code>, <code>ApprovalNotFound</code> (new)</td>
+<td><code>ConversationNotFound</code>, <code>DashboardNotFound</code>, <code>WorkspaceNotFound</code> (Wave C), <code>ResultNotFound</code>, <code>JobNotFound</code>, <code>DatasourceNotFound</code>, <code>ApprovalNotFound</code> (new)</td>
 <td>404</td>
 <td><code>NOT_FOUND</code></td>
 </tr>
 <tr>
-<td><code>ConversationBusy</code> (Wave C); <code>ReviewError(FILE_CHANGED)</code> (Wave B) and Wave C's <code>save</code> that reuses it</td>
+<td><code>ConversationBusy</code>, <code>DashboardBusy</code> (Wave C; <code>dashboards/run.py</code>); <code>ReviewError(FILE_CHANGED)</code> (Wave B) and Wave C's <code>save</code> that reuses it</td>
 <td>409</td>
 <td><code>CONFLICT</code>, <code>FILE_CHANGED</code></td>
 </tr>
 <tr>
-<td><code>NoTiles</code>, <code>WorkspaceNotEmpty</code>, <code>ScheduleTooFrequent</code>, <code>NotIndexed</code>, <code>SecretValueInConfig</code> (Wave C); <code>MissingProviderKey</code> (G2); a facade argument check that raises its own subclass</td>
+<td><code>NoTiles</code>, <code>WorkspaceNotEmpty</code>, <code>ScheduleTooFrequent</code>, <code>NotIndexed</code>, <code>SecretValueInConfig</code> (Wave C); <code>MissingProviderKey</code> (G2a); <code>NotPinnable</code> (<code>pin</code> of a saved dashboard or an empty draft), <code>ChartNotSupported</code> (<code>set_tile_chart</code> to a kind the tile cannot draw), <code>UnknownTile</code> and <code>UnknownFilter</code> (<code>refresh</code> with a bad <code>tile_id</code> or filter), all new in D0a-1: they replace the bare <code>ValueError</code>s <code>main</code> raises, and keep <code>ValueError</code> as a parent; any other facade argument check that raises its own subclass</td>
 <td>422</td>
 <td>the exception's code</td>
 </tr>
@@ -4168,7 +4230,7 @@ LookupError</code> still works:</p>
 </table>
 <p>A pipeline outcome is not an error: <code>POST /query</code> answers 200 with a
 <code>QueryResult</code> whose <code>status</code> is <code>error</code>, <code>needs_clarification</code>,
-<code>needs_approval</code> or <code>stopped</code>, as today. D0a removes the per-route <code>except
+<code>needs_approval</code> or <code>stopped</code>, as today. D0a-2 removes the per-route <code>except
 Exception</code> blocks of the old routes so the one handler applies to every
 route from then on. <code>test_no_route_returns_exception_text</code> raises, through
 every registered route with a stub engine, a <code>ValueError</code>, a
@@ -4323,11 +4385,12 @@ generator over the in-memory job and holds no thread.</p>
 <a href="#__codelineno-3-17" id="__codelineno-3-17" name="__codelineno-3-17"></a>    <span class="n">started_at</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span>
 <a href="#__codelineno-3-18" id="__codelineno-3-18" name="__codelineno-3-18"></a>    <span class="n">finished_at</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span>
 <a href="#__codelineno-3-19" id="__codelineno-3-19" name="__codelineno-3-19"></a>    <span class="n">progress</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">JobProgress</span><span class="p">]</span>
-<a href="#__codelineno-3-20" id="__codelineno-3-20" name="__codelineno-3-20"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">IndexResult</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">ProfileReport</span><span class="p">]</span> <span class="o">|</span> <span class="n">EvalReport</span> <span class="o">|</span> <span class="n">DashboardCreated</span> <span class="o">|</span> <span class="kc">None</span>   <span class="c1"># typed per kind</span>
+<a href="#__codelineno-3-20" id="__codelineno-3-20" name="__codelineno-3-20"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">IndexResult</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">ProfileReport</span><span class="p">]</span> <span class="o">|</span> <span class="n">EvalReport</span> <span class="o">|</span> <span class="n">DashboardJobResult</span> <span class="o">|</span> <span class="kc">None</span>   <span class="c1"># typed per kind</span>
 <a href="#__codelineno-3-21" id="__codelineno-3-21" name="__codelineno-3-21"></a>    <span class="n">error</span><span class="p">:</span> <span class="n">ApiError</span> <span class="o">|</span> <span class="kc">None</span>
 </code></pre></div>
-<p><code>IndexResult</code> is the index build's report; <code>DashboardCreated</code> is the new
-dashboard's id and its first <code>DashboardRun</code>. Each lands in <code>openapi.json</code>,
+<p><code>IndexResult</code> is the index build's report; <code>DashboardJobResult</code> (in <code>nl2sql_api/jobs.py</code>) is what
+<code>dashboards.generate</code> returns, as a model: <code>{dashboard: Dashboard, run: DashboardRun}</code>; the engine's
+<code>DashboardGenerated</code> event is a different thing and is not the result. Each lands in <code>openapi.json</code>,
 so the web app reads a typed eval report.</p>
 <table>
 <thead>
@@ -4362,9 +4425,16 @@ so the web app reads a typed eval report.</p>
 <td>admin, in every mode: a report holds every role's cases, plans and SQL</td>
 </tr>
 <tr>
+<td><code>demo</code></td>
+<td><code>POST /jobs/demo</code> <code>{}</code></td>
+<td><code>engine.add_demo(user_context=, on_datasource=)</code> (G2b, D237): adds the three sample databases and the demo glossary to the project, then indexes them; the result is an <code>IndexResult</code></td>
+<td><code>on_datasource</code></td>
+<td>admin</td>
+</tr>
+<tr>
 <td><code>dashboard</code></td>
-<td><code>POST /jobs/dashboard</code> <code>{datasource_id, title?, max_tiles?}</code></td>
-<td>Wave C's <code>engine.dashboards.generate(..., user_context=, on_tile=, cancellation_token=)</code></td>
+<td><code>POST /jobs/dashboard</code> <code>{datasource_id, title?, workspace_id?, max_tiles?}</code></td>
+<td>Wave C's <code>engine.dashboards.generate(datasource_id, *, user_context=, title=, workspace_id=, max_tiles=, on_tile=, cancellation_token=)</code></td>
 <td><code>on_tile</code></td>
 <td>any caller; the dashboard is theirs</td>
 </tr>
@@ -4408,7 +4478,7 @@ so the web app reads a typed eval report.</p>
 </tr>
 <tr>
 <td><strong>Facade gaps</strong></td>
-<td><code>on_datasource</code> exists on <code>index.build</code> and <code>on_case</code> on <code>evals.run</code>; <code>profile</code> and <code>generate</code> gain a callback, and all four gain <code>cancellation_token</code> (G3).</td>
+<td><code>on_datasource</code> exists on <code>index.build</code> and <code>on_case</code> on <code>evals.run</code>; <code>profile</code> and <code>generate</code> gain a callback, and all four gain <code>cancellation_token</code> (G3b).</td>
 </tr>
 </tbody>
 </table>
@@ -4558,7 +4628,7 @@ method takes <code>user_context=caller</code>)</p>
 <tbody>
 <tr>
 <td><code>POST /conversations</code></td>
-<td><code>conversations.start(user_context=, datasource_id=)</code></td>
+<td><code>conversations.start(user_context=, datasource_id=, dashboard_id=)</code>: <code>dashboard_id</code> opens a chat on a saved dashboard to edit it</td>
 </tr>
 <tr>
 <td><code>GET /conversations</code></td>
@@ -4598,11 +4668,17 @@ method takes <code>user_context=caller</code>)</p>
 </tr>
 </tbody>
 </table>
-<p>A busy conversation is a 409 (<code>ConversationBusy</code>). A turn with status
+<p>The model decides what a turn does (Wave C's bounded tool loop), so a turn
+stream carries <code>conversation.step</code> events and ends with <code>conversation.turn</code>;
+there is no separate rewrite step. A busy conversation is a 409
+(<code>ConversationBusy</code>). A turn with status
 <code>needs_clarification</code> is answered with <code>choice</code> (an option id) in the next
 turn's body (Wave C's D104).</p>
-<p><strong>Dashboards</strong> (<code>routes/dashboards.py</code>; D224; every method takes
-<code>user_context=caller</code>)</p>
+<p><strong>Dashboards and workspaces</strong> (<code>routes/dashboards.py</code>, <code>routes/workspaces.py</code>;
+D224; every method takes <code>user_context=caller</code>). A dashboard is an artifact
+the model builds in chat as a draft and the caller pins whole into a workspace
+(Wave C's D116, D131); the routes are thin over the named methods of
+<code>engine.dashboards</code> and <code>engine.workspaces</code> and add none.</p>
 <table>
 <thead>
 <tr>
@@ -4613,42 +4689,95 @@ turn's body (Wave C's D104).</p>
 <tbody>
 <tr>
 <td><code>GET /dashboards</code></td>
-<td><code>dashboards.list</code>: the caller's</td>
+<td><code>dashboards.list(workspace_id=, status=)</code>: the caller's</td>
 </tr>
 <tr>
 <td><code>POST /jobs/dashboard</code></td>
-<td><code>dashboards.generate</code> (a job)</td>
+<td><code>dashboards.generate</code> (a job; the result is a <code>DashboardJobResult</code>: the new <code>Dashboard</code> and its first <code>DashboardRun</code>)</td>
 </tr>
 <tr>
 <td><code>GET /dashboards/{id}</code></td>
-<td><code>dashboards.get</code></td>
+<td><code>dashboards.open(id, refresh_due=False)</code>: only reads, never refreshes (D234). A <code>DashboardView</code> with the stored <code>TileRun</code>s, <code>refreshed_at</code> and the tiles due; the page then calls <code>POST /dashboards/{id}/refresh</code> for the tiles that are due</td>
+</tr>
+<tr>
+<td><code>POST /dashboards/{id}/refresh</code></td>
+<td><code>dashboards.refresh(id, tile_id=, filters=, approvals=)</code>; synchronous: a refresh makes no model call and runs the stored queries, so a request's <code>approval_ids</code> are request ids (D215)</td>
+</tr>
+<tr>
+<td><code>GET /dashboards/{id}/filters/{filter_id}/values</code></td>
+<td><code>dashboards.filter_values(id, filter_id, limit=)</code></td>
+</tr>
+<tr>
+<td><code>PUT /dashboards/{id}/title</code></td>
+<td><code>dashboards.rename</code></td>
+</tr>
+<tr>
+<td><code>PUT /dashboards/{id}/tiles/{tile_id}/title</code></td>
+<td><code>dashboards.rename_tile</code></td>
+</tr>
+<tr>
+<td><code>PUT /dashboards/{id}/tiles/{tile_id}/chart</code></td>
+<td><code>dashboards.set_tile_chart(..., chart=)</code>: <code>auto</code>, <code>line</code>, <code>bar</code>, <code>big_number</code> or <code>table</code></td>
+</tr>
+<tr>
+<td><code>DELETE /dashboards/{id}/tiles/{tile_id}</code></td>
+<td><code>dashboards.remove_tile</code>: how a <code>needs_fixing</code> tile is removed</td>
+</tr>
+<tr>
+<td><code>PUT /dashboards/{id}/layout</code></td>
+<td><code>dashboards.arrange(id, arrangements)</code>: <code>TileArrangement</code>s (a <code>TileLayout</code> plus its <code>tile_id</code>) on the 4-column grid</td>
+</tr>
+<tr>
+<td><code>PUT /dashboards/{id}/filters</code></td>
+<td><code>dashboards.set_filters</code> (<code>in</code> and <code>between</code>)</td>
+</tr>
+<tr>
+<td><code>PUT /dashboards/{id}/schedule</code></td>
+<td><code>dashboards.set_schedule(id, every_minutes)</code>; <code>null</code> stops it</td>
+</tr>
+<tr>
+<td><code>POST /dashboards/{id}/pin</code></td>
+<td><code>dashboards.pin(id, workspace_id=, title=)</code>: saves a draft whole into a workspace; a saved dashboard is a 422</td>
+</tr>
+<tr>
+<td><code>POST /dashboards/{id}/move</code></td>
+<td><code>dashboards.move(id, workspace_id)</code></td>
 </tr>
 <tr>
 <td><code>DELETE /dashboards/{id}</code></td>
 <td><code>dashboards.delete(id)</code></td>
 </tr>
 <tr>
-<td><code>DELETE /dashboards/{id}/tiles/{tile_id}</code></td>
-<td><code>dashboards.delete(id, tile_id=)</code>: how a stale tile is removed</td>
+<td><code>GET /workspaces</code></td>
+<td><code>workspaces.list()</code></td>
 </tr>
 <tr>
-<td><code>POST /dashboards/{id}/refresh</code></td>
-<td><code>dashboards.refresh(id, filters=)</code>; synchronous: a refresh makes no model call and its tiles are capped at <code>max_tiles</code></td>
+<td><code>POST /workspaces</code></td>
+<td><code>workspaces.create(name)</code></td>
 </tr>
 <tr>
-<td><code>GET /dashboards/{id}/filters/{filter_id}/values</code></td>
-<td><code>dashboards.filter_values</code></td>
+<td><code>PUT /workspaces/{id}/name</code></td>
+<td><code>workspaces.rename(id, name)</code></td>
 </tr>
 <tr>
-<td><code>POST /dashboards/pin</code></td>
-<td><code>dashboards.pin(conversation_id, turn, dashboard_id=, title=)</code></td>
+<td><code>DELETE /workspaces/{id}</code></td>
+<td><code>workspaces.delete(id)</code>: an empty one only, else <code>WorkspaceNotEmpty</code> (422)</td>
 </tr>
 <tr>
 <td><code>GET /datasources/{id}/starter-questions</code></td>
-<td><code>dashboards.suggest_questions(id, user_context=, n=)</code></td>
+<td><code>dashboards.suggest_questions(id, user_context=, n=)</code>; its router file is <code>routes/dashboards.py</code> (A2b), though the path sits under <code>/datasources</code></td>
 </tr>
 </tbody>
 </table>
+<p>Edits that change what data a chart shows (<code>add_tile</code>, <code>replace_plan</code>) exist
+only in chat, as Wave C's D133 has them: the page offers rename, chart type,
+remove, arrange, filters, schedule and move, which call no model. A draft is
+made and edited in a conversation by the <code>dashboard_edit</code> tool and pinned by
+the <code>dashboard_pin</code> tool (<code>POST /conversations/{id}/tools/{name}</code>) or by the
+pin route above. <code>DashboardNotFound</code> and <code>WorkspaceNotFound</code> are 404;
+<code>DashboardBusy</code> (a refresh already running) is a 409; <code>NoTiles</code>,
+<code>ScheduleTooFrequent</code> and <code>WorkspaceNotEmpty</code> are 422. D0a-1 re-parents them
+on <code>NL2SQLError</code> with those statuses.</p>
 <p><strong>Datasources, Connect, index and drift</strong> (<code>routes/datasources.py</code>,
 <code>routes/index.py</code>)</p>
 <table>
@@ -4962,7 +5091,7 @@ a local user types the key once per tab (or puts it in <code>.env</code> once);
 </tr>
 </tbody>
 </table>
-<p><code>nl2sql_api/overrides.py</code> (in D0a) turns the headers into the engine's
+<p><code>nl2sql_api/overrides.py</code> (in D0a-3) turns the headers into the engine's
 <code>LLMOverride(keys={provider: key}, models={agent: (provider, model)})</code> and
 passes it as <code>llm_override=</code> (a new keyword, so it never means two types
 beside Wave A's <code>evals.run(llm=)</code>) to <code>run_query</code>, <code>stream_query</code> and
@@ -5061,7 +5190,7 @@ replacing <code>server.py</code>) or <code>python -m nl2sql_api serve</code>:</p
 under <code>/</code> that is not a file answers the page, so the hash router owns
 navigation.</p>
 <h3 id="nl2sql-demo-a-launcher-d211"><code>nl2sql demo</code>, a launcher (D211)</h3>
-<p><code>cli/commands/demo.py</code> (X1 shrinks it where it is; CL1 then moves it to
+<p><code>cli/commands/demo.py</code> (X1a shrinks it where it is; CL1 then moves it to
 <code>nl2sql_cli/commands/demo.py</code>, D227) is about 40 lines. It checks that
 <code>nl2sql_api</code> is installed (<code>importlib.util.find_spec</code>), else prints
 <code>pip install "nl2sql-cli[web]"</code> and exits 1. It then starts
@@ -5074,10 +5203,10 @@ and the limits are gone from it (the Space runs <code>nl2sql-api serve</code>
 directly), and so are <code>--record</code>, <code>--api-key</code> and <code>--allow-settings</code>, with
 no alias: recording is a script, a key is typed into the page or put in
 <code>.env</code>, and the settings gate is D205's loopback rule.</p>
-<p>X1 replaces the engine's <code>demo = ["fastapi", "uvicorn"]</code> with
+<p>X1a replaces the engine's <code>demo = ["fastapi", "uvicorn"]</code> with
 <code>demo = ["nl2sql-api~=X.Y.Z"]</code> (the release-please version marker, as
 <code>nl2sql-api</code> pins the engine) and drops the package data for
-<code>nl2sql.cli.demo</code> and <code>nl2sql.cli.demo.playground</code>; between X1 and CL1 the
+<code>nl2sql.cli.demo</code> and <code>nl2sql.cli.demo.playground</code>; between X1a and CL1 the
 engine and the API depend on each other, so <code>publish_pypi.yaml</code> uploads
 <code>nl2sql-api</code> before or with the engine and <code>docs/development/releasing.md</code>
 says so. CL1 replaces the engine's extra with the <code>web</code> extra of
@@ -5135,7 +5264,7 @@ project; that line becomes <code>nl2sql-api serve --config DIR/nl2sql.yaml</code
 <li><strong>Local or self-hosted.</strong> When the served project has no datasource yet (a fresh <code>nl2sql-api serve</code> on an empty
   project folder, which Wave C's L2 already allows), the app opens on a start screen with <strong>Try the demo</strong> and
   <strong>Connect your database</strong>. <strong>Try the demo</strong> adds the three sample databases and the demo glossary to the project as
-  ordinary datasources and indexes them (a job with progress), then opens Chat on a guided question. <strong>Connect your
+  ordinary datasources and indexes them (<code>POST /jobs/demo</code>, a job with progress, which calls the facade method <code>engine.add_demo()</code>), then opens Chat on a guided question. <strong>Connect your
   database</strong> opens Connect. Both remain reachable afterwards: Connect can add the sample databases, and the Chat
   datasource switcher moves between them and the caller's own. The server still serves one project; no second
   engine is involved. Both actions are admin, as Connect is.</li>
@@ -5170,7 +5299,7 @@ project; that line becomes <code>nl2sql-api serve --config DIR/nl2sql.yaml</code
 </tr>
 <tr>
 <td>Dashboards</td>
-<td>Generate (one job per session, no model call), refresh, filter, pin, delete a tile: on, per session</td>
+<td>Generate (one job per session, no model call), open, refresh, filter, edit, arrange, pin whole, move, delete, and workspaces: on, per session</td>
 </tr>
 <tr>
 <td>Knowledge view, "why this answer"</td>
@@ -5202,7 +5331,7 @@ $PORT ...</code>. Its healthcheck and <code>scripts/fresh_install_check.py</code
 <code>/api/v1/health</code>, <code>/api/v1/meta</code>, <code>/api/v1/datasources/{id}/schema</code> (with a
 session) and <code>/api/v1/index</code>; <code>publish_pypi.yaml</code>'s <code>space-smoke</code> and
 <code>test.yml</code>'s <code>fresh-install</code> keep their shape. The cutover is rehearsed on a
-scratch Space before the release (<a href="#14-pr-plan">X1</a>).</p>
+scratch Space before the release (<a href="#14-pr-plan">X1a</a>).</p>
 <h2 id="5-the-web-app">5. The web app</h2>
 <h3 id="architecture">Architecture</h3>
 <pre class="mermaid"><code>flowchart LR
@@ -5224,7 +5353,7 @@ scratch Space before the release (<a href="#14-pr-plan">X1</a>).</p>
 <tbody>
 <tr>
 <td><strong>Where</strong></td>
-<td><code>nl2sql-ui/</code> at the repository root (D225; renamed from <code>web/playground/</code> by D0b, which leaves no <code>web/</code> folder). The API's Docker image builds it in a Node stage and <code>nl2sql-api</code> serves the result (D226). <code>npm run build</code> writes <code>packages/api/src/nl2sql_api/web/static/</code>, which the image and the wheel both carry (D226), so <code>pip install nl2sql-api</code> needs no Node. The single-file plugin goes (D214): the build is <code>index.html</code> plus hashed chunks, and Mermaid is its own chunk. Until X1, <code>nl2sql demo</code> keeps serving the page already committed in the engine.</td>
+<td><code>nl2sql-ui/</code> at the repository root (D225; renamed from <code>web/playground/</code> by D0b, which leaves no <code>web/</code> folder). The API's Docker image builds it in a Node stage and <code>nl2sql-api</code> serves the result (D226). <code>npm run build</code> writes <code>packages/api/src/nl2sql_api/web/static/</code>, which the image and the wheel both carry (D226), so <code>pip install nl2sql-api</code> needs no Node. The single-file plugin goes (D214): the build is <code>index.html</code> plus hashed chunks, and Mermaid is its own chunk. Until X1a, <code>nl2sql demo</code> keeps serving the page already committed in the engine.</td>
 </tr>
 <tr>
 <td><strong>One build, every mode</strong></td>
@@ -5236,7 +5365,7 @@ scratch Space before the release (<a href="#14-pr-plan">X1</a>).</p>
 </tr>
 <tr>
 <td><strong>Client</strong></td>
-<td>One file per area, each owned by the W-PR for that area: <code>src/api/chat.js</code> (W1), <code>outputs.js</code> and <code>dashboards.js</code> (W2), <code>connect.js</code> and <code>knowledge.js</code> (W3), <code>evals.js</code>, <code>settings.js</code> and <code>meta.js</code> (W4). <code>src/api/routes.test.js</code> reads every <code>src/api/*.js</code> file's paths.</td>
+<td>One file per area, each owned by the W-PR for that area: <code>src/api/chat.js</code> (W1), <code>outputs.js</code> (W2a) and <code>dashboards.js</code> (W2b), <code>connect.js</code> and <code>knowledge.js</code> (W3), <code>evals.js</code> and <code>settings.js</code> (W4a), <code>meta.js</code> (W4b). <code>src/api/routes.test.js</code> reads every <code>src/api/*.js</code> file's paths.</td>
 </tr>
 <tr>
 <td><strong>Router</strong></td>
@@ -5285,7 +5414,7 @@ no W-PR deletes a file another imports:</p>
 <tr>
 <td><code>JobProgress.jsx</code> (new), <code>outputs/Output.jsx</code> (new: a stub that dispatches a <code>ToolOutput</code> by kind)</td>
 <td><code>src/components/</code>, <code>src/outputs/</code></td>
-<td>W2 fills <code>Output.jsx</code>'s renderers</td>
+<td>W2a fills <code>Output.jsx</code>'s renderers</td>
 </tr>
 <tr>
 <td><code>App.jsx</code> (the shell), <code>router.js</code>, <code>main.jsx</code></td>
@@ -5300,7 +5429,7 @@ no W-PR deletes a file another imports:</p>
 <tr>
 <td><code>RowsTable.jsx</code>, <code>results.js</code></td>
 <td><code>src/outputs/</code></td>
-<td>W2</td>
+<td>W2a</td>
 </tr>
 <tr>
 <td><code>SchemaPanel.jsx</code>, <code>datasources.js</code></td>
@@ -5310,7 +5439,7 @@ no W-PR deletes a file another imports:</p>
 <tr>
 <td><code>Home.jsx</code>, <code>home.js</code>, <code>Clip.jsx</code>, <code>Pipeline.jsx</code>, <code>pipeline.js</code>, <code>pipelinePhases.js</code>, <code>Retrieval.jsx</code>, <code>retrieval.js</code>, <code>Settings.jsx</code>, <code>hostedKey.js</code>, <code>hostedModels.js</code>, <code>firstRun.js</code>, <code>status.js</code>, <code>faults.js</code>, <code>questions.js</code>, <code>railFade.js</code></td>
 <td><code>src/pages/</code> and beside them</td>
-<td>W4</td>
+<td>W4a (<code>Settings.jsx</code>, <code>hostedKey.js</code>, <code>hostedModels.js</code>) and W4b (the rest)</td>
 </tr>
 <tr>
 <td><code>Feedback.jsx</code>, <code>feedback.js</code></td>
@@ -5336,12 +5465,12 @@ no W-PR deletes a file another imports:</p>
 </tr>
 <tr>
 <td><strong>Chat</strong> (replaces Ask)</td>
-<td>The caller's conversations, the transcript, the composer with the guided questions as chips and the datasource switcher. Each turn: the question that ran (with "rewritten from ..." when it was), the answer, the result table (paged, CSV), its chart, warnings, and folded panels: <strong>Why this answer</strong> (Wave B's <code>explanation</code>: tables, joins, filters, measures, assumptions, terms, the planner's note labelled), <strong>SQL</strong>, <strong>Plan</strong>, <strong>Trace</strong> (the node inspector). Streaming fills the run spine as <code>node.*</code> events arrive.</td>
+<td>The caller's conversations, the transcript, the composer with the guided questions as chips and the datasource switcher. Each turn: the model's steps as they stream (<code>conversation.step</code>: it chose to ask, to chart, to edit a dashboard), the question that ran, the answer, the result table (paged, CSV), its chart, warnings, and folded panels: <strong>Why this answer</strong> (Wave B's <code>explanation</code>: tables, joins, filters, measures, assumptions, terms, the planner's note labelled), <strong>SQL</strong>, <strong>Plan</strong>, <strong>Trace</strong> (the node inspector). Streaming fills the run spine as <code>node.*</code> events arrive.</td>
 <td><code>chat.js</code></td>
 </tr>
 <tr>
 <td>— tools</td>
-<td>Buttons on a turn: <strong>Chart</strong>, <strong>Diagram</strong>, <strong>Report</strong>, <strong>Pin</strong>; or typed ("chart that"). A tool turn renders its <code>ToolOutput</code> through <code>Output.jsx</code>.</td>
+<td>Buttons on a turn: <strong>Chart</strong>, <strong>Diagram</strong>, <strong>Report</strong>, and <strong>Pin dashboard</strong> when the conversation holds a draft dashboard (the <code>dashboard_pin</code> tool saves it whole into a workspace); or typed ("chart that"), where the model picks the tool. A tool turn renders its <code>ToolOutput</code> through <code>Output.jsx</code>.</td>
 <td><code>chat.js</code></td>
 </tr>
 <tr>
@@ -5366,7 +5495,7 @@ no W-PR deletes a file another imports:</p>
 </tr>
 <tr>
 <td><strong>Dashboards</strong></td>
-<td>The caller's; <strong>Generate</strong> for a datasource (a job with progress); a dashboard as a 4-column grid of tiles (big number, line, bar, table), each with its takeaway, "not filtered" when a filter does not apply, <code>stale</code> with <strong>Remove</strong>, <code>denied</code> as a blank tile; filters as chips (an <code>in</code> filter's values, a <code>between</code> range); <strong>Refresh</strong>; <strong>Delete</strong></td>
+<td>The caller's workspaces (create, rename, delete when empty) and the dashboards in each; <strong>Generate</strong> for a datasource (a job with progress). A dashboard opens with its stored results (a read), then the page refreshes the tiles older than its schedule with <code>POST /dashboards/{id}/refresh</code> ("refreshed 2 h ago"); it is a 4-column grid of tiles (big number, line, bar, table), each with its takeaway, "not filtered" when a filter does not apply, <code>needs_fixing</code> with <strong>Remove</strong> (or <strong>Fix in chat</strong>, which opens a conversation on the dashboard), <code>denied</code> as a blank tile, <code>needs_approval</code> with a link to Approvals. Edits that call no model: rename, chart type, remove, <strong>arrange</strong> (drag on the grid), filters as chips (an <code>in</code> filter's values, a <code>between</code> range), a refresh <strong>schedule</strong>, <strong>Move</strong> to another workspace, <strong>Pin</strong> a draft whole, <strong>Refresh</strong>, <strong>Delete</strong>. Changes to what a chart shows are made in chat</td>
 <td><code>dashboards.js</code></td>
 </tr>
 <tr>
@@ -5401,7 +5530,7 @@ no W-PR deletes a file another imports:</p>
 <thead>
 <tr>
 <th>Output</th>
-<th>Rendered by (W2)</th>
+<th>Rendered by (W2a)</th>
 </tr>
 </thead>
 <tbody>
@@ -5442,7 +5571,7 @@ no W-PR deletes a file another imports:</p>
 </tr>
 <tr>
 <td>Golden fixtures</td>
-<td><code>nl2sql-ui/src/api/fixtures/*.json</code>: an <code>ApiError</code> and a <code>Job</code> (D0a), a <code>QueryResult</code> (A1), a <code>Turn</code> and a <code>Dashboard</code> with its run (A2), a <code>Proposal</code> and a <code>DriftReport</code> (A3), a <code>Job</code> with an <code>EvalReport</code> and <code>/meta</code> (A4). Each is written by that PR's route test from a real response, and <code>test_web_fixtures_are_current</code> fails when one is stale, as <code>openapi.json</code>'s test does. <code>turns.js</code>, <code>chart.js</code>, <code>status.js</code> and the other node tests read them.</td>
+<td><code>nl2sql-ui/src/api/fixtures/*.json</code>: an <code>ApiError</code> and a <code>Job</code> (D0a-3), a <code>QueryResult</code> (A1), a <code>Turn</code> (A2a), a <code>Dashboard</code> and a <code>DashboardView</code> with its runs (A2b), a <code>Proposal</code> and a <code>DriftReport</code> (A3), a <code>Job</code> with an <code>EvalReport</code> and <code>/meta</code> (A4a). Each is written by that PR's route test from a real response, and <code>test_web_fixtures_are_current</code> fails when one is stale, as <code>openapi.json</code>'s test does. <code>turns.js</code>, <code>chart.js</code>, <code>status.js</code> and the other node tests read them.</td>
 </tr>
 <tr>
 <td><code>test_openapi_snapshot_is_current</code></td>
@@ -5592,7 +5721,7 @@ upgrading.</p>
 </tr>
 <tr>
 <td><strong>Tests</strong></td>
-<td>In <code>nl2sql-cli/tests/</code>, Textual's <code>App.run_test()</code> pilot over an engine with the fake LLM from <code>nl2sql.testing</code>: <code>test_chat_streams_a_turn_and_shows_rows</code>, <code>test_follow_up_shows_the_rewritten_question</code>, <code>test_chart_tool_draws_sparklines_for_a_line</code>, <code>test_bar_chart_text_has_one_row_per_category</code>, <code>test_clarification_pick_asks_with_choice</code>, <code>test_approver_can_approve_and_retry</code>, <code>test_demo_mode_answers_from_recordings</code>, <code>test_the_cli_imports_only_the_public_nl2sql</code> (architecture, over all of <code>nl2sql_cli</code>), <code>test_importing_nl2sql_loads_no_textual</code> (existing).</td>
+<td>In <code>nl2sql-cli/tests/</code>, Textual's <code>App.run_test()</code> pilot over an engine with the fake LLM from <code>nl2sql.testing</code>: <code>test_chat_streams_a_turn_and_shows_rows</code>, <code>test_follow_up_shows_the_models_steps</code>, <code>test_chart_tool_draws_sparklines_for_a_line</code>, <code>test_bar_chart_text_has_one_row_per_category</code>, <code>test_clarification_pick_asks_with_choice</code>, <code>test_approver_can_approve_and_retry</code>, <code>test_demo_mode_answers_from_recordings</code>, <code>test_the_cli_imports_only_the_public_nl2sql</code> (architecture, over all of <code>nl2sql_cli</code>), <code>test_importing_nl2sql_loads_no_textual</code> (existing).</td>
 </tr>
 </tbody>
 </table>
@@ -5704,7 +5833,7 @@ upgrading.</p>
 <td><code>dashboards.*</code></td>
 <td><code>/dashboards/...</code>, <code>/jobs/dashboard</code></td>
 <td>Dashboards</td>
-<td>— (<code>/pin</code> only)</td>
+<td>— (<code>/pin</code> pins the draft whole)</td>
 </tr>
 <tr>
 <td>Connect</td>
@@ -5719,6 +5848,13 @@ upgrading.</p>
 <td><code>/jobs/index</code>, <code>/index</code>, <code>/index/inspect</code></td>
 <td>Settings, Retrieval</td>
 <td>— (<code>nl2sql index</code>)</td>
+</tr>
+<tr>
+<td>Try the demo</td>
+<td><code>add_demo</code> (G2b)</td>
+<td><code>/jobs/demo</code></td>
+<td>Home (start screen)</td>
+<td>— (<code>nl2sql init --demo</code>)</td>
 </tr>
 <tr>
 <td>Drift</td>
@@ -5801,13 +5937,13 @@ work, so it does not repeat them.</p>
 <td>B200</td>
 <td>Routes answer <code>str(e)</code> in a 500; a driver's message can hold a connection string</td>
 <td><code>routes/datasource.py</code> (<code>list_datasources</code>, <code>get_datasource</code>, <code>remove_datasource</code>), <code>routes/indexing.py</code>, <code>routes/llm.py</code></td>
-<td>D0a (the envelope and the handler on every route)</td>
+<td>D0a-2 (the envelope and the handler on every route)</td>
 </tr>
 <tr>
 <td>B201</td>
 <td><code>/ready</code> is always ready</td>
 <td><code>services/health.py</code> <code>readiness_check</code></td>
-<td>A4 (with G3's <code>CheckReport.ready</code>)</td>
+<td>A4a (with G3b's <code>CheckReport.ready</code>)</td>
 </tr>
 <tr>
 <td>B202</td>
@@ -5831,7 +5967,7 @@ work, so it does not repeat them.</p>
 <td>B205</td>
 <td>A replay miss is recognised by matching an error message string</td>
 <td><code>playground/app.py</code> <code>REPLAY_MISS_MARKER</code>, <code>finish_question</code></td>
-<td>G2 (<code>REPLAY_MISS</code> code)</td>
+<td>G2b (<code>REPLAY_MISS</code> code; the shape is D0a-1)</td>
 </tr>
 </tbody>
 </table>
@@ -5851,6 +5987,10 @@ work, so it does not repeat them.</p>
 <tr>
 <td><code>api</code> section</td>
 <td><code>auth</code> (<code>api_keys</code>, <code>proxy</code>, <code>static</code>, <code>none</code>), <code>proxy</code> (<code>trusted_from</code>, the three headers), <code>static_role</code>, <code>request_llm</code>, <code>cors_origins</code>; <code>role_header</code>, <code>role</code>, <code>trust_body_role</code> deleted</td>
+</tr>
+<tr>
+<td><code>mode</code> (top-level key)</td>
+<td><code>demo</code>, <code>your_data</code> or <code>hosted</code>; <code>your_data</code> when absent (D229). The one environment override is <code>NL2SQL_MODE</code>, read at <code>nl2sql_api serve</code> only</td>
 </tr>
 <tr>
 <td><code>settings.approvals.max_age_hours</code></td>
@@ -5886,13 +6026,13 @@ lists the gaps, each a facade change with its PR.</p>
 <td>Wave A</td>
 <td>D10, D24 ("nothing is queued or stored")</td>
 <td>Approval grants are stored and named by request id (D215); the checks are unchanged</td>
-<td>G3</td>
+<td>G3a</td>
 </tr>
 <tr>
 <td>Wave C</td>
 <td>D107 (<code>retry</code> takes <code>Approval</code>s; nothing stored)</td>
 <td><code>retry(approvals=)</code> also takes request ids</td>
-<td>G3</td>
+<td>G3a</td>
 </tr>
 <tr>
 <td>Wave B, Wave C</td>
@@ -5919,12 +6059,12 @@ lists the gaps, each a facade change with its PR.</p>
 </thead>
 <tbody>
 <tr>
-<td>D0a</td>
+<td>D0a-1</td>
 <td><strong><code>nl2sql.NL2SQLError</code> (<code>code</code>, <code>message</code>, <code>fix</code>, <code>status</code>)</strong> as the base of every named facade exception (Waves A to C's and this wave's), keeping their built-in parents</td>
 <td>The error envelope (D202)</td>
 </tr>
 <tr>
-<td>D0a</td>
+<td>D0a-1</td>
 <td><strong><code>LLMOverride(keys, models)</code>, <code>ErrorCode.REPLAY_MISS</code> and <code>APPROVAL_NOT_GRANTED</code>, <code>NotAuthorized</code>, <code>ApprovalNotFound</code>, the approval store methods and migration, the <code>Api</code> fields</strong>: shapes only</td>
 <td>Every later PR</td>
 </tr>
@@ -5939,37 +6079,37 @@ lists the gaps, each a facade change with its PR.</p>
 <td><code>/feedback</code></td>
 </tr>
 <tr>
-<td>G2</td>
+<td>G2a</td>
 <td><strong><code>llm_override=</code> on <code>run_query</code>, <code>stream_query</code>, <code>conversations.ask</code>, <code>stream</code>, <code>retry</code></strong>, through <code>llm/request_key.py</code>, which the apps stop importing; a model override refused without the caller's own key for that provider</td>
 <td>D210</td>
 </tr>
 <tr>
-<td>G2</td>
+<td>G2b</td>
 <td><strong>The <code>replay</code> provider, <code>ReplayMiss</code>, <code>engine.llm.recorded(questions)</code></strong>, the <code>conversation</code> agent prompt's <code>[USER_QUERY]</code> marker</td>
 <td>Demo mode</td>
 </tr>
 <tr>
-<td>G2</td>
+<td>G2a</td>
 <td><strong><code>engine.llm.providers()</code> with each provider's label, verified models and key shape; <code>nl2sql.provider_for_key(key)</code> and <code>nl2sql.provider_keys_in_environment()</code> exported</strong>, replacing the apps' imports of <code>nl2sql.llm.providers</code></td>
 <td>Settings, hosted start</td>
 </tr>
 <tr>
-<td>G2</td>
+<td>G2b</td>
 <td><strong><code>DatasourceInfo.sample_questions</code></strong> (the datasource's own plus accepted glossary <code>examples</code>); <strong><code>nl2sql.prepare_demo(dir) -&gt; Path</code></strong> (with today's model choice) and <strong><code>nl2sql.init_project</code></strong> exported from the top level, replacing the apps' imports of <code>nl2sql.datasets.demo</code> and <code>nl2sql.config</code></td>
 <td><code>/meta</code>, demo mode, <code>nl2sql chat --demo</code></td>
 </tr>
 <tr>
-<td>G3</td>
+<td>G3a</td>
 <td><strong><code>engine.approvals</code>: <code>list</code>, <code>grant</code>, <code>deny</code>; a <code>needs_approval</code> run stores its requests; <code>run_query</code>, <code>stream_query</code> and <code>conversations.retry</code> take request ids</strong> (amendments above)</td>
 <td>Approvals</td>
 </tr>
 <tr>
-<td>G3</td>
+<td>G3b</td>
 <td><strong><code>on_datasource=</code> on <code>knowledge.profile</code>, <code>on_tile=</code> on <code>dashboards.generate</code>, and <code>cancellation_token=</code> on <code>index.build</code>, <code>knowledge.profile</code>, <code>evals.run</code> and <code>dashboards.generate</code></strong></td>
 <td>Jobs</td>
 </tr>
 <tr>
-<td>G3</td>
+<td>G3b</td>
 <td><strong><code>CheckReport.ready(*, keys_optional: bool) -&gt; bool</code> and <code>CheckReport.problems() -&gt; list[str]</code></strong>, with <code>stale</code> counting as ready</td>
 <td><code>/ready</code>, <code>nl2sql doctor</code></td>
 </tr>
@@ -5994,7 +6134,7 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>Wave C</td>
-<td><code>conversations.*</code> (caller required, D105, D130), statuses including <code>needs_clarification</code>, <code>chat_tools.list</code>, <code>ToolOutput</code>; <code>results.chart</code>, <code>ChartSpec.to_vega_lite</code>, <code>diagram_for</code>, <code>datasources.diagram(*, user_context)</code>; <code>dashboards.generate</code>, <code>refresh</code>, <code>filter_values</code>, <code>pin</code>, <code>get</code>, <code>list</code>, <code>delete(*, tile_id=None)</code>, <code>suggest_questions(*, user_context)</code> (D118, D130); <code>datasources.types</code>, <code>test</code>, <code>add</code>, <code>save(id, *, by, env_file=False)</code> and D122's rule for <code>env_file</code>; <code>proposals.propose_examples</code> and the <code>example</code> proposal kind (Wave C's need B2 from Wave B); <code>api_keys.create</code>, <code>list</code>, <code>revoke</code> (each with <code>by</code>) and <code>verify</code>; <code>nl2sql.config.write_project</code></td>
+<td><code>conversations.*</code> (caller required, D105, D130), statuses including <code>needs_clarification</code>, <code>chat_tools.list</code>, <code>ToolOutput</code>; <code>results.chart</code>, <code>ChartSpec.to_vega_lite</code>, <code>diagram_for</code>, <code>datasources.diagram(*, user_context)</code>; <code>dashboards.generate</code>, <code>open</code>, <code>refresh</code>, <code>filter_values</code>, <code>pin</code> (whole), <code>get</code>, <code>list</code>, <code>delete</code>, <code>create_draft</code>, <code>edit</code> and its named wrappers (<code>rename</code>, <code>rename_tile</code>, <code>set_tile_chart</code>, <code>remove_tile</code>, <code>arrange</code>, <code>set_filters</code>, <code>set_schedule</code>, <code>move</code>), <code>suggest_questions(*, user_context)</code>, and <code>workspaces.create</code>, <code>rename</code>, <code>list</code>, <code>delete</code> (D116, D118, D130, D131, D133); <code>datasources.types</code>, <code>test</code>, <code>add</code>, <code>save(id, *, by, env_file=False)</code> and D122's rule for <code>env_file</code>; <code>proposals.propose_examples</code> and the <code>example</code> proposal kind (Wave C's need B2 from Wave B); <code>api_keys.create</code>, <code>list</code>, <code>revoke</code> (each with <code>by</code>) and <code>verify</code>; <code>nl2sql.config.write_project</code></td>
 </tr>
 </tbody>
 </table>
@@ -6009,7 +6149,7 @@ lists the gaps, each a facade change with its PR.</p>
 <tbody>
 <tr>
 <td>The REST API, the playground and <code>nl2sql demo</code> import only the top-level <code>nl2sql</code></td>
-<td><code>STILL_IMPORTED_FROM_INSIDE</code> is emptied and deleted (X1); the playground is gone; <code>cli/commands/demo.py</code> imports nothing from the engine but <code>nl2sql</code> and <code>nl2sql.cli</code>. The test covers <code>nl2sql_api/</code>, <code>cli/commands/demo.py</code> and <code>nl2sql/cli/chat/</code> at X1; CL0 widens it to the whole CLI and CL1 repoints it at <code>nl2sql-cli/src/nl2sql_cli/</code> (<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).</td>
+<td><code>STILL_IMPORTED_FROM_INSIDE</code> is emptied and deleted (X1b); the playground is gone; <code>cli/commands/demo.py</code> imports nothing from the engine but <code>nl2sql</code> and <code>nl2sql.cli</code>. The test covers <code>nl2sql_api/</code> and <code>cli/commands/demo.py</code> at X1b (the terminal app is built in <code>nl2sql-cli</code>, so <code>nl2sql/cli/chat/</code> never exists); CL0a widens it to the whole CLI with a named, shrinking list, CL0b empties the list and CL1 repoints it at <code>nl2sql-cli/src/nl2sql_cli/</code> (<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).</td>
 </tr>
 <tr>
 <td>New: the engine never imports <code>nl2sql_api</code></td>
@@ -6029,7 +6169,7 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>The <code>.env</code> entry points</td>
-<td><code>ENTRY_POINTS_LOADING_DOTENV</code> drops <code>cli/commands/demo.py</code> (the launcher loads nothing; its child does) and replaces <code>api/src/nl2sql_api/main.py</code> with <code>api/src/nl2sql_api/serve.py</code>. CL1 then repoints every <code>nl2sql/src/nl2sql/cli/...</code> path in <code>ENTRY_POINTS_LOADING_DOTENV</code>, <code>READS_THE_ENVIRONMENT</code> and <code>PERSONS_FILE_WRITERS</code> at <code>nl2sql-cli/src/nl2sql_cli/...</code>. <code>READS_THE_ENVIRONMENT</code> is unchanged: <code>--hosted</code>'s key check calls <code>nl2sql.provider_keys_in_environment()</code>, which reads inside <code>llm/</code>.</td>
+<td><code>ENTRY_POINTS_LOADING_DOTENV</code> drops <code>cli/commands/demo.py</code> (the launcher loads nothing; its child does) and replaces <code>api/src/nl2sql_api/main.py</code> with <code>api/src/nl2sql_api/serve.py</code>. CL1 then repoints every <code>nl2sql/src/nl2sql/cli/...</code> path in <code>ENTRY_POINTS_LOADING_DOTENV</code>, <code>READS_THE_ENVIRONMENT</code> and <code>PERSONS_FILE_WRITERS</code> at <code>nl2sql-cli/src/nl2sql_cli/...</code>. A4b adds <code>NL2SQL_MODE</code> to <code>READS_THE_ENVIRONMENT</code> (D229); <code>--hosted</code>'s key check calls <code>nl2sql.provider_keys_in_environment()</code>, which reads inside <code>llm/</code>.</td>
 </tr>
 <tr>
 <td>Only <code>nl2sql/mcp/</code>, <code>nl2sql/cli/demo/</code> and <code>cli/commands/demo.py</code> import Starlette or Uvicorn (Wave C)</td>
@@ -6037,7 +6177,7 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>The CLI moves out of the engine (D227)</td>
-<td>The CLI rules change in CL0 and CL1: <a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a> lists them one by one.</td>
+<td>The CLI rules change in CL0a, CL0b and CL1: <a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a> lists them one by one.</td>
 </tr>
 <tr>
 <td><em>Only an Accept Writes a Person's File</em> (Wave B, amended by Wave C)</td>
@@ -6063,11 +6203,11 @@ lists the gaps, each a facade change with its PR.</p>
 </thead>
 <tbody>
 <tr>
-<td>Engine gaps (G1 to G3)</td>
+<td>Engine gaps (G1, G2a, G2b, G3a, G3b)</td>
 <td>Unit tests with the fake LLM, as every wave</td>
 </tr>
 <tr>
-<td>API routes (A1 to A4)</td>
+<td>API routes (A1, A2a, A2b, A3, A4a, A4b)</td>
 <td>FastAPI <code>TestClient</code> over a stub engine with dependency overrides (<code>packages/api/tests/conftest.py</code>'s pattern), plus one module per router over a real engine built with <code>nl2sql.testing.config.make_config</code> and the fake LLM for the flows that cross namespaces (ask, chart, pin, refresh); each writes its golden fixtures</td>
 </tr>
 <tr>
@@ -6084,7 +6224,7 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>Fresh install, the Space</td>
-<td><code>scripts/fresh_install_check.py</code> on the v1 routes, in <code>fresh-install</code> and <code>space-smoke</code>, and on the scratch Space in X1 and R1</td>
+<td><code>scripts/fresh_install_check.py</code> on the v1 routes, in <code>fresh-install</code> and <code>space-smoke</code>, and on the scratch Space in X1a and R1</td>
 </tr>
 <tr>
 <td>Real models</td>
@@ -6095,53 +6235,85 @@ lists the gaps, each a facade change with its PR.</p>
 <h2 id="14-pr-plan">14. PR plan</h2>
 <p>Each PR is written test-first and updates the docs it affects in the same
 PR; a new docs page gets its <code>mkdocs.yml</code> nav entry in the PR that adds it.
-At most four PRs are open at once. No test calls a real model; no agent
-uses a key.</p>
+Work is built in <a href="#session-batches">session batches</a>: about five PRs per
+session, stacked in dependency order, at most two or three open at once, each
+built by one build agent and reviewed by a separate review agent, all merged
+before the session ends. No test calls a real model; no agent uses a key.</p>
+<p>Rows that were one PR in the first draft are split so that each part is about
+500 to 1,000 changed lines. Every file, test and doc of the original row lands
+in exactly one part.</p>
 <pre class="mermaid"><code>flowchart TD
-  D["0. This design"] --&gt; CI0["CI0. Web tests in CI"]
-  D --&gt; D0a["D0a. API foundation, engine shapes"]
+  CI0["CI0. Web tests in CI"]
+  DW0 --&gt; D0a1["D0a-1. Engine shapes, mode key"]
+  D0a1 --&gt; D0a2["D0a-2. Errors, identity, app factory, health"]
+  D0a2 --&gt; D0a3["D0a-3. SSE, jobs, overrides, fixtures"]
   CI0 --&gt; D0b["D0b. Web foundation"]
-  D0a --&gt; D0b
-  D0a --&gt; G1["G1. Results bound to the user, ratings"]
-  D0a --&gt; G2["G2. Overrides, replay, demo"]
-  D0a --&gt; G3["G3. Approvals, progress, readiness"]
+  D0a3 --&gt; D0b
+  D0a1 --&gt; G1["G1. Results bound to the user, ratings"]
+  D0a1 --&gt; G2a["G2a. Overrides, providers"]
+  G2a --&gt; G2b["G2b. Replay, demo, Try the demo"]
+  G3b --&gt; G2b
+  D0a1 --&gt; G3a["G3a. Stored approvals"]
+  D0a1 --&gt; G3b["G3b. Progress, cancellation, readiness"]
   G1 --&gt; A1["A1. Query, results, traces, feedback, approvals"]
-  G2 --&gt; A1
-  G3 --&gt; A1
-  G1 --&gt; A2["A2. Conversations, tools, dashboards"]
-  G2 --&gt; A2
-  G3 --&gt; A2
-  G2 --&gt; A3["A3. Datasources, Connect, index, drift, knowledge"]
-  G3 --&gt; A3
-  G2 --&gt; A4["A4. Evals, settings, keys, meta, ready, serve, hosted"]
-  G3 --&gt; A4
+  G2a --&gt; A1
+  G3a --&gt; A1
+  D0a3 --&gt; A1
+  G1 --&gt; A2a["A2a. Conversations, chat tools"]
+  G2a --&gt; A2a
+  G3a --&gt; A2a
+  D0a3 --&gt; A2a
+  G1 --&gt; A2b["A2b. Dashboards, workspaces"]
+  G3b --&gt; A2b
+  G3a --&gt; A2b
+  D0a3 --&gt; A2b
+  G2b --&gt; A3["A3. Datasources, Connect, index, drift, knowledge"]
+  G3b --&gt; A3
+  D0a3 --&gt; A3
+  G2a --&gt; A4a["A4a. Evals, settings, keys, ready, meta"]
+  G3b --&gt; A4a
+  G2b --&gt; A4a
+  D0a3 --&gt; A4a
+  A4a --&gt; A4b["A4b. Serve, hosted, preview, web"]
+  G2b --&gt; A4b
   A1 --&gt; W1["W1. Chat"]
-  A2 --&gt; W1
+  A2a --&gt; W1
   D0b --&gt; W1
-  A1 --&gt; W2["W2. Outputs and Dashboards"]
-  A2 --&gt; W2
-  D0b --&gt; W2
+  A1 --&gt; W2a["W2a. Outputs and charts"]
+  A2a --&gt; W2a
+  D0b --&gt; W2a
+  A2b --&gt; W2b["W2b. Dashboards page"]
+  W2a --&gt; W2b
   A3 --&gt; W3["W3. Connect, Knowledge, review, drift"]
   D0b --&gt; W3
-  A4 --&gt; W4["W4. Evals, Settings, Home, Pipeline, Retrieval"]
-  D0b --&gt; W4
-  G1 --&gt; T1["T1. nl2sql chat, in nl2sql-cli"]
-  G2 --&gt; T1
-  G3 --&gt; T1
-  G2 --&gt; CL0["CL0. CLI on the facade only"]
-  G3 --&gt; CL0
-  X1 --&gt; CL1["CL1. CLI extracted to nl2sql-cli"]
-  CL0 --&gt; CL1
-  CL1 --&gt; CL2["CL2. CLI release and CI"]
-  CL1 --&gt; T1
-  D0a --&gt; K1["K1. Image and Compose"]
+  A4a --&gt; W4a["W4a. Evals, Settings"]
+  D0b --&gt; W4a
+  A4b --&gt; W4b["W4b. Home, start screen, Pipeline, Retrieval"]
+  W4a --&gt; W4b
+  G2a --&gt; CL0a["CL0a. CLI on the facade: config and init"]
+  G2b --&gt; CL0a
+  G3b --&gt; CL0a
+  CL0a --&gt; CL0b["CL0b. CLI on the facade: the rest"]
+  D0a1 --&gt; K1["K1. Image and Compose"]
+  D0a2 --&gt; K1
+  D0a3 --&gt; K1
   D0b --&gt; K1
-  W1 --&gt; X1["X1. Cutover, rehearsed"]
-  W2 --&gt; X1
-  W3 --&gt; X1
-  W4 --&gt; X1
-  K1 --&gt; X1
-  X1 --&gt; R1["R1. Owner: re-record, rehearse, browser pass"]
+  A4b --&gt; K1
+  W1 --&gt; X1a["X1a. Launcher, Space, scripts, rehearsal"]
+  W2b --&gt; X1a
+  W3 --&gt; X1a
+  W4b --&gt; X1a
+  K1 --&gt; X1a
+  X1a --&gt; X1b["X1b. Delete the old playground"]
+  X1b --&gt; R1["R1. Owner: re-record, rehearse, browser pass"]
+  X1b --&gt; CL1["CL1. CLI extracted to nl2sql-cli"]
+  CL0b --&gt; CL1
+  CL1 --&gt; CL2["CL2. CLI release, CI, image installs the CLI"]
+  CL1 --&gt; T1["T1. nl2sql chat, in nl2sql-cli"]
+  G1 --&gt; T1
+  G2b --&gt; T1
+  G3a --&gt; T1
+  G3b --&gt; T1
   R1 --&gt; REL["Release"]
   T1 --&gt; REL
   CL2 --&gt; REL</code></pre>
@@ -6149,8 +6321,7 @@ uses a key.</p>
 <thead>
 <tr>
 <th>#</th>
-<th>PR</th>
-<th>Files</th>
+<th>PR (and its files)</th>
 <th>Depends on</th>
 <th>Tests first</th>
 <th>Docs</th>
@@ -6158,100 +6329,144 @@ uses a key.</p>
 </thead>
 <tbody>
 <tr>
+<td>D-W0</td>
+<td><strong>Design gaps fixed (this PR).</strong> Docs only: Wave C's revision (2026-10-28) written into the routes, the pages, D224 and the job and fixture tables; the rows below split for session batches; the batches, the release and the owner's confirmations recorded; assignments of D226 (K1), D229 (D0a-1 and A4b) and D230 (CL2). Files: <code>docs/architecture/wave_d.md</code>, <code>docs/architecture/wave_c.md</code>.</td>
+<td>—</td>
+<td><code>mkdocs build --strict</code></td>
+<td><code>architecture/wave_d.md</code>, <code>architecture/wave_c.md</code></td>
+</tr>
+<tr>
 <td>CI0</td>
-<td><strong>Web tests in CI (B202).</strong> A <code>web</code> job in <code>test.yml</code> on today's <code>web/playground</code>: <code>npm ci</code>, <code>npm test</code>, <code>npm run build</code>, the built page's size in the job summary.</td>
-<td><code>.github/workflows/test.yml</code></td>
+<td><strong>Web tests in CI (B202).</strong> A <code>web</code> job in <code>test.yml</code> on today's <code>web/playground</code>: <code>npm ci</code>, <code>npm test</code>, <code>npm run build</code>, the built page's size in the job summary. Files: <code>.github/workflows/test.yml</code>.</td>
 <td>—</td>
 <td>The job itself, on the 24 existing test files</td>
 <td><code>CONTRIBUTING.md</code> (the web job)</td>
 </tr>
 <tr>
-<td>D0a</td>
-<td><strong>API foundation and engine shapes.</strong> API: <code>nl2sql_api/errors.py</code> (envelope, the <code>NL2SQLError</code> handler, the request id), <code>identity.py</code> (replaces <code>auth.py</code>: four sources, <code>trusted_from</code>, D205's start refusal, <code>Host</code> and forwarded-header checks, <code>caller</code>, <code>admin</code>), <code>sse.py</code>, <code>overrides.py</code> (headers to <code>LLMOverride</code>), <code>jobs.py</code> and <code>routes/jobs.py</code>, <code>routes/health.py</code> (<code>/health</code>, <code>/about</code>, <code>/meta</code> skeleton; <code>/ready</code> keeps today's answer until A4), <code>serve.py</code> and <code>__main__.py</code> (replacing <code>server.py</code>, one worker), <code>main.py</code> (an app factory registering one router per namespace, each an empty <code>APIRouter</code> in its own file: <code>query</code>, <code>approvals</code>, <code>conversations</code>, <code>dashboards</code>, <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code>, <code>web</code>), the <code>except Exception</code> blocks removed from <code>routes/datasource.py</code>, <code>indexing.py</code> and <code>llm.py</code>, <code>openapi.json</code> and its test, the fixtures test with <code>ApiError</code> and <code>Job</code>. Engine shapes only: <code>NL2SQLError</code> and the named exceptions re-parented (<code>common/errors.py</code> and each exception's module), the <code>Api</code> model (<code>config/models.py</code>, <code>config/loader.py</code>), <code>LLMOverride</code> (<code>nl2sql/llm/override.py</code>), <code>REPLAY_MISS</code> and <code>APPROVAL_NOT_GRANTED</code>, <code>NotAuthorized</code>, <code>ApprovalNotFound</code>, the approval store methods and migration (<code>nl2sql_sdk/stores.py</code>, <code>storage/sqlite.py</code>), <code>settings.approvals</code>, <code>nl2sql/__init__.py</code> exports.</td>
-<td>Waves A to C released</td>
-<td><code>test_error_envelope_shape</code>, <code>test_validation_error_never_echoes_input</code>, <code>test_no_route_returns_exception_text</code> (four exception types, B200), <code>test_nl2sql_error_maps_to_its_status</code>, <code>test_builtin_lookup_error_is_500</code>, <code>test_identity_api_keys</code>, <code>test_identity_proxy_headers</code>, <code>test_proxy_headers_from_an_untrusted_peer_are_401</code>, <code>test_identity_static</code>, <code>test_none_refuses_to_start_off_loopback</code>, <code>test_none_refuses_proxied_request</code>, <code>test_none_refuses_foreign_host_header</code>, <code>test_none_loopback_request_is_the_operator</code>, <code>test_trust_body_role_is_gone</code>, <code>test_api_section_is_strict</code>, <code>test_sse_heartbeat_and_close_on_disconnect</code>, the jobs tests (section 3), <code>test_overrides_headers_to_llm_override</code>, <code>test_openapi_snapshot_is_current</code>, <code>test_web_fixtures_are_current</code>, <code>test_state_store_round_trips_approvals</code>, <code>test_named_exceptions_keep_their_builtin_parents</code></td>
-<td><code>architecture/wave_d.md</code> (Built note), <code>api/rest/index.md</code> (conventions, envelope, identity), new <code>api/rest/errors.md</code> and <code>api/rest/jobs.md</code> (with nav entries), <code>configuration/system.md</code> (<code>api</code>), <code>security/model.md</code> (identity, D205)</td>
-<td></td>
+<td>D0a-1</td>
+<td><strong>Engine shapes and the <code>mode:</code> key.</strong> Shapes only, no behaviour: <code>nl2sql.NL2SQLError</code> and the named exceptions re-parented (<code>common/errors.py</code> and each exception's module, Wave C's <code>WorkspaceNotFound</code> (404) and <code>DashboardBusy</code> (409, in <code>dashboards/run.py</code>) and the other named ones included), <strong>new named exceptions on <code>NL2SQLError</code> that keep <code>ValueError</code> as a parent</strong> for the argument errors that raise a bare <code>ValueError</code> on <code>main</code>, so they map to 422 instead of 500 (D202): <code>NotPinnable</code> (<code>pin</code> of a saved dashboard or an empty draft), <code>ChartNotSupported</code> (<code>set_tile_chart</code>), <code>UnknownTile</code> and <code>UnknownFilter</code> (<code>refresh</code>), <code>ErrorCode.REPLAY_MISS</code> and <code>APPROVAL_NOT_GRANTED</code>, <code>NotAuthorized</code>, <code>ApprovalNotFound</code>, the <code>Api</code> model's new fields (<code>config/models.py</code>, <code>config/loader.py</code>; the old <code>role_header</code>, <code>role</code> and <code>trust_body_role</code> stay until D0a-2 replaces <code>auth.py</code>), <code>LLMOverride</code> (<code>nl2sql/llm/override.py</code>), the approval store methods and migration (<code>nl2sql_sdk/stores.py</code>, <code>storage/sqlite.py</code>), <code>settings.approvals</code>, <strong>the <code>mode:</code> config key of D229</strong> (<code>demo</code>, <code>your_data</code> or <code>hosted</code>; <code>your_data</code> when absent) with <code>resolve_mode(flag, env, file)</code>, a pure function that takes the three values as arguments, reads no environment and returns the flag, else the environment value, else the file's (the serve side is A4b), <code>nl2sql/__init__.py</code> exports.</td>
+<td>D-W0; Waves A to C released</td>
+<td><code>test_named_exceptions_keep_their_builtin_parents</code>, <code>test_dashboard_argument_errors_are_named_and_keep_valueerror</code>, <code>test_api_section_is_strict</code>, <code>test_state_store_round_trips_approvals</code>, <code>test_mode_defaults_to_your_data</code>, <code>test_mode_rejects_an_unknown_value</code>, <code>test_mode_precedence_is_flag_then_env_then_file</code></td>
+<td><code>configuration/system.md</code> (<code>api</code>, <code>mode</code>, <code>settings.approvals</code>), <code>architecture/wave_d.md</code> (Built note)</td>
+</tr>
+<tr>
+<td>D0a-2</td>
+<td><strong>Errors, identity, app factory, health.</strong> <code>nl2sql_api/errors.py</code> (envelope, the <code>NL2SQLError</code> handler, the request id), <code>identity.py</code> (replaces <code>auth.py</code>: four sources, <code>trusted_from</code>, D205's start refusal, <code>Host</code> and forwarded-header checks, <code>caller</code>, <code>admin</code>; the engine's <code>role_header</code>, <code>role</code> and <code>trust_body_role</code> fields deleted here), <code>serve.py</code> and <code>__main__.py</code> (replacing <code>server.py</code>, one worker), <code>main.py</code> (an app factory registering one router per namespace, each an empty <code>APIRouter</code> in its own file: <code>query</code>, <code>approvals</code>, <code>conversations</code>, <code>dashboards</code>, <code>workspaces</code>, <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code>, <code>web</code>), the <code>except Exception</code> blocks removed from <code>routes/datasource.py</code>, <code>indexing.py</code> and <code>llm.py</code>, <code>routes/health.py</code> (<code>/health</code>, <code>/about</code>, <code>/meta</code> skeleton; <code>/ready</code> keeps today's answer until A4a), <code>openapi.json</code> and its test.</td>
+<td>D0a-1</td>
+<td><code>test_error_envelope_shape</code>, <code>test_validation_error_never_echoes_input</code>, <code>test_no_route_returns_exception_text</code> (four exception types, B200), <code>test_nl2sql_error_maps_to_its_status</code>, <code>test_builtin_lookup_error_is_500</code>, <code>test_identity_api_keys</code>, <code>test_identity_proxy_headers</code>, <code>test_proxy_headers_from_an_untrusted_peer_are_401</code>, <code>test_identity_static</code>, <code>test_none_refuses_to_start_off_loopback</code>, <code>test_none_refuses_proxied_request</code>, <code>test_none_refuses_foreign_host_header</code>, <code>test_none_loopback_request_is_the_operator</code>, <code>test_trust_body_role_is_gone</code>, <code>test_openapi_snapshot_is_current</code></td>
+<td><code>api/rest/index.md</code> (conventions, envelope, identity), new <code>api/rest/errors.md</code> (with its nav entry), <code>security/model.md</code> (identity, D205), <code>architecture/wave_d.md</code> (Built note)</td>
+</tr>
+<tr>
+<td>D0a-3</td>
+<td><strong>SSE, jobs, overrides, fixtures.</strong> <code>nl2sql_api/sse.py</code>, <code>jobs.py</code> and <code>routes/jobs.py</code>, <code>overrides.py</code> (headers to <code>LLMOverride</code>), the <code>DashboardJobResult</code> model, the web fixtures test with the <code>ApiError</code> and <code>Job</code> golden files (written under <code>web/playground/src/api/fixtures/</code>, which D0b moves with the app), <code>openapi.json</code> regenerated for the jobs routes.</td>
+<td>D0a-1, D0a-2</td>
+<td><code>test_sse_heartbeat_and_close_on_disconnect</code>, the jobs tests (<code>test_jobs_run_one_at_a_time_in_order</code>, <code>test_job_progress_replays_then_follows</code>, <code>test_job_events_hold_no_worker_thread</code>, <code>test_cancel_running_job_stops_between_items</code>, <code>test_second_job_for_a_caller_is_a_conflict</code>, <code>test_two_users_generate_for_one_datasource</code>, <code>test_another_users_job_is_not_found</code>, <code>test_api_runs_one_worker</code>), <code>test_overrides_headers_to_llm_override</code>, <code>test_web_fixtures_are_current</code></td>
+<td>new <code>api/rest/jobs.md</code> (with its nav entry), <code>architecture/wave_d.md</code> (Built note)</td>
 </tr>
 <tr>
 <td>D0b</td>
-<td><strong>Web foundation.</strong> <code>git mv web/playground nl2sql-ui</code> (D225); <code>src/lib/</code> and <code>src/components/</code> (the ownership table in section 5); <code>src/api/http.js</code> and its tests; <code>src/api/routes.test.js</code> (reads every <code>src/api/*.js</code>); the shell <code>App.jsx</code> with lazy page stubs and the router's new routes; <code>outputs/Output.jsx</code> (stub), <code>components/JobProgress.jsx</code>; <code>styles.css</code> split into <code>styles/*.css</code> by moving rules; Vite output to <code>packages/api/src/nl2sql_api/web/static/</code> without the single-file plugin; <code>packages/api/pyproject.toml</code> (package data for <code>web/</code>); <code>test.yml</code> (the job's path).</td>
-<td>CI0, D0a</td>
+<td><strong>Web foundation.</strong> <code>git mv web/playground nl2sql-ui</code> (D225); <code>src/lib/</code> and <code>src/components/</code> (the ownership table in section 5); <code>src/api/http.js</code> and its tests; <code>src/api/routes.test.js</code> (reads every <code>src/api/*.js</code>); the shell <code>App.jsx</code> with lazy page stubs and the router's new routes; <code>outputs/Output.jsx</code> (stub), <code>components/JobProgress.jsx</code>; <code>styles.css</code> split into <code>styles/*.css</code> by moving rules; Vite output to <code>packages/api/src/nl2sql_api/web/static/</code> without the single-file plugin; <code>packages/api/pyproject.toml</code> (package data for <code>web/</code>); the fixtures test and its writer in <code>packages/api/tests/</code> (D0a-3's <code>test_web_fixtures_are_current</code>), repointed from <code>web/playground/src/api/fixtures/</code> to <code>nl2sql-ui/src/api/fixtures/</code>; <code>test.yml</code> (the job's path).</td>
+<td>CI0, D0a-3</td>
 <td><code>http.test.js</code> (envelope, identity and key headers), <code>sse.test.js</code> (split frames, heartbeats), <code>router.test.js</code> (new routes), <code>styles.test.js</code> (unchanged tokens after the split), every existing test still green after its move</td>
 <td><code>nl2sql-ui/README.md</code></td>
-<td></td>
 </tr>
 <tr>
 <td>G1</td>
 <td><strong>Results bound to the user, ratings.</strong> Files: <code>execution/artifacts/results.py</code>, <code>api/results_api.py</code>, <code>tracing/document.py</code>, <code>api/traces_api.py</code>, <code>api/feedback_api.py</code>, <code>feedback/</code> (record from a trace), <code>nl2sql/chat_tools/chart.py</code>, <code>nl2sql/dashboards/</code> (pass the caller to <code>results</code>), <code>docs/architecture/invariants.md</code>.</td>
-<td>D0a</td>
+<td>D0a-1</td>
 <td><code>test_manifest_records_the_asker</code>, <code>test_another_users_result_is_not_found</code>, <code>test_another_users_trace_is_not_found</code>, <code>test_cli_trace_reads_any_run</code>, <code>test_ownerless_result_is_read_only_by_the_operator</code>, <code>test_chart_with_another_users_trace_is_not_found</code>, <code>test_record_reads_the_runs_own_trace</code>, <code>test_record_of_another_users_run_is_not_found</code>, <code>test_record_requires_a_caller</code></td>
 <td>new <code>api/core/results.md</code> (with its nav entry), <code>observability/feedback.md</code>, <code>invariants.md</code> (<em>Results Belong to Their Asker</em>)</td>
-<td></td>
 </tr>
 <tr>
-<td>G2</td>
-<td><strong>Overrides, replay and demo.</strong> <code>llm_override=</code> on the run and conversation methods through <code>use_request_llms</code>; the model-override key rule; the <code>replay</code> provider (from <code>llm/replay.py</code>), <code>ReplayMiss</code>, <code>recorded()</code>, the recordings moved to <code>nl2sql/datasets/recordings/</code>; <code>llm.providers()</code> with labels, verified models and key shape; <code>provider_for_key</code> and <code>provider_keys_in_environment</code> exported; the rewriter prompt's marker; <code>DatasourceInfo.sample_questions</code>; <code>prepare_demo</code> (the model choice from today's <code>cli/commands/demo.py</code>, the Ollama check in <code>llm/</code>) and <code>init_project</code> exported; <code>scripts/record_demo_answers.py</code> on the <code>Recorder</code>. Files: <code>nl2sql/llm/providers/replay.py</code> (new), <code>llm/registry.py</code>, <code>llm/replay.py</code>, <code>llm/request_key.py</code>, <code>api/query_api.py</code> (<code>llm_override</code>), <code>nl2sql/conversations/api.py</code> and <code>prompts.py</code>, <code>api/llm_api.py</code>, <code>api/types.py</code>, <code>api/datasource_api.py</code> (<code>sample_questions</code>), <code>config/project.py</code> (<code>prepare_demo</code>), <code>public_api.py</code>, <code>nl2sql/__init__.py</code>, <code>pyproject.toml</code> (package data), <code>scripts/record_demo_answers.py</code>.</td>
-<td>D0a</td>
-<td><code>test_replay_answers_a_recorded_question_through_the_pipeline</code>, <code>test_unrecorded_question_is_replay_miss</code>, <code>test_replay_usage_names_the_recorded_model</code>, <code>test_recorded_lists_covered_questions</code>, <code>test_override_key_replaces_replay_for_one_call</code>, <code>test_override_never_reaches_the_environment_or_trace</code>, <code>test_model_override_without_its_key_is_refused</code>, <code>test_providers_carry_labels_and_key_shape</code>, <code>test_recorded_follow_up_replays_the_rewrite</code>, <code>test_datasource_info_lists_sample_questions</code>, <code>test_prepare_demo_writes_once_and_indexes_when_missing</code>, <code>test_prepare_demo_picks_replay_without_a_key</code>, <code>test_record_script_writes_the_store</code> (fake upstream)</td>
-<td><code>configuration/llm.md</code> (<code>replay</code>, overrides), <code>getting_started/demo.md</code></td>
-<td></td>
+<td>G2a</td>
+<td><strong>Per-request overrides and the providers catalogue.</strong> <code>llm_override=</code> on the run and conversation methods through <code>use_request_llms</code>; the model-override key rule; <code>llm.providers()</code> with labels, verified models and key shape; <code>provider_for_key</code> and <code>provider_keys_in_environment</code> exported. Files: <code>llm/registry.py</code>, <code>llm/request_key.py</code>, <code>api/query_api.py</code> (<code>llm_override</code>), <code>nl2sql/conversations/api.py</code> (<code>llm_override</code>), <code>api/llm_api.py</code>, <code>api/types.py</code>, <code>public_api.py</code>, <code>nl2sql/__init__.py</code>.</td>
+<td>D0a-1</td>
+<td><code>test_override_never_reaches_the_environment_or_trace</code>, <code>test_model_override_without_its_key_is_refused</code>, <code>test_providers_carry_labels_and_key_shape</code>, <code>test_provider_for_key_and_environment_keys_are_exported</code></td>
+<td><code>configuration/llm.md</code> (per-request overrides, the providers catalogue)</td>
 </tr>
 <tr>
-<td>G3</td>
-<td><strong>Approvals, progress, readiness.</strong> <code>engine.approvals</code>; a <code>needs_approval</code> run stores its requests; request ids in <code>run_query</code>, <code>stream_query</code> and <code>conversations.retry</code>; <code>on_datasource</code> and <code>on_tile</code> and the four <code>cancellation_token</code>s; <code>CheckReport.ready</code> and <code>problems</code>. Files: <code>nl2sql/approvals/</code> (new: <code>api.py</code>), <code>hooks/runner.py</code> (look up grants), <code>api/query_api.py</code> (store requests, ids), <code>nl2sql/conversations/api.py</code> (<code>retry</code>), <code>api/indexing_api.py</code>, <code>api/knowledge_api.py</code>, <code>nl2sql/profiler/run.py</code>, <code>nl2sql/dashboards/api.py</code>, <code>nl2sql/evaluation/run.py</code>, <code>check.py</code>, <code>public_api.py</code>.</td>
-<td>D0a</td>
-<td><code>test_grant_by_id_runs_as_an_approval</code>, <code>test_grant_needs_an_approver_role</code>, <code>test_denied_request_does_not_run</code>, <code>test_grant_is_reusable_until_it_expires</code>, <code>test_grants_are_purged</code>, <code>test_needs_approval_run_stores_its_request</code>, <code>test_retry_with_a_granted_id</code>, <code>test_profile_reports_each_datasource</code>, <code>test_generate_reports_each_tile</code>, <code>test_cancelled_index_build_stops_between_datasources</code> (and the same for profile, evals and generate), <code>test_ready_counts_stale_as_ready</code>, <code>test_ready_with_optional_keys</code>, <code>test_problems_name_no_secret</code></td>
-<td><code>security/model.md</code> (approvals), <code>api/core/*.md</code> for each changed method</td>
-<td></td>
+<td>G2b</td>
+<td><strong>Replay, demo and Try the demo.</strong> The <code>replay</code> provider (from <code>llm/replay.py</code>), <code>ReplayMiss</code>, <code>recorded()</code>, the recordings moved to <code>nl2sql/datasets/recordings/</code>; the conversation prompt's <code>[USER_QUERY]</code> marker; <code>DatasourceInfo.sample_questions</code>; <code>prepare_demo</code> (the model choice from today's <code>cli/commands/demo.py</code>, the Ollama check in <code>llm/</code>) and <code>init_project</code> exported; <code>scripts/record_demo_answers.py</code> on the <code>Recorder</code>; <strong>the "Try the demo" facade method <code>engine.add_demo()</code></strong> (D237, <a href="#the-start-screen">section 4</a>): it adds the three sample databases and the demo glossary to the served project as ordinary datasources, then indexes them, passing <code>on_datasource</code> to <code>index.build</code> (G3b)); <strong><code>test_replay_covered</code></strong>, moved here from R1. Files: <code>nl2sql/llm/providers/replay.py</code> (new), <code>llm/replay.py</code>, <code>nl2sql/conversations/prompts.py</code>, <code>api/datasource_api.py</code> (<code>sample_questions</code> and <code>add_demo</code>), <code>api/types.py</code>, <code>config/project.py</code> (<code>prepare_demo</code>), <code>public_api.py</code>, <code>nl2sql/__init__.py</code>, <code>pyproject.toml</code> (package data), <code>scripts/record_demo_answers.py</code>.</td>
+<td>G2a, G3b</td>
+<td><code>test_replay_answers_a_recorded_question_through_the_pipeline</code>, <code>test_unrecorded_question_is_replay_miss</code>, <code>test_replay_usage_names_the_recorded_model</code>, <code>test_recorded_lists_covered_questions</code>, <code>test_override_key_replaces_replay_for_one_call</code>, <code>test_recorded_follow_up_replays_the_models_steps</code>, <code>test_datasource_info_lists_sample_questions</code>, <code>test_prepare_demo_writes_once_and_indexes_when_missing</code>, <code>test_prepare_demo_picks_replay_without_a_key</code>, <code>test_add_demo_adds_the_samples_and_indexes_them</code>, <code>test_record_script_writes_the_store</code> (fake upstream), <code>test_replay_covered</code></td>
+<td><code>configuration/llm.md</code> (<code>replay</code>), <code>getting_started/demo.md</code></td>
+</tr>
+<tr>
+<td>G3a</td>
+<td><strong>Stored approval grants.</strong> <code>engine.approvals</code> (<code>list</code>, <code>grant</code>, <code>deny</code>; 24 hours); a <code>needs_approval</code> run stores its requests; request ids in <code>run_query</code>, <code>stream_query</code>, <code>conversations.retry</code> and <code>dashboards.refresh</code> (D236); retry ids; the hooks runner looks up grants. Files: <code>nl2sql/approvals/</code> (new: <code>api.py</code>), <code>hooks/runner.py</code> (look up grants), <code>api/query_api.py</code> (store requests, ids), <code>nl2sql/conversations/api.py</code> (<code>retry</code>), <code>nl2sql/dashboards/api.py</code> and <code>api/dashboards_api.py</code> (<code>refresh</code>), <code>public_api.py</code>.</td>
+<td>D0a-1</td>
+<td><code>test_grant_by_id_runs_as_an_approval</code>, <code>test_grant_needs_an_approver_role</code>, <code>test_denied_request_does_not_run</code>, <code>test_grant_is_reusable_until_it_expires</code>, <code>test_grants_are_purged</code>, <code>test_needs_approval_run_stores_its_request</code>, <code>test_retry_with_a_granted_id</code>, <code>test_refresh_with_a_granted_id</code></td>
+<td><code>security/model.md</code> (approvals), <code>api/core/*.md</code> for the changed run, <code>retry</code> and <code>refresh</code> methods</td>
+</tr>
+<tr>
+<td>G3b</td>
+<td><strong>Progress, cancellation, readiness.</strong> <code>on_datasource</code> on <code>knowledge.profile</code> and <code>on_tile</code> on <code>dashboards.generate</code>; the four <code>cancellation_token</code>s (<code>index.build</code>, <code>knowledge.profile</code>, <code>evals.run</code>, <code>dashboards.generate</code>); <code>CheckReport.ready</code> and <code>problems</code>. Files: <code>api/indexing_api.py</code>, <code>api/knowledge_api.py</code>, <code>nl2sql/profiler/run.py</code>, <code>nl2sql/dashboards/api.py</code> and <code>api/dashboards_api.py</code>, <code>nl2sql/evaluation/run.py</code>, <code>check.py</code>, <code>public_api.py</code>.</td>
+<td>D0a-1</td>
+<td><code>test_profile_reports_each_datasource</code>, <code>test_generate_reports_each_tile</code>, <code>test_cancelled_index_build_stops_between_datasources</code> (and the same for profile, evals and generate), <code>test_ready_counts_stale_as_ready</code>, <code>test_ready_with_optional_keys</code>, <code>test_problems_name_no_secret</code></td>
+<td><code>api/core/*.md</code> for each changed method</td>
 </tr>
 <tr>
 <td>A1</td>
 <td><strong>Query, results, traces, feedback, approvals routes.</strong> Files: <code>routes/query.py</code> (rewritten), <code>routes/approvals.py</code>, <code>models/query.py</code>, fixtures (<code>QueryResult</code>); delete <code>services/query.py</code>.</td>
-<td>G1, G2, G3</td>
+<td>D0a-3, G1, G2a, G3a</td>
 <td><code>test_query_body_question_choice_and_approval_ids</code>, <code>test_choice_with_approval_ids_is_422</code>, <code>test_query_stream_yields_wave_a_events</code>, <code>test_results_route_hides_another_users_rows</code>, <code>test_trace_route_hides_another_users_trace</code>, <code>test_chart_route_and_vega_lite_format</code>, <code>test_feedback_records_from_the_trace</code>, <code>test_correct_returns_a_proposal</code>, <code>test_approver_grants_and_asker_retries</code>, <code>test_request_key_headers_refused_without_request_llm</code>, <code>test_model_override_without_request_key_is_422_even_when_server_has_key</code>, <code>test_request_key_never_in_a_response_log_or_trace</code>, <code>test_query_docs_name_no_removed_variable</code> (B203)</td>
 <td><code>api/rest/query.md</code>, new <code>api/rest/results.md</code> and <code>api/rest/approvals.md</code> (with nav entries)</td>
-<td></td>
 </tr>
 <tr>
-<td>A2</td>
-<td><strong>Conversations, chat tools, dashboards routes.</strong> Files: <code>routes/conversations.py</code>, <code>routes/dashboards.py</code>, <code>models/conversations.py</code>, <code>models/dashboards.py</code>, fixtures (<code>Turn</code>, <code>Dashboard</code>).</td>
-<td>G1, G2, G3</td>
-<td><code>test_start_ask_follow_up_round_trip</code> (fake LLM), <code>test_turn_stream_ends_with_conversation_turn</code>, <code>test_closing_the_stream_cancels_the_turn</code>, <code>test_busy_conversation_is_409</code>, <code>test_needs_clarification_then_choice_turn</code>, <code>test_retry_with_approval_ids</code>, <code>test_tool_route_returns_tool_output</code>, <code>test_report_is_markdown</code>, <code>test_other_users_conversation_is_404</code>, <code>test_generate_is_a_job_with_tile_progress</code>, <code>test_refresh_with_filters</code>, <code>test_filter_values</code>, <code>test_delete_a_tile</code>, <code>test_pin_a_turn</code>, <code>test_starter_questions_need_a_caller</code></td>
-<td>new <code>api/rest/conversations.md</code> and <code>api/rest/dashboards.md</code> (with nav entries)</td>
-<td></td>
+<td>A2a</td>
+<td><strong>Conversations and chat tools routes.</strong> Files: <code>routes/conversations.py</code>, <code>models/conversations.py</code>, fixtures (<code>Turn</code>).</td>
+<td>D0a-3, G1, G2a, G3a</td>
+<td><code>test_start_ask_follow_up_round_trip</code> (fake LLM), <code>test_start_for_a_saved_dashboard</code>, <code>test_turn_stream_ends_with_conversation_turn</code>, <code>test_turn_stream_carries_conversation_step</code>, <code>test_closing_the_stream_cancels_the_turn</code>, <code>test_busy_conversation_is_409</code>, <code>test_needs_clarification_then_choice_turn</code>, <code>test_retry_with_approval_ids</code>, <code>test_tool_route_returns_tool_output</code>, <code>test_report_is_markdown</code>, <code>test_other_users_conversation_is_404</code></td>
+<td>new <code>api/rest/conversations.md</code> (with its nav entry)</td>
+</tr>
+<tr>
+<td>A2b</td>
+<td><strong>Dashboards and workspaces routes,</strong> thin over <code>engine.dashboards</code> and <code>engine.workspaces</code> as Wave C ships them (<a href="#the-routes">the routes</a>). Files: <code>routes/dashboards.py</code>, <code>routes/workspaces.py</code>, <code>models/dashboards.py</code>, the <code>starter-questions</code> route, fixtures (<code>Dashboard</code>, <code>DashboardView</code> with its runs).</td>
+<td>D0a-3, G1, G3a, G3b</td>
+<td><code>test_generate_is_a_job_with_tile_progress</code>, <code>test_open_serves_stored_results_and_runs_nothing</code>, <code>test_refresh_with_filters</code>, <code>test_filter_values</code>, <code>test_set_filters_and_schedule</code>, <code>test_schedule_too_frequent_is_422</code>, <code>test_edit_routes_call_the_named_methods</code>, <code>test_arrange_layout</code>, <code>test_remove_a_tile</code>, <code>test_pin_a_draft_whole_into_a_workspace</code>, <code>test_pin_a_saved_dashboard_is_422</code>, <code>test_move_to_another_workspace</code>, <code>test_delete_a_dashboard</code>, <code>test_busy_dashboard_is_409</code>, <code>test_other_users_dashboard_is_404</code>, <code>test_workspace_create_rename_delete</code>, <code>test_delete_a_non_empty_workspace_is_422</code>, <code>test_starter_questions_need_a_caller</code></td>
+<td>new <code>api/rest/dashboards.md</code> (dashboards and workspaces, with its nav entry)</td>
 </tr>
 <tr>
 <td>A3</td>
 <td><strong>Datasources, Connect, index, drift, knowledge routes.</strong> Files: <code>routes/datasources.py</code> (replaces <code>routes/datasource.py</code>), <code>routes/index.py</code> (replaces <code>routes/indexing.py</code>), <code>routes/knowledge.py</code>, <code>models/datasources.py</code>, fixtures (<code>Proposal</code>, <code>DriftReport</code>); delete <code>services/datasource.py</code>, <code>services/indexing.py</code>.</td>
-<td>G2, G3</td>
+<td>D0a-3, G2b, G3b</td>
 <td><code>test_types_route_carries_connection_schemas</code>, <code>test_test_route_registers_nothing</code>, <code>test_save_uses_wave_cs_writer_with_env_file_only_on_fresh_local_install</code>, <code>test_save_on_a_read_only_config_is_its_own_error</code>, <code>test_index_job_progress_per_datasource</code>, <code>test_drift_check_route_is_admin</code>, <code>test_inspect_route</code>, <code>test_schema_route_hides_denied_tables</code>, <code>test_datasources_list_has_sample_questions_in_scope</code>, <code>test_knowledge_show_as_caller</code>, <code>test_profile_job_creates_proposals_on_the_server_key</code>, <code>test_accept_many_with_edits</code>, <code>test_accept_and_reject_need_admin</code>, <code>test_accept_file_changed_is_409</code>, <code>test_file_starter_questions_as_examples</code>, <code>test_save_choice_creates_a_term_proposal</code></td>
 <td><code>api/rest/datasource.md</code> (renamed <code>datasources.md</code>), <code>api/rest/indexing.md</code>, new <code>api/rest/knowledge.md</code> (with its nav entry)</td>
-<td></td>
 </tr>
 <tr>
-<td>A4</td>
-<td><strong>Evals, settings, keys, meta, ready, serve, hosted.</strong> Files: <code>routes/evals.py</code>, <code>routes/settings.py</code> (replaces <code>routes/llm.py</code>), <code>routes/health.py</code> (<code>/ready</code> on <code>CheckReport.ready</code>, <code>/meta</code> filled), <code>routes/web.py</code> (page, assets, clips, social card), <code>serve.py</code> (<code>--demo</code>, <code>--hosted</code>), <code>hosted.py</code> (anonymous sessions, limits, the job and stream caps) and <code>preview.py</code> (moved from the playground), fixtures (<code>Job</code> with an <code>EvalReport</code>, <code>/meta</code>); delete <code>services/llm.py</code>, <code>services/health.py</code>.</td>
-<td>G2, G3</td>
-<td><code>test_eval_job_is_admin_only</code>, <code>test_providers_route_has_no_key</code>, <code>test_replace_llm_is_admin</code>, <code>test_api_key_token_returned_once</code>, <code>test_ready_*</code> (section 3), <code>test_meta_without_a_caller_lists_no_datasource</code>, <code>test_meta_lists_sample_questions_and_recorded</code>, <code>test_serve_demo_prepares_and_serves</code>, <code>test_hosted_refuses_an_environment_key</code>, <code>test_hosted_session_cookie_is_nl2sql_demo_session</code>, <code>test_hosted_limits_are_429_with_retry_after</code>, <code>test_hosted_one_job_and_two_streams_per_session</code>, <code>test_hosted_admin_routes_are_403</code>, <code>test_page_and_clips_are_served</code>, <code>test_unknown_path_serves_the_page</code></td>
-<td><code>api/rest/llm.md</code> (renamed <code>settings.md</code>), new <code>api/rest/evals.md</code> (with its nav entry), <code>api/rest/health.md</code>, <code>deployment/hosted-demo.md</code></td>
-<td></td>
+<td>A4a</td>
+<td><strong>Evals, settings, API keys, <code>/ready</code>, <code>/meta</code>.</strong> Files: <code>routes/evals.py</code>, <code>routes/settings.py</code> (replaces <code>routes/llm.py</code>), <code>routes/health.py</code> (<code>/ready</code> on <code>CheckReport.ready</code>, <code>/meta</code> filled, with the mode from the engine's config), fixtures (<code>Job</code> with an <code>EvalReport</code>, <code>/meta</code>); the <code>demo</code> job kind (<code>POST /jobs/demo</code>, D237), delete <code>services/llm.py</code>, <code>services/health.py</code>.</td>
+<td>D0a-3, G2a, G2b, G3b</td>
+<td><code>test_eval_job_is_admin_only</code>, <code>test_demo_job_adds_the_samples_and_indexes_them</code>, <code>test_demo_job_is_admin</code>, <code>test_providers_route_has_no_key</code>, <code>test_replace_llm_is_admin</code>, <code>test_api_key_token_returned_once</code>, <code>test_ready_*</code> (section 3), <code>test_meta_without_a_caller_lists_no_datasource</code>, <code>test_meta_lists_sample_questions_and_recorded</code>, <code>test_meta_reports_the_mode</code></td>
+<td><code>api/rest/llm.md</code> (renamed <code>settings.md</code>), new <code>api/rest/evals.md</code> (with its nav entry), <code>api/rest/health.md</code></td>
+</tr>
+<tr>
+<td>A4b</td>
+<td><strong>Serve, hosted, preview, web.</strong> <code>serve.py</code> (<code>--demo</code>, <code>--hosted</code>), <strong>the serve side of D229</strong> (<code>serve</code> reads <code>NL2SQL_MODE</code>, resolves flag, then variable, then file with <code>resolve_mode</code>, and puts the result in the config the engine is built from; <code>NL2SQL_MODE</code> is added to <code>READS_THE_ENVIRONMENT</code> in <code>tests/architecture/test_boundaries.py</code>), <code>hosted.py</code> (anonymous sessions, limits, the job and stream caps) and <code>preview.py</code> (moved from the playground), <code>routes/web.py</code> (page, assets, clips, social card).</td>
+<td>A4a, G2b</td>
+<td><code>test_serve_demo_prepares_and_serves</code>, <code>test_serve_mode_precedence_flag_env_file</code>, <code>test_the_environment_variable_is_read_only_at_the_entry_point</code>, <code>test_hosted_refuses_an_environment_key</code>, <code>test_hosted_session_cookie_is_nl2sql_demo_session</code>, <code>test_hosted_limits_are_429_with_retry_after</code>, <code>test_hosted_one_job_and_two_streams_per_session</code>, <code>test_hosted_admin_routes_are_403</code>, <code>test_page_and_clips_are_served</code>, <code>test_unknown_path_serves_the_page</code></td>
+<td><code>deployment/hosted-demo.md</code>, <code>configuration/system.md</code> (<code>NL2SQL_MODE</code>)</td>
 </tr>
 <tr>
 <td>W1</td>
 <td><strong>Chat.</strong> Files: <code>src/pages/Chat.jsx</code>, <code>src/chat/</code> (<code>Transcript.jsx</code>, <code>Turn.jsx</code>, <code>Composer.jsx</code>, <code>Clarify.jsx</code>, <code>Approval.jsx</code>, <code>WhyPanel.jsx</code>, <code>Warnings.jsx</code>, <code>Correction.jsx</code>, <code>turns.js</code>, <code>spine.js</code>, <code>Feedback.jsx</code> and <code>feedback.js</code> moved), <code>src/pages/Approvals.jsx</code>, <code>src/api/chat.js</code>, <code>styles/chat.css</code>; delete <code>AskParts.jsx</code>, <code>Panes.jsx</code>, <code>stream.js</code> and their tests.</td>
-<td>A1, A2, D0b</td>
-<td><code>turns.test.js</code> (from the <code>Turn</code> fixtures: rewritten, <code>needs_clarification</code>, <code>needs_approval</code>, tool), <code>spine.test.js</code> (Wave A's event names fill the spine), <code>clarify.test.js</code>, <code>why.test.js</code> (explanation sections, the planner note labelled), <code>warnings.test.js</code></td>
+<td>A1, A2a, D0b</td>
+<td><code>turns.test.js</code> (from the <code>Turn</code> fixtures: the model's steps, <code>needs_clarification</code>, <code>needs_approval</code>, tool), <code>spine.test.js</code> (Wave A's event names fill the spine), <code>clarify.test.js</code>, <code>why.test.js</code> (explanation sections, the planner note labelled), <code>warnings.test.js</code></td>
 <td>new <code>apps/web.md</code> (with its nav entry), <code>nl2sql-ui/README.md</code></td>
-<td></td>
 </tr>
 <tr>
-<td>W2</td>
-<td><strong>Outputs and Dashboards.</strong> Files: <code>src/outputs/</code> (<code>Output.jsx</code> filled, <code>Chart.jsx</code>, <code>chart.js</code>, <code>Mermaid.jsx</code>, <code>Report.jsx</code>, <code>markdown.js</code>, <code>RowsTable.jsx</code> and <code>results.js</code> moved), <code>src/pages/Dashboards.jsx</code>, <code>src/dashboards/</code> (<code>Grid.jsx</code>, <code>Tile.jsx</code>, <code>Filters.jsx</code>, <code>layout.js</code>), <code>src/api/outputs.js</code>, <code>src/api/dashboards.js</code>, <code>styles/outputs.css</code>, <code>styles/dashboards.css</code>, <code>package.json</code> (<code>mermaid</code>).</td>
-<td>A1, A2, D0b</td>
-<td><code>chart.test.js</code> (from fixtures: scales, a line per series, bars in the spec's order, big number formatting, truncated said), <code>markdown.test.js</code>, <code>layout.test.js</code> (the 4-column grid from <code>TileLayout</code>), <code>filters.test.js</code> (<code>in</code> and <code>between</code> values to the refresh body), <code>mermaid.test.js</code> (theme follows the page)</td>
-<td><code>apps/web.md</code> (charts, dashboards)</td>
-<td></td>
+<td>W2a</td>
+<td><strong>Outputs and charts.</strong> Files: <code>src/outputs/</code> (<code>Output.jsx</code> filled, <code>Chart.jsx</code>, <code>chart.js</code>, <code>Mermaid.jsx</code>, <code>Report.jsx</code>, <code>markdown.js</code>, <code>RowsTable.jsx</code> and <code>results.js</code> moved), <code>src/api/outputs.js</code>, <code>styles/outputs.css</code>, <code>package.json</code> (<code>mermaid</code>).</td>
+<td>A1, A2a, D0b</td>
+<td><code>chart.test.js</code> (from fixtures: scales, a line per series, bars in the spec's order, big number formatting, truncated said), <code>markdown.test.js</code>, <code>mermaid.test.js</code> (theme follows the page)</td>
+<td><code>apps/web.md</code> (charts, diagrams, reports)</td>
+</tr>
+<tr>
+<td>W2b</td>
+<td><strong>Dashboards page,</strong> for the revised Wave C: workspaces, open with stored results, arrange, edit, filters, schedule, pin, move, delete. Files: <code>src/pages/Dashboards.jsx</code>, <code>src/dashboards/</code> (<code>Workspaces.jsx</code>, <code>Grid.jsx</code>, <code>Tile.jsx</code>, <code>Edit.jsx</code>, <code>Filters.jsx</code>, <code>Schedule.jsx</code>, <code>layout.js</code>), <code>src/api/dashboards.js</code>, <code>styles/dashboards.css</code>.</td>
+<td>A2b, W2a, D0b</td>
+<td><code>layout.test.js</code> (the 4-column grid from <code>TileLayout</code>, arrange bodies of <code>TileArrangement</code>s), <code>filters.test.js</code> (<code>in</code> and <code>between</code> values to the refresh body), <code>tile.test.js</code> (from the <code>DashboardView</code> fixture: "refreshed" age, <code>needs_fixing</code>, <code>denied</code>, <code>needs_approval</code>), <code>edit.test.js</code> (rename, chart type and remove bodies), <code>workspaces.test.js</code> (create, rename, delete, move)</td>
+<td><code>apps/web.md</code> (dashboards, workspaces)</td>
 </tr>
 <tr>
 <td>W3</td>
@@ -6259,144 +6474,189 @@ uses a key.</p>
 <td>A3, D0b</td>
 <td><code>schemaForm.test.js</code> (each JSON Schema type, <code>format: password</code> hidden, required fields, defaults, enums), <code>proposals.test.js</code> (an accept body for several ids with edits, from the <code>Proposal</code> fixture), <code>drift.test.js</code> (from the <code>DriftReport</code> fixture), <code>datasources.test.js</code> (moved)</td>
 <td><code>apps/web.md</code> (Connect, review)</td>
-<td></td>
 </tr>
 <tr>
-<td>W4</td>
-<td><strong>Evals, Settings, Home (with the start screen of section 4, and <code>/meta</code>'s <code>start</code>), Pipeline, Retrieval, hosted first run.</strong> Tests add <code>startScreen.test.js</code> (the three <code>start</code> values from <code>/meta</code> fixtures; hosted "Connect" shows the run-it-yourself steps and calls no route) and a route test that an empty project's <code>/meta</code> says <code>choose</code>. Files: <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code>, <code>src/pages/Settings.jsx</code> (per-tab keys and models, the tab's API key, server LLM, API keys), <code>src/pages/Home.jsx</code>, <code>Pipeline.jsx</code>, <code>Retrieval.jsx</code> and the modules beside them (section 5's table), <code>src/api/evals.js</code>, <code>settings.js</code>, <code>meta.js</code>, <code>styles/settings.css</code>, <code>styles/evals.css</code>.</td>
-<td>A4, D0b</td>
-<td><code>report.test.js</code> (from the <code>EvalReport</code> fixture), <code>hostedKey.test.js</code> and <code>hostedModels.test.js</code> (kept, now every mode), <code>firstRun.test.js</code> (recorded from the <code>usage</code> provider), <code>status.test.js</code> (modes from the <code>/meta</code> fixture), <code>home.test.js</code> (kept)</td>
-<td><code>apps/web.md</code> (evals, settings), the <code>getting_started/</code> pages that show the playground</td>
-<td></td>
+<td>W4a</td>
+<td><strong>Evals and Settings.</strong> Files: <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code>, <code>src/pages/Settings.jsx</code> (per-tab keys and models, the tab's API key, server LLM, API keys), <code>hostedKey.js</code> and <code>hostedModels.js</code> (moved beside it), <code>src/api/evals.js</code>, <code>settings.js</code>, <code>styles/settings.css</code>, <code>styles/evals.css</code>.</td>
+<td>A4a, D0b</td>
+<td><code>report.test.js</code> (from the <code>EvalReport</code> fixture), <code>hostedKey.test.js</code> and <code>hostedModels.test.js</code> (kept, now every mode)</td>
+<td><code>apps/web.md</code> (evals, settings)</td>
 </tr>
 <tr>
-<td>CL0</td>
-<td><strong>CLI on the facade only.</strong> Done in place, before the move: the whole CLI (not only the demo command) imports only the top-level <code>nl2sql</code>, so CL1 is a rename. Each internal import the CLI has today becomes a facade method or export (the list is in section 17); the engine's <code>nl2sql.config</code> helpers, the provider catalogue, the MCP server's start and the model types the commands print are the bulk. Files: the CLI commands that import them, <code>public_api.py</code>, <code>nl2sql/__init__.py</code>, <code>tests/architecture/test_boundaries.py</code> (the rule widened to <code>nl2sql/cli/</code>). Sized to one PR; split by area (config and init, then the rest) if the audit passes 1,000 changed lines.</td>
-<td>G2, G3</td>
-<td><code>test_the_cli_imports_only_the_public_nl2sql</code> (fails on today's list, passes at the end), one test per new facade method</td>
+<td>W4b</td>
+<td><strong>Home (with the start screen of section 4 and <code>/meta</code>'s <code>start</code>), Pipeline, Retrieval, hosted first run.</strong> Files: <code>src/pages/Home.jsx</code>, <code>Pipeline.jsx</code>, <code>Retrieval.jsx</code> and the modules beside them (section 5's table, except W4a's), <code>src/api/meta.js</code>, <code>styles/home.css</code>.</td>
+<td>A4b, W4a, D0b</td>
+<td><code>startScreen.test.js</code> (the three <code>start</code> values from <code>/meta</code> fixtures; hosted "Connect" shows the run-it-yourself steps and calls no route; "Try the demo" calls <code>POST /jobs/demo</code>), a route test that an empty project's <code>/meta</code> says <code>choose</code>, <code>firstRun.test.js</code> (recorded from the <code>usage</code> provider), <code>status.test.js</code> (modes from the <code>/meta</code> fixture), <code>home.test.js</code> (kept)</td>
+<td><code>apps/web.md</code> (Home, the start screen), the <code>getting_started/</code> pages that show the playground</td>
+</tr>
+<tr>
+<td>CL0a</td>
+<td><strong>CLI on the facade only: config and init.</strong> Done in place, before the move, so CL1 is a rename. The commands that deal with configuration, init and checks stop importing the engine's internals: <code>commands/config_check.py</code>, <code>init.py</code>, <code>doctor.py</code>, <code>install.py</code>, <code>cli/config.py</code>, <code>cli/common/engine.py</code> and the matching parts of <code>main.py</code>. Each internal import becomes a facade method or export (the list is in section 17): <code>init_project</code> and <code>prepare_demo</code> (G2b), <code>engine.llm.providers()</code> (G2a), <code>engine.check</code> (G3b), and the <code>nl2sql.config</code> helpers the commands need. The architecture test is widened to the whole CLI, with a named list of the files CL0b still has to fix (it shrinks, like <code>STILL_IMPORTED_FROM_INSIDE</code>). Files: those commands, <code>public_api.py</code>, <code>nl2sql/__init__.py</code>, <code>tests/architecture/test_boundaries.py</code>.</td>
+<td>G2a, G2b, G3b</td>
+<td><code>test_the_cli_imports_only_the_public_nl2sql</code> (the whole CLI, with the named list), one test per new facade method</td>
 <td><code>invariants.md</code> (the CLI rule), <code>CLAUDE.md</code></td>
-<td></td>
+</tr>
+<tr>
+<td>CL0b</td>
+<td><strong>CLI on the facade only: the rest.</strong> The other commands (<code>eval.py</code>, <code>launch.py</code>, <code>mcp.py</code>, <code>knowledge.py</code>, <code>profile.py</code>, <code>review.py</code>, <code>trace.py</code>, <code>feedback.py</code>, <code>keys.py</code>, <code>demo.py</code>, <code>reporting.py</code> and the rest): the MCP server's start (D232), the model types the commands print, the provider catalogue. Empties the named list, so the rule has no exception. Files: those commands, <code>public_api.py</code>, <code>nl2sql/__init__.py</code>, <code>tests/architecture/test_boundaries.py</code>. Sized to one PR; split further if the audit passes 1,000 changed lines.</td>
+<td>CL0a</td>
+<td><code>test_the_cli_imports_only_the_public_nl2sql</code> (no list left), one test per new facade method</td>
+<td><code>invariants.md</code> (the CLI rule), <code>CLAUDE.md</code></td>
 </tr>
 <tr>
 <td>CL1</td>
-<td><strong>Extract the CLI.</strong> <code>git mv packages/nl2sql/src/nl2sql/cli nl2sql-cli/src/nl2sql_cli</code> (after X1 has deleted <code>cli/demo/playground</code>), imports rewritten from <code>nl2sql.cli</code> to <code>nl2sql_cli</code>; <code>nl2sql-cli/pyproject.toml</code> (distribution <code>nl2sql-cli</code>, imports <code>nl2sql-engine</code> only and depends on it and on <code>textual</code>, <code>[project.scripts] nl2sql = "nl2sql_cli.main:main"</code>, the <code>web</code> extra <code>nl2sql-api~=X.Y.Z</code> with the release-please marker, D231); the <code>nl2sql</code> script and the <code>demo</code> and <code>tui</code> extras removed from <code>packages/nl2sql/pyproject.toml</code>; <code>packages/nl2sql/tests/cli/</code> moved to <code>nl2sql-cli/tests/</code>; <code>test_boundaries.py</code> repointed (section 17). Mostly renames.</td>
-<td>X1, CL0</td>
-<td><code>test_nl2sql_command_is_installed_by_nl2sql_cli</code>, <code>test_the_engine_has_no_cli_package</code>, <code>test_the_engine_and_the_api_never_import_nl2sql_cli</code>, <code>test_nl2sql_cli_imports_only_the_engine</code>, every moved CLI test green in its new place</td>
+<td><strong>Extract the CLI.</strong> <code>git mv packages/nl2sql/src/nl2sql/cli nl2sql-cli/src/nl2sql_cli</code> (after X1b has deleted <code>cli/demo/playground</code>), imports rewritten from <code>nl2sql.cli</code> to <code>nl2sql_cli</code>; <code>nl2sql-cli/pyproject.toml</code> (distribution <code>nl2sql-cli</code>, imports <code>nl2sql-engine</code> only and depends on it and on <code>textual</code>, <code>[project.scripts] nl2sql = "nl2sql_cli.main:main"</code>, the <code>web</code> extra <code>nl2sql-api~=X.Y.Z</code> with the release-please marker, D231); the <code>nl2sql</code> script and the <code>demo</code> and <code>tui</code> extras removed from <code>packages/nl2sql/pyproject.toml</code>; <code>packages/nl2sql/tests/cli/</code> moved to <code>nl2sql-cli/tests/</code>; <code>test_boundaries.py</code> repointed (section 17); <code>deploy/huggingface/Dockerfile</code> (<code>nl2sql-engine[demo]</code> becomes <code>nl2sql-cli[web]</code>, the engine's <code>demo</code> extra being gone) and <code>.github/workflows/publish_space.yml</code> (its install line and path filters), so the Space still builds. Mostly renames.</td>
+<td>X1b, CL0b</td>
+<td><code>test_nl2sql_command_is_installed_by_nl2sql_cli</code>, <code>test_the_engine_has_no_cli_package</code>, <code>test_the_engine_and_the_api_never_import_nl2sql_cli</code>, <code>test_nl2sql_cli_imports_only_the_engine</code>, <code>test_hosted_space_definition</code> (updated for <code>nl2sql-cli[web]</code>), every moved CLI test green in its new place</td>
 <td><code>README.md</code>, <code>packages/nl2sql/README.md</code>, new <code>nl2sql-cli/README.md</code>, <code>getting_started/index.md</code>, <code>CLAUDE.md</code>, <code>invariants.md</code></td>
-<td></td>
 </tr>
 <tr>
 <td>CL2</td>
-<td><strong>CLI release and CI.</strong> <code>release-please-config.json</code> (a fourth <code>generic</code> updater for <code>nl2sql-cli/pyproject.toml</code>, with the marker on its version and on its <code>nl2sql-engine</code> pin); <code>.github/workflows/test.yml</code> (the <code>test</code>, <code>integration</code> and <code>eval-gates</code> installs gain <code>-e nl2sql-cli</code>; the <code>build</code> loop; a <code>cli</code> job for the moved tests if the main job should not run them; <code>fresh-install</code> installs four wheels); <code>publish_pypi.yaml</code> (the <code>build</code> loop, the <code>pypi</code> job's upload step and order, <code>pypi-smoke</code>); <code>docs/development/releasing.md</code>; <code>CONTRIBUTING.md</code>.</td>
+<td><strong>CLI release, CI, and the image installs the CLI (D230).</strong> <code>release-please-config.json</code> (a fourth <code>generic</code> updater for <code>nl2sql-cli/pyproject.toml</code>, with the marker on its version and on its <code>nl2sql-engine</code> pin); <code>Dockerfile</code> (the API image also installs <code>nl2sql-cli</code>, so <code>docker compose run --rm api nl2sql index</code> works again after CL1 removed the command from the engine); <code>.github/workflows/test.yml</code> (the <code>test</code>, <code>integration</code> and <code>eval-gates</code> installs gain <code>-e nl2sql-cli</code>; the <code>build</code> loop; the <code>api-image</code> job checks the <code>nl2sql</code> command; a <code>cli</code> job for the moved tests if the main job should not run them; <code>fresh-install</code> installs four wheels); <code>publish_pypi.yaml</code> (the <code>build</code> loop, the <code>pypi</code> job's upload step and order, <code>pypi-smoke</code>); <code>docs/development/releasing.md</code>; <code>CONTRIBUTING.md</code>.</td>
 <td>CL1</td>
-<td><code>test_packaging_metadata.py</code> extended: the fourth pyproject carries the release-please marker and pins the engine; <code>test_publish_uploads_four_distributions</code></td>
-<td><code>releasing.md</code>, <code>CONTRIBUTING.md</code>, <code>deployment/</code> install lines</td>
-<td></td>
+<td><code>test_packaging_metadata.py</code> extended: the fourth pyproject carries the release-please marker and pins the engine; <code>test_publish_uploads_four_distributions</code>; <code>test_api_image_installs_the_cli</code></td>
+<td><code>releasing.md</code>, <code>CONTRIBUTING.md</code>, <code>deployment/docker.md</code>, <code>deployment/</code> install lines</td>
 </tr>
 <tr>
 <td>T1</td>
 <td><strong><code>nl2sql chat</code>.</strong> Files: <code>nl2sql-cli/src/nl2sql_cli/chat/</code> (new: <code>app.py</code>, <code>widgets.py</code>, <code>charts.py</code>), <code>nl2sql_cli/commands/chat.py</code> (new), <code>nl2sql_cli/main.py</code>, <code>nl2sql-cli/pyproject.toml</code> (<code>textual&gt;=0.80</code> as a normal dependency, D231), <code>tests/architecture/test_boundaries.py</code> (<code>textual</code> only in <code>nl2sql_cli/chat/</code>).</td>
-<td>G1, G2, G3, CL1</td>
+<td>G1, G2a, G2b, G3a, G3b, CL1</td>
 <td>The pilot tests in section 7, in <code>nl2sql-cli/tests/</code></td>
 <td>new <code>apps/terminal.md</code> (with its nav entry), <code>getting_started/index.md</code></td>
-<td></td>
 </tr>
 <tr>
 <td>K1</td>
-<td><strong>Image and Compose.</strong> Files: <code>Dockerfile</code> at the repository root, moved from <code>packages/api/Dockerfile</code> (D233; stage one builds <code>nl2sql-ui</code>, stage two is the API image serving it and installing <code>nl2sql-cli</code>, D226 and D230; ODBC, all adapters, the samples and the embedding model, non-root, <code>serve</code>, healthcheck), <code>.dockerignore</code> (<code>nl2sql-ui/node_modules</code>), <code>deploy/compose/</code> (new: <code>docker-compose.yml</code>, <code>config/</code>, <code>.env.example</code>, <code>README.md</code>), <code>.github/workflows/test.yml</code> (<code>api-image</code>: driver check, size and <code>GET /</code> answering the page), <code>tests/unit/test_docker_images.py</code>. The arm64 check for <code>msodbcsql18</code> is recorded in the PR.</td>
-<td>D0a, D0b</td>
-<td><code>test_compose_file_shape</code>, <code>test_api_image_runs_one_worker</code>, <code>test_api_image_healthcheck_is_ready</code>, <code>test_api_image_builds_the_ui_in_a_node_stage</code>, <code>test_compose_example_config_uses_api_keys</code>, the image job's <code>pyodbc.drivers()</code> check</td>
+<td><strong>Image and Compose, and the wheel that carries the UI (D226).</strong> Files: <code>Dockerfile</code> at the repository root, moved from <code>packages/api/Dockerfile</code> (D233; stage one builds <code>nl2sql-ui</code>, stage two is the API image serving it: ODBC, all adapters, the samples and the embedding model, non-root, <code>serve</code>, healthcheck; it does not install <code>nl2sql-cli</code> yet, which is CL2, D230), the <code>nl2sql-api</code> wheel build running the UI build first so the wheel carries the same built page (D226: <code>packages/api/pyproject.toml</code> and the <code>build</code> loop's step in <code>test.yml</code>), <code>.dockerignore</code> (<code>nl2sql-ui/node_modules</code>), <code>deploy/compose/</code> (new: <code>docker-compose.yml</code>, <code>config/</code>, <code>.env.example</code>, <code>README.md</code>), <code>.github/workflows/test.yml</code> (<code>api-image</code>: driver check, size and <code>GET /</code> answering the page), <code>tests/unit/test_docker_images.py</code>. The arm64 check for <code>msodbcsql18</code> is recorded in the PR.</td>
+<td>D0a-1, D0a-2, D0a-3, D0b, A4b</td>
+<td><code>test_compose_file_shape</code>, <code>test_api_image_runs_one_worker</code>, <code>test_api_image_healthcheck_is_ready</code>, <code>test_api_image_builds_the_ui_in_a_node_stage</code>, <code>test_compose_example_config_uses_api_keys</code>, <code>test_api_wheel_carries_the_built_ui</code>, the image job's <code>pyodbc.drivers()</code> check</td>
 <td>new <code>deployment/compose.md</code> (with its nav entry), <code>deployment/docker.md</code>, <code>deployment/architecture.md</code></td>
-<td></td>
 </tr>
 <tr>
-<td>X1</td>
-<td><strong>Cutover, rehearsed.</strong> <code>cli/commands/demo.py</code> as the launcher; delete <code>nl2sql/cli/demo/</code> (the playground, <code>llm_config.py</code>, <code>stamp.py</code>, <code>defaults.py</code>); the engine's <code>demo</code> extra and package data; <code>STILL_IMPORTED_FROM_INSIDE</code> emptied and deleted; <code>ENTRY_POINTS_LOADING_DOTENV</code>; <code>cli/commands/launch.py</code> (its last line); <code>deploy/huggingface/Dockerfile</code>, <code>docker-compose.yml</code>, <code>README.md</code>; <code>scripts/fresh_install_check.py</code>, <code>scripts/record_home_clips.py</code> (v1 routes, <code>serve --demo --hosted</code>); <code>.github/workflows/record_demo.yml</code>, <code>publish_space.yml</code>, <code>publish_pypi.yaml</code> (upload order); <code>docs/development/releasing.md</code>; the playground's Python tests replaced by the API's; <code>README.md</code>, <code>packages/nl2sql/README.md</code>, <code>packages/api/README.md</code>, <code>CLAUDE.md</code>. <strong>Done when</strong> <code>publish_space.yml</code>'s no-tag dispatch has deployed <code>main</code> with this PR to a scratch Space and <code>fresh_install_check.py</code>, the keyless guided questions and one keyless follow-up pass against it.</td>
-<td>W1 to W4, K1</td>
-<td><code>test_demo_is_a_launcher</code> (runs <code>nl2sql_api serve --demo</code> with the flags; install hint without <code>nl2sql_api</code>), <code>test_launcher_forwards_ctrl_c</code>, <code>test_engine_never_imports_the_api</code>, <code>test_apps_always_pass_the_caller</code>, <code>test_still_imported_from_inside_is_gone</code> (the public-only test with no exceptions), <code>test_hosted_space_definition</code> (updated), <code>test_launch_prints_the_serve_command</code>, the <code>fresh-install</code> job on the new routes</td>
-<td><code>deployment/hosted-demo.md</code>, <code>getting_started/demo.md</code>, <code>CLAUDE.md</code> (the facade rule's exception list is gone), <code>CONTRIBUTING.md</code></td>
-<td></td>
+<td>X1a</td>
+<td><strong>Cutover, rehearsed: the launcher and the Space.</strong> <code>cli/commands/demo.py</code> as the launcher; the engine's <code>demo</code> extra replaced by <code>nl2sql-api</code>; <code>ENTRY_POINTS_LOADING_DOTENV</code>; <code>cli/commands/launch.py</code> (its last line); <code>deploy/huggingface/Dockerfile</code>, <code>docker-compose.yml</code>, <code>README.md</code>; <code>scripts/fresh_install_check.py</code>, <code>scripts/record_home_clips.py</code> (v1 routes, <code>serve --demo --hosted</code>); <code>.github/workflows/record_demo.yml</code>, <code>publish_space.yml</code>, <code>publish_pypi.yaml</code> (upload order); <code>docs/development/releasing.md</code>. <strong>Done when</strong> <code>publish_space.yml</code>'s no-tag dispatch has deployed <code>main</code> with this PR to a scratch Space and <code>fresh_install_check.py</code>, the keyless guided questions and one keyless follow-up pass against it.</td>
+<td>W1, W2a, W2b, W3, W4a, W4b, K1</td>
+<td><code>test_demo_is_a_launcher</code> (runs <code>nl2sql_api serve --demo</code> with the flags; install hint without <code>nl2sql_api</code>), <code>test_launcher_forwards_ctrl_c</code>, <code>test_engine_never_imports_the_api</code>, <code>test_hosted_space_definition</code> (updated), <code>test_launch_prints_the_serve_command</code>, the <code>fresh-install</code> job on the new routes</td>
+<td><code>deployment/hosted-demo.md</code>, <code>getting_started/demo.md</code></td>
+</tr>
+<tr>
+<td>X1b</td>
+<td><strong>Cutover: delete the old playground.</strong> Delete <code>nl2sql/cli/demo/</code> (the playground, <code>llm_config.py</code>, <code>stamp.py</code>, <code>defaults.py</code>) and the engine's package data for it; <code>STILL_IMPORTED_FROM_INSIDE</code> emptied and deleted; the playground's Python tests replaced by the API's; <code>README.md</code>, <code>packages/nl2sql/README.md</code>, <code>packages/api/README.md</code>, <code>CLAUDE.md</code>. Mostly deletions, so it may pass 1,000 changed lines: deleted lines carry no review weight, and splitting a deletion would leave a half-deleted playground on <code>main</code>.</td>
+<td>X1a</td>
+<td><code>test_apps_always_pass_the_caller</code>, <code>test_still_imported_from_inside_is_gone</code> (the public-only test with no exceptions), the <code>fresh-install</code> job still green</td>
+<td><code>CLAUDE.md</code> (the facade rule's exception list is gone), <code>CONTRIBUTING.md</code></td>
 </tr>
 <tr>
 <td>R1</td>
-<td><strong>Owner: re-record, rehearse, browser pass.</strong> Not an agent PR. The owner runs Actions → <strong>Record demo answers</strong> with <code>record: answers</code> (the guided questions, the scripted follow-ups and the clarification question, on the key the workflow holds), reviews and merges its PR, then <code>record: clips</code> for the home page clips on the new server. Then the scratch-Space rehearsal of X1 again, and the short browser pass (section 5). Pre-approved by the owner; no agent runs any of it.</td>
-<td>X1</td>
-<td>The workflow's own checks; <code>test_replay_covered</code></td>
+<td><strong>Owner: re-record, rehearse, browser pass.</strong> Not an agent PR. The owner runs Actions → <strong>Record demo answers</strong> with <code>record: answers</code> (the guided questions, the scripted follow-ups and the clarification question, on the key the workflow holds), reviews and merges its PR, then <code>record: clips</code> for the home page clips on the new server. Then the scratch-Space rehearsal of X1a again, and the short browser pass (section 5). Pre-approved by the owner; no agent runs any of it.</td>
+<td>X1b</td>
+<td>The workflow's own checks; <code>test_replay_covered</code> (G2b) on the re-recorded store</td>
 <td>the release's <code>docs/releases/</code> page</td>
-<td></td>
 </tr>
 </tbody>
 </table>
-<p>The waves, with at most four PRs at once:</p>
+<h3 id="session-batches">Session batches</h3>
+<p>One session builds one batch: about five PRs, stacked in the order below
+(each branch starts from the one before it), at most two or three open at
+once. Each PR is built by a build agent and reviewed by a separate review
+agent; the batch is merged in order, each PR as soon as its checks pass,
+before the session ends. The tracker rows carry the batch id. A step that
+needs the owner (R1) is a stop, not a batch.</p>
 <table>
 <thead>
 <tr>
-<th>Wave</th>
-<th>PRs</th>
+<th>Batch</th>
+<th>PRs, in order</th>
 <th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>1</td>
-<td>CI0, D0a</td>
-<td>CI0 is a bug fix and may land at once</td>
+<td>D-S1</td>
+<td>D-W0 (this PR), CI0, D0a-1, D0a-2, D0a-3, D0b</td>
+<td>D-W0 merges first (D0a-1 builds on it, and it must merge before D-S3). CI0 is a bug fix that needs nothing from it and may land at once.</td>
 </tr>
 <tr>
-<td>2</td>
-<td>D0b, G1, G2, G3</td>
-<td>The G-PRs share three files, edited in separate functions (below)</td>
+<td>D-S2</td>
+<td>G1, G2a, G3a, G3b, G2b</td>
+<td>The G-PRs share three files, edited in separate functions (below).</td>
 </tr>
 <tr>
-<td>3</td>
-<td>A1, A2, A3, A4</td>
-<td>One router each; <code>main.py</code> already registers them all</td>
+<td>D-S3</td>
+<td>A1, A2a, A2b, A3</td>
+<td>One router each; <code>main.py</code> already registers them all (D0a-2).</td>
 </tr>
 <tr>
-<td>4</td>
-<td>W1, W2, W3, W4</td>
-<td>One area each; the shell, <code>http.js</code>, <code>src/lib/</code> and <code>styles/base.css</code> are D0b's</td>
+<td>D-S4</td>
+<td>A4a, A4b, K1, CL0a, CL0b</td>
+<td>CL0a and CL0b need only G2a, G2b and G3b.</td>
 </tr>
 <tr>
-<td>5</td>
-<td>K1, CL0</td>
-<td>CL0 needs only G2 and G3 and may start earlier if a slot is free</td>
+<td>D-S5</td>
+<td>W1, W2a, W2b, W3</td>
+<td>One area each; the shell, <code>http.js</code>, <code>src/lib/</code> and <code>styles/base.css</code> are D0b's.</td>
 </tr>
 <tr>
-<td>6</td>
-<td>X1</td>
-<td>Then R1 by the owner, then the release; CL1 may proceed beside R1</td>
+<td>D-S6</td>
+<td>W4a, W4b, X1a, X1b</td>
+<td>X1a is done when the scratch Space passes (above).</td>
 </tr>
 <tr>
-<td>7</td>
-<td>CL1, then CL2 and T1</td>
-<td>The CLI leaves the engine only after the cutover has deleted the playground (D231)</td>
+<td>R1</td>
+<td>The owner's own task</td>
+<td>Re-record, rehearse again, browser pass.</td>
+</tr>
+<tr>
+<td>D-S7</td>
+<td>CL1, CL2, T1</td>
+<td>The CLI leaves the engine only after X1b has deleted the playground (D231).</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>One release, after D-S7</td>
+<td>None between X1b and CL1 (<a href="#15-release">section 15</a>).</td>
 </tr>
 </tbody>
 </table>
 <p>Known overlaps, kept small:</p>
 <ul>
-<li><code>public_api.py</code> and <code>nl2sql/__init__.py</code>: G1, G2 and G3 each add methods
-  or exports; they land in wave order and rebase.</li>
-<li><code>api/query_api.py</code>: G2's <code>llm_override</code> and G3's stored requests and ids,
-  in separate functions; <code>nl2sql/conversations/api.py</code>: G2's
-  <code>llm_override</code>, G3's <code>retry</code> ids.</li>
+<li><code>public_api.py</code> and <code>nl2sql/__init__.py</code>: G1, G2a, G2b, G3a and G3b each add
+  methods or exports; they land in batch order and rebase.</li>
+<li><code>api/query_api.py</code>: G2a's <code>llm_override</code> and G3a's stored requests and ids,
+  in separate functions; <code>nl2sql/conversations/api.py</code>: G2a's
+  <code>llm_override</code>, G3a's <code>retry</code> ids.</li>
+<li><code>api/types.py</code> and <code>configuration/llm.md</code>: G2a (overrides, providers) and G2b
+  (<code>sample_questions</code>, <code>replay</code>); G2b lands after G2a and rebases.</li>
+<li><code>nl2sql/dashboards/api.py</code> and <code>api/dashboards_api.py</code>: G1 (the caller to
+  <code>results</code>), G3a (<code>refresh</code> request ids) and G3b (<code>on_tile</code>, the token), each in
+  its own function.</li>
 <li><code>packages/api/openapi.json</code> and <code>nl2sql-ui/src/api/fixtures/</code>: every A-PR
-  regenerates them. The A-PRs merge one at a time; each rebases and
-  regenerates with the command <code>test_openapi_snapshot_is_current</code> prints,
-  and each writes only its own fixture files.</li>
-<li>The engine's <code>pyproject.toml</code>: G2's package data, X1's <code>demo</code> extra, then
-  CL1's removal of the <code>nl2sql</code> script and the <code>demo</code> extra.</li>
-<li><code>nl2sql-ui/package.json</code>: W2 adds <code>mermaid</code>; nobody else adds a dependency.</li>
+  (A1, A2a, A2b, A3, A4a, A4b) regenerates them. The A-PRs merge one at a
+  time; each rebases and regenerates with the command
+  <code>test_openapi_snapshot_is_current</code> prints, and each writes only its own
+  fixture files.</li>
+<li>The engine's <code>pyproject.toml</code>: G2b's package data, X1a's <code>demo</code> extra, X1b's
+  package data removal, then CL1's removal of the <code>nl2sql</code> script and the
+  <code>demo</code> extra.</li>
+<li><code>nl2sql-ui/package.json</code>: W2a adds <code>mermaid</code>; nobody else adds a dependency.</li>
 <li><code>.github/workflows/test.yml</code>: CI0, then D0b's path change (<code>web/playground</code>
-  to <code>nl2sql-ui</code>), then K1's image job, then CL2's installs; never in the same
-  wave.</li>
-<li><code>packages/nl2sql/tests/architecture/test_boundaries.py</code>: CL0 widens the CLI
-  rule, X1 empties <code>STILL_IMPORTED_FROM_INSIDE</code>, CL1 repoints the paths, T1
-  adds the <code>textual</code> rule; in that order.</li>
+  to <code>nl2sql-ui</code>), then K1's image job, then CL2's installs; each rebases on
+  the one before.</li>
+<li><code>Dockerfile</code>: K1 moves and builds it, CL2 adds the CLI install.</li>
+<li><code>packages/nl2sql/tests/architecture/test_boundaries.py</code>: A4b adds
+  <code>NL2SQL_MODE</code> to <code>READS_THE_ENVIRONMENT</code>, CL0a widens the CLI rule with a
+  named list, CL0b empties it, X1b empties <code>STILL_IMPORTED_FROM_INSIDE</code>, CL1
+  repoints the paths, T1 adds the <code>textual</code> rule; in that order.</li>
+<li><code>docs/architecture/wave_d.md</code>: every PR adds its Built note under its own
+  row; D-W0 changes the rest.</li>
 </ul>
 <h2 id="15-release">15. Release</h2>
 <ul>
+<li><strong>One release, after D-S7.</strong> Wave D ships as a single release once the last
+  <a href="#session-batches">session batch</a> has merged and the owner has done R1.
+  There is no release between X1b and CL1: after X1b the engine has no
+  playground and still has the CLI, and a release there would publish an
+  engine whose <code>demo</code> extra and <code>nl2sql demo</code> already point at the API. No
+  batch before D-S7 releases anything.</li>
 <li>release-please opens the release PR as usual. Releasing is the owner's act
   (see <a href="../../development/releasing/">Releasing</a>); no agent merges it.</li>
 <li><code>docs/releases/X.Y.Z.md</code> is written with the release-notes process. Its
@@ -6410,20 +6670,21 @@ uses a key.</p>
   required datasource fails, and <code>/ready</code> failing where it used to pass.</li>
 <li>Before tagging, the owner checks the scratch Space (keyless and with a
   key), runs the Compose stack with a key, connects the test bed's
-  PostgreSQL through the web app, asks three follow-ups with a chart and a
-  pin, generates a dashboard, runs the Chinook evals in <code>plans</code> mode, and
+  PostgreSQL through the web app, asks three follow-ups with a chart,
+  pins a dashboard whole into a workspace, generates a dashboard, runs the Chinook evals in <code>plans</code> mode, and
   opens <code>nl2sql chat --demo</code>. After the release deploys, the live Space is
   checked again.</li>
 </ul>
 <h2 id="16-open-questions">16. Open questions</h2>
-<p>No question is open. Every decision from D200 to D224 is marked for the owner to confirm.
-Five are worth a look first, because they change what a user or an
-operator sees: D211 (the <code>web</code> extra becomes the CLI's dependency on <code>nl2sql-api</code>),
-D210 (a key typed into the web app is never saved, locally too), D215
-(approval grants are stored, amending Waves A and C), D221 (what the hosted
-demo leaves on) and D224 (dashboards stay at Wave C's surface). The layout
-decisions D225 to D233 are the owner's, made on 2026-10-30 and answering every
-question section 17 raised (<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).</p>
+<p>No question is open. The owner confirmed D210, D211, D215, D221, D223 and
+D224 on 2026-10-30: the ones that change what a user or an operator sees
+(D211, the <code>web</code> extra on the CLI; D210, a key typed into the web app is never
+saved, locally too; D215, approval grants are stored, amending Waves A and C;
+D221, what the hosted demo leaves on; D224, dashboards stay at Wave C's
+surface) and the split of the foundation (D223). The other decisions from D200
+to D222 still read "owner to confirm". The layout decisions D225 to D233 are
+the owner's, made on 2026-10-30 and answering every question section 17 raised
+(<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).</p>
 <h2 id="17-repository-layout-the-ui-and-the-cli-app">17. Repository layout: the UI and the CLI app</h2>
 <div class="admonition note">
 <p class="admonition-title">Decided by the owner on 2026-10-30</p>
@@ -6500,7 +6761,7 @@ but the API. The SDK is for adapter authors, so the CLI does not import it.</p>
   it, so <code>pip install nl2sql-api</code> and the image carry the same page.</li>
 <li>The image is one two-stage <code>Dockerfile</code> at the repository root (D233): a
   Node stage builds <code>nl2sql-ui</code>, the Python stage is the API image, and it
-  installs <code>nl2sql-cli</code> (D230). The Space image
+  installs <code>nl2sql-cli</code> (D230; K1 builds the image without it, CL2 adds it). The Space image
   (<code>deploy/huggingface/Dockerfile</code>) stays its own file.</li>
 <li>The UI keeps talking to <code>/api/v1</code> only. Nothing in <code>nl2sql-ui</code> imports
   or names a Python package.</li>
@@ -6511,7 +6772,7 @@ but the API. The SDK is for adapter authors, so the CLI does not import it.</p>
   command <code>nl2sql</code>: <code>nl2sql = "nl2sql_cli.main:main"</code> under
   <code>[project.scripts]</code> in <code>nl2sql-cli/pyproject.toml</code>; the engine's
   <code>pyproject.toml</code> loses its <code>nl2sql = "nl2sql.cli.main:main"</code> line (CL1).</li>
-<li><strong>What moves.</strong> Everything under <code>packages/nl2sql/src/nl2sql/cli/</code> once X1
+<li><strong>What moves.</strong> Everything under <code>packages/nl2sql/src/nl2sql/cli/</code> once X1b
   has deleted the playground: <code>main.py</code>, <code>console.py</code>, <code>reporting.py</code>,
   <code>checks.py</code>, <code>config.py</code>, <code>types.py</code>, <code>common/</code>, the command modules
   (<code>commands/</code>), the demo launcher and, from T1, <code>chat/</code>. About 3,700
@@ -6525,7 +6786,7 @@ but the API. The SDK is for adapter authors, so the CLI does not import it.</p>
   <code>serve</code>. Those commands start the API as a child process
   (<code>python -m nl2sql_api serve</code>), so <code>nl2sql_cli</code> never imports <code>nl2sql_api</code>
   and the boundary test forbids it outright. The engine and the API stop
-  depending on each other. The CLI moves after X1 (CL1 follows X1), so the
+  depending on each other. The CLI moves after X1b (CL1 follows X1b, in the last session batch), so the
   playground never moves and the chat app is built in its final place.</li>
 </ul>
 <h3 id="boundary-rules-that-change">Boundary rules that change</h3>
@@ -6552,7 +6813,7 @@ only to the "no <code>_runtime</code>" rule.</p>
 <tr>
 <td><code>cli.demo</code> never imports <code>cli.commands</code> (<code>test_cli_demo_never_imports_cli_commands</code>)</td>
 <td>Over <code>nl2sql/cli/demo/</code></td>
-<td>Deleted with the playground at X1; the launcher is one command module with nothing to protect.</td>
+<td>Deleted with the playground at X1b; the launcher is one command module with nothing to protect.</td>
 </tr>
 <tr>
 <td>The CLI, MCP and the API never touch <code>engine._runtime</code> (<code>test_the_cli_the_playground_and_the_api_use_only_the_public_api</code>)</td>
@@ -6562,12 +6823,12 @@ only to the "no <code>_runtime</code>" rule.</p>
 <tr>
 <td>The playground, <code>nl2sql demo</code> and the API import only the top-level <code>nl2sql</code> (<code>test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql</code>)</td>
 <td>Playground, <code>cli/commands/demo.py</code> and the API, with the exceptions in <code>STILL_IMPORTED_FROM_INSIDE</code></td>
-<td>Renamed <code>test_the_cli_and_the_api_import_only_the_public_nl2sql</code>. Covers <strong>all</strong> of <code>nl2sql_cli</code> (CL0 in place, CL1 repoints) and <code>nl2sql_api</code>, with no exception list, and forbids <code>nl2sql_sdk</code> in the CLI.</td>
+<td>Renamed <code>test_the_cli_and_the_api_import_only_the_public_nl2sql</code>. Covers <strong>all</strong> of <code>nl2sql_cli</code> (CL0a and CL0b in place, CL1 repoints) and <code>nl2sql_api</code>, with no exception list, and forbids <code>nl2sql_sdk</code> in the CLI.</td>
 </tr>
 <tr>
 <td><code>STILL_IMPORTED_FROM_INSIDE</code></td>
 <td>Six entries</td>
-<td>Emptied and deleted at X1, each entry becoming a facade method (below).</td>
+<td>Emptied and deleted at X1b, each entry becoming a facade method (below).</td>
 </tr>
 <tr>
 <td>Only <code>nl2sql/mcp/</code>, <code>nl2sql/cli/demo/</code> and <code>cli/commands/demo.py</code> import Starlette or Uvicorn</td>
@@ -6598,11 +6859,11 @@ only to the "no <code>_runtime</code>" rule.</p>
 </table>
 <p><code>docs/architecture/invariants.md</code> (its dependency-direction and facade rules)
 and <code>CLAUDE.md</code> (the "Nothing outside <code>nl2sql/cli/</code>" bullet, the facade
-bullet) change in CL0 and CL1, not in this design PR.</p>
-<h3 id="what-becomes-a-facade-method-cl0">What becomes a facade method (CL0)</h3>
+bullet) change in CL0a, CL0b and CL1, not in this design PR.</p>
+<h3 id="what-becomes-a-facade-method-cl0a-and-cl0b">What becomes a facade method (CL0a and CL0b)</h3>
 <p>Counted on 2026-10-30 from the <code>nl2sql</code> imports in <code>packages/nl2sql/src/nl2sql/cli/</code>,
-outside the playground. Where Waves A to C or G2 and G3 already give the
-facade the method, the CLI switches to it; otherwise CL0 adds it.</p>
+outside the playground. Where Waves A to C or G2a, G2b, G3a and G3b already give the
+facade the method, the CLI switches to it; otherwise CL0a or CL0b adds it.</p>
 <table>
 <thead>
 <tr>
@@ -6613,19 +6874,19 @@ facade the method, the CLI switches to it; otherwise CL0 adds it.</p>
 <tbody>
 <tr>
 <td><code>nl2sql.llm.providers</code> (5), <code>nl2sql.llm.models</code>, <code>nl2sql.llm.wires.anthropic</code></td>
-<td><code>engine.llm.providers()</code> (G2) and, for the rest, an <code>engine.llm</code> method</td>
+<td><code>engine.llm.providers()</code> (G2a) and, for the rest, an <code>engine.llm</code> method</td>
 </tr>
 <tr>
 <td><code>nl2sql.config</code> (9), <code>nl2sql.config.writer</code>, <code>nl2sql.config.check</code></td>
-<td><code>init_project</code> and <code>prepare_demo</code> (G2), <code>datasources.save</code> (Wave C), <code>engine.check</code> (G3); the rest named in CL0</td>
+<td><code>init_project</code> and <code>prepare_demo</code> (G2b), <code>datasources.save</code> (Wave C), <code>engine.check</code> (G3b); the rest named in CL0a</td>
 </tr>
 <tr>
 <td><code>STILL_IMPORTED_FROM_INSIDE</code>: <code>llm.request_key</code>, <code>llm.replay</code>, <code>testing.fake_llm</code>, <code>datasets.demo</code></td>
-<td>G2 (<code>llm_override=</code>, the replay provider, <code>DatasourceInfo.sample_questions</code>) and X1 (the playground is deleted)</td>
+<td>G2a (<code>llm_override=</code>), G2b (the replay provider, <code>DatasourceInfo.sample_questions</code>) and X1b (the playground is deleted)</td>
 </tr>
 <tr>
 <td><code>nl2sql.mcp</code> (2)</td>
-<td>The facade method that starts the MCP server (D232)</td>
+<td>The facade method that starts the MCP server (D232), added by CL0b</td>
 </tr>
 <tr>
 <td><code>nl2sql.knowledge.models</code>, <code>nl2sql.profiler.models</code>, <code>nl2sql.evaluation</code> and <code>.records</code>, <code>nl2sql.tracing.document</code>, <code>nl2sql.registry</code>, <code>nl2sql.common.exceptions</code>, <code>nl2sql.common.logger</code></td>
@@ -6656,7 +6917,7 @@ facade the method, the CLI switches to it; otherwise CL0 adds it.</p>
 <tr>
 <td>CI test jobs</td>
 <td><code>test</code>, <code>integration</code>, <code>eval-gates</code> install <code>-e packages/sdk -e packages/nl2sql[...] -e packages/api</code></td>
-<td>Add <code>-e nl2sql-cli</code>; CI0's web job runs on <code>nl2sql-ui</code> from D0b; <code>build</code> loops over four packages; <code>api-image</code> builds the UI stage (K1); <code>fresh-install</code> installs four wheels (CL2)</td>
+<td>Add <code>-e nl2sql-cli</code> (CL2); CI0's web job runs on <code>nl2sql-ui</code> from D0b; <code>build</code> loops over four packages (CL2); <code>api-image</code> builds the UI stage (K1); <code>fresh-install</code> installs four wheels (CL2)</td>
 </tr>
 <tr>
 <td>PyPI publish</td>
