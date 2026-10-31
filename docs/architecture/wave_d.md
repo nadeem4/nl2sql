@@ -23,7 +23,7 @@
     The owner decided where the apps live: one UI codebase in the
     root-level `nl2sql-ui/`, built into the API's Docker image, and the
     terminal app with every other CLI command in their own root-level
-    `nl2sql-cli/` distribution, built on the engine's facade (D225 to D228,
+    `nl2sql-cli/` distribution, built on the engine's facade (D225 to D233,
     [section 17](#17-repository-layout-the-ui-and-the-cli-app)).
     Below, a path that describes the planned layout is corrected
     (`web/app` and the planned `nl2sql/cli/chat/` become `nl2sql-ui/` and
@@ -92,14 +92,14 @@ D13 to D16** and records how each is applied.
 | D208 | **`/ready` is real, and its rule is the engine's:** `CheckReport.ready(keys_optional=)` decides (every required datasource ready, every key resolves unless keys are optional, the index `ok` or `stale`). `/ready` answers status only to an anonymous caller and the report to an admin. The API now starts with a failed required datasource and reports not ready, instead of refusing to start. | decided overnight, amended after review, owner to confirm | [Health and readiness](#health-and-readiness) |
 | D209 | **The replay provider is an LLM provider,** `provider: replay`, answering through the normal LLM interface from a recordings file; a question it has no recording for ends with the error code `REPLAY_MISS`. The demo's local fake HTTP server and its error-string matching leave the demo path. `nl2sql demo --record` is removed; recording is `scripts/record_demo_answers.py`, run by the owner. | decided overnight, owner to confirm | [The replay provider](#the-replay-provider) |
 | D210 | **A key typed into the web app stays in the browser tab** and travels with each request as a per-call `LLMOverride` (`llm_override=` on the facade), in every mode. The web app never writes a key to disk. **A model the caller chooses runs only on a key the caller sent:** `X-NL2SQL-Models` is honoured only for providers the same request carries a key for, so a caller can never move a step onto the operator's account. Callers may bring a key only where `api.request_llm: true`; the demo sets it, the default is off. | decided overnight, amended after review, owner to confirm | [Keys and models](#keys-and-models-in-the-web-app) |
-| D211 | **Final-design D13, applied with one change.** The web app ships inside `nl2sql-api` as package data, served by `nl2sql-api serve`. It adds no dependency to `nl2sql-api`, so there is no `web` extra there; instead the `demo` extra becomes `nl2sql-api` (first written on the engine, so `pip install "nl2sql-engine[demo]"` was the one install line; since D227 it belongs to `nl2sql-cli`, so the line is `pip install "nl2sql-cli[demo]"` and the engine and the API no longer depend on each other). `nl2sql demo` is a launcher that runs `python -m nl2sql_api serve --demo` in a child process; the engine never imports `nl2sql_api`. The playground server (`nl2sql/cli/demo/`) is deleted. Whether the wheel still carries the built page is open (section 17, Q1). | decided overnight, amended after review, owner to confirm; install line and launcher's home amended by D227 | [Serving](#4-serving-the-web-app-and-nl2sql-demo) |
+| D211 | **Final-design D13, applied with one change.** The web app ships inside `nl2sql-api` as package data, served by `nl2sql-api serve`. It adds no dependency to `nl2sql-api`, so there is no `web` extra there; instead the `demo` extra becomes `nl2sql-api` (first written on the engine, so `pip install "nl2sql-engine[demo]"` was the one install line; since D227 it belongs to `nl2sql-cli`, which depends on `nl2sql-api` outright (D231), so the line is `pip install nl2sql-cli` and the engine and the API no longer depend on each other). `nl2sql demo` is a launcher that runs `python -m nl2sql_api serve --demo` in a child process; the engine never imports `nl2sql_api`. The playground server (`nl2sql/cli/demo/`) is deleted. The wheel keeps carrying the built page (D226). | decided overnight, amended after review, owner to confirm; install line and launcher's home amended by D227 | [Serving](#4-serving-the-web-app-and-nl2sql-demo) |
 | D212 | **Final-design D14, applied through Wave C's writer:** Connect's **Save** calls Wave C's `datasources.save(id, *, by, env_file)`, which writes `datasources/<id>.yaml`, with `env_file` true only for the fresh local install (Wave C's D122). No second save target, no overlay, no new switch. Saving is admin work, so it is off on the hosted demo; where the config is mounted read-only (Docker), `save` fails with its own message and the datasource stays registered in memory until restart, which the page says. | decided overnight, amended after review, owner to confirm | [Saving a datasource](#saving-a-datasource-final-design-d14) |
 | D213 | **Final-design D16, applied: one Docker image,** `nl2sql-api`, with all five adapters and Microsoft's ODBC driver for SQL Server. The driver and unixODBC are small beside the ONNX runtime and Chroma the image already carries, so slim and full images are not worth two tags. CI builds and tests `linux/amd64`; `arm64` is published only once K1 has checked that `msodbcsql18` exists for Debian 12 on arm64. The image job records the size; a split is reconsidered only if the ODBC layers pass 15% of it. | decided overnight, amended after review, owner to confirm | [Docker image](#the-image) |
 | D214 | **Charts are drawn by our own SVG renderer from `ChartSpec`** (four kinds), in Porcelain's tokens; Vega is not bundled, and the Vega-Lite export is a download. Mermaid is loaded on the first diagram as its own chunk (about 2 to 3 MB of the `nl2sql-api` wheel, recorded by the web job). The single-file build is dropped. | decided overnight, amended after review, owner to confirm | [Charts and diagrams](#charts-diagrams-and-reports) |
 | D215 | **Approval grants are stored by the engine** (`engine.approvals`), amending Wave A's D10 and D24 and Wave C's D107. Over HTTP the approver and the asker are two callers at different times: the asker cannot prove a grant, and the approver must not run the question as the asker, so the approver grants a request by id and the asker's re-run names the id. A grant is reusable until it expires (24 hours), as an `Approval` is. | decided overnight, amended after review, owner to confirm | [Approvals](#approvals-over-rest) |
 | D216 | **One React app, in `nl2sql-ui/`** (renamed from `web/playground`, at the repository root since D225): the existing Vite and React 18 setup, a hash router, plain JavaScript, Porcelain's CSS split per area, the API client split per area. No TypeScript, no state library, no component library. The location was `web/app` until 2026-10-30. | decided overnight, amended after review, owner to confirm; location amended by D225 (decided by owner 2026-10-30) | [The web app](#5-the-web-app) |
 | D217 | **Web tests stay what they are, run in CI, and read real shapes:** `node --test` over pure modules, a contract test that every route the client calls is in `openapi.json`, and golden response files (`nl2sql-ui/src/api/fixtures/*.json`) written by the API's route tests and checked like `openapi.json`, which the node tests read instead of hand-made objects. No browser test runs in CI; the owner runs a short browser pass before the release. | decided overnight, amended after review, owner to confirm | [Testing](#testing-the-web-app) |
-| D218 | **The terminal app is `nl2sql chat`,** on Textual (behind a `tui` extra, section 17 Q5), in `nl2sql-cli/src/nl2sql_cli/chat/` since D227 (it was `nl2sql/cli/chat/`), on the facade only. Charts become text (a big number, sparklines, bars, a table); diagrams are shown as text. It takes no key: the CLI's environment and `.env` as everywhere. | decided overnight, owner to confirm; location amended by D227 (decided by owner 2026-10-30) | [The terminal app](#7-the-terminal-app-nl2sql-chat) |
+| D218 | **The terminal app is `nl2sql chat`,** on Textual (a normal dependency of `nl2sql-cli`, D231), in `nl2sql-cli/src/nl2sql_cli/chat/` since D227 (it was `nl2sql/cli/chat/`), on the facade only. Charts become text (a big number, sparklines, bars, a table); diagrams are shown as text. It takes no key: the CLI's environment and `.env` as everywhere. | decided overnight, owner to confirm; location and the extra amended by D227 and D231 (decided by owner 2026-10-30) | [The terminal app](#7-the-terminal-app-nl2sql-chat) |
 | D219 | **Compose is one service:** `api` (one Uvicorn worker), one data volume, `auth: api_keys`, a healthcheck on `/api/v1/ready`. It starts not ready until indexed; `/ready` says why, and indexing is one command, `docker compose run --rm api nl2sql index`, so nothing re-indexes on every `up`. | decided overnight, amended after review, owner to confirm | [Compose](#6-docker-compose-self-host) |
 | D220 | **Not in `nl2sql-api`:** MCP (Wave C's D126 stands: its own process), the operator event stream (observers are the operator's surface) and a `scan` route (Wave C's D121 left it to Wave D; the server's files and ports are still not the user's). `GET /events/catalog` is the one events route. | decided overnight, amended after review, owner to confirm | [Not in Wave D](#not-in-wave-d) |
 | D221 | **The hosted demo serves the user's side of the web app:** chat, tools, charts, diagrams, reports, dashboards and the knowledge view, keyless from recordings or with the visitor's key. Admin work (Connect, review, index, profile, evals, drift, LLM settings, keys) is off because a hosted visitor is never admin, not by a hosted switch. Jobs, streams and questions are capped per session. | decided overnight, amended after review, owner to confirm | [The hosted demo](#the-hosted-demo) |
@@ -107,9 +107,14 @@ D13 to D16** and records how each is applied.
 | D223 | **The foundation is three PRs, not one:** the CI web job first (bug B202, needs nothing), then the API foundation with every engine shape the gaps need, and the web foundation (shell, shared helpers, the client's transport, the CSS split, the build output) beside it, so the parallel PRs never edit the same file. | decided overnight, amended after review, owner to confirm | [PR plan](#14-pr-plan) |
 | D224 | **Dashboards are Wave C's surface and no more:** whatever Wave C's `engine.dashboards` and `engine.workspaces` offer (open, refresh, edit, arrange, filters, schedule, pin, move, delete, workspaces), as thin routes. Wave C (revised 2026-10-28) builds editing and workspaces in the package; this page's route table has not yet been revised to expose them. | decided after review, owner to confirm; superseded in part by Wave C's D116, D131 and D133 | [Routes](#the-routes) |
 | D225 | **One UI codebase, in the root-level `nl2sql-ui/`** (not under `packages/`, not under `web/`; amends D216's location, not its stack). It is one of the shipped products. Demo, playground and real use are the same code: the mode (demo, your data, hosted) is configuration, not a build, and reaches the page through `GET /meta`. The configuration is the project's config and, in Docker Compose, environment variables. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
-| D226 | **The UI ships inside the API's Docker image.** The image builds `nl2sql-ui` and `nl2sql-api` serves the result; the UI talks only to the API. Compose stays one service (D219 stands). | decided by owner 2026-10-30 | [Image](#the-image) |
-| D227 | **The terminal app and every other CLI command move to their own root-level `nl2sql-cli/`,** packaged as its own distribution built on the engine package only, through the public `nl2sql` facade, as `nl2sql-api` is. It does not use the SDK (the SDK is for adapter authors) and never touches `engine._runtime`. The `nl2sql` console script, the `tui` and `demo` extras and `nl2sql chat` (D218) move with it; the engine keeps no `nl2sql/cli/`. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
-| D228 | **What ships:** the packages (`nl2sql-engine`, `nl2sql-sdk`, `nl2sql-api`), the UI (inside the API image) and the CLI app (`nl2sql-cli`). | decided by owner 2026-10-30 (the count of "four" is open, section 17 Q7) | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
+| D226 | **The UI ships inside the API's Docker image, and the API's PyPI wheel carries the same built UI.** One build (`npm run build` in `nl2sql-ui`, written to `nl2sql_api/web/static/`) serves `pip install nl2sql-api` and the image: the image's Node stage runs it, and so does the wheel build, so neither needs Node at install time. `nl2sql-api` serves the result; the UI talks only to the API. Compose stays one service (D219 stands). | decided by owner 2026-10-30 | [Image](#the-image) |
+| D227 | **The terminal app and every other CLI command move to their own root-level `nl2sql-cli/`,** packaged as its own distribution that imports the engine package only, through the public `nl2sql` facade, as `nl2sql-api` does. It does not use the SDK (the SDK is for adapter authors) and never touches `engine._runtime`. The `nl2sql` console script and `nl2sql chat` (D218) move with it; the engine keeps no `nl2sql/cli/`. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
+| D228 | **Four things ship:** the engine (`nl2sql-engine`, with `nl2sql-sdk` for adapter authors), the API image with the UI inside it (and the `nl2sql-api` wheel), the CLI app (`nl2sql-cli`), and the UI as its own folder, `nl2sql-ui/`. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
+| D229 | **The mode is a `mode:` key in `nl2sql.yaml`** (`demo`, `your_data` or `hosted`; `your_data` when absent), **overridable in Compose by one environment variable, `NL2SQL_MODE`.** `GET /meta` reports it. The variable is read at the entry point only (`nl2sql_api serve`, added to `READS_THE_ENVIRONMENT` in the boundary test) and travels in `Config`, so two engines in one process share nothing; the engine and the page read no environment. `serve --demo` and `--demo --hosted` stay as launcher flags and set `demo` and `hosted`; a flag beats `NL2SQL_MODE`, which beats the file. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
+| D230 | **The API image installs `nl2sql-cli`,** so `docker compose run --rm api nl2sql index` (and `nl2sql keys create`) work. | decided by owner 2026-10-30 | [Compose](#6-docker-compose-self-host) |
+| D231 | **Names and dependencies of the CLI.** PyPI distribution `nl2sql-cli`, import package `nl2sql_cli`, console command `nl2sql`. Textual is a normal dependency of `nl2sql-cli`, and the `demo` extra merges into it: `nl2sql-cli` depends on `nl2sql-api` outright (the launcher starts it as a child process and never imports it), so there is no `tui` or `demo` extra and `pip install nl2sql-cli` is the one install line. The CLI moves after the cutover: CL1 follows X1. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
+| D232 | **The engine facade gets a public method that starts the MCP server;** `nl2sql mcp` calls it. The server stays in `nl2sql/mcp/`. | decided by owner 2026-10-30 | [Layout](#17-repository-layout-the-ui-and-the-cli-app) |
+| D233 | **One two-stage Dockerfile at the repository root:** stage one builds `nl2sql-ui`, stage two is the API image. It moves from `packages/api/Dockerfile`; the three workflows that name it change with it. The Space's `deploy/huggingface/Dockerfile` stays its own file. | decided by owner 2026-10-30 | [Image](#the-image) |
 
 ## Where 0.9 will leave us
 
@@ -670,7 +675,7 @@ navigation.
 `cli/commands/demo.py` (X1 shrinks it where it is; CL1 then moves it to
 `nl2sql_cli/commands/demo.py`, D227) is about 40 lines. It checks that
 `nl2sql_api` is installed (`importlib.util.find_spec`), else prints
-`pip install "nl2sql-cli[demo]"` and exits 1. It then starts
+`pip install nl2sql-cli` and exits 1. It then starts
 `[sys.executable, "-m", "nl2sql_api", "serve", "--demo", ...]` with
 `subprocess.Popen`, opens the browser unless `--no-browser`, and waits; a
 `KeyboardInterrupt` is forwarded to the child (`CTRL_BREAK_EVENT` on
@@ -687,8 +692,8 @@ X1 replaces the engine's `demo = ["fastapi", "uvicorn"]` with
 `nl2sql.cli.demo` and `nl2sql.cli.demo.playground`; between X1 and CL1 the
 engine and the API depend on each other, so `publish_pypi.yaml` uploads
 `nl2sql-api` before or with the engine and `docs/development/releasing.md`
-says so. CL1 moves the extra to `nl2sql-cli`'s `pyproject.toml`: the
-dependencies then run one way (`nl2sql-cli[demo]` to `nl2sql-api` to
+says so. CL1 replaces the extra with a plain `nl2sql-api` dependency of
+`nl2sql-cli` (D231): the dependencies then run one way (`nl2sql-cli` to `nl2sql-api` to
 `nl2sql-engine` to `nl2sql-sdk`), the engine has no `demo` extra, and the
 upload-order rule is no longer needed. The recordings
 move to `nl2sql/datasets/recordings/`, beside the sample databases they
@@ -741,7 +746,7 @@ The Space keeps its URL, its limits and its keyless start (D221):
 | State | The Space's disk is ephemeral: conversations and dashboards live until the container restarts, and the page says so |
 
 `deploy/huggingface/Dockerfile` installs `nl2sql-engine[demo]` (which brings
-`nl2sql-api`; plain `nl2sql-api` once CL1 removes the extra), builds the demo
+`nl2sql-api`; `nl2sql-cli`, which depends on it, once CL1 has moved the CLI), builds the demo
 project and index as today, and runs
 `nl2sql-api serve --demo --hosted --dir /home/demo/demo --host 0.0.0.0 --port
 $PORT ...`. Its healthcheck and `scripts/fresh_install_check.py` move to
@@ -768,8 +773,8 @@ flowchart LR
 
 | Rule | Detail |
 |---|---|
-| **Where** | `nl2sql-ui/` at the repository root (D225; renamed from `web/playground/` by D0b, which leaves no `web/` folder). The API's Docker image builds it in a Node stage and `nl2sql-api` serves the result (D226). Until section 17's Q1 is answered, `npm run build` still writes `packages/api/src/nl2sql_api/web/static/`, committed, so `pip install nl2sql-api` needs no Node. The single-file plugin goes (D214): the build is `index.html` plus hashed chunks, and Mermaid is its own chunk. Until X1, `nl2sql demo` keeps serving the page already committed in the engine. |
-| **One build, every mode** | Demo, playground and real use are the same code (D225). The mode and what follows from it (the start screen, the hosted limits, whether a visitor may bring a key) arrive in `GET /meta`; the page reads no environment variable and no build flag. The server derives the mode from the project's config and, in Compose, from environment variables (their names are open, section 17 Q2). |
+| **Where** | `nl2sql-ui/` at the repository root (D225; renamed from `web/playground/` by D0b, which leaves no `web/` folder). The API's Docker image builds it in a Node stage and `nl2sql-api` serves the result (D226). `npm run build` writes `packages/api/src/nl2sql_api/web/static/`, which the image and the wheel both carry (D226), so `pip install nl2sql-api` needs no Node. The single-file plugin goes (D214): the build is `index.html` plus hashed chunks, and Mermaid is its own chunk. Until X1, `nl2sql demo` keeps serving the page already committed in the engine. |
+| **One build, every mode** | Demo, playground and real use are the same code (D225). The mode and what follows from it (the start screen, the hosted limits, whether a visitor may bring a key) arrive in `GET /meta`; the page reads no environment variable and no build flag. The server derives the mode from the project's config and, in Compose, from environment variables (`mode:` in the config, `NL2SQL_MODE` in Compose, D229). |
 | **Transport** | `src/api/http.js` (D0b): `request(method, path, body)` adds the identity header (a bearer key held in the tab under `api_keys`), the key and model headers (D210), and parses the envelope into an `ApiError`; `stream(path, body, onEvent)` reads SSE from a `fetch` body. |
 | **Client** | One file per area, each owned by the W-PR for that area: `src/api/chat.js` (W1), `outputs.js` and `dashboards.js` (W2), `connect.js` and `knowledge.js` (W3), `evals.js`, `settings.js` and `meta.js` (W4). `src/api/routes.test.js` reads every `src/api/*.js` file's paths. |
 | **Router** | `src/router.js` (kept): hash routes `#/`, `#/chat/{id?}`, `#/dashboards/{id?}`, `#/connect`, `#/knowledge`, `#/approvals`, `#/evals`, `#/settings`, `#/pipeline`, `#/retrieval`, `#/trace/{id}`. The shell (D0b) lazy-loads a stub per page, which the W-PRs fill. |
@@ -838,7 +843,7 @@ no W-PR deletes a file another imports:
 
 ### The image
 
-`packages/api/Dockerfile`, one image (D213):
+`Dockerfile` at the repository root (D233), one image (D213):
 
 - `python:3.12-slim`; Microsoft's package repository for `msodbcsql18` and
   `unixodbc` with `ACCEPT_EULA=Y`;
@@ -868,7 +873,7 @@ arm64 image is published (D213).
 services:
   api:
     image: nl2sql-api:local
-    build: { context: ../.., dockerfile: packages/api/Dockerfile }
+    build: { context: ../.., dockerfile: Dockerfile }
     env_file: .env
     volumes: [ "./config:/etc/nl2sql:ro", "nl2sql-data:/data" ]
     ports: [ "8000:8000" ]
@@ -886,7 +891,7 @@ volumes:
 | **One volume** | `storage.path: "${env:NL2SQL_DATA_DIR}"` with `NL2SQL_DATA_DIR=/data` in `.env`: index, state store, traces, results, audit log. |
 | **Auth on** | `config/nl2sql.yaml` ships with `api.auth: api_keys`. The first admin key: `docker compose run --rm api nl2sql keys create --as admin --user admin --role admin`, printed once (Wave C's CLI). |
 | **The example config** | One datasource, `/opt/nl2sql/samples/data/chinook.sqlite` from the image, so the stack answers after one index command; the docs show replacing it with a PostgreSQL datasource. |
-| **Keys** | `.env.example` lists the provider key and `NL2SQL_DATA_DIR`; `.env` is git-ignored. |
+| **Keys and mode** | `.env.example` lists the provider key, `NL2SQL_DATA_DIR` and `NL2SQL_MODE` (D229; it overrides the config file's `mode:`); `.env` is git-ignored. |
 | **TLS** | A reverse proxy in front, with `api_keys` (D205 forbids `none` off loopback); the page shows Caddy's two lines. |
 
 `docs/deployment/compose.md` (new) is the page: up, index, the first key,
@@ -901,7 +906,7 @@ nl2sql chat [--config PATH | --demo [--dir nl2sql-demo]] [--as ROLE] [--user NAM
 
 | Rule | Detail |
 |---|---|
-| **Where** | `nl2sql-cli/src/nl2sql_cli/chat/` (`app.py`, `widgets.py`, `charts.py`), the command in `nl2sql_cli/commands/chat.py`, which imports the app lazily and prints `pip install "nl2sql-cli[tui]"` when Textual is missing (D227; whether `tui` stays an extra is section 17's Q5). It lives in the CLI distribution, not the engine. `import nl2sql` still loads no `textual` (the existing test). |
+| **Where** | `nl2sql-cli/src/nl2sql_cli/chat/` (`app.py`, `widgets.py`, `charts.py`), the command in `nl2sql_cli/commands/chat.py`, which imports the app lazily (so `nl2sql index` does not load Textual) (D227; Textual is a normal dependency, D231, so there is no install hint to print). It lives in the CLI distribution, not the engine. `import nl2sql` still loads no `textual` (the existing test). |
 | **Facade only** | `nl2sql_cli/chat/` imports only the top-level `nl2sql` and `textual`, like the rest of `nl2sql_cli` (D227); it does not import `nl2sql_sdk`. The caller is `UserContext(user_id=--user or the OS user, roles=[--as or policies.default_role])`, passed to every call (D204). |
 | **Layout** | Conversations on the left (`conversations.list`); the transcript in the middle; the composer at the bottom with the guided questions on `Tab`; a side panel toggled with `F2` for "why this answer", `F3` for the SQL. |
 | **A turn** | Streamed from `conversations.stream`: a one-line status per step, then the answer, the warnings, and the result as a `DataTable` (first page; `PageDown` reads the next through `results.page(..., user_context=)`). |
@@ -965,7 +970,7 @@ work, so it does not repeat them.
 | `api` section | `auth` (`api_keys`, `proxy`, `static`, `none`), `proxy` (`trusted_from`, the three headers), `static_role`, `request_llm`, `cors_origins`; `role_header`, `role`, `trust_body_role` deleted |
 | `settings.approvals.max_age_hours` | 24 (D215) |
 | State store | `put_approval`, `get_approval`, `list_approvals`, `decide_approval`, `purge_approvals`; the store interface version Wave C sets (4) is raised to 5; the `sqlite` store adds one table in migration 7 |
-| Extras | Engine: `demo = ["nl2sql-api~=X.Y.Z"]`, `tui = ["textual>=0.80"]`. `nl2sql-api`: none. |
+| Extras | None added. The engine's `demo = ["nl2sql-api~=X.Y.Z"]` goes at CL1; `nl2sql-cli` depends on `nl2sql-api` and `textual>=0.80` outright (D231). |
 
 ## 11. Needs from Waves A to C
 
@@ -1110,10 +1115,10 @@ flowchart TD
 | W3 | **Connect, Knowledge, review, drift.** Files: `src/pages/Connect.jsx`, `src/connect/` (`SchemaForm.jsx`, `schemaForm.js`, `Steps.jsx`, `SchemaPanel.jsx` and `datasources.js` moved), `src/pages/Knowledge.jsx`, `src/knowledge/` (`Glossary.jsx`, `Proposals.jsx`, `Drift.jsx`), `src/api/connect.js`, `src/api/knowledge.js`, `styles/connect.css`, `styles/knowledge.css`. | A3, D0b | `schemaForm.test.js` (each JSON Schema type, `format: password` hidden, required fields, defaults, enums), `proposals.test.js` (an accept body for several ids with edits, from the `Proposal` fixture), `drift.test.js` (from the `DriftReport` fixture), `datasources.test.js` (moved) | `apps/web.md` (Connect, review) |
 | W4 | **Evals, Settings, Home (with the start screen of section 4, and `/meta`'s `start`), Pipeline, Retrieval, hosted first run.** Tests add `startScreen.test.js` (the three `start` values from `/meta` fixtures; hosted "Connect" shows the run-it-yourself steps and calls no route) and a route test that an empty project's `/meta` says `choose`. Files: `src/pages/Evals.jsx`, `src/evals/report.js`, `src/pages/Settings.jsx` (per-tab keys and models, the tab's API key, server LLM, API keys), `src/pages/Home.jsx`, `Pipeline.jsx`, `Retrieval.jsx` and the modules beside them (section 5's table), `src/api/evals.js`, `settings.js`, `meta.js`, `styles/settings.css`, `styles/evals.css`. | A4, D0b | `report.test.js` (from the `EvalReport` fixture), `hostedKey.test.js` and `hostedModels.test.js` (kept, now every mode), `firstRun.test.js` (recorded from the `usage` provider), `status.test.js` (modes from the `/meta` fixture), `home.test.js` (kept) | `apps/web.md` (evals, settings), the `getting_started/` pages that show the playground |
 | CL0 | **CLI on the facade only.** Done in place, before the move: the whole CLI (not only the demo command) imports only the top-level `nl2sql`, so CL1 is a rename. Each internal import the CLI has today becomes a facade method or export (the list is in section 17); the engine's `nl2sql.config` helpers, the provider catalogue, the MCP server's start and the model types the commands print are the bulk. Files: the CLI commands that import them, `public_api.py`, `nl2sql/__init__.py`, `tests/architecture/test_boundaries.py` (the rule widened to `nl2sql/cli/`). Sized to one PR; split by area (config and init, then the rest) if the audit passes 1,000 changed lines. | G2, G3 | `test_the_cli_imports_only_the_public_nl2sql` (fails on today's list, passes at the end), one test per new facade method | `invariants.md` (the CLI rule), `CLAUDE.md` |
-| CL1 | **Extract the CLI.** `git mv packages/nl2sql/src/nl2sql/cli nl2sql-cli/src/nl2sql_cli` (after X1 has deleted `cli/demo/playground`), imports rewritten from `nl2sql.cli` to `nl2sql_cli`; `nl2sql-cli/pyproject.toml` (distribution `nl2sql-cli`, depends on `nl2sql-engine` only, `[project.scripts] nl2sql = "nl2sql_cli.main:main"`, the `demo` and `tui` extras); the same three entries removed from `packages/nl2sql/pyproject.toml`; `packages/nl2sql/tests/cli/` moved to `nl2sql-cli/tests/`; `test_boundaries.py` repointed (section 17). Mostly renames. | X1, CL0 | `test_nl2sql_command_is_installed_by_nl2sql_cli`, `test_the_engine_has_no_cli_package`, `test_the_engine_and_the_api_never_import_nl2sql_cli`, `test_nl2sql_cli_depends_only_on_the_engine`, every moved CLI test green in its new place | `README.md`, `packages/nl2sql/README.md`, new `nl2sql-cli/README.md`, `getting_started/index.md`, `CLAUDE.md`, `invariants.md` |
+| CL1 | **Extract the CLI.** `git mv packages/nl2sql/src/nl2sql/cli nl2sql-cli/src/nl2sql_cli` (after X1 has deleted `cli/demo/playground`), imports rewritten from `nl2sql.cli` to `nl2sql_cli`; `nl2sql-cli/pyproject.toml` (distribution `nl2sql-cli`, imports `nl2sql-engine` only and depends on it, on `nl2sql-api` and on `textual`, `[project.scripts] nl2sql = "nl2sql_cli.main:main"`, no extras, D231); the `nl2sql` script and the `demo` and `tui` extras removed from `packages/nl2sql/pyproject.toml`; `packages/nl2sql/tests/cli/` moved to `nl2sql-cli/tests/`; `test_boundaries.py` repointed (section 17). Mostly renames. | X1, CL0 | `test_nl2sql_command_is_installed_by_nl2sql_cli`, `test_the_engine_has_no_cli_package`, `test_the_engine_and_the_api_never_import_nl2sql_cli`, `test_nl2sql_cli_imports_only_the_engine`, every moved CLI test green in its new place | `README.md`, `packages/nl2sql/README.md`, new `nl2sql-cli/README.md`, `getting_started/index.md`, `CLAUDE.md`, `invariants.md` |
 | CL2 | **CLI release and CI.** `release-please-config.json` (a fourth `generic` updater for `nl2sql-cli/pyproject.toml`, with the marker on its version and on its `nl2sql-engine` pin); `.github/workflows/test.yml` (the `test`, `integration` and `eval-gates` installs gain `-e nl2sql-cli`; the `build` loop; a `cli` job for the moved tests if the main job should not run them; `fresh-install` installs four wheels); `publish_pypi.yaml` (the `build` loop, the `pypi` job's upload step and order, `pypi-smoke`); `docs/development/releasing.md`; `CONTRIBUTING.md`. | CL1 | `test_packaging_metadata.py` extended: the fourth pyproject carries the release-please marker and pins the engine; `test_publish_uploads_four_distributions` | `releasing.md`, `CONTRIBUTING.md`, `deployment/` install lines |
-| T1 | **`nl2sql chat`.** Files: `nl2sql-cli/src/nl2sql_cli/chat/` (new: `app.py`, `widgets.py`, `charts.py`), `nl2sql_cli/commands/chat.py` (new), `nl2sql_cli/main.py`, `nl2sql-cli/pyproject.toml` (the Textual dependency or `tui` extra, Q5), `tests/architecture/test_boundaries.py` (`textual` only in `nl2sql_cli/chat/`). | G1, G2, G3, CL1 | The pilot tests in section 7, in `nl2sql-cli/tests/` | new `apps/terminal.md` (with its nav entry), `getting_started/index.md` |
-| K1 | **Image and Compose.** Files: `packages/api/Dockerfile` (a Node stage that builds `nl2sql-ui` and the API serving it, D226; ODBC, all adapters, the samples and the embedding model, non-root, `serve`, healthcheck), `.dockerignore` (`nl2sql-ui/node_modules`), `deploy/compose/` (new: `docker-compose.yml`, `config/`, `.env.example`, `README.md`), `.github/workflows/test.yml` (`api-image`: driver check, size and `GET /` answering the page), `tests/unit/test_docker_images.py`. The arm64 check for `msodbcsql18` is recorded in the PR. | D0a, D0b | `test_compose_file_shape`, `test_api_image_runs_one_worker`, `test_api_image_healthcheck_is_ready`, `test_api_image_builds_the_ui_in_a_node_stage`, `test_compose_example_config_uses_api_keys`, the image job's `pyodbc.drivers()` check | new `deployment/compose.md` (with its nav entry), `deployment/docker.md`, `deployment/architecture.md` |
+| T1 | **`nl2sql chat`.** Files: `nl2sql-cli/src/nl2sql_cli/chat/` (new: `app.py`, `widgets.py`, `charts.py`), `nl2sql_cli/commands/chat.py` (new), `nl2sql_cli/main.py`, `nl2sql-cli/pyproject.toml` (`textual>=0.80` and `nl2sql-api` as normal dependencies, D231), `tests/architecture/test_boundaries.py` (`textual` only in `nl2sql_cli/chat/`). | G1, G2, G3, CL1 | The pilot tests in section 7, in `nl2sql-cli/tests/` | new `apps/terminal.md` (with its nav entry), `getting_started/index.md` |
+| K1 | **Image and Compose.** Files: `Dockerfile` at the repository root, moved from `packages/api/Dockerfile` (D233; stage one builds `nl2sql-ui`, stage two is the API image serving it and installing `nl2sql-cli`, D226 and D230; ODBC, all adapters, the samples and the embedding model, non-root, `serve`, healthcheck), `.dockerignore` (`nl2sql-ui/node_modules`), `deploy/compose/` (new: `docker-compose.yml`, `config/`, `.env.example`, `README.md`), `.github/workflows/test.yml` (`api-image`: driver check, size and `GET /` answering the page), `tests/unit/test_docker_images.py`. The arm64 check for `msodbcsql18` is recorded in the PR. | D0a, D0b | `test_compose_file_shape`, `test_api_image_runs_one_worker`, `test_api_image_healthcheck_is_ready`, `test_api_image_builds_the_ui_in_a_node_stage`, `test_compose_example_config_uses_api_keys`, the image job's `pyodbc.drivers()` check | new `deployment/compose.md` (with its nav entry), `deployment/docker.md`, `deployment/architecture.md` |
 | X1 | **Cutover, rehearsed.** `cli/commands/demo.py` as the launcher; delete `nl2sql/cli/demo/` (the playground, `llm_config.py`, `stamp.py`, `defaults.py`); the engine's `demo` extra and package data; `STILL_IMPORTED_FROM_INSIDE` emptied and deleted; `ENTRY_POINTS_LOADING_DOTENV`; `cli/commands/launch.py` (its last line); `deploy/huggingface/Dockerfile`, `docker-compose.yml`, `README.md`; `scripts/fresh_install_check.py`, `scripts/record_home_clips.py` (v1 routes, `serve --demo --hosted`); `.github/workflows/record_demo.yml`, `publish_space.yml`, `publish_pypi.yaml` (upload order); `docs/development/releasing.md`; the playground's Python tests replaced by the API's; `README.md`, `packages/nl2sql/README.md`, `packages/api/README.md`, `CLAUDE.md`. **Done when** `publish_space.yml`'s no-tag dispatch has deployed `main` with this PR to a scratch Space and `fresh_install_check.py`, the keyless guided questions and one keyless follow-up pass against it. | W1 to W4, K1 | `test_demo_is_a_launcher` (runs `nl2sql_api serve --demo` with the flags; install hint without `nl2sql_api`), `test_launcher_forwards_ctrl_c`, `test_engine_never_imports_the_api`, `test_apps_always_pass_the_caller`, `test_still_imported_from_inside_is_gone` (the public-only test with no exceptions), `test_hosted_space_definition` (updated), `test_launch_prints_the_serve_command`, the `fresh-install` job on the new routes | `deployment/hosted-demo.md`, `getting_started/demo.md`, `CLAUDE.md` (the facade rule's exception list is gone), `CONTRIBUTING.md` |
 | R1 | **Owner: re-record, rehearse, browser pass.** Not an agent PR. The owner runs Actions → **Record demo answers** with `record: answers` (the guided questions, the scripted follow-ups and the clarification question, on the key the workflow holds), reviews and merges its PR, then `record: clips` for the home page clips on the new server. Then the scratch-Space rehearsal of X1 again, and the short browser pass (section 5). Pre-approved by the owner; no agent runs any of it. | X1 | The workflow's own checks; `test_replay_covered` | the release's `docs/releases/` page |
 
@@ -1127,7 +1132,7 @@ The waves, with at most four PRs at once:
 | 4 | W1, W2, W3, W4 | One area each; the shell, `http.js`, `src/lib/` and `styles/base.css` are D0b's |
 | 5 | K1, CL0 | CL0 needs only G2 and G3 and may start earlier if a slot is free |
 | 6 | X1 | Then R1 by the owner, then the release; CL1 may proceed beside R1 |
-| 7 | CL1, then CL2 and T1 | The CLI leaves the engine only after the cutover has deleted the playground (section 17, Q6) |
+| 7 | CL1, then CL2 and T1 | The CLI leaves the engine only after the cutover has deleted the playground (D231) |
 
 Known overlaps, kept small:
 
@@ -1141,7 +1146,7 @@ Known overlaps, kept small:
   regenerates with the command `test_openapi_snapshot_is_current` prints,
   and each writes only its own fixture files.
 - The engine's `pyproject.toml`: G2's package data, X1's `demo` extra, then
-  CL1's removal of the `nl2sql` script and the `tui` and `demo` extras.
+  CL1's removal of the `nl2sql` script and the `demo` extra.
 - `nl2sql-ui/package.json`: W2 adds `mermaid`; nobody else adds a dependency.
 - `.github/workflows/test.yml`: CI0, then D0b's path change (`web/playground`
   to `nl2sql-ui`), then K1's image job, then CL2's installs; never in the same
@@ -1159,8 +1164,8 @@ Known overlaps, kept small:
   `/llm/{agent}` among them, no aliases), the error envelope, `api.auth`
   replacing `role_header`, `role` and `trust_body_role`, results bound to
   their asker (ownerless old results), `feedback.record`'s new signature,
-  `nl2sql demo`'s removed flags, the `nl2sql` command and the `demo` and `tui`
-  extras moving from `nl2sql-engine` to the new `nl2sql-cli` distribution
+  `nl2sql demo`'s removed flags, the `nl2sql` command and the `demo` extra
+  moving from `nl2sql-engine` to the new `nl2sql-cli` distribution
   (a plain `pip install nl2sql-engine` no longer installs the command), the state store's new version, the API starting when a
   required datasource fails, and `/ready` failing where it used to pass.
 - Before tagging, the owner checks the scratch Space (keyless and with a
@@ -1172,21 +1177,21 @@ Known overlaps, kept small:
 
 ## 16. Open questions
 
-None blocking. Every decision above is marked for the owner to confirm.
+No question is open. Every decision from D200 to D224 is marked for the owner to confirm.
 Five are worth a look first, because they change what a user or an
-operator sees: D211 (the `web` extra moves to the engine's `demo` extra),
+operator sees: D211 (the `web` extra becomes the CLI's dependency on `nl2sql-api`),
 D210 (a key typed into the web app is never saved, locally too), D215
 (approval grants are stored, amending Waves A and C), D221 (what the hosted
 demo leaves on) and D224 (dashboards stay at Wave C's surface). The layout
-decisions D225 to D228 are the owner's, made on 2026-10-30; what they leave
-open is the list at the end of [section 17](#17-repository-layout-the-ui-and-the-cli-app).
+decisions D225 to D233 are the owner's, made on 2026-10-30 and answering every
+question section 17 raised ([section 17](#17-repository-layout-the-ui-and-the-cli-app)).
 
 ## 17. Repository layout: the UI and the CLI app
 
 !!! note "Decided by the owner on 2026-10-30"
-    D225 to D228 are binding. This section says what they change in the
-    repository, the boundary test and the release machinery, and lists what
-    they leave open. Nothing here is built.
+    D225 to D233 are binding. This section says what they change in the
+    repository, the boundary test and the release machinery. Nothing here is
+    built.
 
 ### The layout
 
@@ -1195,9 +1200,10 @@ nl2sql/
   packages/
     sdk/         nl2sql-sdk      adapter authors compile against it
     nl2sql/      nl2sql-engine   the library and the `nl2sql` facade
-    api/         nl2sql-api      REST; serves the built UI
-  nl2sql-ui/                     the one UI (React, Vite); built into the API image
+    api/         nl2sql-api      REST; serves the built UI (its wheel carries it)
+  nl2sql-ui/                     the one UI (React, Vite); built into the API image and wheel
   nl2sql-cli/                    nl2sql-cli: the `nl2sql` command and the terminal app
+  Dockerfile                     two stages: build the UI, then the API image (D233)
 ```
 
 ```mermaid
@@ -1216,29 +1222,36 @@ but the API. The SDK is for adapter authors, so the CLI does not import it.
 
 | Thing | Artifact | Where it lives | Built on |
 |---|---|---|---|
-| The packages | `nl2sql-engine`, `nl2sql-sdk`, `nl2sql-api` on PyPI | `packages/` | the SDK, then the engine, then the API |
-| The UI | Inside the API's Docker image (and the committed build in the API wheel while Q1 is open) | `nl2sql-ui/` | the API's `/api/v1` only |
+| The engine | `nl2sql-engine` on PyPI, with `nl2sql-sdk` for adapter authors | `packages/nl2sql/`, `packages/sdk/` | the SDK |
+| The API image | The Docker image from the root `Dockerfile`, with the UI inside; the `nl2sql-api` wheel carries the same build (D226) | `packages/api/`, `Dockerfile` | the engine's facade only |
 | The CLI app | `nl2sql-cli` on PyPI: the `nl2sql` command, `nl2sql chat` | `nl2sql-cli/` | the engine's facade only |
+| The UI | Its own folder, built into the image and the wheel | `nl2sql-ui/` | the API's `/api/v1` only |
 
-### One UI, every mode (D225, D226)
+### One UI, every mode (D225, D226, D229, D233)
 
-- The mode is configuration. Today `nl2sql-api serve --demo` and
-  `--demo --hosted` choose it by flag (section 4); the flags stay the way a
-  launcher or a Dockerfile sets it, and the result is the same `/meta`
-  answer a Compose file produces from its environment. The page never
-  learns the mode from how it was built.
-- The API image is the delivery vehicle. A stage on a Node image builds
-  `nl2sql-ui`; the Python stage serves the output. The Space image
-  (`deploy/huggingface/Dockerfile`) and the Compose image can share that
-  stage or use the published image.
+- The mode is configuration (D229): a `mode:` key in `nl2sql.yaml` (`demo`,
+  `your_data`, `hosted`), overridden in Compose by `NL2SQL_MODE`, and reported
+  by `GET /meta`. The variable is read once, in `nl2sql_api serve` (the entry
+  point, on the `READS_THE_ENVIRONMENT` allow-list), and travels in `Config`.
+  The flags `serve --demo` and `--demo --hosted` stay the way a launcher sets
+  it and beat the variable. The page never learns the mode from how it was
+  built.
+- One build serves every way of installing (D226). `npm run build` writes
+  `nl2sql_api/web/static/`; the image's Node stage and the wheel build run
+  it, so `pip install nl2sql-api` and the image carry the same page.
+- The image is one two-stage `Dockerfile` at the repository root (D233): a
+  Node stage builds `nl2sql-ui`, the Python stage is the API image, and it
+  installs `nl2sql-cli` (D230). The Space image
+  (`deploy/huggingface/Dockerfile`) stays its own file.
 - The UI keeps talking to `/api/v1` only. Nothing in `nl2sql-ui` imports
   or names a Python package.
 
-### The CLI app (D227)
+### The CLI app (D227, D231, D232)
 
-- **Entry point.** `nl2sql = "nl2sql_cli.main:main"` under `[project.scripts]`
-  in `nl2sql-cli/pyproject.toml`; the engine's `pyproject.toml` loses its
-  `nl2sql = "nl2sql.cli.main:main"` line (CL1).
+- **Names.** Distribution `nl2sql-cli`, import package `nl2sql_cli`, console
+  command `nl2sql`: `nl2sql = "nl2sql_cli.main:main"` under
+  `[project.scripts]` in `nl2sql-cli/pyproject.toml`; the engine's
+  `pyproject.toml` loses its `nl2sql = "nl2sql.cli.main:main"` line (CL1).
 - **What moves.** Everything under `packages/nl2sql/src/nl2sql/cli/` once X1
   has deleted the playground: `main.py`, `console.py`, `reporting.py`,
   `checks.py`, `config.py`, `types.py`, `common/`, the command modules
@@ -1246,11 +1259,15 @@ but the API. The SDK is for adapter authors, so the CLI does not import it.
   lines. Its tests move from `packages/nl2sql/tests/cli/` to
   `nl2sql-cli/tests/`.
 - **What stays in the engine.** The MCP server (`nl2sql/mcp/`, Wave C's
-  D126), `nl2sql.testing` and the recordings. The CLI starts the MCP server
-  through the facade (Q8).
-- **Dependencies.** `nl2sql-cli` depends on `nl2sql-engine`; its `demo` extra
-  is `nl2sql-api`. The engine loses its `demo` and `tui` extras, so the
-  engine and the API stop depending on each other.
+  D126), `nl2sql.testing` and the recordings. The facade gets a public
+  method that starts the MCP server and `nl2sql mcp` calls it (D232).
+- **Dependencies.** `nl2sql-cli` depends on `nl2sql-engine`, `nl2sql-api`
+  (the launcher starts it as a child process) and `textual`, all normal
+  dependencies (D231). It has no extras: the `demo` extra merged into the
+  dependencies and Textual is not optional. It imports the engine only, so
+  the engine and the API stop depending on each other. The CLI moves after
+  X1 (CL1 follows X1), so the playground never moves and the chat app is
+  built in its final place.
 
 ### Boundary rules that change
 
@@ -1289,7 +1306,7 @@ facade the method, the CLI switches to it; otherwise CL0 adds it.
 | `nl2sql.llm.providers` (5), `nl2sql.llm.models`, `nl2sql.llm.wires.anthropic` | `engine.llm.providers()` (G2) and, for the rest, an `engine.llm` method |
 | `nl2sql.config` (9), `nl2sql.config.writer`, `nl2sql.config.check` | `init_project` and `prepare_demo` (G2), `datasources.save` (Wave C), `engine.check` (G3); the rest named in CL0 |
 | `STILL_IMPORTED_FROM_INSIDE`: `llm.request_key`, `llm.replay`, `testing.fake_llm`, `datasets.demo` | G2 (`llm_override=`, the replay provider, `DatasourceInfo.sample_questions`) and X1 (the playground is deleted) |
-| `nl2sql.mcp` (2) | Q8 |
+| `nl2sql.mcp` (2) | The facade method that starts the MCP server (D232) |
 | `nl2sql.knowledge.models`, `nl2sql.profiler.models`, `nl2sql.evaluation` and `.records`, `nl2sql.tracing.document`, `nl2sql.registry`, `nl2sql.common.exceptions`, `nl2sql.common.logger` | Result and error types exported from `nl2sql`, or the namespace method that returns what the command prints |
 
 ### Where each piece of release machinery goes
@@ -1300,38 +1317,5 @@ facade the method, the CLI switches to it; otherwise CL0 adds it.
 | release-please | `release-please-config.json`: `extra-files` for the three package manifests, one version in `.release-please-manifest.json` | A fourth `generic` updater for `nl2sql-cli/pyproject.toml`; the same marker comments; one version for all four (CL2). The UI has no version of its own. |
 | CI test jobs | `test`, `integration`, `eval-gates` install `-e packages/sdk -e packages/nl2sql[...] -e packages/api` | Add `-e nl2sql-cli`; CI0's web job runs on `nl2sql-ui` from D0b; `build` loops over four packages; `api-image` builds the UI stage (K1); `fresh-install` installs four wheels (CL2) |
 | PyPI publish | `publish_pypi.yaml` builds and uploads three | Four, in dependency order: SDK, engine, API, CLI (CL2) |
-| Dockerfile that builds the UI | none | `packages/api/Dockerfile` gets the Node stage (K1) |
+| Dockerfile that builds the UI | none | One two-stage `Dockerfile` at the repository root, moved from `packages/api/Dockerfile`; the three workflows that name it change (K1, D233) |
 | Docs | `releasing.md` says "three distributions" | "Four distributions"; `CONTRIBUTING.md` lists the folders (CL2) |
-
-### Open questions
-
-Not decided here. Each needs the owner.
-
-1. **Does the API wheel still carry the built UI?** D211 and D216 committed
-   the build into `nl2sql_api/web/static/` so `pip install` needs no Node.
-   D226 says the image carries the UI. Without the committed build, the
-   `nl2sql demo` launcher and a plain `pip install nl2sql-api` serve no page.
-2. **How is the mode named in config and Compose?** `/meta`'s `mode` and
-   `start` exist (section 3). The project-config keys and the Compose
-   environment variables that set them are not designed; today it is
-   `serve --demo` and `--hosted`.
-3. **Does the API image install `nl2sql-cli`?** Section 6's commands
-   (`docker compose run --rm api nl2sql index`, `nl2sql keys create`) need
-   the `nl2sql` command, which leaves the engine. The Space image builds the
-   demo project the same way.
-4. **Names.** The distribution `nl2sql-cli` and the import package
-   `nl2sql_cli` follow from the folder. Confirm them.
-5. **Is Textual a dependency or an extra of `nl2sql-cli`?** And does the
-   `demo` extra (`nl2sql-api`) fit "built on the engine package only", since
-   the launcher starts the API as a child process?
-6. **Order.** The plan moves the CLI after X1, so the playground never moves
-   and the chat app is built in its final place. The alternative moves it
-   first and carries the playground as a temporary exception.
-7. **"Four things".** The decision lists three groups (the packages, the UI,
-   the CLI app) and counts four. Is the fourth the SDK on its own, the
-   API on its own, or something else?
-8. **MCP.** `nl2sql mcp` starts the server in `nl2sql/mcp/`. A facade
-   function that serves it, or the server moves to its own package?
-9. **The Dockerfile's place.** It stays at `packages/api/Dockerfile` with the
-   repository root as context (D213). Moving it to the root would be a
-   one-line change to the three workflows that name it.
