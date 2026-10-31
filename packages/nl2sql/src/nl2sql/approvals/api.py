@@ -66,6 +66,8 @@ class Approvals:
             doc = self._ctx.state.get_approval(item)
             if doc is None:
                 return [], f"There is no approval request '{item}'."
+            if user is not None and doc["request"].get("asker_tenant_id") != user.tenant_id                     or user is None and doc["request"].get("asker_tenant_id") is not None:
+                return [], f"There is no approval request '{item}'."  # another tenant's: not told apart from unknown
             if self._expired(doc):
                 return [], f"The approval request '{item}' has expired."
             if doc["status"] == "pending" or (doc["status"] == "granted" and not doc.get("approver")):
@@ -90,7 +92,7 @@ class Approvals:
         self._approvable(request_id, by)
         decided = self._decide(request_id, "granted", by)
         if decided["status"] == "granted" and not decided.get("approver"):
-            decided = {**decided, "approver": by.model_dump(mode="json")}
+            decided = {**decided, "approver": by.model_dump(mode="json"), "decided_by": by.user_id}
             self._ctx.state.put_approval(decided)
         return _record(decided)
 

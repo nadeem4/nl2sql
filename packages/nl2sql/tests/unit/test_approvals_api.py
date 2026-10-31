@@ -239,14 +239,14 @@ def test_another_tenants_request_is_not_listed_or_grantable(approvals):
         approvals.deny(request.id, by=MALLORY)
 
 
-def test_an_approval_from_another_tenant_does_not_cover_the_run():
-    from nl2sql.hooks.approval import approval_problem
+def test_another_tenants_id_does_not_resolve(approvals):
+    request = _request()
+    approvals.submit([request])
+    approvals.grant(request.id, by=DBA)
 
-    problem = approval_problem(Approval(request=_request(), by=MALLORY), hook="review", roles=["dba"],
-                               question="How many customers?", user=ANA, datasource_id="chinook", sql=SQL,
-                               params=None)
+    resolved, problem = approvals.resolve([request.id], user=UserContext(user_id="ana", tenant_id="globex"))
 
-    assert problem and "tenant" in problem
+    assert resolved == [] and "no approval request" in problem
 
 
 def test_callers_with_no_identity_do_not_see_each_others_requests(approvals):
@@ -278,6 +278,7 @@ def test_a_grant_with_no_approver_is_waiting_until_an_approver_grants_again(appr
 
     resolved, problem = approvals.resolve([request.id], user=ANA)
     assert problem is None and resolved[0].by == other
+    assert state.get_approval(request.id)["decided_by"] == "dba2"
 
 
 def test_deny_then_grant_stays_denied(approvals):

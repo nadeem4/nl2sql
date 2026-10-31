@@ -1336,7 +1336,7 @@ or `stale`; it carries no reason text, which can echo a secret. `index.refresh` 
 The code on `main` matched the design except that `index.build` and `evals.run` had their callbacks already, as the
 facade-gaps row says.
 
-**G3a (stored approval grants).** Review fixes (PR #410): requests are tenant-bound (`list`, `grant` and `deny` never see another tenant's request, and `approval_problem` rejects an approver of another tenant than the asker); a caller with no `user_id` owns nothing; `approver` is excluded from what callers see; a granted record with no approver is still waiting, and a later `grant` fills it in. `nl2sql/approvals/api.py`: `Approvals(ctx)`, which is `engine.approvals`, and
+**G3a (stored approval grants).** Review fixes (PR #410): requests are tenant-bound (`list`, `grant` and `deny` never see another tenant's request, and a run's id of another tenant's request does not resolve); a caller with no `user_id` owns nothing; `approver` is excluded from what callers see; a granted record with no approver is still waiting, and a later `grant` fills it in. `nl2sql/approvals/api.py`: `Approvals(ctx)`, which is `engine.approvals`, and
 `ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `approver` (the granting
 `UserContext`, with the roles it held), `reason`), exported from `nl2sql`. `list(*, user_context, status="pending")` shows
 the requests the caller's roles may approve (the hook's approver roles, else `policies.admin_roles`; `allow_all` makes no

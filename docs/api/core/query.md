@@ -139,7 +139,7 @@ result = engine.run_query(question, user_context=asker, approvals=[record.id])
 ```
 
 `list(*, user_context, status="pending")` shows the requests the caller's roles may approve and the
-caller's own, within the caller's tenant (another tenant's id is `ApprovalNotFound` everywhere, and an approval whose approver is in another tenant than the asker covers nothing); `grant(request_id, *, by)` and `deny(request_id, *, by, reason=None)` return the
+caller's own, within the caller's tenant (another tenant's id is `ApprovalNotFound` in `list`, `grant` and `deny`, and `APPROVAL_NOT_GRANTED` as a run's id); `grant(request_id, *, by)` and `deny(request_id, *, by, reason=None)` return the
 `ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `reason`; the approver's roles stay inside the engine);
 a request already decided is returned as it is, and an unknown or expired id is `ApprovalNotFound`.
 A grant is reusable for any re-run of that request (same question, asker, plan and SQL) until it

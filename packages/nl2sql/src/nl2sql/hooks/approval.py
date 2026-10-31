@@ -143,8 +143,6 @@ def approval_problem(approval: Approval, *, hook: str, roles: Sequence[str], que
     if problem:
         return problem
     request = approval.request
-    if approval.by.tenant_id != request.asker_tenant_id:
-        return "its approver is in another tenant"
     if request.hook != hook:
         return f"it is for the hook '{request.hook}'"
     if request.datasource_id != datasource_id:
