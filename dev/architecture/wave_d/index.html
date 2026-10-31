@@ -971,6 +971,82 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#17-repository-layout-the-ui-and-the-cli-app">
+<span class="md-ellipsis">
+      
+        17. Repository layout: the UI and the CLI app
+      
+    </span>
+</a>
+<nav aria-label="17. Repository layout: the UI and the CLI app" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-layout">
+<span class="md-ellipsis">
+      
+        The layout
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-ships-d228">
+<span class="md-ellipsis">
+      
+        What ships (D228)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-ui-every-mode-d225-d226-d229-d233">
+<span class="md-ellipsis">
+      
+        One UI, every mode (D225, D226, D229, D233)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-cli-app-d227-d231-d232">
+<span class="md-ellipsis">
+      
+        The CLI app (D227, D231, D232)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#boundary-rules-that-change">
+<span class="md-ellipsis">
+      
+        Boundary rules that change
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-becomes-a-facade-method-cl0">
+<span class="md-ellipsis">
+      
+        What becomes a facade method (CL0)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#where-each-piece-of-release-machinery-goes">
+<span class="md-ellipsis">
+      
+        Where each piece of release machinery goes
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </li>
@@ -3388,6 +3464,82 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#17-repository-layout-the-ui-and-the-cli-app">
+<span class="md-ellipsis">
+      
+        17. Repository layout: the UI and the CLI app
+      
+    </span>
+</a>
+<nav aria-label="17. Repository layout: the UI and the CLI app" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-layout">
+<span class="md-ellipsis">
+      
+        The layout
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-ships-d228">
+<span class="md-ellipsis">
+      
+        What ships (D228)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-ui-every-mode-d225-d226-d229-d233">
+<span class="md-ellipsis">
+      
+        One UI, every mode (D225, D226, D229, D233)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-cli-app-d227-d231-d232">
+<span class="md-ellipsis">
+      
+        The CLI app (D227, D231, D232)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#boundary-rules-that-change">
+<span class="md-ellipsis">
+      
+        Boundary rules that change
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-becomes-a-facade-method-cl0">
+<span class="md-ellipsis">
+      
+        What becomes a facade method (CL0)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#where-each-piece-of-release-machinery-goes">
+<span class="md-ellipsis">
+      
+        Where each piece of release machinery goes
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -3415,6 +3567,18 @@ written; this page follows its amended version. Wave D renders what the
 three waves build. Where it needs something they do not provide, the gap
 is listed in <a href="#11-needs-from-waves-a-to-c">Needs from Waves A to C</a> as a
 facade method, not designed around.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Layout amended on 2026-10-30</p>
+<p>The owner decided where the apps live: one UI codebase in the
+root-level <code>nl2sql-ui/</code>, built into the API's Docker image, and the
+terminal app with every other CLI command in their own root-level
+<code>nl2sql-cli/</code> distribution, built on the engine's facade (D225 to D233,
+<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).
+Below, a path that describes the planned layout is corrected
+(<code>web/app</code> and the planned <code>nl2sql/cli/chat/</code> become <code>nl2sql-ui/</code> and
+<code>nl2sql-cli/</code>); a path that describes today's code (<code>web/playground</code>,
+<code>nl2sql/cli/demo/</code>) keeps its name.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Wave C was revised on 2026-10-28; this page has not been updated to match</p>
@@ -3452,7 +3616,7 @@ ago", <code>needs_fixing</code>), and the dashboard job.</p>
   sample databases with recorded answers and no key; your-data mode is the
   caller's <code>nl2sql.yaml</code>.</li>
 <li><strong>The UI must not look AI-generated.</strong> The playground's "Porcelain" design
-  system (<code>web/playground/src/styles.css</code>: its tokens, type scale, the run
+  system (<code>web/playground/src/styles.css</code> today, <code>nl2sql-ui/src/styles.css</code> after D0b: its tokens, type scale, the run
   spine, the raised card, the 44px controls) is the baseline for every new
   page. No component library, no gradient, no icon font.</li>
 </ul>
@@ -3542,8 +3706,8 @@ D13 to D16</strong> and records how each is applied.</p>
 </tr>
 <tr>
 <td>D211</td>
-<td><strong>Final-design D13, applied with one change.</strong> The web app ships inside <code>nl2sql-api</code> as package data, served by <code>nl2sql-api serve</code>. It adds no dependency to <code>nl2sql-api</code>, so there is no <code>web</code> extra there; instead the engine's <code>demo</code> extra becomes <code>nl2sql-api</code>, so <code>pip install "nl2sql-engine[demo]"</code> stays the one install line. <code>nl2sql demo</code> is a launcher that runs <code>python -m nl2sql_api serve --demo</code> in a child process; the engine never imports <code>nl2sql_api</code>. The playground server (<code>nl2sql/cli/demo/</code>) is deleted.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td><strong>Final-design D13, applied with one change.</strong> The web app ships inside <code>nl2sql-api</code> as package data, served by <code>nl2sql-api serve</code>. It adds no dependency to <code>nl2sql-api</code>, so there is no <code>web</code> extra there; instead the <code>demo</code> extra becomes <code>nl2sql-api</code> (first written on the engine, so <code>pip install "nl2sql-engine[demo]"</code> was the one install line; since D227 it belongs to <code>nl2sql-cli</code>, whose <code>web</code> extra is <code>nl2sql-api</code> (D231), so the line is <code>pip install "nl2sql-cli[web]"</code> and the engine and the API no longer depend on each other). <code>nl2sql demo</code> is a launcher that runs <code>python -m nl2sql_api serve --demo</code> in a child process; the engine never imports <code>nl2sql_api</code>. The playground server (<code>nl2sql/cli/demo/</code>) is deleted. The wheel keeps carrying the built page (D226).</td>
+<td>decided overnight, amended after review, owner to confirm; install line and launcher's home amended by D227</td>
 <td><a href="#4-serving-the-web-app-and-nl2sql-demo">Serving</a></td>
 </tr>
 <tr>
@@ -3572,20 +3736,20 @@ D13 to D16</strong> and records how each is applied.</p>
 </tr>
 <tr>
 <td>D216</td>
-<td><strong>One React app, in <code>web/app</code></strong> (renamed from <code>web/playground</code>): the existing Vite and React 18 setup, a hash router, plain JavaScript, Porcelain's CSS split per area, the API client split per area. No TypeScript, no state library, no component library.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td><strong>One React app, in <code>nl2sql-ui/</code></strong> (renamed from <code>web/playground</code>, at the repository root since D225): the existing Vite and React 18 setup, a hash router, plain JavaScript, Porcelain's CSS split per area, the API client split per area. No TypeScript, no state library, no component library. The location was <code>web/app</code> until 2026-10-30.</td>
+<td>decided overnight, amended after review, owner to confirm; location amended by D225 (decided by owner 2026-10-30)</td>
 <td><a href="#5-the-web-app">The web app</a></td>
 </tr>
 <tr>
 <td>D217</td>
-<td><strong>Web tests stay what they are, run in CI, and read real shapes:</strong> <code>node --test</code> over pure modules, a contract test that every route the client calls is in <code>openapi.json</code>, and golden response files (<code>web/app/src/api/fixtures/*.json</code>) written by the API's route tests and checked like <code>openapi.json</code>, which the node tests read instead of hand-made objects. No browser test runs in CI; the owner runs a short browser pass before the release.</td>
+<td><strong>Web tests stay what they are, run in CI, and read real shapes:</strong> <code>node --test</code> over pure modules, a contract test that every route the client calls is in <code>openapi.json</code>, and golden response files (<code>nl2sql-ui/src/api/fixtures/*.json</code>) written by the API's route tests and checked like <code>openapi.json</code>, which the node tests read instead of hand-made objects. No browser test runs in CI; the owner runs a short browser pass before the release.</td>
 <td>decided overnight, amended after review, owner to confirm</td>
 <td><a href="#testing-the-web-app">Testing</a></td>
 </tr>
 <tr>
 <td>D218</td>
-<td><strong>The terminal app is <code>nl2sql chat</code>,</strong> on Textual behind the <code>tui</code> extra, in <code>nl2sql/cli/chat/</code>, on the facade only. Charts become text (a big number, sparklines, bars, a table); diagrams are shown as text. It takes no key: the CLI's environment and <code>.env</code> as everywhere.</td>
-<td>decided overnight, owner to confirm</td>
+<td><strong>The terminal app is <code>nl2sql chat</code>,</strong> on Textual (a normal dependency of <code>nl2sql-cli</code>, D231), in <code>nl2sql-cli/src/nl2sql_cli/chat/</code> since D227 (it was <code>nl2sql/cli/chat/</code>), on the facade only. Charts become text (a big number, sparklines, bars, a table); diagrams are shown as text. It takes no key: the CLI's environment and <code>.env</code> as everywhere.</td>
+<td>decided overnight, owner to confirm; location and the extra amended by D227 and D231 (decided by owner 2026-10-30)</td>
 <td><a href="#7-the-terminal-app-nl2sql-chat">The terminal app</a></td>
 </tr>
 <tr>
@@ -3623,6 +3787,60 @@ D13 to D16</strong> and records how each is applied.</p>
 <td><strong>Dashboards are Wave C's surface and no more:</strong> whatever Wave C's <code>engine.dashboards</code> and <code>engine.workspaces</code> offer (open, refresh, edit, arrange, filters, schedule, pin, move, delete, workspaces), as thin routes. Wave C (revised 2026-10-28) builds editing and workspaces in the package; this page's route table has not yet been revised to expose them.</td>
 <td>decided after review, owner to confirm; superseded in part by Wave C's D116, D131 and D133</td>
 <td><a href="#the-routes">Routes</a></td>
+</tr>
+<tr>
+<td>D225</td>
+<td><strong>One UI codebase, in the root-level <code>nl2sql-ui/</code></strong> (not under <code>packages/</code>, not under <code>web/</code>; amends D216's location, not its stack). It is one of the shipped products. Demo, playground and real use are the same code: the mode (demo, your data, hosted) is configuration, not a build, and reaches the page through <code>GET /meta</code>. The configuration is the project's config and, in Docker Compose, environment variables.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
+</tr>
+<tr>
+<td>D226</td>
+<td><strong>The UI ships inside the API's Docker image, and the API's PyPI wheel carries the same built UI.</strong> One build (<code>npm run build</code> in <code>nl2sql-ui</code>, written to <code>nl2sql_api/web/static/</code>) serves <code>pip install nl2sql-api</code> and the image: the image's Node stage runs it, and so does the wheel build, so neither needs Node at install time. <code>nl2sql-api</code> serves the result; the UI talks only to the API. Compose stays one service (D219 stands).</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#the-image">Image</a></td>
+</tr>
+<tr>
+<td>D227</td>
+<td><strong>The terminal app and every other CLI command move to their own root-level <code>nl2sql-cli/</code>,</strong> packaged as its own distribution that imports the engine package only, through the public <code>nl2sql</code> facade, as <code>nl2sql-api</code> does. It does not use the SDK (the SDK is for adapter authors) and never touches <code>engine._runtime</code>. The <code>nl2sql</code> console script and <code>nl2sql chat</code> (D218) move with it; the engine keeps no <code>nl2sql/cli/</code>.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
+</tr>
+<tr>
+<td>D228</td>
+<td><strong>Four things ship:</strong> the engine (<code>nl2sql-engine</code>, with <code>nl2sql-sdk</code> for adapter authors), the API image with the UI inside it (and the <code>nl2sql-api</code> wheel), the CLI app (<code>nl2sql-cli</code>), and the UI as its own folder, <code>nl2sql-ui/</code>.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
+</tr>
+<tr>
+<td>D229</td>
+<td><strong>The mode is a <code>mode:</code> key in <code>nl2sql.yaml</code></strong> (<code>demo</code>, <code>your_data</code> or <code>hosted</code>; <code>your_data</code> when absent), <strong>overridable in Compose by one environment variable, <code>NL2SQL_MODE</code>.</strong> <code>GET /meta</code> reports it. The variable is read at the entry point only (<code>nl2sql_api serve</code>, added to <code>READS_THE_ENVIRONMENT</code> in the boundary test) and travels in <code>Config</code>, so two engines in one process share nothing; the engine and the page read no environment. <code>serve --demo</code> and <code>--demo --hosted</code> stay as launcher flags and set <code>demo</code> and <code>hosted</code>; a flag beats <code>NL2SQL_MODE</code>, which beats the file.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
+</tr>
+<tr>
+<td>D230</td>
+<td><strong>The API image installs <code>nl2sql-cli</code>,</strong> so <code>docker compose run --rm api nl2sql index</code> (and <code>nl2sql keys create</code>) work.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#6-docker-compose-self-host">Compose</a></td>
+</tr>
+<tr>
+<td>D231</td>
+<td><strong>Names and dependencies of the CLI.</strong> PyPI distribution <code>nl2sql-cli</code>, import package <code>nl2sql_cli</code>, console command <code>nl2sql</code>. The CLI sits on the engine only: its one dependency is <code>nl2sql-engine</code>, plus Textual as a plain dependency (the terminal app) and the <code>demo</code> command itself, which move in. Commands that need the web server (<code>nl2sql demo</code>, <code>serve</code>) need <code>nl2sql-api</code>, which is the optional <code>web</code> extra: <code>pip install "nl2sql-cli[web]"</code>. Those commands <strong>shell out</strong> (<code>python -m nl2sql_api serve ...</code> as a child process, found with <code>importlib.util.find_spec</code>), so <code>nl2sql_cli</code> never imports <code>nl2sql_api</code>, lazily or otherwise; shelling out is the least code and keeps the boundary test absolute. Without the extra they print the install line and exit 1. The API image installs <code>nl2sql-cli</code> beside <code>nl2sql-api</code>, so every command works there. The CLI moves after the cutover: CL1 follows X1.</td>
+<td>decided by owner 2026-10-30; the <code>web</code> extra and the shell-out are the coordinator's correction of the same day</td>
+<td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
+</tr>
+<tr>
+<td>D232</td>
+<td><strong>The engine facade gets a public method that starts the MCP server;</strong> <code>nl2sql mcp</code> calls it. The server stays in <code>nl2sql/mcp/</code>.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#17-repository-layout-the-ui-and-the-cli-app">Layout</a></td>
+</tr>
+<tr>
+<td>D233</td>
+<td><strong>One two-stage Dockerfile at the repository root:</strong> stage one builds <code>nl2sql-ui</code>, stage two is the API image. It moves from <code>packages/api/Dockerfile</code>; the three workflows that name it change with it. The Space's <code>deploy/huggingface/Dockerfile</code> stays its own file.</td>
+<td>decided by owner 2026-10-30</td>
+<td><a href="#the-image">Image</a></td>
 </tr>
 </tbody>
 </table>
@@ -3713,7 +3931,7 @@ describe them.</p>
 </tr>
 <tr>
 <td><strong>The web app</strong></td>
-<td>Served by <code>nl2sql-api</code>; demonstrates every capability: chat with follow-ups and tools, charts, diagrams, reports, clarification, approval, "why this answer", warnings, dashboards, Connect, knowledge and proposals review, corrections, evals, drift. Demo and your-data modes. Porcelain kept.</td>
+<td>One codebase in <code>nl2sql-ui/</code> (D225), served by <code>nl2sql-api</code> and built into its image (D226); demonstrates every capability: chat with follow-ups and tools, charts, diagrams, reports, clarification, approval, "why this answer", warnings, dashboards, Connect, knowledge and proposals review, corrections, evals, drift. Demo and your-data modes. Porcelain kept.</td>
 </tr>
 <tr>
 <td><strong>The hosted demo keeps working</strong></td>
@@ -3725,11 +3943,15 @@ describe them.</p>
 </tr>
 <tr>
 <td><strong>The terminal app</strong></td>
-<td><code>nl2sql chat</code>: conversation, results, charts as text, clarification and approval prompts, demo and your-data modes.</td>
+<td><code>nl2sql chat</code> in the <code>nl2sql-cli</code> distribution (D227): conversation, results, charts as text, clarification and approval prompts, demo and your-data modes.</td>
+</tr>
+<tr>
+<td><strong>A CLI of its own</strong></td>
+<td>The <code>nl2sql</code> command and its subcommands leave the engine for <code>nl2sql-cli</code>, on the facade only (D227).</td>
 </tr>
 <tr>
 <td><strong>No exceptions left</strong></td>
-<td><code>STILL_IMPORTED_FROM_INSIDE</code> is empty and deleted.</td>
+<td><code>STILL_IMPORTED_FROM_INSIDE</code> is empty and deleted, and the whole CLI, not only the demo command, imports only the top-level <code>nl2sql</code> (CL0).</td>
 </tr>
 </tbody>
 </table>
@@ -3775,6 +3997,10 @@ describe them.</p>
 <td>D216</td>
 </tr>
 <tr>
+<td>A second UI codebase (a separate demo or hosted build)</td>
+<td>D225: one codebase, the mode is configuration</td>
+</tr>
+<tr>
 <td>A Kubernetes chart</td>
 <td><code>docs/deployment/kubernetes.md</code> stays prose; Compose is the supported self-host</td>
 </tr>
@@ -3794,13 +4020,19 @@ describe them.</p>
   G --&gt; A["API routes&lt;br/&gt;A1 to A4, one router each"]
   A --&gt; W["Web app&lt;br/&gt;W1 to W4, one area each"]
   DB --&gt; W
-  G --&gt; T["T1. Terminal app"]
+  G --&gt; CL0["CL0. CLI on the facade only"]
+  X1 --&gt; CL1["CL1. CLI extracted&lt;br/&gt;to nl2sql-cli"]
+  CL0 --&gt; CL1
+  CL1 --&gt; CL2["CL2. CLI release and CI"]
+  CL1 --&gt; T["T1. Terminal app"]
+  G --&gt; T
   DA --&gt; K["K1. Image and Compose"]
   W --&gt; X["X1. Cutover, rehearsed&lt;br/&gt;on a scratch Space"]
   K --&gt; X
   X --&gt; R["R1. Owner re-records,&lt;br/&gt;rehearses again"]
   R --&gt; REL["Release"]
-  T --&gt; REL</code></pre>
+  T --&gt; REL
+  CL2 --&gt; REL</code></pre>
 <h2 id="3-the-api-apiv1-at-parity">3. The API: <code>/api/v1</code> at parity</h2>
 <h3 id="route-conventions">Route conventions</h3>
 <table>
@@ -4017,11 +4249,11 @@ terminal app all get it:</p>
    <code>ResultNotFound</code>. <code>engine.traces.get(trace_id, *, user_context=None)</code>
    does the same and returns <code>None</code>.</li>
 <li><code>user_context=None</code> is the trusted in-process operator: it reads any run
-   of the engine's tenant, as <code>nl2sql trace &lt;id&gt;</code> (<code>cli/commands/trace.py</code>)
+   of the engine's tenant, as <code>nl2sql trace &lt;id&gt;</code> (<code>cli/commands/trace.py</code>, <code>nl2sql_cli/commands/trace.py</code> after D227)
    and <code>nl2sql run</code> need, and as Wave A's D24 trusts the context an
    in-process caller passes.</li>
 <li>Every app passes the caller. <code>test_apps_always_pass_the_caller</code> scans
-   <code>nl2sql_api/</code>, <code>nl2sql/mcp/</code> and <code>nl2sql/cli/chat/</code> (AST) for calls of
+   <code>nl2sql_api/</code>, <code>nl2sql/mcp/</code> and <code>nl2sql-cli/src/nl2sql_cli/</code> (AST) for calls of
    <code>results.*</code>, <code>traces.get</code> and <code>results.chart</code> without <code>user_context</code>.</li>
 <li>Wave C's built-in <code>chart</code> tool and dashboard runs pass the tool's or the
    tile's caller (<code>nl2sql/chat_tools/chart.py</code>, <code>nl2sql/dashboards/</code>).</li>
@@ -4829,9 +5061,10 @@ replacing <code>server.py</code>) or <code>python -m nl2sql_api serve</code>:</p
 under <code>/</code> that is not a file answers the page, so the hash router owns
 navigation.</p>
 <h3 id="nl2sql-demo-a-launcher-d211"><code>nl2sql demo</code>, a launcher (D211)</h3>
-<p><code>cli/commands/demo.py</code> shrinks to about 40 lines. It checks that <code>nl2sql_api</code>
-is installed (<code>importlib.util.find_spec</code>), else prints
-<code>pip install "nl2sql-engine[demo]"</code> and exits 1. It then starts
+<p><code>cli/commands/demo.py</code> (X1 shrinks it where it is; CL1 then moves it to
+<code>nl2sql_cli/commands/demo.py</code>, D227) is about 40 lines. It checks that
+<code>nl2sql_api</code> is installed (<code>importlib.util.find_spec</code>), else prints
+<code>pip install "nl2sql-cli[web]"</code> and exits 1. It then starts
 <code>[sys.executable, "-m", "nl2sql_api", "serve", "--demo", ...]</code> with
 <code>subprocess.Popen</code>, opens the browser unless <code>--no-browser</code>, and waits; a
 <code>KeyboardInterrupt</code> is forwarded to the child (<code>CTRL_BREAK_EVENT</code> on
@@ -4841,13 +5074,16 @@ and the limits are gone from it (the Space runs <code>nl2sql-api serve</code>
 directly), and so are <code>--record</code>, <code>--api-key</code> and <code>--allow-settings</code>, with
 no alias: recording is a script, a key is typed into the page or put in
 <code>.env</code>, and the settings gate is D205's loopback rule.</p>
-<p>The engine's <code>pyproject.toml</code> replaces <code>demo = ["fastapi", "uvicorn"]</code> with
+<p>X1 replaces the engine's <code>demo = ["fastapi", "uvicorn"]</code> with
 <code>demo = ["nl2sql-api~=X.Y.Z"]</code> (the release-please version marker, as
-<code>nl2sql-api</code> pins the engine), and drops the package data for
-<code>nl2sql.cli.demo</code> and <code>nl2sql.cli.demo.playground</code>. The two distributions
-now depend on each other; <code>publish_pypi.yaml</code> uploads <code>nl2sql-api</code> before
-or with the engine, so <code>pip install "nl2sql-engine[demo]"</code> never resolves
-in between, and <code>docs/development/releasing.md</code> says so. The recordings
+<code>nl2sql-api</code> pins the engine) and drops the package data for
+<code>nl2sql.cli.demo</code> and <code>nl2sql.cli.demo.playground</code>; between X1 and CL1 the
+engine and the API depend on each other, so <code>publish_pypi.yaml</code> uploads
+<code>nl2sql-api</code> before or with the engine and <code>docs/development/releasing.md</code>
+says so. CL1 replaces the engine's extra with the <code>web</code> extra of
+<code>nl2sql-cli</code> (D231): the dependencies then run one way (<code>nl2sql-cli[web]</code> to <code>nl2sql-api</code> to
+<code>nl2sql-engine</code> to <code>nl2sql-sdk</code>), the engine has no <code>demo</code> extra, and the
+upload-order rule is no longer needed. The recordings
 move to <code>nl2sql/datasets/recordings/</code>, beside the sample databases they
 answer. Wave C's <code>nl2sql launch</code> ends by printing a command that serves the
 project; that line becomes <code>nl2sql-api serve --config DIR/nl2sql.yaml</code>.</p>
@@ -4959,7 +5195,8 @@ project; that line becomes <code>nl2sql-api serve --config DIR/nl2sql.yaml</code
 </tbody>
 </table>
 <p><code>deploy/huggingface/Dockerfile</code> installs <code>nl2sql-engine[demo]</code> (which brings
-<code>nl2sql-api</code>), builds the demo project and index as today, and runs
+<code>nl2sql-api</code>; <code>nl2sql-cli[web]</code>, once CL1 has moved the CLI), builds the demo
+project and index as today, and runs
 <code>nl2sql-api serve --demo --hosted --dir /home/demo/demo --host 0.0.0.0 --port
 $PORT ...</code>. Its healthcheck and <code>scripts/fresh_install_check.py</code> move to
 <code>/api/v1/health</code>, <code>/api/v1/meta</code>, <code>/api/v1/datasources/{id}/schema</code> (with a
@@ -4976,7 +5213,7 @@ scratch Space before the release (<a href="#14-pr-plan">X1</a>).</p>
   end
   C --&gt;|"JSON, SSE"| API["nl2sql-api /api/v1"]
   API --&gt; F["NL2SQL facade"]
-  T["nl2sql chat (Textual)"] --&gt; F</code></pre>
+  T["nl2sql-cli: nl2sql chat (Textual)"] --&gt; F</code></pre>
 <table>
 <thead>
 <tr>
@@ -4987,7 +5224,11 @@ scratch Space before the release (<a href="#14-pr-plan">X1</a>).</p>
 <tbody>
 <tr>
 <td><strong>Where</strong></td>
-<td><code>web/app/</code> (renamed from <code>web/playground/</code>, D216). <code>npm run build</code> writes <code>packages/api/src/nl2sql_api/web/static/</code>, committed, so <code>pip install nl2sql-api</code> needs no Node. The single-file plugin goes (D214): the build is <code>index.html</code> plus hashed chunks, and Mermaid is its own chunk. Until X1, <code>nl2sql demo</code> keeps serving the page already committed in the engine.</td>
+<td><code>nl2sql-ui/</code> at the repository root (D225; renamed from <code>web/playground/</code> by D0b, which leaves no <code>web/</code> folder). The API's Docker image builds it in a Node stage and <code>nl2sql-api</code> serves the result (D226). <code>npm run build</code> writes <code>packages/api/src/nl2sql_api/web/static/</code>, which the image and the wheel both carry (D226), so <code>pip install nl2sql-api</code> needs no Node. The single-file plugin goes (D214): the build is <code>index.html</code> plus hashed chunks, and Mermaid is its own chunk. Until X1, <code>nl2sql demo</code> keeps serving the page already committed in the engine.</td>
+</tr>
+<tr>
+<td><strong>One build, every mode</strong></td>
+<td>Demo, playground and real use are the same code (D225). The mode and what follows from it (the start screen, the hosted limits, whether a visitor may bring a key) arrive in <code>GET /meta</code>; the page reads no environment variable and no build flag. The server derives the mode from the project's config and, in Compose, from environment variables (<code>mode:</code> in the config, <code>NL2SQL_MODE</code> in Compose, D229).</td>
 </tr>
 <tr>
 <td><strong>Transport</strong></td>
@@ -5201,7 +5442,7 @@ no W-PR deletes a file another imports:</p>
 </tr>
 <tr>
 <td>Golden fixtures</td>
-<td><code>web/app/src/api/fixtures/*.json</code>: an <code>ApiError</code> and a <code>Job</code> (D0a), a <code>QueryResult</code> (A1), a <code>Turn</code> and a <code>Dashboard</code> with its run (A2), a <code>Proposal</code> and a <code>DriftReport</code> (A3), a <code>Job</code> with an <code>EvalReport</code> and <code>/meta</code> (A4). Each is written by that PR's route test from a real response, and <code>test_web_fixtures_are_current</code> fails when one is stale, as <code>openapi.json</code>'s test does. <code>turns.js</code>, <code>chart.js</code>, <code>status.js</code> and the other node tests read them.</td>
+<td><code>nl2sql-ui/src/api/fixtures/*.json</code>: an <code>ApiError</code> and a <code>Job</code> (D0a), a <code>QueryResult</code> (A1), a <code>Turn</code> and a <code>Dashboard</code> with its run (A2), a <code>Proposal</code> and a <code>DriftReport</code> (A3), a <code>Job</code> with an <code>EvalReport</code> and <code>/meta</code> (A4). Each is written by that PR's route test from a real response, and <code>test_web_fixtures_are_current</code> fails when one is stale, as <code>openapi.json</code>'s test does. <code>turns.js</code>, <code>chart.js</code>, <code>status.js</code> and the other node tests read them.</td>
 </tr>
 <tr>
 <td><code>test_openapi_snapshot_is_current</code></td>
@@ -5223,12 +5464,16 @@ no W-PR deletes a file another imports:</p>
 </table>
 <h2 id="6-docker-compose-self-host">6. Docker Compose self-host</h2>
 <h3 id="the-image">The image</h3>
-<p><code>packages/api/Dockerfile</code>, one image (D213):</p>
+<p><code>Dockerfile</code> at the repository root (D233), one image (D213):</p>
 <ul>
 <li><code>python:3.12-slim</code>; Microsoft's package repository for <code>msodbcsql18</code> and
   <code>unixodbc</code> with <code>ACCEPT_EULA=Y</code>;</li>
 <li><code>nl2sql-engine[postgres,mysql,mssql,duckdb,anthropic]</code> and <code>nl2sql-api</code>
   from the repository;</li>
+<li>a first stage on a Node image that runs <code>npm ci</code> and <code>npm run build</code> in
+  <code>nl2sql-ui/</code> and copies the build into the image, where the API serves it
+  (D226; the build context is the repository root, as for the Python
+  layers);</li>
 <li>the three sample databases, written at build time by <code>nl2sql init --demo
   /opt/nl2sql/samples</code>, and the local embedding model fetched into the
   image's cache, as the Space's image does;</li>
@@ -5239,14 +5484,14 @@ no W-PR deletes a file another imports:</p>
 </ul>
 <p><code>test.yml</code>'s <code>api-image</code> job builds it for <code>linux/amd64</code>, imports both
 packages, runs <code>pyodbc.drivers()</code> to see the SQL Server driver, and records
-the image size in the job summary. K1 checks the arm64 package before any
+the image size in the job summary, and <code>GET /</code> answers the built page. K1 checks the arm64 package before any
 arm64 image is published (D213).</p>
 <h3 id="deploycompose"><code>deploy/compose/</code></h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="c1"># deploy/compose/docker-compose.yml (shape)</span>
 <a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a><span class="nt">services</span><span class="p">:</span>
 <a href="#__codelineno-7-3" id="__codelineno-7-3" name="__codelineno-7-3"></a><span class="w">  </span><span class="nt">api</span><span class="p">:</span>
 <a href="#__codelineno-7-4" id="__codelineno-7-4" name="__codelineno-7-4"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nl2sql-api:local</span>
-<a href="#__codelineno-7-5" id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> context</span><span class="p">:</span><span class="w"> </span><span class="nv">../..</span><span class="p p-Indicator">,</span><span class="nt"> dockerfile</span><span class="p">:</span><span class="w"> </span><span class="nv">packages/api/Dockerfile</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a href="#__codelineno-7-5" id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> context</span><span class="p">:</span><span class="w"> </span><span class="nv">../..</span><span class="p p-Indicator">,</span><span class="nt"> dockerfile</span><span class="p">:</span><span class="w"> </span><span class="nv">Dockerfile</span><span class="w"> </span><span class="p p-Indicator">}</span>
 <a href="#__codelineno-7-6" id="__codelineno-7-6" name="__codelineno-7-6"></a><span class="w">    </span><span class="nt">env_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span>
 <a href="#__codelineno-7-7" id="__codelineno-7-7" name="__codelineno-7-7"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">"./config:/etc/nl2sql:ro"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"nl2sql-data:/data"</span><span class="w"> </span><span class="p p-Indicator">]</span>
 <a href="#__codelineno-7-8" id="__codelineno-7-8" name="__codelineno-7-8"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">"8000:8000"</span><span class="w"> </span><span class="p p-Indicator">]</span>
@@ -5282,8 +5527,8 @@ arm64 image is published (D213).</p>
 <td>One datasource, <code>/opt/nl2sql/samples/data/chinook.sqlite</code> from the image, so the stack answers after one index command; the docs show replacing it with a PostgreSQL datasource.</td>
 </tr>
 <tr>
-<td><strong>Keys</strong></td>
-<td><code>.env.example</code> lists the provider key and <code>NL2SQL_DATA_DIR</code>; <code>.env</code> is git-ignored.</td>
+<td><strong>Keys and mode</strong></td>
+<td><code>.env.example</code> lists the provider key, <code>NL2SQL_DATA_DIR</code> and <code>NL2SQL_MODE</code> (D229; it overrides the config file's <code>mode:</code>); <code>.env</code> is git-ignored.</td>
 </tr>
 <tr>
 <td><strong>TLS</strong></td>
@@ -5307,11 +5552,11 @@ upgrading.</p>
 <tbody>
 <tr>
 <td><strong>Where</strong></td>
-<td><code>nl2sql/cli/chat/</code> (<code>app.py</code>, <code>widgets.py</code>, <code>charts.py</code>), the command in <code>cli/commands/chat.py</code>, which imports the app lazily and prints <code>pip install "nl2sql-engine[tui]"</code> when Textual is missing. <code>import nl2sql</code> still loads no <code>textual</code> (the existing test).</td>
+<td><code>nl2sql-cli/src/nl2sql_cli/chat/</code> (<code>app.py</code>, <code>widgets.py</code>, <code>charts.py</code>), the command in <code>nl2sql_cli/commands/chat.py</code>, which imports the app lazily (so <code>nl2sql index</code> does not load Textual) (D227; Textual is a normal dependency, D231, so there is no install hint to print). It lives in the CLI distribution, not the engine. <code>import nl2sql</code> still loads no <code>textual</code> (the existing test).</td>
 </tr>
 <tr>
 <td><strong>Facade only</strong></td>
-<td><code>nl2sql/cli/chat/</code> imports only the top-level <code>nl2sql</code> and <code>textual</code>. The caller is <code>UserContext(user_id=--user or the OS user, roles=[--as or policies.default_role])</code>, passed to every call (D204).</td>
+<td><code>nl2sql_cli/chat/</code> imports only the top-level <code>nl2sql</code> and <code>textual</code>, like the rest of <code>nl2sql_cli</code> (D227); it does not import <code>nl2sql_sdk</code>. The caller is <code>UserContext(user_id=--user or the OS user, roles=[--as or policies.default_role])</code>, passed to every call (D204).</td>
 </tr>
 <tr>
 <td><strong>Layout</strong></td>
@@ -5347,7 +5592,7 @@ upgrading.</p>
 </tr>
 <tr>
 <td><strong>Tests</strong></td>
-<td>Textual's <code>App.run_test()</code> pilot over an engine with the fake LLM from <code>nl2sql.testing</code>: <code>test_chat_streams_a_turn_and_shows_rows</code>, <code>test_follow_up_shows_the_rewritten_question</code>, <code>test_chart_tool_draws_sparklines_for_a_line</code>, <code>test_bar_chart_text_has_one_row_per_category</code>, <code>test_clarification_pick_asks_with_choice</code>, <code>test_approver_can_approve_and_retry</code>, <code>test_demo_mode_answers_from_recordings</code>, <code>test_chat_imports_only_the_public_nl2sql</code> (architecture), <code>test_importing_nl2sql_loads_no_textual</code> (existing).</td>
+<td>In <code>nl2sql-cli/tests/</code>, Textual's <code>App.run_test()</code> pilot over an engine with the fake LLM from <code>nl2sql.testing</code>: <code>test_chat_streams_a_turn_and_shows_rows</code>, <code>test_follow_up_shows_the_rewritten_question</code>, <code>test_chart_tool_draws_sparklines_for_a_line</code>, <code>test_bar_chart_text_has_one_row_per_category</code>, <code>test_clarification_pick_asks_with_choice</code>, <code>test_approver_can_approve_and_retry</code>, <code>test_demo_mode_answers_from_recordings</code>, <code>test_the_cli_imports_only_the_public_nl2sql</code> (architecture, over all of <code>nl2sql_cli</code>), <code>test_importing_nl2sql_loads_no_textual</code> (existing).</td>
 </tr>
 </tbody>
 </table>
@@ -5617,7 +5862,7 @@ work, so it does not repeat them.</p>
 </tr>
 <tr>
 <td>Extras</td>
-<td>Engine: <code>demo = ["nl2sql-api~=X.Y.Z"]</code>, <code>tui = ["textual&gt;=0.80"]</code>. <code>nl2sql-api</code>: none.</td>
+<td>None added. The engine's <code>demo = ["nl2sql-api~=X.Y.Z"]</code> goes at CL1; <code>nl2sql-cli</code> gains <code>web = ["nl2sql-api~=X.Y.Z"]</code> and depends on <code>textual&gt;=0.80</code> (D231).</td>
 </tr>
 </tbody>
 </table>
@@ -5764,7 +6009,7 @@ lists the gaps, each a facade change with its PR.</p>
 <tbody>
 <tr>
 <td>The REST API, the playground and <code>nl2sql demo</code> import only the top-level <code>nl2sql</code></td>
-<td><code>STILL_IMPORTED_FROM_INSIDE</code> is emptied and deleted (X1); the playground is gone; <code>cli/commands/demo.py</code> imports nothing from the engine but <code>nl2sql</code> and <code>nl2sql.cli</code>. The test covers <code>nl2sql_api/</code>, <code>cli/commands/demo.py</code> and <code>nl2sql/cli/chat/</code>.</td>
+<td><code>STILL_IMPORTED_FROM_INSIDE</code> is emptied and deleted (X1); the playground is gone; <code>cli/commands/demo.py</code> imports nothing from the engine but <code>nl2sql</code> and <code>nl2sql.cli</code>. The test covers <code>nl2sql_api/</code>, <code>cli/commands/demo.py</code> and <code>nl2sql/cli/chat/</code> at X1; CL0 widens it to the whole CLI and CL1 repoints it at <code>nl2sql-cli/src/nl2sql_cli/</code> (<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).</td>
 </tr>
 <tr>
 <td>New: the engine never imports <code>nl2sql_api</code></td>
@@ -5779,16 +6024,20 @@ lists the gaps, each a facade change with its PR.</p>
 <td><code>routes.test.js</code> (D200, D217)</td>
 </tr>
 <tr>
-<td>New: only <code>nl2sql/cli/chat/</code> imports <code>textual</code></td>
-<td>Added to the boundary test; <code>import nl2sql</code> loads no <code>textual</code> (existing)</td>
+<td>New: only <code>nl2sql_cli/chat/</code> imports <code>textual</code></td>
+<td>Added to the boundary test by T1, which scans <code>nl2sql-cli/src</code>; <code>import nl2sql</code> loads no <code>textual</code> (existing)</td>
 </tr>
 <tr>
 <td>The <code>.env</code> entry points</td>
-<td><code>ENTRY_POINTS_LOADING_DOTENV</code> drops <code>cli/commands/demo.py</code> (the launcher loads nothing; its child does) and replaces <code>api/src/nl2sql_api/main.py</code> with <code>api/src/nl2sql_api/serve.py</code>. <code>READS_THE_ENVIRONMENT</code> is unchanged: <code>--hosted</code>'s key check calls <code>nl2sql.provider_keys_in_environment()</code>, which reads inside <code>llm/</code>.</td>
+<td><code>ENTRY_POINTS_LOADING_DOTENV</code> drops <code>cli/commands/demo.py</code> (the launcher loads nothing; its child does) and replaces <code>api/src/nl2sql_api/main.py</code> with <code>api/src/nl2sql_api/serve.py</code>. CL1 then repoints every <code>nl2sql/src/nl2sql/cli/...</code> path in <code>ENTRY_POINTS_LOADING_DOTENV</code>, <code>READS_THE_ENVIRONMENT</code> and <code>PERSONS_FILE_WRITERS</code> at <code>nl2sql-cli/src/nl2sql_cli/...</code>. <code>READS_THE_ENVIRONMENT</code> is unchanged: <code>--hosted</code>'s key check calls <code>nl2sql.provider_keys_in_environment()</code>, which reads inside <code>llm/</code>.</td>
 </tr>
 <tr>
 <td>Only <code>nl2sql/mcp/</code>, <code>nl2sql/cli/demo/</code> and <code>cli/commands/demo.py</code> import Starlette or Uvicorn (Wave C)</td>
 <td><code>nl2sql/cli/demo/</code> is deleted and the launcher imports neither; the engine imports them only in <code>nl2sql/mcp/</code></td>
+</tr>
+<tr>
+<td>The CLI moves out of the engine (D227)</td>
+<td>The CLI rules change in CL0 and CL1: <a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a> lists them one by one.</td>
 </tr>
 <tr>
 <td><em>Only an Accept Writes a Person's File</em> (Wave B, amended by Wave C)</td>
@@ -5876,10 +6125,17 @@ uses a key.</p>
   D0b --&gt; W3
   A4 --&gt; W4["W4. Evals, Settings, Home, Pipeline, Retrieval"]
   D0b --&gt; W4
-  G1 --&gt; T1["T1. nl2sql chat"]
+  G1 --&gt; T1["T1. nl2sql chat, in nl2sql-cli"]
   G2 --&gt; T1
   G3 --&gt; T1
+  G2 --&gt; CL0["CL0. CLI on the facade only"]
+  G3 --&gt; CL0
+  X1 --&gt; CL1["CL1. CLI extracted to nl2sql-cli"]
+  CL0 --&gt; CL1
+  CL1 --&gt; CL2["CL2. CLI release and CI"]
+  CL1 --&gt; T1
   D0a --&gt; K1["K1. Image and Compose"]
+  D0b --&gt; K1
   W1 --&gt; X1["X1. Cutover, rehearsed"]
   W2 --&gt; X1
   W3 --&gt; X1
@@ -5887,7 +6143,8 @@ uses a key.</p>
   K1 --&gt; X1
   X1 --&gt; R1["R1. Owner: re-record, rehearse, browser pass"]
   R1 --&gt; REL["Release"]
-  T1 --&gt; REL</code></pre>
+  T1 --&gt; REL
+  CL2 --&gt; REL</code></pre>
 <table>
 <thead>
 <tr>
@@ -5918,10 +6175,10 @@ uses a key.</p>
 </tr>
 <tr>
 <td>D0b</td>
-<td><strong>Web foundation.</strong> <code>git mv web/playground web/app</code>; <code>src/lib/</code> and <code>src/components/</code> (the ownership table in section 5); <code>src/api/http.js</code> and its tests; <code>src/api/routes.test.js</code> (reads every <code>src/api/*.js</code>); the shell <code>App.jsx</code> with lazy page stubs and the router's new routes; <code>outputs/Output.jsx</code> (stub), <code>components/JobProgress.jsx</code>; <code>styles.css</code> split into <code>styles/*.css</code> by moving rules; Vite output to <code>packages/api/src/nl2sql_api/web/static/</code> without the single-file plugin; <code>packages/api/pyproject.toml</code> (package data for <code>web/</code>); <code>test.yml</code> (the job's path).</td>
+<td><strong>Web foundation.</strong> <code>git mv web/playground nl2sql-ui</code> (D225); <code>src/lib/</code> and <code>src/components/</code> (the ownership table in section 5); <code>src/api/http.js</code> and its tests; <code>src/api/routes.test.js</code> (reads every <code>src/api/*.js</code>); the shell <code>App.jsx</code> with lazy page stubs and the router's new routes; <code>outputs/Output.jsx</code> (stub), <code>components/JobProgress.jsx</code>; <code>styles.css</code> split into <code>styles/*.css</code> by moving rules; Vite output to <code>packages/api/src/nl2sql_api/web/static/</code> without the single-file plugin; <code>packages/api/pyproject.toml</code> (package data for <code>web/</code>); <code>test.yml</code> (the job's path).</td>
 <td>CI0, D0a</td>
 <td><code>http.test.js</code> (envelope, identity and key headers), <code>sse.test.js</code> (split frames, heartbeats), <code>router.test.js</code> (new routes), <code>styles.test.js</code> (unchanged tokens after the split), every existing test still green after its move</td>
-<td><code>web/app/README.md</code></td>
+<td><code>nl2sql-ui/README.md</code></td>
 <td></td>
 </tr>
 <tr>
@@ -5985,7 +6242,7 @@ uses a key.</p>
 <td><strong>Chat.</strong> Files: <code>src/pages/Chat.jsx</code>, <code>src/chat/</code> (<code>Transcript.jsx</code>, <code>Turn.jsx</code>, <code>Composer.jsx</code>, <code>Clarify.jsx</code>, <code>Approval.jsx</code>, <code>WhyPanel.jsx</code>, <code>Warnings.jsx</code>, <code>Correction.jsx</code>, <code>turns.js</code>, <code>spine.js</code>, <code>Feedback.jsx</code> and <code>feedback.js</code> moved), <code>src/pages/Approvals.jsx</code>, <code>src/api/chat.js</code>, <code>styles/chat.css</code>; delete <code>AskParts.jsx</code>, <code>Panes.jsx</code>, <code>stream.js</code> and their tests.</td>
 <td>A1, A2, D0b</td>
 <td><code>turns.test.js</code> (from the <code>Turn</code> fixtures: rewritten, <code>needs_clarification</code>, <code>needs_approval</code>, tool), <code>spine.test.js</code> (Wave A's event names fill the spine), <code>clarify.test.js</code>, <code>why.test.js</code> (explanation sections, the planner note labelled), <code>warnings.test.js</code></td>
-<td>new <code>apps/web.md</code> (with its nav entry), <code>web/app/README.md</code></td>
+<td>new <code>apps/web.md</code> (with its nav entry), <code>nl2sql-ui/README.md</code></td>
 <td></td>
 </tr>
 <tr>
@@ -6013,18 +6270,42 @@ uses a key.</p>
 <td></td>
 </tr>
 <tr>
+<td>CL0</td>
+<td><strong>CLI on the facade only.</strong> Done in place, before the move: the whole CLI (not only the demo command) imports only the top-level <code>nl2sql</code>, so CL1 is a rename. Each internal import the CLI has today becomes a facade method or export (the list is in section 17); the engine's <code>nl2sql.config</code> helpers, the provider catalogue, the MCP server's start and the model types the commands print are the bulk. Files: the CLI commands that import them, <code>public_api.py</code>, <code>nl2sql/__init__.py</code>, <code>tests/architecture/test_boundaries.py</code> (the rule widened to <code>nl2sql/cli/</code>). Sized to one PR; split by area (config and init, then the rest) if the audit passes 1,000 changed lines.</td>
+<td>G2, G3</td>
+<td><code>test_the_cli_imports_only_the_public_nl2sql</code> (fails on today's list, passes at the end), one test per new facade method</td>
+<td><code>invariants.md</code> (the CLI rule), <code>CLAUDE.md</code></td>
+<td></td>
+</tr>
+<tr>
+<td>CL1</td>
+<td><strong>Extract the CLI.</strong> <code>git mv packages/nl2sql/src/nl2sql/cli nl2sql-cli/src/nl2sql_cli</code> (after X1 has deleted <code>cli/demo/playground</code>), imports rewritten from <code>nl2sql.cli</code> to <code>nl2sql_cli</code>; <code>nl2sql-cli/pyproject.toml</code> (distribution <code>nl2sql-cli</code>, imports <code>nl2sql-engine</code> only and depends on it and on <code>textual</code>, <code>[project.scripts] nl2sql = "nl2sql_cli.main:main"</code>, the <code>web</code> extra <code>nl2sql-api~=X.Y.Z</code> with the release-please marker, D231); the <code>nl2sql</code> script and the <code>demo</code> and <code>tui</code> extras removed from <code>packages/nl2sql/pyproject.toml</code>; <code>packages/nl2sql/tests/cli/</code> moved to <code>nl2sql-cli/tests/</code>; <code>test_boundaries.py</code> repointed (section 17). Mostly renames.</td>
+<td>X1, CL0</td>
+<td><code>test_nl2sql_command_is_installed_by_nl2sql_cli</code>, <code>test_the_engine_has_no_cli_package</code>, <code>test_the_engine_and_the_api_never_import_nl2sql_cli</code>, <code>test_nl2sql_cli_imports_only_the_engine</code>, every moved CLI test green in its new place</td>
+<td><code>README.md</code>, <code>packages/nl2sql/README.md</code>, new <code>nl2sql-cli/README.md</code>, <code>getting_started/index.md</code>, <code>CLAUDE.md</code>, <code>invariants.md</code></td>
+<td></td>
+</tr>
+<tr>
+<td>CL2</td>
+<td><strong>CLI release and CI.</strong> <code>release-please-config.json</code> (a fourth <code>generic</code> updater for <code>nl2sql-cli/pyproject.toml</code>, with the marker on its version and on its <code>nl2sql-engine</code> pin); <code>.github/workflows/test.yml</code> (the <code>test</code>, <code>integration</code> and <code>eval-gates</code> installs gain <code>-e nl2sql-cli</code>; the <code>build</code> loop; a <code>cli</code> job for the moved tests if the main job should not run them; <code>fresh-install</code> installs four wheels); <code>publish_pypi.yaml</code> (the <code>build</code> loop, the <code>pypi</code> job's upload step and order, <code>pypi-smoke</code>); <code>docs/development/releasing.md</code>; <code>CONTRIBUTING.md</code>.</td>
+<td>CL1</td>
+<td><code>test_packaging_metadata.py</code> extended: the fourth pyproject carries the release-please marker and pins the engine; <code>test_publish_uploads_four_distributions</code></td>
+<td><code>releasing.md</code>, <code>CONTRIBUTING.md</code>, <code>deployment/</code> install lines</td>
+<td></td>
+</tr>
+<tr>
 <td>T1</td>
-<td><strong><code>nl2sql chat</code>.</strong> Files: <code>nl2sql/cli/chat/</code> (new: <code>app.py</code>, <code>widgets.py</code>, <code>charts.py</code>), <code>cli/commands/chat.py</code> (new), <code>cli/main.py</code>, <code>pyproject.toml</code> (<code>tui</code> extra), <code>tests/architecture/test_boundaries.py</code> (<code>textual</code> only in <code>cli/chat/</code>; <code>cli/chat/</code> imports only <code>nl2sql</code>).</td>
-<td>G1, G2, G3</td>
-<td>The pilot tests in section 7</td>
+<td><strong><code>nl2sql chat</code>.</strong> Files: <code>nl2sql-cli/src/nl2sql_cli/chat/</code> (new: <code>app.py</code>, <code>widgets.py</code>, <code>charts.py</code>), <code>nl2sql_cli/commands/chat.py</code> (new), <code>nl2sql_cli/main.py</code>, <code>nl2sql-cli/pyproject.toml</code> (<code>textual&gt;=0.80</code> as a normal dependency, D231), <code>tests/architecture/test_boundaries.py</code> (<code>textual</code> only in <code>nl2sql_cli/chat/</code>).</td>
+<td>G1, G2, G3, CL1</td>
+<td>The pilot tests in section 7, in <code>nl2sql-cli/tests/</code></td>
 <td>new <code>apps/terminal.md</code> (with its nav entry), <code>getting_started/index.md</code></td>
 <td></td>
 </tr>
 <tr>
 <td>K1</td>
-<td><strong>Image and Compose.</strong> Files: <code>packages/api/Dockerfile</code> (ODBC, all adapters, the samples and the embedding model, non-root, <code>serve</code>, healthcheck), <code>deploy/compose/</code> (new: <code>docker-compose.yml</code>, <code>config/</code>, <code>.env.example</code>, <code>README.md</code>), <code>.github/workflows/test.yml</code> (<code>api-image</code>: driver check and size), <code>tests/unit/test_docker_images.py</code>. The arm64 check for <code>msodbcsql18</code> is recorded in the PR.</td>
-<td>D0a</td>
-<td><code>test_compose_file_shape</code>, <code>test_api_image_runs_one_worker</code>, <code>test_api_image_healthcheck_is_ready</code>, <code>test_compose_example_config_uses_api_keys</code>, the image job's <code>pyodbc.drivers()</code> check</td>
+<td><strong>Image and Compose.</strong> Files: <code>Dockerfile</code> at the repository root, moved from <code>packages/api/Dockerfile</code> (D233; stage one builds <code>nl2sql-ui</code>, stage two is the API image serving it and installing <code>nl2sql-cli</code>, D226 and D230; ODBC, all adapters, the samples and the embedding model, non-root, <code>serve</code>, healthcheck), <code>.dockerignore</code> (<code>nl2sql-ui/node_modules</code>), <code>deploy/compose/</code> (new: <code>docker-compose.yml</code>, <code>config/</code>, <code>.env.example</code>, <code>README.md</code>), <code>.github/workflows/test.yml</code> (<code>api-image</code>: driver check, size and <code>GET /</code> answering the page), <code>tests/unit/test_docker_images.py</code>. The arm64 check for <code>msodbcsql18</code> is recorded in the PR.</td>
+<td>D0a, D0b</td>
+<td><code>test_compose_file_shape</code>, <code>test_api_image_runs_one_worker</code>, <code>test_api_image_healthcheck_is_ready</code>, <code>test_api_image_builds_the_ui_in_a_node_stage</code>, <code>test_compose_example_config_uses_api_keys</code>, the image job's <code>pyodbc.drivers()</code> check</td>
 <td>new <code>deployment/compose.md</code> (with its nav entry), <code>deployment/docker.md</code>, <code>deployment/architecture.md</code></td>
 <td></td>
 </tr>
@@ -6078,13 +6359,18 @@ uses a key.</p>
 </tr>
 <tr>
 <td>5</td>
-<td>T1, K1</td>
-<td></td>
+<td>K1, CL0</td>
+<td>CL0 needs only G2 and G3 and may start earlier if a slot is free</td>
 </tr>
 <tr>
 <td>6</td>
 <td>X1</td>
-<td>Then R1 by the owner, then the release</td>
+<td>Then R1 by the owner, then the release; CL1 may proceed beside R1</td>
+</tr>
+<tr>
+<td>7</td>
+<td>CL1, then CL2 and T1</td>
+<td>The CLI leaves the engine only after the cutover has deleted the playground (D231)</td>
 </tr>
 </tbody>
 </table>
@@ -6095,15 +6381,19 @@ uses a key.</p>
 <li><code>api/query_api.py</code>: G2's <code>llm_override</code> and G3's stored requests and ids,
   in separate functions; <code>nl2sql/conversations/api.py</code>: G2's
   <code>llm_override</code>, G3's <code>retry</code> ids.</li>
-<li><code>packages/api/openapi.json</code> and <code>web/app/src/api/fixtures/</code>: every A-PR
+<li><code>packages/api/openapi.json</code> and <code>nl2sql-ui/src/api/fixtures/</code>: every A-PR
   regenerates them. The A-PRs merge one at a time; each rebases and
   regenerates with the command <code>test_openapi_snapshot_is_current</code> prints,
   and each writes only its own fixture files.</li>
-<li>The engine's <code>pyproject.toml</code>: G2's package data, T1's extra, X1's <code>demo</code>
-  extra.</li>
-<li><code>web/app/package.json</code>: W2 adds <code>mermaid</code>; nobody else adds a dependency.</li>
-<li><code>.github/workflows/test.yml</code>: CI0, then D0b's path change, then K1's
-  image job; never in the same wave.</li>
+<li>The engine's <code>pyproject.toml</code>: G2's package data, X1's <code>demo</code> extra, then
+  CL1's removal of the <code>nl2sql</code> script and the <code>demo</code> extra.</li>
+<li><code>nl2sql-ui/package.json</code>: W2 adds <code>mermaid</code>; nobody else adds a dependency.</li>
+<li><code>.github/workflows/test.yml</code>: CI0, then D0b's path change (<code>web/playground</code>
+  to <code>nl2sql-ui</code>), then K1's image job, then CL2's installs; never in the same
+  wave.</li>
+<li><code>packages/nl2sql/tests/architecture/test_boundaries.py</code>: CL0 widens the CLI
+  rule, X1 empties <code>STILL_IMPORTED_FROM_INSIDE</code>, CL1 repoints the paths, T1
+  adds the <code>textual</code> rule; in that order.</li>
 </ul>
 <h2 id="15-release">15. Release</h2>
 <ul>
@@ -6114,8 +6404,9 @@ uses a key.</p>
   <code>/llm/{agent}</code> among them, no aliases), the error envelope, <code>api.auth</code>
   replacing <code>role_header</code>, <code>role</code> and <code>trust_body_role</code>, results bound to
   their asker (ownerless old results), <code>feedback.record</code>'s new signature,
-  <code>nl2sql demo</code>'s removed flags, the engine's <code>demo</code> extra now installing
-  <code>nl2sql-api</code>, the state store's new version, the API starting when a
+  <code>nl2sql demo</code>'s removed flags, the <code>nl2sql</code> command and the <code>demo</code> extra
+  moving from <code>nl2sql-engine</code> to the new <code>nl2sql-cli</code> distribution
+  (a plain <code>pip install nl2sql-engine</code> no longer installs the command), the state store's new version, the API starting when a
   required datasource fails, and <code>/ready</code> failing where it used to pass.</li>
 <li>Before tagging, the owner checks the scratch Space (keyless and with a
   key), runs the Compose stack with a key, connects the test bed's
@@ -6125,12 +6416,265 @@ uses a key.</p>
   checked again.</li>
 </ul>
 <h2 id="16-open-questions">16. Open questions</h2>
-<p>None blocking. Every decision above is marked for the owner to confirm.
+<p>No question is open. Every decision from D200 to D224 is marked for the owner to confirm.
 Five are worth a look first, because they change what a user or an
-operator sees: D211 (the <code>web</code> extra moves to the engine's <code>demo</code> extra),
+operator sees: D211 (the <code>web</code> extra becomes the CLI's dependency on <code>nl2sql-api</code>),
 D210 (a key typed into the web app is never saved, locally too), D215
 (approval grants are stored, amending Waves A and C), D221 (what the hosted
-demo leaves on) and D224 (dashboards stay at Wave C's surface).</p>
+demo leaves on) and D224 (dashboards stay at Wave C's surface). The layout
+decisions D225 to D233 are the owner's, made on 2026-10-30 and answering every
+question section 17 raised (<a href="#17-repository-layout-the-ui-and-the-cli-app">section 17</a>).</p>
+<h2 id="17-repository-layout-the-ui-and-the-cli-app">17. Repository layout: the UI and the CLI app</h2>
+<div class="admonition note">
+<p class="admonition-title">Decided by the owner on 2026-10-30</p>
+<p>D225 to D233 are binding. This section says what they change in the
+repository, the boundary test and the release machinery. Nothing here is
+built.</p>
+</div>
+<h3 id="the-layout">The layout</h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a>nl2sql/
+<a href="#__codelineno-9-2" id="__codelineno-9-2" name="__codelineno-9-2"></a>  packages/
+<a href="#__codelineno-9-3" id="__codelineno-9-3" name="__codelineno-9-3"></a>    sdk/         nl2sql-sdk      adapter authors compile against it
+<a href="#__codelineno-9-4" id="__codelineno-9-4" name="__codelineno-9-4"></a>    nl2sql/      nl2sql-engine   the library and the `nl2sql` facade
+<a href="#__codelineno-9-5" id="__codelineno-9-5" name="__codelineno-9-5"></a>    api/         nl2sql-api      REST; serves the built UI (its wheel carries it)
+<a href="#__codelineno-9-6" id="__codelineno-9-6" name="__codelineno-9-6"></a>  nl2sql-ui/                     the one UI (React, Vite); built into the API image and wheel
+<a href="#__codelineno-9-7" id="__codelineno-9-7" name="__codelineno-9-7"></a>  nl2sql-cli/                    nl2sql-cli: the `nl2sql` command and the terminal app
+<a href="#__codelineno-9-8" id="__codelineno-9-8" name="__codelineno-9-8"></a>  Dockerfile                     two stages: build the UI, then the API image (D233)
+</code></pre></div>
+<pre class="mermaid"><code>flowchart LR
+  UI["nl2sql-ui&lt;br/&gt;(in the API image)"] --&gt;|"HTTP, SSE"| API["nl2sql-api"]
+  API --&gt; F["nl2sql facade&lt;br/&gt;(nl2sql-engine)"]
+  CLI["nl2sql-cli"] --&gt; F
+  F --&gt; SDK["nl2sql-sdk"]
+  AD["adapters"] --&gt; SDK</code></pre>
+<p>Every caller reaches the engine through the facade. The UI reaches nothing
+but the API. The SDK is for adapter authors, so the CLI does not import it.</p>
+<h3 id="what-ships-d228">What ships (D228)</h3>
+<table>
+<thead>
+<tr>
+<th>Thing</th>
+<th>Artifact</th>
+<th>Where it lives</th>
+<th>Built on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The engine</td>
+<td><code>nl2sql-engine</code> on PyPI, with <code>nl2sql-sdk</code> for adapter authors</td>
+<td><code>packages/nl2sql/</code>, <code>packages/sdk/</code></td>
+<td>the SDK</td>
+</tr>
+<tr>
+<td>The API image</td>
+<td>The Docker image from the root <code>Dockerfile</code>, with the UI inside; the <code>nl2sql-api</code> wheel carries the same build (D226)</td>
+<td><code>packages/api/</code>, <code>Dockerfile</code></td>
+<td>the engine's facade only</td>
+</tr>
+<tr>
+<td>The CLI app</td>
+<td><code>nl2sql-cli</code> on PyPI: the <code>nl2sql</code> command, <code>nl2sql chat</code></td>
+<td><code>nl2sql-cli/</code></td>
+<td>the engine's facade only</td>
+</tr>
+<tr>
+<td>The UI</td>
+<td>Its own folder, built into the image and the wheel</td>
+<td><code>nl2sql-ui/</code></td>
+<td>the API's <code>/api/v1</code> only</td>
+</tr>
+</tbody>
+</table>
+<h3 id="one-ui-every-mode-d225-d226-d229-d233">One UI, every mode (D225, D226, D229, D233)</h3>
+<ul>
+<li>The mode is configuration (D229): a <code>mode:</code> key in <code>nl2sql.yaml</code> (<code>demo</code>,
+  <code>your_data</code>, <code>hosted</code>), overridden in Compose by <code>NL2SQL_MODE</code>, and reported
+  by <code>GET /meta</code>. The variable is read once, in <code>nl2sql_api serve</code> (the entry
+  point, on the <code>READS_THE_ENVIRONMENT</code> allow-list), and travels in <code>Config</code>.
+  The flags <code>serve --demo</code> and <code>--demo --hosted</code> stay the way a launcher sets
+  it and beat the variable. The page never learns the mode from how it was
+  built.</li>
+<li>One build serves every way of installing (D226). <code>npm run build</code> writes
+  <code>nl2sql_api/web/static/</code>; the image's Node stage and the wheel build run
+  it, so <code>pip install nl2sql-api</code> and the image carry the same page.</li>
+<li>The image is one two-stage <code>Dockerfile</code> at the repository root (D233): a
+  Node stage builds <code>nl2sql-ui</code>, the Python stage is the API image, and it
+  installs <code>nl2sql-cli</code> (D230). The Space image
+  (<code>deploy/huggingface/Dockerfile</code>) stays its own file.</li>
+<li>The UI keeps talking to <code>/api/v1</code> only. Nothing in <code>nl2sql-ui</code> imports
+  or names a Python package.</li>
+</ul>
+<h3 id="the-cli-app-d227-d231-d232">The CLI app (D227, D231, D232)</h3>
+<ul>
+<li><strong>Names.</strong> Distribution <code>nl2sql-cli</code>, import package <code>nl2sql_cli</code>, console
+  command <code>nl2sql</code>: <code>nl2sql = "nl2sql_cli.main:main"</code> under
+  <code>[project.scripts]</code> in <code>nl2sql-cli/pyproject.toml</code>; the engine's
+  <code>pyproject.toml</code> loses its <code>nl2sql = "nl2sql.cli.main:main"</code> line (CL1).</li>
+<li><strong>What moves.</strong> Everything under <code>packages/nl2sql/src/nl2sql/cli/</code> once X1
+  has deleted the playground: <code>main.py</code>, <code>console.py</code>, <code>reporting.py</code>,
+  <code>checks.py</code>, <code>config.py</code>, <code>types.py</code>, <code>common/</code>, the command modules
+  (<code>commands/</code>), the demo launcher and, from T1, <code>chat/</code>. About 3,700
+  lines. Its tests move from <code>packages/nl2sql/tests/cli/</code> to
+  <code>nl2sql-cli/tests/</code>.</li>
+<li><strong>What stays in the engine.</strong> The MCP server (<code>nl2sql/mcp/</code>, Wave C's
+  D126), <code>nl2sql.testing</code> and the recordings. The facade gets a public
+  method that starts the MCP server and <code>nl2sql mcp</code> calls it (D232).</li>
+<li><strong>Dependencies.</strong> <code>nl2sql-cli</code> depends on <code>nl2sql-engine</code> and <code>textual</code>
+  (D231). Its one extra, <code>web</code>, is <code>nl2sql-api</code>, for <code>nl2sql demo</code> and
+  <code>serve</code>. Those commands start the API as a child process
+  (<code>python -m nl2sql_api serve</code>), so <code>nl2sql_cli</code> never imports <code>nl2sql_api</code>
+  and the boundary test forbids it outright. The engine and the API stop
+  depending on each other. The CLI moves after X1 (CL1 follows X1), so the
+  playground never moves and the chat app is built in its final place.</li>
+</ul>
+<h3 id="boundary-rules-that-change">Boundary rules that change</h3>
+<p>Today the CLI lives in the engine (<code>ENGINE / "cli"</code> in
+<code>packages/nl2sql/tests/architecture/test_boundaries.py</code>) and is held to less
+than the API: only <code>cli/commands/demo.py</code> and the playground must import the
+top-level <code>nl2sql</code>; the other commands import <code>nl2sql.config</code>,
+<code>nl2sql.llm.providers</code>, <code>nl2sql.mcp</code> and a dozen more modules, and are held
+only to the "no <code>_runtime</code>" rule.</p>
+<table>
+<thead>
+<tr>
+<th>Rule (test)</th>
+<th>Today</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nothing outside <code>nl2sql/cli/</code> imports the CLI (<code>test_nothing_outside_the_cli_imports_the_cli</code>)</td>
+<td>Scans the engine, the SDK and the API for <code>nl2sql.cli</code></td>
+<td>Becomes "nothing imports <code>nl2sql_cli</code>": the engine, the SDK and the API never name it. <code>nl2sql/cli/</code> must not exist in the engine (CL1). The scan list gains <code>nl2sql-cli/src/nl2sql_cli</code>.</td>
+</tr>
+<tr>
+<td><code>cli.demo</code> never imports <code>cli.commands</code> (<code>test_cli_demo_never_imports_cli_commands</code>)</td>
+<td>Over <code>nl2sql/cli/demo/</code></td>
+<td>Deleted with the playground at X1; the launcher is one command module with nothing to protect.</td>
+</tr>
+<tr>
+<td>The CLI, MCP and the API never touch <code>engine._runtime</code> (<code>test_the_cli_the_playground_and_the_api_use_only_the_public_api</code>)</td>
+<td>Over <code>nl2sql/cli/</code>, <code>nl2sql/mcp/</code>, <code>nl2sql_api/</code></td>
+<td>The first path becomes <code>nl2sql-cli/src/nl2sql_cli</code>. The playground is gone.</td>
+</tr>
+<tr>
+<td>The playground, <code>nl2sql demo</code> and the API import only the top-level <code>nl2sql</code> (<code>test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql</code>)</td>
+<td>Playground, <code>cli/commands/demo.py</code> and the API, with the exceptions in <code>STILL_IMPORTED_FROM_INSIDE</code></td>
+<td>Renamed <code>test_the_cli_and_the_api_import_only_the_public_nl2sql</code>. Covers <strong>all</strong> of <code>nl2sql_cli</code> (CL0 in place, CL1 repoints) and <code>nl2sql_api</code>, with no exception list, and forbids <code>nl2sql_sdk</code> in the CLI.</td>
+</tr>
+<tr>
+<td><code>STILL_IMPORTED_FROM_INSIDE</code></td>
+<td>Six entries</td>
+<td>Emptied and deleted at X1, each entry becoming a facade method (below).</td>
+</tr>
+<tr>
+<td>Only <code>nl2sql/mcp/</code>, <code>nl2sql/cli/demo/</code> and <code>cli/commands/demo.py</code> import Starlette or Uvicorn</td>
+<td>As named</td>
+<td><code>nl2sql/mcp/</code> alone in the engine; the launcher imports neither; <code>nl2sql_cli</code> imports neither.</td>
+</tr>
+<tr>
+<td><code>ENTRY_POINTS_LOADING_DOTENV</code>, <code>READS_THE_ENVIRONMENT</code> (<code>cli/commands/eval.py</code>, <code>launch.py</code>), <code>PERSONS_FILE_WRITERS</code> (<code>_LAUNCH</code>)</td>
+<td>Paths under <code>nl2sql/src/nl2sql/cli/</code></td>
+<td>Paths under <code>nl2sql-cli/src/nl2sql_cli/</code>; the rules themselves are unchanged. The <code>DATABASE_URL</code> rule still names <code>launch.py</code> alone.</td>
+</tr>
+<tr>
+<td><code>import nl2sql</code> loads no <code>textual</code>; only the chat app imports it</td>
+<td>Textual is unused</td>
+<td>Only <code>nl2sql_cli/chat/</code> imports it; <code>FORBIDDEN_AT_IMPORT</code> is unchanged.</td>
+</tr>
+<tr>
+<td><code>PACKAGES</code> and <code>SOURCES</code> in the test</td>
+<td><code>packages/</code> and three source roots</td>
+<td><code>REPO</code> already exists; <code>SOURCES</code> gains the CLI root. The file stays in the engine's tests (it checks the whole repository).</td>
+</tr>
+<tr>
+<td>The dialect scan</td>
+<td>The CLI is exempt (registry knowledge)</td>
+<td>Unchanged; the exemption follows the code.</td>
+</tr>
+</tbody>
+</table>
+<p><code>docs/architecture/invariants.md</code> (its dependency-direction and facade rules)
+and <code>CLAUDE.md</code> (the "Nothing outside <code>nl2sql/cli/</code>" bullet, the facade
+bullet) change in CL0 and CL1, not in this design PR.</p>
+<h3 id="what-becomes-a-facade-method-cl0">What becomes a facade method (CL0)</h3>
+<p>Counted on 2026-10-30 from the <code>nl2sql</code> imports in <code>packages/nl2sql/src/nl2sql/cli/</code>,
+outside the playground. Where Waves A to C or G2 and G3 already give the
+facade the method, the CLI switches to it; otherwise CL0 adds it.</p>
+<table>
+<thead>
+<tr>
+<th>The CLI imports today</th>
+<th>Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nl2sql.llm.providers</code> (5), <code>nl2sql.llm.models</code>, <code>nl2sql.llm.wires.anthropic</code></td>
+<td><code>engine.llm.providers()</code> (G2) and, for the rest, an <code>engine.llm</code> method</td>
+</tr>
+<tr>
+<td><code>nl2sql.config</code> (9), <code>nl2sql.config.writer</code>, <code>nl2sql.config.check</code></td>
+<td><code>init_project</code> and <code>prepare_demo</code> (G2), <code>datasources.save</code> (Wave C), <code>engine.check</code> (G3); the rest named in CL0</td>
+</tr>
+<tr>
+<td><code>STILL_IMPORTED_FROM_INSIDE</code>: <code>llm.request_key</code>, <code>llm.replay</code>, <code>testing.fake_llm</code>, <code>datasets.demo</code></td>
+<td>G2 (<code>llm_override=</code>, the replay provider, <code>DatasourceInfo.sample_questions</code>) and X1 (the playground is deleted)</td>
+</tr>
+<tr>
+<td><code>nl2sql.mcp</code> (2)</td>
+<td>The facade method that starts the MCP server (D232)</td>
+</tr>
+<tr>
+<td><code>nl2sql.knowledge.models</code>, <code>nl2sql.profiler.models</code>, <code>nl2sql.evaluation</code> and <code>.records</code>, <code>nl2sql.tracing.document</code>, <code>nl2sql.registry</code>, <code>nl2sql.common.exceptions</code>, <code>nl2sql.common.logger</code></td>
+<td>Result and error types exported from <code>nl2sql</code>, or the namespace method that returns what the command prints</td>
+</tr>
+</tbody>
+</table>
+<h3 id="where-each-piece-of-release-machinery-goes">Where each piece of release machinery goes</h3>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Today</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Console script <code>nl2sql</code></td>
+<td><code>packages/nl2sql/pyproject.toml</code></td>
+<td><code>nl2sql-cli/pyproject.toml</code> (CL1)</td>
+</tr>
+<tr>
+<td>release-please</td>
+<td><code>release-please-config.json</code>: <code>extra-files</code> for the three package manifests, one version in <code>.release-please-manifest.json</code></td>
+<td>A fourth <code>generic</code> updater for <code>nl2sql-cli/pyproject.toml</code>; the same marker comments; one version for all four (CL2). The UI has no version of its own.</td>
+</tr>
+<tr>
+<td>CI test jobs</td>
+<td><code>test</code>, <code>integration</code>, <code>eval-gates</code> install <code>-e packages/sdk -e packages/nl2sql[...] -e packages/api</code></td>
+<td>Add <code>-e nl2sql-cli</code>; CI0's web job runs on <code>nl2sql-ui</code> from D0b; <code>build</code> loops over four packages; <code>api-image</code> builds the UI stage (K1); <code>fresh-install</code> installs four wheels (CL2)</td>
+</tr>
+<tr>
+<td>PyPI publish</td>
+<td><code>publish_pypi.yaml</code> builds and uploads three</td>
+<td>Four, in dependency order: SDK, engine, API, CLI (CL2)</td>
+</tr>
+<tr>
+<td>Dockerfile that builds the UI</td>
+<td>none</td>
+<td>One two-stage <code>Dockerfile</code> at the repository root, moved from <code>packages/api/Dockerfile</code>; the three workflows that name it change (K1, D233)</td>
+</tr>
+<tr>
+<td>Docs</td>
+<td><code>releasing.md</code> says "three distributions"</td>
+<td>"Four distributions"; <code>CONTRIBUTING.md</code> lists the folders (CL2)</td>
+</tr>
+</tbody>
+</table>
 </article>
 </div>
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
