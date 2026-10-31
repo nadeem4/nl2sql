@@ -8,8 +8,9 @@ design is docs/architecture/wave_a.md, section 7 (D10, D24).
 The engine checks an approval, not the hook: ``approval_problem`` says why
 one does not cover the SQL a hook asked about (the runner calls it at
 ``execute.before``), and ``request_problem`` why one is not this run's at all
-(the run calls it before pinning the approved plan). Nothing is stored; the
-request's ``id`` depends only on its content, so a store can key on it.
+(the run calls it before pinning the approved plan). An ``Approval`` object is not stored or signed; the
+request's ``id`` depends only on its content, so a store can key on it (``engine.approvals`` keeps requests
+and grants by id, and they expire).
 """
 from __future__ import annotations
 
@@ -142,6 +143,8 @@ def approval_problem(approval: Approval, *, hook: str, roles: Sequence[str], que
     if problem:
         return problem
     request = approval.request
+    if approval.by.tenant_id != request.asker_tenant_id:
+        return "its approver is in another tenant"
     if request.hook != hook:
         return f"it is for the hook '{request.hook}'"
     if request.datasource_id != datasource_id:

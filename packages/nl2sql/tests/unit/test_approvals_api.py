@@ -221,3 +221,151 @@ def test_refresh_with_a_granted_id(ctx, approvals):
     approvals.grant(request.id, by=DBA)
 
     assert resolve_refresh_approvals(ctx, [request.id], ANA) == [Approval(request=request, by=DBA)]
+
+
+# ---------------------------------------------------------------- the review's findings (PR #410)
+
+MALLORY = UserContext(user_id="mallory", tenant_id="globex", roles=["dba"])
+
+
+def test_another_tenants_request_is_not_listed_or_grantable(approvals):
+    request = _request()
+    approvals.submit([request])
+
+    assert approvals.list(user_context=MALLORY) == []
+    with pytest.raises(ApprovalNotFound):
+        approvals.grant(request.id, by=MALLORY)
+    with pytest.raises(ApprovalNotFound):
+        approvals.deny(request.id, by=MALLORY)
+
+
+def test_an_approval_from_another_tenant_does_not_cover_the_run():
+    from nl2sql.hooks.approval import approval_problem
+
+    problem = approval_problem(Approval(request=_request(), by=MALLORY), hook="review", roles=["dba"],
+                               question="How many customers?", user=ANA, datasource_id="chinook", sql=SQL,
+                               params=None)
+
+    assert problem and "tenant" in problem
+
+
+def test_callers_with_no_identity_do_not_see_each_others_requests(approvals):
+    nobody = UserContext(roles=["viewer"])
+    approvals.submit([_request(asker=UserContext(roles=["admin"]))])
+
+    assert approvals.list(user_context=nobody) == []
+
+
+def test_a_purged_request_is_not_found_when_decided(approvals, state, monkeypatch):
+    request = _request()
+    approvals.submit([request])
+    monkeypatch.setattr(state, "decide_approval", lambda *a, **k: None)
+
+    with pytest.raises(ApprovalNotFound):
+        approvals.grant(request.id, by=DBA)
+    with pytest.raises(ApprovalNotFound):
+        approvals.deny(request.id, by=DBA)
+
+
+def test_a_grant_with_no_approver_is_waiting_until_an_approver_grants_again(approvals, state):
+    request = _request()
+    approvals.submit([request])
+    state.decide_approval(request.id, "granted", by="dba")  # the crash between the two writes
+    assert "waiting" in approvals.resolve([request.id], user=ANA)[1]
+
+    other = UserContext(user_id="dba2", tenant_id="acme", roles=["dba"])
+    approvals.grant(request.id, by=other)
+
+    resolved, problem = approvals.resolve([request.id], user=ANA)
+    assert problem is None and resolved[0].by == other
+
+
+def test_deny_then_grant_stays_denied(approvals):
+    request = _request()
+    approvals.submit([request])
+    approvals.deny(request.id, by=DBA)
+
+    assert approvals.grant(request.id, by=DBA).status == "denied"
+    assert "denied" in approvals.resolve([request.id], user=ANA)[1]
+
+
+def test_rerun_does_not_reopen_a_denied_request(approvals, state):
+    request = _request()
+    approvals.submit([request])
+    approvals.deny(request.id, by=DBA)
+
+    approvals.submit([request])
+
+    assert state.get_approval(request.id)["status"] == "denied"
+
+
+def test_the_approver_is_not_part_of_what_callers_see(approvals):
+    request = _request()
+    approvals.submit([request])
+    approvals.grant(request.id, by=DBA)
+
+    [record] = approvals.list(user_context=ANA, status="granted")
+
+    assert record.decided_by == "dba" and "approver" not in record.model_dump()
+
+
+def _stream_state(request):
+    error = PipelineError(node="executor", message="needs approval", severity=ErrorSeverity.CRITICAL,
+                          error_code=ErrorCode.NEEDS_APPROVAL)
+    return GraphState(user_query="How many customers?", approvals_needed=[request], user_context=ANA,
+                      errors=[error]).model_dump()
+
+
+def test_stream_stores_its_requests(ctx, state, monkeypatch):
+    from nl2sql.api import query_api
+
+    request = _request()
+    monkeypatch.setattr(query_api, "run_with_graph", lambda *a, **k: _stream_state(request))
+
+    events = list(query_api.QueryAPI(ctx).stream_query("How many customers?", user_context=ANA))
+
+    assert events[-1].name == "run.finished"
+    assert [r["id"] for r in state.list_approvals("pending")] == [request.id]
+
+
+def test_stream_with_an_ungranted_id_ends_approval_not_granted(ctx, monkeypatch):
+    from nl2sql.api import query_api
+
+    monkeypatch.setattr(query_api, "run_with_graph", lambda *a, **k: pytest.fail("the graph must not run"))
+
+    events = list(query_api.QueryAPI(ctx).stream_query("How many customers?", user_context=ANA, approvals=["nope"]))
+
+    result = events[-1].data["result"]
+    assert result["status"] == "error" and result["errors"][0]["error_code"] == "APPROVAL_NOT_GRANTED"
+
+
+def test_stream_with_a_granted_id_passes_the_approval(ctx, approvals, monkeypatch):
+    from nl2sql.api import query_api
+
+    request = _request()
+    approvals.submit([request])
+    approvals.grant(request.id, by=DBA)
+    seen = {}
+
+    def graph(ctx_, question, **kwargs):
+        seen.update(kwargs)
+        return {"trace_id": "t", "user_query": question, "user_context": ANA}
+
+    monkeypatch.setattr(query_api, "run_with_graph", graph)
+
+    list(query_api.QueryAPI(ctx).stream_query("How many customers?", user_context=ANA, approvals=[request.id]))
+
+    assert seen["approvals"] == [Approval(request=request, by=DBA)]
+
+
+def test_refresh_facade_raises_before_any_chart_runs(ctx):
+    from types import SimpleNamespace
+
+    from nl2sql.api.dashboards_api import DashboardsAPI
+
+    api = DashboardsAPI.__new__(DashboardsAPI)
+    api._ctx = ctx
+    api._service = SimpleNamespace(refresh=lambda *a, **k: pytest.fail("no chart may run"))
+
+    with pytest.raises(ApprovalNotFound):
+        api.refresh("d1", user_context=ANA, approvals=["nope"])

@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nl2sql.common.errors import ApprovalNotFound, NotAuthorized
 from nl2sql.hooks.approval import Approval, ApprovalRequest
@@ -28,7 +28,8 @@ class ApprovalRecord(BaseModel):
     created_at: datetime
     updated_at: datetime
     decided_by: Optional[str] = None
-    approver: Optional[UserContext] = None  # who granted, with the roles they held then
+    # Who granted, with the roles they held then: the engine's own record, never shown to callers.
+    approver: Optional[UserContext] = Field(default=None, exclude=True)
     reason: Optional[str] = None  # why it was denied
 
 
@@ -67,13 +68,12 @@ class Approvals:
                 return [], f"There is no approval request '{item}'."
             if self._expired(doc):
                 return [], f"The approval request '{item}' has expired."
-            if doc["status"] == "pending":
+            if doc["status"] == "pending" or (doc["status"] == "granted" and not doc.get("approver")):
                 return [], f"The approval request '{item}' is still waiting for an approver."
             if doc["status"] == "denied":
                 return [], f"The approval request '{item}' was denied."
             record = _record(doc)
-            by = record.approver or UserContext(user_id=record.decided_by)
-            resolved.append(Approval(request=record.request, by=by))
+            resolved.append(Approval(request=record.request, by=record.approver))
         return resolved, None
 
     # -- the people's side ---------------------------------------------------------
@@ -88,9 +88,8 @@ class Approvals:
         """Grant a pending request. ``NotAuthorized`` unless ``by`` holds one of the hook's approver roles;
         ``ApprovalNotFound`` for an unknown or expired id. A request already decided is returned as it is."""
         self._approvable(request_id, by)
-        decided = self._ctx.state.decide_approval(request_id, "granted", by=by.user_id)
-        if decided["status"] == "granted" and decided.get("approver") is None \
-                and decided.get("decided_by") == by.user_id:
+        decided = self._decide(request_id, "granted", by)
+        if decided["status"] == "granted" and not decided.get("approver"):
             decided = {**decided, "approver": by.model_dump(mode="json")}
             self._ctx.state.put_approval(decided)
         return _record(decided)
@@ -98,7 +97,7 @@ class Approvals:
     def deny(self, request_id: str, *, by: UserContext, reason: Optional[str] = None) -> ApprovalRecord:
         """Deny a pending request; the same checks as :meth:`grant`."""
         self._approvable(request_id, by)
-        decided = self._ctx.state.decide_approval(request_id, "denied", by=by.user_id)
+        decided = self._decide(request_id, "denied", by)
         if decided["status"] == "denied" and decided.get("decided_by") == by.user_id and reason is not None \
                 and decided.get("reason") is None:
             decided = {**decided, "reason": reason}
@@ -107,21 +106,31 @@ class Approvals:
 
     # -- internals -----------------------------------------------------------------
 
+    def _decide(self, request_id: str, status: str, by: UserContext) -> Dict[str, Any]:
+        decided = self._ctx.state.decide_approval(request_id, status, by=by.user_id)
+        if decided is None:  # purged between the check and the decision
+            raise ApprovalNotFound(f"There is no approval request '{request_id}'.")
+        return decided
+
     def _roles(self, request: ApprovalRequest) -> Sequence[str]:
         return self._ctx.hooks.approver_roles(request.hook)
 
     def _approvable(self, request_id: str, by: UserContext) -> None:
         doc = self._ctx.state.get_approval(request_id)
-        if doc is None or self._expired(doc):
+        request = ApprovalRequest.model_validate(doc["request"]) if doc else None
+        if doc is None or self._expired(doc) or request.asker_tenant_id != by.tenant_id:
+            # Another tenant's request is not found, never "not authorized": its existence is not told.
             raise ApprovalNotFound(f"There is no approval request '{request_id}'.")
-        roles = self._roles(ApprovalRequest.model_validate(doc["request"]))
+        roles = self._roles(request)
         if not set(by.roles) & set(roles):
             raise NotAuthorized("Only an approver may decide an approval request.",
                                 fix=f"Ask someone with one of these roles: {', '.join(roles) or 'none are configured'}.")
 
     def _visible(self, record: ApprovalRecord, user: UserContext) -> bool:
         request = record.request
-        if (request.asker_user_id, request.asker_tenant_id) == (user.user_id, user.tenant_id):
+        if request.asker_tenant_id != user.tenant_id:
+            return False
+        if user.user_id is not None and request.asker_user_id == user.user_id:
             return True
         return bool(set(user.roles) & set(self._roles(request)))
 

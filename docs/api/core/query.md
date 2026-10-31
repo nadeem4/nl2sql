@@ -139,8 +139,8 @@ result = engine.run_query(question, user_context=asker, approvals=[record.id])
 ```
 
 `list(*, user_context, status="pending")` shows the requests the caller's roles may approve and the
-caller's own; `grant(request_id, *, by)` and `deny(request_id, *, by, reason=None)` return the
-`ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `reason`);
+caller's own, within the caller's tenant (another tenant's id is `ApprovalNotFound` everywhere, and an approval whose approver is in another tenant than the asker covers nothing); `grant(request_id, *, by)` and `deny(request_id, *, by, reason=None)` return the
+`ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `reason`; the approver's roles stay inside the engine);
 a request already decided is returned as it is, and an unknown or expired id is `ApprovalNotFound`.
 A grant is reusable for any re-run of that request (same question, asker, plan and SQL) until it
 expires (`settings.approvals.max_age_hours`, 24, counted from the last change). An id that is
@@ -161,8 +161,8 @@ the hash of the SQL just generated equals the request's (and, on the verified
 path, the values are the same), and `by` holds one of the hook's configured
 `approver_roles` (by default `policies.admin_roles`), never the roles the
 request lists. Then the next hook still runs. Anything else asks again: the
-run ends `needs_approval` with a new request. Nothing is stored, and an
-`Approval` is not signed and does not expire: it is trusted as far as the
+run ends `needs_approval` with a new request. An `Approval` object is not
+stored, signed or expired by the engine (request ids are stored and expire: see above): it is trusted as far as the
 `user_context` a caller passes. See [Hooks](../../configuration/hooks.md#approval).
 
 Returns:
