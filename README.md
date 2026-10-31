@@ -362,7 +362,7 @@ set), builds one engine with `NL2SQL.from_config()` (`NL2SQL_CONFIG`, else
 ```bash
 pip install nl2sql-api
 cd nl2sql-demo                               # ./nl2sql.yaml is the config
-nl2sql-api --host 127.0.0.1 --port 8000
+nl2sql-api serve --port 8000        # 127.0.0.1, one worker
 # or: NL2SQL_CONFIG=nl2sql-demo/nl2sql.yaml uvicorn nl2sql_api.main:app --port 8000
 ```
 
@@ -371,7 +371,8 @@ ignores:
 
 ```yaml
 # api.yaml (included from nl2sql.yaml as  api: { file: api.yaml })
-role: admin                     # one static role for every request
+auth: static                    # api_keys | proxy | static | none (default none)
+static_role: admin              # one static role for every request
 cors_origins: []                # browser origins allowed to call the API
 ```
 
@@ -379,23 +380,22 @@ Full interactive docs at `http://localhost:8000/docs` (Swagger UI), with ReDoc
 at `/redoc` and the schema at `/openapi.json`. Browser access from other origins
 is off unless listed in `api.cors_origins`.
 
-The API does not authenticate callers itself, and it never takes the RBAC role
-from the request body. The role comes from one of these settings, first match
-wins:
+`api.auth` picks who is asking, and the request body never carries the caller:
 
-| Setting | Role source |
+| `api.auth` | Identity |
 | --- | --- |
-| `api.role_header: X-NL2SQL-Role` | A header set by a trusted proxy that authenticates the caller. Comma-separated values are several roles. |
-| `api.role: admin` | One static role for every request. |
-| `api.trust_body_role: true` | Dev only: `user_context` in the body. Any client can pick any role, so the server logs a warning at startup. |
+| `api_keys` | `Authorization: Bearer <key>` from `nl2sql keys create`. |
+| `proxy` | The user, tenant and roles headers of a proxy that connects from `api.proxy.trusted_from`. |
+| `static` | `api.static_role` for every request. |
+| `none` (default) | The local operator, for a request made straight to `localhost` only; `nl2sql-api serve` refuses to bind any other host. |
 
-With none of them, `/api/v1/query`, `/api/v1/query/stream` and the result routes answer HTTP 401.
+With no identity the routes answer HTTP 401 (HTTP 403 under `none` for a request that is not the local operator). Every
+error is one envelope, `{"error": {"code", "message", "fix", "details", "request_id"}}`.
 
 The routes that change the process (`POST /api/v1/datasource`, `DELETE /api/v1/datasource/{id}`, and the
 Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasource/test`,
 `PUT /api/v1/settings/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
-also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403. With no
-role setting at all they answer loopback clients only.
+also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -405,6 +405,8 @@ role setting at all they answer loopback clients only.
 | `GET` | `/api/v1/query/{request_id}/results/{result_id}.csv` | The whole of a run's saved result as CSV, streamed |
 | `GET` | `/api/v1/health` | Liveness check |
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
+| `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller |
+| `GET` | `/api/v1/about` | What the engine is: version and pipeline steps |
 | `GET` | `/api/v1/datasource-types` | The adapters the engine can name, installed or not, each with its connection schema (the Connect a database form) |
 | `POST` | `/api/v1/datasource/test` | Connect to a datasource that is not added and report the stage that failed and the fix; registers nothing |
 | `POST` | `/api/v1/datasource` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...). `save: true` also writes `datasources/<id>.yaml`, with every secret as a reference. A body that does not validate is a 422 listing each problem by path |

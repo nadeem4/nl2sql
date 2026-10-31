@@ -1239,6 +1239,24 @@ Facade argument checks outside the dashboard and workspace methods still raise b
 each A-row converts the ones raised by the facade methods it routes into named `NL2SQLError`s (for example
 `PermissionError` becomes `NotAuthorized`), so D0a-2's `test_no_route_returns_exception_text` finds none left.
 
+**D0a-2 (errors, identity, serve, app factory).** `nl2sql_api/errors.py` holds the envelope (`ApiError`, `ErrorBody`,
+`ERROR_RESPONSE` for a route's `responses=`), `RequestRefused(status, code, message, *, fix, details, headers)` (an
+`NL2SQLError` a route or dependency raises for its own refusal, with a message it wrote), the handlers (an `NL2SQLError`
+maps to its status and code; a status of 500 or more that is not a `RequestRefused`, and anything else, is a 500
+`INTERNAL` that names a request id and logs the cause under it), and `RequestIdMiddleware`, which sets
+`X-Request-ID` on every response. `identity.py` replaces `auth.py`: `caller` and `admin` (sync dependencies),
+`check_bind(auth, host)` and `StartRefused`, `AUTH_RESPONSES` and `ADMIN_RESPONSES`, and `is_local_operator(engine)`,
+which the add-datasource route uses for the D122 `.env` decision. `admin` checks `policies.admin_roles` only
+(`allow_all` does not make an admin). `serve.py` is `nl2sql-api serve [--config] [--host] [--port]` (one worker, no
+reload; it exits with a one-line message on a bad config or a refused bind); `server.py` is gone. `main.create_app`
+mounts one router module per namespace; `app = create_app()` stays for `uvicorn nl2sql_api.main:app` (and the existing
+Dockerfile, which K1 replaces). `routes/datasource.py`, `indexing.py` and `llm.py` keep their names (the row names them)
+beside the empty `datasources.py`, `index.py` and `settings.py`. The engine still raises a bare `ValueError` for an
+unknown or taken datasource id: the routes turn it into a 404 or a fixed-message 422 and log the text, and a later row
+should give the engine named exceptions for both. `QueryRequest.user_context` and `DatasourceTestRequest.user_context`
+are gone with `trust_body_role`. `/health` answers `{status, version: {engine, api}}`, `/meta` the mode, auth source and
+`request_llm`, `/about` `engine.about()`; `/ready` is unchanged. `packages/api/openapi.json` is the snapshot.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below

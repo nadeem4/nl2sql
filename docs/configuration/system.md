@@ -500,9 +500,9 @@ start from.
 
 | 0.4 variable | 0.5 |
 | --- | --- |
-| `NL2SQL_API_ROLE_HEADER` | `api.role_header` |
-| `NL2SQL_API_ROLE` | `api.role` |
-| `NL2SQL_API_TRUST_BODY_ROLE` | `api.trust_body_role` |
+| `NL2SQL_API_ROLE_HEADER` | `api.proxy.roles_header` with `api.auth: proxy` (0.10) |
+| `NL2SQL_API_ROLE` | `api.static_role` with `api.auth: static` (0.10) |
+| `NL2SQL_API_TRUST_BODY_ROLE` | removed in 0.10: a request body never carries the caller |
 | `NL2SQL_API_CORS_ORIGINS` (comma-separated) | `api.cors_origins` (a list) |
 | `NL2SQL_API_ADMIN_ROLES` | `policies.admin_roles` |
 | `NL2SQL_DEMO_HOSTED` | `nl2sql demo --hosted` |
