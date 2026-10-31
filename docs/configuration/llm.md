@@ -507,6 +507,37 @@ the engine started is used only once the LLM is set again.
 Genuine misconfiguration fails immediately: an unknown provider, or an agent
 with no model.
 
+## Per-request keys and models
+
+A caller can bring its own key, and its own model for a step, for one call
+(D210): `llm_override=LLMOverride(keys={"anthropic": key}, models={"ast_planner": ("anthropic", "claude-opus-5")})`
+on `run_query`, `stream_query`, and a conversation's `ask`, `stream` and
+`retry`. `keys` maps a provider to the caller's key; `models` maps an agent
+name (the node name, such as `ast_planner`) to `(provider, model)`.
+
+- **Only providers that read an API key can be chosen.** A key or a model for a provider with no key variable
+  (`ollama`, `openai_compatible`, a plugin whose `api_key_env` is unset) raises `InvalidArgument`: those are
+  reached by the operator's endpoint and credentials, which a caller may not borrow. A caller's key, with or without a model,
+  never inherits the operator's `base_url` or `headers`, even on the configured provider.
+- **A model runs only on a key the caller sent.** A step the override puts on
+  a provider with no key in `keys` raises `MissingProviderKey` at the call,
+  before anything runs, so a caller's choice never lands on the operator's
+  account. A step the override does not name runs on the caller's key for its
+  configured provider if sent, else the caller's first key, else the call
+  fails `MissingProviderKey`.
+- **The keys live for the call.** They are never written to the environment,
+  to a file or to a cache (each step's client is built for the call and kept
+  nowhere), and the trace masks them like any other secret. `repr` of an
+  `LLMOverride` leaves `keys` out.
+- **A conversation turn** binds the override for the whole turn: the model's
+  own steps and every run it asks for.
+- **Over REST**, `X-NL2SQL-Api-Key-<provider>` and `X-NL2SQL-Models` become
+  the override only where `api.request_llm: true` (`nl2sql_api/overrides.py`).
+
+`engine.llm.providers()` lists what a form needs to offer the choice: each
+provider's label, verified models and key shape; see
+[LLM](../api/core/llm.md#llmproviders).
+
 ## Replacing the LLM at runtime
 
 `engine.llm.replace` swaps the whole `llm` section at once, while the engine

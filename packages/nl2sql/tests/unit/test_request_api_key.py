@@ -162,15 +162,15 @@ def test_a_request_with_no_key_at_all_names_the_step_and_its_provider():
     assert (raised.value.agent, raised.value.provider) == ("decomposer", "openai")
 
 
-def test_a_chosen_model_on_the_configured_provider_keeps_the_configured_endpoint(registry):
+def test_a_chosen_model_on_the_configured_provider_drops_the_operators_endpoint(registry):
     config = registry.current.config_for("default").model_copy(update={"base_url": "http://fake/v1"})
     llms = RequestLLMs(keys={"openai": FIRST_KEY}, models={"astplanner": ("openai", "gpt-4.1")})
 
     moved, key = LLMRegistry._for_request(config, "astplanner", llms)
 
     assert (moved.provider, moved.model, key) == ("openai", "gpt-4.1", FIRST_KEY)
-    # Same provider, so the endpoint the config pinned is still in force.
-    assert moved.base_url == "http://fake/v1"
+    # The caller's choice runs at the provider's own endpoint, never the operator's (D210).
+    assert moved.base_url is None
     # And the temperature moves with the model.
     assert moved.temperature == 0.0
 

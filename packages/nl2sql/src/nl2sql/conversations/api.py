@@ -12,7 +12,7 @@ import queue
 import secrets
 import threading
 import time
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Union
@@ -36,6 +36,8 @@ from nl2sql.events.catalog import ChatToolCalled, ConversationStarted, Conversat
 from nl2sql.hooks.approval import Approval
 from nl2sql.limits import Budget, LimitReached
 from nl2sql.llm.failures import classify_provider_error
+from nl2sql.llm.override import LLMOverride
+from nl2sql.llm.request_key import RequestLLMs, use_llm_override, use_request_llms
 from nl2sql.llm.wires import StructuredOutputError
 from nl2sql.pipeline.runtime import usage_prices
 from nl2sql.policies import UserContext
@@ -127,14 +129,20 @@ class Conversations:
 
     def ask(self, conversation_id: str, text: Optional[str] = None, *, user_context: UserContext,
             choice: Optional[str] = None, execute: bool = True,
-            cancellation_token: Optional[CancellationToken] = None) -> Turn:
+            cancellation_token: Optional[CancellationToken] = None,
+            llm_override: Optional[LLMOverride] = None) -> Turn:
         kind, shown = self._prepare(self.get(conversation_id, user_context=user_context), text, choice)
         body = self._by_choice if kind == "choice" else self._by_model
-        return self._turn(conversation_id, user_context, kind, shown, execute,
-                          cancellation_token or CancellationToken(), lambda run: body(run, choice))
+        with use_llm_override(llm_override, getattr(self._ctx, "registry", None)):  # the whole turn: the model's steps and every run it asks for
+            return self._turn(conversation_id, user_context, kind, shown, execute,
+                              cancellation_token or CancellationToken(), lambda run: body(run, choice))
 
     def retry(self, conversation_id: str, *, user_context: UserContext,
-              approvals: Sequence[Union[Approval, str]] = ()) -> Turn:
+              approvals: Sequence[Union[Approval, str]] = (), llm_override: Optional[LLMOverride] = None) -> Turn:
+        with use_llm_override(llm_override, getattr(self._ctx, "registry", None)):
+            return self._retry(conversation_id, user_context, approvals)
+
+    def _retry(self, conversation_id: str, user_context: UserContext, approvals: Sequence[Union[Approval, str]]) -> Turn:
         conversation = self.get(conversation_id, user_context=user_context)
         question = next((s.question for t in reversed(conversation.turns) for s in reversed(t.steps)
                          if s.call.name == "ask" and s.question), None)
@@ -185,11 +193,14 @@ class Conversations:
         return holder[0]
 
     def stream(self, conversation_id: str, text: Optional[str] = None, *, user_context: UserContext,
-               choice: Optional[str] = None, execute: bool = True) -> Iterator[Event]:
-        """As ``ask``, as events. Ownership and the arguments are checked now; a busy conversation raises
-        ``ConversationBusy`` from the first ``next``."""
+               choice: Optional[str] = None, execute: bool = True,
+               llm_override: Optional[LLMOverride] = None) -> Iterator[Event]:
+        """As ``ask``, as events. Ownership, the arguments and ``llm_override`` are checked now; a busy conversation
+        raises ``ConversationBusy`` from the first ``next``."""
+        llms = (RequestLLMs.from_override(llm_override, getattr(self._ctx, "registry", None))
+                if llm_override is not None and not llm_override.empty else None)
         kind, shown = self._prepare(self.get(conversation_id, user_context=user_context), text, choice)
-        return self._stream(conversation_id, user_context, kind, shown, execute, choice)
+        return self._stream(conversation_id, user_context, kind, shown, execute, choice, llms)
 
     # ------------------------------------------------------------ the machinery
 
@@ -416,7 +427,7 @@ class Conversations:
     # ------------------------------------------------------------ the stream
 
     def _stream(self, conversation_id: str, user: UserContext, kind: TurnKind, text: str, execute: bool,
-                choice: Optional[str]) -> Iterator[Event]:
+                choice: Optional[str], llms: Optional[RequestLLMs] = None) -> Iterator[Event]:
         events: "queue.Queue[Any]" = queue.Queue()
         token = CancellationToken()
         body = (lambda run: self._by_choice(run, choice)) if kind == "choice" else self._by_model
@@ -426,7 +437,7 @@ class Conversations:
 
         def work() -> None:
             try:
-                with self._locked(conversation_id):
+                with self._locked(conversation_id), use_request_llms(llms) if llms is not None else nullcontext():
                     run = self._open(self.get(conversation_id, user_context=user), user, kind, text, execute,
                                      token, on_step_scope=follow, keep_cancelled=False)
                     run.scope.follow(events.put, {"conversation.step", "run.failed"})

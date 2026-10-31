@@ -45,7 +45,7 @@ PUBLIC_SURFACE = {
     "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
     "ConnectionInvalid",
     "NL2SQLError", "NotAuthorized", "InvalidArgument", "NotPinnable", "ChartNotSupported", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
-    "LLMOverride", "resolve_mode",
+    "LLMOverride", "resolve_mode", "provider_for_key", "provider_keys_in_environment",
 }
 
 

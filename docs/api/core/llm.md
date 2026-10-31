@@ -90,13 +90,22 @@ Signature:
 Each LLM provider this engine can use: the built-ins whose client library is
 installed, and any a plugin or `Registry.add_llm` registered. Each has `name`,
 `label`, `key_variable` (the environment variable it reads its key from;
-`None` for one that needs no key, such as `ollama`) and `key_present` (whether
-that variable is set). Never the key.
+`None` for one that needs no key, such as `ollama`), `key_present` (whether
+that variable is set), `models` (the verified models, `[]` when none are
+known) and `key_shape` (`pattern`, `min_length` and `prefix` of a key, for a
+form to check one before sending it). Never the key.
 
 ```python
 engine.llm.providers()[0]
-# {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False}
+# {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False,
+#  'models': ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],
+#  'key_shape': {'pattern': '^[A-Za-z0-9_-]{20,}$', 'min_length': 20, 'prefix': 'sk-ant-'}}
 ```
+
+`nl2sql.provider_for_key(key) -> str` names the provider a key belongs to
+(from its prefix), and `nl2sql.provider_keys_in_environment() -> dict[str, str]`
+maps each keyed provider whose variable is set to its key (print only a masked
+form). Both are top-level exports, so an app never imports `nl2sql.llm.providers`.
 
 ### llm.prices
 

@@ -39,12 +39,15 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Dict, Iterator, Mapping, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Mapping, NamedTuple, Optional, Tuple
 
 from nl2sql.common.errors import NL2SQLError
 
+if TYPE_CHECKING:
+    from .override import LLMOverride
+
 __all__ = ["MissingProviderKey", "RequestLLMs", "current_api_key", "current_api_keys",
-           "current_request_llms", "use_api_key", "use_request_llms"]
+           "current_request_llms", "use_api_key", "use_llm_override", "use_request_llms"]
 
 
 class MissingProviderKey(NL2SQLError):
@@ -62,6 +65,19 @@ class MissingProviderKey(NL2SQLError):
         super().__init__(f"No API key was supplied for provider '{provider}', "
                          f"which step '{agent}' is set to run on.",
                          fix=f"Send a key for '{provider}' or drop the model choice for '{agent}'.")
+
+
+def _takes_a_key(provider: str, registry: Any) -> bool:
+    """True when ``provider`` reads an API key (it has an ``api_key_env``): the only kind a caller may bring."""
+    from .providers import LLM_PROVIDERS
+
+    found = LLM_PROVIDERS.get(provider)
+    if found is None and registry is not None:
+        try:
+            found = registry.load("llm", provider)
+        except Exception:  # not installed, or a plugin that fails its checks
+            found = None
+    return bool(getattr(found, "api_key_env", None))
 
 
 class RequestLLMs(NamedTuple):
@@ -99,6 +115,35 @@ class RequestLLMs(NamedTuple):
         if not clean:
             return cls()
         return cls(keys={provider_for_key(clean): clean}, models={}, fallback=clean)
+
+    @classmethod
+    def from_override(cls, override: "LLMOverride", registry: Any = None) -> "RequestLLMs":
+        """What an :class:`~nl2sql.LLMOverride` asks for, checked: a model runs only on a key the caller sent.
+
+        ``registry`` is the engine's provider registry, to find a plugin provider's key variable; without one
+        only the built-in providers are known.
+
+        Raises:
+            MissingProviderKey: a step is put on a provider the override carries no key for. A caller's model
+                choice is never moved onto the operator's account (D210), so this is refused before anything runs.
+            InvalidArgument: a key or a model names a provider that takes no key of its own (``ollama``,
+                ``openai_compatible``, a plugin with no ``api_key_env``). Such a provider is reached by the
+                operator's endpoint and credentials, so a caller may not move a step onto it.
+        """
+        from nl2sql.common.errors import InvalidArgument
+
+        keys = {provider.lower(): key.strip() for provider, key in override.keys.items() if key and key.strip()}
+        for provider in (*keys, *(p.lower() for p, _ in override.models.values())):
+            if not _takes_a_key(provider, registry):
+                raise InvalidArgument(
+                    f"Provider '{provider}' takes no API key of its own, so a request cannot choose it.",
+                    fix="Send keys and models only for providers that read an API key, such as openai or anthropic.")
+        models = {}
+        for agent, (provider, model) in override.models.items():
+            if provider.lower() not in keys:
+                raise MissingProviderKey(agent, provider.lower())
+            models[agent] = (provider.lower(), model)
+        return cls(keys=keys, models=models)
 
     @property
     def empty(self) -> bool:
@@ -167,6 +212,21 @@ def use_request_llms(llms: Optional[RequestLLMs]) -> Iterator[None]:
 def use_api_key(key: Optional[str]) -> Iterator[None]:
     """Binds one key, with no per-step choices, for the duration of the block."""
     with use_request_llms(RequestLLMs.from_key(key)):
+        yield
+
+
+@contextmanager
+def use_llm_override(override: Optional["LLMOverride"], registry: Any = None) -> Iterator[None]:
+    """Binds ``override`` for the block; with None or an empty one it changes nothing, so a nested call keeps
+    its caller's.
+
+    Raises:
+        MissingProviderKey: at once, before the block runs, when a model is chosen without its provider's key.
+    """
+    if override is None or override.empty:
+        yield
+        return
+    with use_request_llms(RequestLLMs.from_override(override, registry)):
         yield
 
 

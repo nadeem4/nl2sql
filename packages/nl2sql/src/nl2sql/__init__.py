@@ -39,6 +39,7 @@ _EXPORTS = {
     "nl2sql.dashboards.run": ("DashboardBusy",),
     "nl2sql.llm.request_key": ("MissingProviderKey",),
     "nl2sql.llm.override": ("LLMOverride",),
+    "nl2sql.llm.providers": ("provider_for_key", "provider_keys_in_environment"),
     "nl2sql.config.mode": ("resolve_mode",),
     "nl2sql.common.cancellation": ("CancellationToken", "RunCancelled"),
     "nl2sql_sdk.policy": ("UserContext",),
@@ -245,4 +246,6 @@ __all__ = [
     "MissingProviderKey",
     "LLMOverride",
     "resolve_mode",
+    "provider_for_key",
+    "provider_keys_in_environment",
 ]

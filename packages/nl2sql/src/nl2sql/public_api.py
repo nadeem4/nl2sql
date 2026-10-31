@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from nl2sql.policies import UserContext
     from nl2sql.clarify.models import ClarificationChoice
     from nl2sql.hooks.approval import Approval
+    from nl2sql.llm.override import LLMOverride
     from nl2sql.pipeline.pinned import SuppliedPlan
     from nl2sql.check import CheckReport
     from nl2sql.common.cancellation import CancellationToken
@@ -331,7 +332,8 @@ class NL2SQL:
                   cancellation_token: Optional["CancellationToken"] = None,
                   plan: Optional["SuppliedPlan"] = None,
                   approvals: Optional[Sequence[Union["Approval", str]]] = None, clarify: bool = True,
-                  choice: Optional["ClarificationChoice"] = None, answer: bool = True) -> "QueryResult":
+                  choice: Optional["ClarificationChoice"] = None, answer: bool = True,
+                  llm_override: Optional["LLMOverride"] = None) -> "QueryResult":
         """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
 
         ``datasource_id`` skips routing; ``execute=False`` stops after the SQL
@@ -366,12 +368,22 @@ class NL2SQL:
         None and the run makes no model call for prose (a dashboard refresh
         re-runs stored plans with ``plan=`` and ``answer=False``, and no
         model call at all).
+
+        ``llm_override`` (a :class:`~nl2sql.LLMOverride`) gives this one call the
+        caller's own keys and models in place of the configured ones (D210): its
+        ``keys`` map a provider to the caller's key, its ``models`` map an agent
+        name to ``(provider, model)``. A model runs only on a key the override
+        carries for its provider, else ``MissingProviderKey`` is raised before
+        anything runs, so a caller's choice never lands on the operator's
+        account. The keys live for the call: they are in no environment variable
+        and no cache, and the trace masks them. With a replay provider (G2b) an
+        override key replaces the recording for this call.
         """
         self._ensure_open()
         return self._queries.run_query(question, datasource_id=datasource_id, execute=execute,
                                        user_context=user_context, cancellation_token=cancellation_token,
                                        plan=plan, approvals=approvals, clarify=clarify, choice=choice,
-                                       answer=answer)
+                                       answer=answer, llm_override=llm_override)
 
     def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                      user_context: Optional["UserContext"] = None,
@@ -379,7 +391,7 @@ class NL2SQL:
                      plan: Optional["SuppliedPlan"] = None,
                      approvals: Optional[Sequence[Union["Approval", str]]] = None,
                      clarify: bool = True, choice: Optional["ClarificationChoice"] = None,
-                     answer: bool = True) -> Iterator["Event"]:
+                     answer: bool = True, llm_override: Optional["LLMOverride"] = None) -> Iterator["Event"]:
         """
         Run a question as ``run_query`` does, yielding its :class:`~nl2sql.Event`
         values as they are published, from the caller-safe allow-list:
@@ -391,13 +403,14 @@ class NL2SQL:
         (``policy.decision``, ``hook.decision``, ``llm.call``) are never on
         it: subscribe to ``events`` for those. ``event.sse()`` is the event as
         one Server-Sent Event. Closing the iterator early cancels the run.
-        ``plan``, ``approvals``, ``clarify``, ``choice`` and ``answer`` are as for :meth:`run_query`.
+        ``plan``, ``approvals``, ``clarify``, ``choice``, ``answer`` and ``llm_override`` are as for :meth:`run_query`;
+        a refused override raises at the call.
         """
         self._ensure_open()
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
                                           user_context=user_context, cancellation_token=cancellation_token,
                                           plan=plan, approvals=approvals, clarify=clarify, choice=choice,
-                                          answer=answer)
+                                          answer=answer, llm_override=llm_override)
 
     def clear_plan_cache(self) -> int:
         """Remove every cached plan from the state store; returns how many there were.
