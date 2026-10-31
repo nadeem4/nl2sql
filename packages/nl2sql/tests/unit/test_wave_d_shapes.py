@@ -171,6 +171,18 @@ def test_state_store_round_trips_approvals(store):
     assert store.get_approval("r2") is None and store.get_approval("r1") is not None
 
 
+def test_decide_approval_decides_once(store):
+    assert store.decide_approval("nope", "granted", by="ada") is None
+    store.put_approval(_record("r1"))
+    at = datetime(2026, 10, 31, tzinfo=timezone.utc)
+    decided = store.decide_approval("r1", "granted", by="ada", at=at)
+    assert (decided["status"], decided["decided_by"], decided["updated_at"]) == ("granted", "ada", at.isoformat())
+    assert store.get_approval("r1") == decided
+    # a decided request is never overwritten: a late deny returns the stored grant, unchanged
+    assert store.decide_approval("r1", "denied", by="bob") == decided
+    assert store.get_approval("r1")["status"] == "granted"
+
+
 def test_approvals_migration_is_registered():
     assert MIGRATIONS[-1][0] == "0007_approvals"
 

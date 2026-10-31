@@ -1225,12 +1225,19 @@ validators in `dashboards/models.py` stay `ValueError`). `ReviewError` maps its 
 `APPROVAL_NOT_GRANTED` are fatal. `Api` gained `auth`, `proxy` (`ApiProxy`), `static_role` and `request_llm`;
 the old three fields stay until D0a-2. `settings.approvals.max_age_hours` (24). `LLMOverride(keys, models)` is a
 frozen dataclass in `nl2sql/llm/override.py` (`keys` is left out of `repr`). The state store gained
-`put_approval(doc)`, `get_approval(request_id)`, `list_approvals(status=None)` and `purge_approvals(older_than)`
+`put_approval(doc)`, `get_approval(request_id)`, `list_approvals(status=None)`, `decide_approval` and `purge_approvals(older_than)`
 over plain JSON documents (`id` is the request id; `status` is `pending`, `granted` or `denied`; `created_at`
-and `updated_at`), migration `0007_approvals`; the store `interface_version` stays 4 (decision for the owner: bump
-it to 5 when G3a uses the methods). `mode:` is `Config.mode`; `nl2sql.config.mode.resolve_mode(flag, env, file)`
+and `updated_at`), migration `0007_approvals`; `decide_approval(request_id, status, *, by, at=None)` (atomic: it
+changes only a `pending` request and returns an already decided one unchanged), and the store `interface_version` is
+raised to 5 (registry and the four built-in stores), so a version 4 third-party store is refused at load. `mode:` is `Config.mode`; `nl2sql.config.mode.resolve_mode(flag, env, file)`
 is pure and raises `ValueError` for an unknown value. Exported from `nl2sql`: `NL2SQLError`, `NotAuthorized`,
-`InvalidArgument`, `ApprovalNotFound`, `DashboardBusy`, `MissingProviderKey`, `LLMOverride`, `resolve_mode`.
+`InvalidArgument` and its four subclasses `NotPinnable`, `ChartNotSupported`, `UnknownTile` and `UnknownFilter`
+(each its own `code`, still 422 and a `ValueError`; `set_tile_chart` to a kind the result cannot draw now raises
+`ChartNotSupported`), `ApprovalNotFound`, `DashboardBusy`, `MissingProviderKey`, `LLMOverride`, `resolve_mode`.
+Facade argument checks outside the dashboard and workspace methods still raise bare builtins
+(`conversations/api.py`, `api/api_keys_api.py`'s `PermissionError`, `api/datasource_api.py`, `api/knowledge_api.py`):
+each A-row converts the ones raised by the facade methods it routes into named `NL2SQLError`s (for example
+`PermissionError` becomes `NotAuthorized`), so D0a-2's `test_no_route_returns_exception_text` finds none left.
 
 ### Session batches
 

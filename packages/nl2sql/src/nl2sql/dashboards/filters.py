@@ -15,7 +15,7 @@ from decimal import Decimal
 from functools import reduce
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from nl2sql.common.errors import InvalidArgument
+from nl2sql.common.errors import InvalidArgument, UnknownFilter
 from nl2sql.dashboards.models import ChartPlan, DashboardFilter
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, OrderItem, PlanModel, SelectItem, TableRef
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
@@ -50,12 +50,12 @@ class Active:
 
 
 def find(filters: Sequence[DashboardFilter], filter_id: str) -> DashboardFilter:
-    """The dashboard's filter ``filter_id``; a ``ValueError`` naming the ids it has when there is none."""
+    """The dashboard's filter ``filter_id``; an ``UnknownFilter`` naming the ids it has when there is none."""
     for f in filters:
         if f.id == filter_id:
             return f
     ids = ", ".join(f"'{f.id}'" for f in filters) or "none"
-    raise InvalidArgument(f"No filter '{filter_id}' in this dashboard; its filters: {ids}.")
+    raise UnknownFilter(f"No filter '{filter_id}' in this dashboard; its filters: {ids}.")
 
 
 def activate(filters: Sequence[DashboardFilter], given: Optional[Mapping[str, Any]]) -> List[Active]:

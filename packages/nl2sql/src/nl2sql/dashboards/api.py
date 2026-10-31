@@ -14,7 +14,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from nl2sql.common.errors import InvalidArgument, NoTiles, WorkspaceNotEmpty
+from nl2sql.common.errors import InvalidArgument, NoTiles, NotPinnable, UnknownTile, WorkspaceNotEmpty
 from nl2sql.conversations.models import Conversation
 from nl2sql.conversations.store import ConversationStore, Owner
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits, plan_from_step
@@ -105,9 +105,9 @@ class Dashboards:
         with self._refresher.locked(dashboard_id):
             dashboard = self._store.get(dashboard_id, owner)
             if dashboard.status == "saved":
-                raise InvalidArgument(f"Dashboard '{dashboard_id}' is already saved.")
+                raise NotPinnable(f"Dashboard '{dashboard_id}' is already saved.")
             if not dashboard.tiles:
-                raise InvalidArgument("An empty draft cannot be pinned: add a chart first.")
+                raise NotPinnable("An empty draft cannot be pinned: add a chart first.")
             if workspace_id is not None:
                 target = self._store.workspace(workspace_id, owner)
             else:
@@ -250,7 +250,7 @@ class Dashboards:
             return list(dashboard.tiles)
         chosen = [t for t in dashboard.tiles if t.id == tile_id]
         if not chosen:
-            raise InvalidArgument(f"No chart '{tile_id}' in this dashboard.")
+            raise UnknownTile(f"No chart '{tile_id}' in this dashboard.")
         return chosen
 
     def _last_runs(self, dashboard: Dashboard) -> Dict[str, TileRun]:

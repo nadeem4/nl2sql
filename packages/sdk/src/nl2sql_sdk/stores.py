@@ -4,14 +4,16 @@ A store is named by ``type`` in one of the four ``storage`` sub-blocks, for
 example ``index: {type: qdrant, url: ...}``. Every store class has:
 
 * ``interface_version``: the version of these interfaces it was written for
-  (``4``). The engine accepts exactly the version it was built for. Version 2
+  (``5``). The engine accepts exactly the version it was built for. Version 2
   added ``StateStore.put_schema_diff`` and ``get_schema_diff``; version 3 the
   review queue's methods (``put_proposal``, ``get_proposal``,
   ``list_proposals``, ``decide_proposal``, ``purge_proposals``, typed with
   ``Proposal``) and ``BuildPointer.knowledge_hash``; version 4 the
   conversation, workspace, dashboard, stored chart result and API key
   methods, which take and return plain JSON documents (``dict``), since this
-  module holds no engine model. The version is one per kind, so every store
+  module holds no engine model; version 5 the approval methods
+  (``put_approval``, ``get_approval``, ``list_approvals``, ``decide_approval``,
+  ``purge_approvals``). The version is one per kind, so every store
   class declares it, whatever its slot.
 * ``slot``: the sub-block it fills, ``"index"``, ``"state"``, ``"traces"`` or
   ``"results"``. Store names share one entry point group, ``nl2sql.stores``,
@@ -388,6 +390,13 @@ class StateStore(Store, Protocol):
 
     def list_approvals(self, status: Optional[str] = None) -> List[dict]:
         """The approvals with ``status`` (all when None), newest (``created_at``) first."""
+        ...
+
+    def decide_approval(self, request_id: str, status: str, *, by: Optional[str],
+                        at: Optional[datetime] = None) -> Optional[dict]:
+        """Atomically decide a ``pending`` approval: set ``status``, ``decided_by`` and ``updated_at`` (``at``,
+        else now) and return the stored document. An already decided request is returned unchanged, so a late
+        deny never overwrites a grant; None when there is no such id."""
         ...
 
     def purge_approvals(self, older_than: datetime) -> int:

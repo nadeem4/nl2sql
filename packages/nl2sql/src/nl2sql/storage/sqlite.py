@@ -285,7 +285,7 @@ def _locked(method):
 class SqliteState:
     """The built-in ``StateStore``, on one SQLite file (or ``:memory:``, for tests)."""
 
-    interface_version: ClassVar[int] = 4
+    interface_version: ClassVar[int] = 5
     slot: ClassVar[str] = "state"
     config_model: ClassVar[type] = NoKeys
 
@@ -775,6 +775,18 @@ class SqliteState:
             values.append(status)
         rows = self._conn().execute(sql + " ORDER BY created_at DESC, id;", values).fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def decide_approval(self, request_id: str, status: str, *, by: Optional[str],
+                        at: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+        """Decides a ``pending`` approval; one already decided is returned unchanged; None for an unknown id."""
+        doc = self.get_approval(request_id)
+        if doc is None or doc["status"] != "pending":
+            return doc
+        moment = at or datetime.fromtimestamp(self.clock(), tz=timezone.utc)
+        doc = {**doc, "status": status, "decided_by": by, "updated_at": moment.isoformat()}
+        self.put_approval(doc)
+        return doc
 
     @_locked
     def purge_approvals(self, older_than: datetime) -> int:

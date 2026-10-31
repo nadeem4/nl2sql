@@ -14,7 +14,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from nl2sql.charts.choose import choose
 from nl2sql.charts.spec import ChartSpec, ColumnKind
-from nl2sql.common.errors import InvalidArgument, ScheduleTooFrequent, WorkspaceNotFound
+from nl2sql.common.errors import InvalidArgument, ScheduleTooFrequent, UnknownTile, WorkspaceNotFound
 from nl2sql.config.models import ChartSettings
 from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.models import (
@@ -71,7 +71,7 @@ def _tile(dashboard: Dashboard, tile_id: str) -> Tile:
     for tile in dashboard.tiles:
         if tile.id == tile_id:
             return tile
-    raise InvalidArgument(f"No chart '{tile_id}' in this dashboard.")
+    raise UnknownTile(f"No chart '{tile_id}' in this dashboard.")
 
 
 def _with_tile(dashboard: Dashboard, tile_id: str, **changes) -> Dashboard:

@@ -294,6 +294,30 @@ class InvalidArgument(NL2SQLError, ValueError):
     code, status = "INVALID_ARGUMENT", 422
 
 
+class NotPinnable(InvalidArgument):
+    """``pin`` of a dashboard that is already saved, or of an empty draft."""
+
+    code = "NOT_PINNABLE"
+
+
+class ChartNotSupported(InvalidArgument):
+    """``set_tile_chart`` to a kind the tile's result cannot be drawn as; the message names the kinds it can."""
+
+    code = "CHART_NOT_SUPPORTED"
+
+
+class UnknownTile(InvalidArgument):
+    """A chart id the dashboard does not have."""
+
+    code = "UNKNOWN_TILE"
+
+
+class UnknownFilter(InvalidArgument):
+    """A filter id the dashboard does not have."""
+
+    code = "UNKNOWN_FILTER"
+
+
 class NotIndexed(NL2SQLError, ValueError):
     """A datasource has no live index build; the message names the command that builds it."""
 
