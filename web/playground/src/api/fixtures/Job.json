@@ -1,0 +1,33 @@
+{
+  "created_at": "2026-01-01T00:00:00Z",
+  "created_by": "ann",
+  "error": null,
+  "finished_at": "2026-01-01T00:00:03Z",
+  "id": "job-0001-fixture-id",
+  "kind": "index",
+  "params": {
+    "datasource_ids": [
+      "chinook"
+    ]
+  },
+  "progress": [
+    {
+      "at": "2026-01-01T00:00:02Z",
+      "done": 1,
+      "step": "chinook",
+      "total": 1
+    }
+  ],
+  "result": {
+    "empty": [],
+    "failed": [],
+    "ok": true,
+    "stats": [
+      {
+        "datasource_id": "chinook"
+      }
+    ]
+  },
+  "started_at": "2026-01-01T00:00:01Z",
+  "status": "succeeded"
+}

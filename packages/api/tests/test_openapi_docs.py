@@ -2,14 +2,14 @@
 
 from fastapi.routing import APIRoute
 
-from nl2sql_api.routes import datasource, health, indexing, llm, query
+from nl2sql_api.routes import datasource, health, indexing, jobs, llm, query
 
 PREFIX = "/api/v1"
 
 
 def _routes():
     """Every (method, path) the routers declare, as main.py mounts them under /api/v1."""
-    return [(method, PREFIX + route.path) for module in (query, health, datasource, llm, indexing)
+    return [(method, PREFIX + route.path) for module in (query, health, datasource, llm, indexing, jobs)
             for route in module.router.routes if isinstance(route, APIRoute) for method in sorted(route.methods)]
 
 
@@ -24,7 +24,7 @@ def test_the_schema_lists_every_route_with_a_summary_and_a_description(api_clien
     client, _ = api_client()
     paths = client.get("/openapi.json").json()["paths"]
     routes = _routes()
-    assert len(routes) == 21
+    assert len(routes) == 25
     assert sum(len(ops) for ops in paths.values()) == len(routes)
     for method, path in routes:
         operation = paths[path][method.lower()]
