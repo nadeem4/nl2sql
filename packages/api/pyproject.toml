@@ -43,3 +43,7 @@ nl2sql-api = "nl2sql_api.serve:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["nl2sql_api*"]
+
+# The built web app (nl2sql-ui, `npm run build`): the wheel carries it so `pip install nl2sql-api` needs no Node.
+[tool.setuptools.package-data]
+"nl2sql_api.web" = ["static/*", "static/assets/*"]

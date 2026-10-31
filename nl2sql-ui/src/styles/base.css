@@ -1,0 +1,345 @@
+/* nl2sql playground.
+   One idea carries the page: the run is a single spine, question to cost, and
+   the checks sit across it like a gate. Everything else stays quiet.
+
+   Type: Schibsted Grotesk (UI) and Fragment Mono (plans, SQL, names, numbers),
+   both bundled into the page from @fontsource so it works offline. Latin only. */
+
+@font-face {
+  font-family: "Schibsted Grotesk";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("../../node_modules/@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fragment Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../node_modules/@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff2") format("woff2");
+}
+
+/* Porcelain: near-white paper, black ink, one oxblood accent used sparingly.
+   The primary button is filled with ink, not the accent. Passed checks and a
+   live status are --ok green, kept apart from the brand accent; real faults
+   are --fault burnt orange. Every text colour holds 4.5:1 on paper, surface,
+   raised and well. */
+:root {
+  --paper: #f5f5f4;
+  --surface: #fafafa;
+  --raised: #ffffff;
+  --well: #ebebea;
+  --ink: #141414;
+  --ink-2: #4b4b4b;
+  --ink-3: #646464;
+  --rule: #d5d5d3;
+  --rule-strong: #8a8a88;
+  --hair: rgba(0, 0, 0, .08);
+  --accent: #8c1d2e;
+  --accent-ink: #ffffff;
+  --accent-soft: #f4e3e6;
+  --accent-fill: #141414;
+  --accent-on: #ffffff;
+  --ok: #1c7340;
+  --ok-soft: #dcefe3;
+  --warn: #8a5a00;
+  --warn-soft: #f6ead0;
+  --fault: #b33b0a;
+  --fault-soft: #fde8dc;
+  --focus: #8c1d2e;
+  --shadow: 0 1px 0 rgba(0, 0, 0, .03), 0 14px 30px -18px rgba(0, 0, 0, .22);
+
+  --sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Fragment Mono", ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* Type scale: six sizes, three weights. */
+  --fs-1: 12px;
+  --fs-2: 13.5px;
+  --fs-3: 15px;
+  --fs-4: 18px;
+  --fs-5: 24px;
+  --fs-6: 34px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 650;
+
+  /* Spacing scale. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 72px;
+
+  --r-control: 8px;
+  --r-well: 8px;
+  --r-raised: 12px;
+  --gutter: var(--sp-6);
+
+  /* Motion: two curves and five durations. Only transform and opacity
+     animate, and only under prefers-reduced-motion: no-preference. */
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --dur-press: 90ms;
+  --dur-state: 160ms;
+  --dur-page: 180ms;
+  --dur-enter: 320ms;
+  --dur-data: 420ms;
+
+  color-scheme: light;
+}
+
+/* Dark is its own palette, not an inversion. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #111111;
+    --surface: #161616;
+    --raised: #1c1c1c;
+    --well: #262626;
+    --ink: #ededed;
+    --ink-2: #b0b0b0;
+    --ink-3: #8f8f8f;
+    --rule: #2f2f2f;
+    --rule-strong: #6b6b6b;
+    --hair: rgba(255, 255, 255, .08);
+    --accent: #f08a9b;
+    --accent-ink: #111111;
+    --accent-soft: #3a1a20;
+    --accent-fill: #ededed;
+    --accent-on: #111111;
+    --ok: #5cc98a;
+    --ok-soft: #15301f;
+    --warn: #e8b85c;
+    --warn-soft: #3a2c12;
+    --fault: #fb923c;
+    --fault-soft: #3b2112;
+    --focus: #f08a9b;
+    --shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 14px 34px -18px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--fs-3)/1.55 var(--sans);
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+code, pre, kbd, .mono { font-family: var(--mono); font-size: 0.87em; }
+
+h1, h2, h3 { margin: 0; font-weight: var(--fw-bold); letter-spacing: -0.01em; }
+
+p { margin: 0; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* One link style, so nothing on the page is browser blue. */
+a {
+  color: var(--accent);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* One disclosure caret for every <summary>: the browser's triangle is off. */
+summary { list-style: none; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+summary::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 10px 0 2px;
+  border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
+  transform: translateY(-2px) rotate(-45deg); transition: transform var(--dur-state) ease;
+}
+details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* A button rather than a fragment link: the hash is the router's, so the jump
+   moves focus instead of writing one. */
+.skip {
+  position: absolute; left: var(--sp-4); top: -48px; z-index: 10;
+  background: var(--ink); color: var(--paper); border: 0;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-control); font: inherit; font-size: var(--fs-2);
+}
+.skip:focus { top: var(--sp-3); }
+
+.quiet { color: var(--ink-2); }
+
+/* ---------- buttons: one family ----------
+   Primary is filled with ink, secondary is an outline, ghost has neither.
+   Hover changes colour only, and only where hover is real; a press scales. */
+
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; }
+
+.ask, .first-run-go, .index-rebuild, .settings-save, .rate-btn, .inspect-close {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: 36px; padding: 0 var(--sp-4); border-radius: var(--r-control);
+  border: 1px solid transparent; font-size: var(--fs-2); font-weight: var(--fw-bold);
+  line-height: 1.2; white-space: nowrap; text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease, border-color var(--dur-state) ease, color var(--dur-state) ease;
+}
+.ask:active:not(:disabled), .first-run-go:active, .index-rebuild:active:not(:disabled),
+.settings-save:active:not(:disabled), .rate-btn:active:not(:disabled), .inspect-close:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+/* primary */
+.ask, .first-run-go, .index-rebuild.is-primary, .settings-save {
+  background: var(--accent-fill); color: var(--accent-on); border-color: var(--accent-fill);
+}
+.ask { min-height: 40px; font-size: var(--fs-3); }
+.ask:disabled, .index-rebuild:disabled, .settings-save:disabled {
+  background: var(--well); color: var(--ink-3); border-color: var(--well);
+}
+.ask kbd { font-size: var(--fs-1); opacity: .72; font-weight: var(--fw-regular); }
+
+/* secondary */
+.index-rebuild, .rate-btn {
+  background: transparent; color: var(--ink); border-color: var(--rule-strong); font-weight: var(--fw-medium);
+}
+.index-rebuild.is-primary { font-weight: var(--fw-bold); }
+
+/* ghost */
+.inspect-close {
+  background: transparent; color: var(--ink-2); font-weight: var(--fw-medium);
+}
+
+@media (pointer: coarse) {
+  .ask, .first-run-go, .index-rebuild, .settings-save, .rate-btn, .inspect-close,
+  .fault-action, .fault-again { min-height: 44px; }
+}
+
+/* ---------- frame ---------- */
+
+.app { max-width: 1480px; margin: 0 auto; padding: 0 var(--gutter) var(--sp-8); }
+
+/* The top bar: the product mark, the pages and one status pill. On a wide
+   window they share one 64px row; narrower, the nav takes the row below. The
+   nav sits on the bar's own rule: the page you are on takes that rule in the
+   accent. Nothing here is a panel that opens -- each name is a page. */
+.topbar {
+  display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--sp-6); row-gap: var(--sp-2);
+  padding-top: var(--sp-3); border-bottom: 1px solid var(--rule);
+}
+.wordmark { font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--ink-3); white-space: nowrap; }
+.wordmark .mono { font-size: 16px; color: var(--ink); margin-right: 2px; }
+
+.status {
+  margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: 32px; max-width: 100%; padding: 0 var(--sp-3); border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--surface);
+  font-size: var(--fs-1); color: var(--ink-2); cursor: default;
+}
+.status-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pulse {
+  flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft);
+}
+.status[data-tone="warn"] .pulse { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+
+.nav { flex-basis: 100%; order: 3; }
+.nav ul {
+  list-style: none; margin: 0 0 -1px; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 0 2px;
+}
+.nav-link {
+  display: inline-flex; align-items: baseline; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); font-weight: var(--fw-medium);
+  color: var(--ink-2); text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color var(--dur-state) ease, border-color var(--dur-state) ease;
+}
+.nav-link[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+/* One underline for the whole nav (App.jsx, useNavIndicator): a 1px bar
+   moved and scaled to the current tab. Once it is placed, the tabs' own
+   accent border gives way to it. */
+.nav { position: relative; }
+.nav-ind {
+  position: absolute; left: 0; bottom: -1px; width: 1px; height: 2px;
+  background: var(--accent); transform-origin: left center; opacity: 0; pointer-events: none;
+}
+.nav[data-ind] .nav-ind { opacity: 1; }
+.nav[data-ind] .nav-link[aria-current="page"] { border-bottom-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .nav[data-ind="on"] .nav-ind { transition: transform 240ms var(--ease-out); }
+}
+.nav-off { font-size: var(--fs-1); font-weight: var(--fw-regular); color: var(--ink-3); }
+.nav-link[aria-current="page"] .nav-off { color: var(--ink-2); }
+
+@media (min-width: 1061px) {
+  .topbar { flex-wrap: nowrap; height: 64px; padding-top: 0; }
+  .nav { flex-basis: auto; order: 0; align-self: stretch; }
+  .nav ul { height: 100%; flex-wrap: nowrap; }
+  .nav-link { height: 100%; align-items: center; padding: 0 var(--sp-3); }
+}
+
+/* Every page says what it is and what it does, then gives its content the
+   full width. */
+.page:focus { outline: none; }
+.page { view-transition-name: page; }
+.topbar { view-transition-name: topbar; }
+/* Only the page moves; the root (the paper behind it) does not animate. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-old(page), ::view-transition-new(page) { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(page) { animation: fade-out var(--dur-page) var(--ease-out) both; }
+  ::view-transition-new(page) { animation: rise-in var(--dur-page) var(--ease-out) both; }
+  @keyframes fade-out { to { opacity: 0; } }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(4px); } }
+}
+.page-head { padding: var(--sp-6) 0 0; }
+.page-head h1 { font-size: var(--fs-5); letter-spacing: -0.02em; line-height: 1.2; }
+.page-lede { margin-top: var(--sp-2); font-size: var(--fs-3); color: var(--ink-2); max-width: 76ch; text-wrap: pretty; }
+.page-note { margin-top: var(--sp-2); font-size: var(--fs-2); color: var(--ink-3); max-width: 84ch; text-wrap: pretty; }
+.sheet { margin-top: var(--sp-5); padding-bottom: var(--sp-2); }
+
+.layout {
+  margin-top: var(--sp-5);
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-areas:
+    "rail composer"
+    "rail run";
+  grid-template-rows: auto 1fr;
+  column-gap: var(--sp-7);
+  align-items: start;
+}
+.composer { grid-area: composer; min-width: 0; }
+.run { grid-area: run; min-width: 0; padding-top: var(--sp-4); }
+.run:focus { outline: none; }
+.rail {
+  grid-area: rail; min-width: 0;
+  position: sticky; top: 0; max-height: 100dvh; overflow: auto;
+  padding: var(--sp-4) var(--sp-4) var(--sp-6) 0; margin-right: calc(-1 * var(--sp-4));
+  border-right: 1px solid var(--rule);
+}
+
+/* ---------- the raised tier ----------
+   One step up from the paper, and only for the four things a reader works
+   with: the composer, the checks gate, the SQL and its rows, and the node
+   inspector. Everything else stays flat. */
+.composer, #pane-validation .station-body, .art, .inspect {
+  background: var(--raised); border: 1px solid var(--hair);
+  border-radius: var(--r-raised); box-shadow: var(--shadow);
+}
+
