@@ -33,7 +33,12 @@ queue. Another user's job is a `404`; an admin sees every caller's.
 | `DELETE /api/v1/jobs/{job_id}` | Cancel: a queued job is removed; a running one stops between items. Returns the job |
 | `GET /api/v1/jobs/{job_id}/events` | Progress as Server-Sent Events |
 
-The routes that start a job (`POST /api/v1/jobs/<kind>`) arrive with the rows that own each kind.
+| Route | Starts |
+|---|---|
+| `POST /api/v1/jobs/dashboard` | A starter dashboard for one datasource, as the caller; any caller. See [Dashboards](dashboards.md#generate-a-starter-dashboard). |
+
+Each `POST /api/v1/jobs/<kind>` answers `202` with the queued `Job` and a `409` when the caller already has a job
+queued or running. The other kinds arrive with the rows that own them.
 
 ## Events
 

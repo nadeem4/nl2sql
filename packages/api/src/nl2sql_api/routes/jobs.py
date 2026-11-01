@@ -9,7 +9,7 @@ from nl2sql import NL2SQL, UserContext
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine, get_jobs
 from nl2sql_api.errors import ERROR_RESPONSE
-from nl2sql_api.jobs import Job, Jobs
+from nl2sql_api.jobs import DashboardJob, DashboardJobResult, Job, JobContext, Jobs
 from nl2sql_api.sse import SSE_HEADERS
 
 router = APIRouter(tags=["jobs"])
@@ -22,6 +22,31 @@ _NOT_FOUND = {404: {**ERROR_RESPONSE, "description": "No such job for this calle
 
 def _admin(user: UserContext, engine: NL2SQL) -> bool:
     return identity.is_admin(user, engine)
+
+
+# One route per kind, each a `def` that submits one runner (a function of a `JobContext`) and returns the queued job
+# with a 202. A route names its body model (a `*Job` in `jobs.py`), its caller (`Caller`, or `identity.admin` for an
+# admin kind) and the facade call the runner makes, reporting each item through `ctx.progress(step, done, total)` and
+# passing `ctx.token` as the call's `cancellation_token`. `jobs.submit` is the one-job-per-caller check (a 409).
+_STARTED = {202: {"description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."},
+            409: {**ERROR_RESPONSE, "description": "The caller already has a job queued or running."},
+            **identity.AUTH_RESPONSES}
+
+
+@router.post("/jobs/dashboard", response_model=Job, status_code=202, summary="Generate a starter dashboard",
+             responses=_STARTED)
+def start_dashboard_job(body: DashboardJob, user: Caller, jobs: Queue, engine: Engine):
+    """Builds the no-model starter dashboard for `datasource_id` as the caller and saves it in their workspace. The
+    job's `result` is the new `Dashboard` and its first `DashboardRun`; `progress` is one step per chart."""
+
+    def run(ctx: JobContext) -> DashboardJobResult:
+        dashboard, first = engine.dashboards.generate(
+            body.datasource_id, user_context=user, title=body.title, workspace_id=body.workspace_id,
+            max_tiles=body.max_tiles, cancellation_token=ctx.token,
+            on_tile=lambda tile: ctx.progress(f"tile {tile.done} of {tile.total}", tile.done, tile.total))
+        return DashboardJobResult(dashboard=dashboard, run=first)
+
+    return jobs.submit("dashboard", body, user, run)
 
 
 @router.get("/jobs", response_model=List[Job], summary="List jobs", responses=identity.AUTH_RESPONSES)

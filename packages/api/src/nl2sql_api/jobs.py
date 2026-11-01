@@ -12,7 +12,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from nl2sql import (CancellationToken, Dashboard, DashboardRun, EvalReport, NL2SQLError, ProfileReport,
                     RunCancelled, UserContext)
@@ -43,6 +43,8 @@ class EvalJob(BaseModel):
 
 
 class DashboardJob(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     datasource_id: str
     title: Optional[str] = None
     workspace_id: Optional[str] = None
