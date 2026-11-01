@@ -39,6 +39,7 @@ def create_workspace(body: WorkspaceBody, user: Caller, engine: Engine):
 @router.put("/workspaces/{workspace_id}/name", response_model=Workspace, summary="Rename a workspace",
             responses={**_MISSING, **_NAME})
 def rename_workspace(workspace_id: str, body: WorkspaceBody, user: Caller, engine: Engine):
+    """Renames the workspace; names are unique per owner, ignoring case."""
     return engine.workspaces.rename(workspace_id, body.name, user_context=user)
 
 

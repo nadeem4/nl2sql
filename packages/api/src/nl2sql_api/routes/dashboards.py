@@ -69,12 +69,14 @@ def filter_values(dashboard_id: str, filter_id: str, user: Caller, engine: Engin
 @router.put("/dashboards/{dashboard_id}/title", response_model=Dashboard, summary="Rename a dashboard",
             responses=_EDIT)
 def rename_dashboard(dashboard_id: str, body: TitleBody, user: Caller, engine: Engine):
+    """Sets the dashboard's title."""
     return engine.dashboards.rename(dashboard_id, body.title, user_context=user)
 
 
 @router.put("/dashboards/{dashboard_id}/tiles/{tile_id}/title", response_model=Dashboard, summary="Rename a chart",
             responses=_EDIT)
 def rename_tile(dashboard_id: str, tile_id: str, body: TitleBody, user: Caller, engine: Engine):
+    """Sets one chart's title."""
     return engine.dashboards.rename_tile(dashboard_id, tile_id, body.title, user_context=user)
 
 
@@ -126,6 +128,7 @@ def pin_dashboard(dashboard_id: str, user: Caller, engine: Engine, body: Optiona
 @router.post("/dashboards/{dashboard_id}/move", response_model=Dashboard, summary="Move to another workspace",
              responses=_EDIT)
 def move_dashboard(dashboard_id: str, body: MoveBody, user: Caller, engine: Engine):
+    """Moves a saved dashboard into one of the caller's workspaces."""
     return engine.dashboards.move(dashboard_id, body.workspace_id, user_context=user)
 
 

@@ -4790,6 +4790,7 @@
     },
     "/api/v1/dashboards/{dashboard_id}/move": {
       "post": {
+        "description": "Moves a saved dashboard into one of the caller's workspaces.",
         "operationId": "move_dashboard_api_v1_dashboards__dashboard_id__move_post",
         "parameters": [
           {
@@ -5309,6 +5310,7 @@
     },
     "/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}/title": {
       "put": {
+        "description": "Sets one chart's title.",
         "operationId": "rename_tile_api_v1_dashboards__dashboard_id__tiles__tile_id__title_put",
         "parameters": [
           {
@@ -5400,6 +5402,7 @@
     },
     "/api/v1/dashboards/{dashboard_id}/title": {
       "put": {
+        "description": "Sets the dashboard's title.",
         "operationId": "rename_dashboard_api_v1_dashboards__dashboard_id__title_put",
         "parameters": [
           {
@@ -7031,6 +7034,7 @@
     },
     "/api/v1/workspaces/{workspace_id}/name": {
       "put": {
+        "description": "Renames the workspace; names are unique per owner, ignoring case.",
         "operationId": "rename_workspace_api_v1_workspaces__workspace_id__name_put",
         "parameters": [
           {
