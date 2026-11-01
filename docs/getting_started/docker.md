@@ -72,7 +72,7 @@ Provider keys come from the environment (`-e OPENAI_API_KEY=...`) or from the
 mounted `.env`. Before it serves, the API calls `engine.check()`: a datasource
 with `required: true` that cannot connect stops the container, and any other
 that fails is logged and left out. Build the index once with
-`POST /api/v1/index-all`, or with `nl2sql --config my-project/nl2sql.yaml index`
+`POST /api/v1/jobs/index`, or with `nl2sql --config my-project/nl2sql.yaml index`
 against the same storage.
 
 ## API usage

@@ -29,9 +29,10 @@ API for remote clients. Use the links below for the full technical references.
   - [REST API index](rest/index.md)
   - [Health API](rest/health.md)
   - [Query API](rest/query.md)
-  - [Datasource API](rest/datasource.md)
+  - [Datasource API](rest/datasources.md)
   - [LLM API](rest/llm.md)
   - [Indexing API](rest/indexing.md)
+  - [Knowledge API](rest/knowledge.md)
 
 ## Supporting contracts
 

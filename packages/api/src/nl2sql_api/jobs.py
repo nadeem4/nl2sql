@@ -29,13 +29,17 @@ JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
 class IndexJob(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     datasource_ids: Optional[List[str]] = None
 
 
 class ProfileJob(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     datasource_ids: Optional[List[str]] = None
     draft: bool = False
-    max_cost_usd: Optional[float] = None
+    max_cost_usd: Optional[float] = Field(None, gt=0)
 
 
 class EvalJob(BaseModel):

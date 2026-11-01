@@ -13,6 +13,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+from nl2sql.common.errors import InvalidArgument
+
 if TYPE_CHECKING:
     from nl2sql.api.query_api import QueryResult
 
@@ -170,7 +172,7 @@ def schema_diagram(view: Dict[str, Any], tables: Optional[Sequence[str]] = None,
     counts the rest.
 
     Raises:
-        ValueError: ``tables`` names no table of the view.
+        InvalidArgument: ``tables`` names no table of the view (a ``ValueError``).
     """
     schema_tables: List[Dict[str, Any]] = view.get("tables") or []
     # An entity id is generated, so two names that look alike to Mermaid never share one; the name is its label.
@@ -217,7 +219,7 @@ def schema_diagram(view: Dict[str, Any], tables: Optional[Sequence[str]] = None,
         asked = {entity(t) for t in schema_tables
                  if t["name"].lower() in wanted or f"{t.get('schema')}.{t['name']}".lower() in wanted}
         if not asked:
-            raise ValueError(f"No table of this datasource matches: {', '.join(tables)}.")
+            raise InvalidArgument(f"No table of this datasource matches: {', '.join(tables)}.")
         near = asked | {b for a, b, _, _ in links if a in asked} | {a for a, b, _, _ in links if b in asked}
         chosen = [t for t in schema_tables if entity(t) in near]
     degree = {entity(t): 0 for t in chosen}

@@ -18,7 +18,7 @@ import yaml
 from langchain_core.embeddings import DeterministicFakeEmbedding
 from typer.testing import CliRunner
 
-from nl2sql import NL2SQL, Embeddings, UserContext
+from nl2sql import InvalidArgument, NL2SQL, Embeddings, UserContext
 from nl2sql.cli.main import app
 from nl2sql.evaluation.run import UnknownPriceError
 from nl2sql.testing.config import make_config
@@ -239,7 +239,7 @@ def test_draft_without_an_llm_reports_and_drafts_nothing(tmp_path):
 
 def test_a_nonpositive_cap_is_a_value_error(tmp_path, drafter):
     with _engine(tmp_path, drafter) as engine:
-        with pytest.raises(ValueError, match="max_cost_usd"):
+        with pytest.raises(InvalidArgument, match="max_cost_usd"):
             engine.knowledge.profile(user_context=ADMIN, draft=True, max_cost_usd=0)
 
 
@@ -291,7 +291,7 @@ def test_a_repeat_draft_does_not_ask_again_for_what_waits_in_the_queue(tmp_path,
 
 def test_a_cap_without_draft_is_a_value_error(tmp_path, drafter):
     with _engine(tmp_path, drafter) as engine:
-        with pytest.raises(ValueError, match="draft"):
+        with pytest.raises(InvalidArgument, match="draft"):
             engine.knowledge.profile(user_context=ADMIN, max_cost_usd=1.0)
 
 

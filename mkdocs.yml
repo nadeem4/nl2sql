@@ -186,9 +186,10 @@ nav:
       - Overview: api/rest/index.md
       - Health: api/rest/health.md
       - Query: api/rest/query.md
-      - Datasource: api/rest/datasource.md
+      - Datasources: api/rest/datasources.md
       - LLM: api/rest/llm.md
       - Indexing: api/rest/indexing.md
+      - Knowledge: api/rest/knowledge.md
       - Dashboards: api/rest/dashboards.md
       - Jobs: api/rest/jobs.md
       - Errors: api/rest/errors.md

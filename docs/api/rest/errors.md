@@ -3,7 +3,7 @@
 Every non-2xx response from `nl2sql-api` is one envelope (`packages/api/src/nl2sql_api/errors.py`):
 
 ```json
-{"error": {"code": "NOT_FOUND", "message": "No datasource 'sales'.", "fix": "List the datasources with GET /api/v1/datasource.",
+{"error": {"code": "NOT_FOUND", "message": "No datasource 'sales'.", "fix": "List the datasources with GET /api/v1/datasources.",
            "details": [], "request_id": null}}
 ```
 

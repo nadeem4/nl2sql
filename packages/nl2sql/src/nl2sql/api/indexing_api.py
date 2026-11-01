@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional
 
 from nl2sql.api.types import IndexProgress
+from nl2sql.common.errors import DatasourceNotFound
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 
@@ -141,7 +142,7 @@ class IndexAPI:
         (``datasource_ids=None``) or unknown (named).
 
         Raises:
-            ValueError: a named datasource is not configured, or the caller
+            DatasourceNotFound: a named datasource is not configured (a ``ValueError``), or the caller
                 cannot reach it (the same message, so neither is told apart).
         """
         from nl2sql.schema.drift import check
@@ -160,7 +161,7 @@ class IndexAPI:
         introduced it, with something in it the caller may read).
 
         Raises:
-            ValueError: the datasource is not configured or the caller cannot reach it.
+            DatasourceNotFound: the datasource is not configured or the caller cannot reach it.
         """
         from nl2sql.schema.drift import versions
 
@@ -174,7 +175,7 @@ class IndexAPI:
         a diff only in tables the caller's scope denies.
 
         Raises:
-            ValueError: the datasource is not configured or the caller cannot reach it.
+            DatasourceNotFound: the datasource is not configured or the caller cannot reach it.
         """
         from nl2sql.schema.drift import stored_diff
 
@@ -184,7 +185,7 @@ class IndexAPI:
         """The caller's scope in a configured datasource it can reach; otherwise "unknown", whichever it is."""
         scope = self._ctx.policy_engine.scope(user_context, datasource_id)
         if datasource_id not in {d.id for d in self._ctx.config.datasources} or not scope.reaches_datasource():
-            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+            raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
         return scope
 
     def clear(self) -> None:

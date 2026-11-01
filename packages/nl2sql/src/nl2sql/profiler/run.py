@@ -21,6 +21,7 @@ from nl2sql_sdk.protocols import ProfilingAdapterProtocol
 from nl2sql_sdk.schema import ColumnRef, SchemaSnapshot
 from nl2sql_sdk.stores import Proposal
 
+from nl2sql.common.errors import InvalidArgument
 from nl2sql.knowledge.resolve import resolve_column, resolve_join, resolve_table, table_label
 from nl2sql.limits import Budget
 from nl2sql.profiler.drafts import ENRICHMENT_LLM_NAME, Drafted, draft_descriptions
@@ -84,13 +85,13 @@ def profile(ctx: Any, datasource_ids: Sequence[str], user: "UserContext", *, dra
     across the whole call.
 
     Raises:
-        ValueError: ``max_cost_usd`` is not positive.
+        InvalidArgument: ``max_cost_usd`` is not positive, or is set without ``draft`` (a ``ValueError``).
         UnknownPriceError: ``draft`` is set and the ``profiler`` model has no price.
     """
     if max_cost_usd is not None and not draft:
-        raise ValueError("max_cost_usd caps drafting: pass draft=True (--draft) with it.")
+        raise InvalidArgument("max_cost_usd caps drafting: pass draft=True (--draft) with it.")
     if max_cost_usd is not None and max_cost_usd <= 0:
-        raise ValueError("max_cost_usd must be a positive number of dollars.")
+        raise InvalidArgument("max_cost_usd must be a positive number of dollars.")
     drafter = _drafter(ctx, max_cost_usd) if draft else None
     reports: List[ProfileReport] = []
 

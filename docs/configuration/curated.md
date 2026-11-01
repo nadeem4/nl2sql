@@ -216,7 +216,7 @@ indexed once with plain `nl2sql index`. A plain `nl2sql index` also picks up
 the file, and a schema re-index always keeps the verified queries.
 
 Until you re-index, `nl2sql doctor` and the index status (`engine.index.health()`,
-`GET /api/v1/index/status`) warn:
+`GET /api/v1/index`) warn:
 
 ```text
 Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --refresh --datasource chinook`.

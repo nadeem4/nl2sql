@@ -1,0 +1,20 @@
+{
+  "change": {
+    "definition": "Sum of invoice totals"
+  },
+  "created_at": "2026-01-02T03:04:05Z",
+  "created_by": null,
+  "datasource_id": "chinook",
+  "decided_at": null,
+  "decided_by": null,
+  "evidence": {},
+  "id": "p-1",
+  "kind": "term",
+  "origin": "clarification",
+  "reason": null,
+  "schema_version": null,
+  "status": "proposed",
+  "tables": [],
+  "target": "revenue",
+  "wrote": null
+}
