@@ -5262,6 +5262,34 @@
   
   
     <li class="md-nav__item">
+      <a href="dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="jobs/" class="md-nav__link">
         
   
@@ -6172,13 +6200,18 @@ server on a config:</p>
 <td>Index management and status.</td>
 </tr>
 <tr>
+<td><a href="dashboards/">Dashboards</a></td>
+<td><code>routes/dashboards.py</code>, <code>routes/workspaces.py</code></td>
+<td>Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions.</td>
+</tr>
+<tr>
 <td><a href="errors/">Errors</a></td>
 <td><code>errors.py</code></td>
 <td>The one error envelope and the request id.</td>
 </tr>
 </tbody>
 </table>
-<p>The routers <code>approvals</code>, <code>conversations</code>, <code>dashboards</code>, <code>workspaces</code>, <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code> and <code>web</code> are empty
+<p>The routers <code>approvals</code>, <code>conversations</code>, <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code> and <code>web</code> are empty
 for now: later rows fill them. The committed contract is <code>packages/api/openapi.json</code>; <code>test_openapi_snapshot_is_current</code>
 fails when a route changes without it (rewrite it with <code>python packages/api/tests/test_openapi_snapshot.py</code>).</p>
 <h2 id="error-handling">Error Handling</h2>

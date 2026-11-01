@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../indexing/">
+        <link rel="prev" href="../dashboards/">
       
       
         <link rel="next" href="../errors/">
@@ -5090,6 +5090,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -5934,7 +5962,9 @@ in the server takes jobs in submission order, so two index builds never race on 
 memory; a restart loses them, and what they produced (an index, proposals, a dashboard) stays in the engine's stores.
 <code>nl2sql-api serve</code> therefore runs one Uvicorn worker and has no <code>--workers</code> option.</p>
 <p>A caller with a job queued or running gets a <code>409</code> naming it when it starts another, so one caller cannot stall the
-queue. Another user's job is a <code>404</code>; an admin sees every caller's.</p>
+queue. Another user's job is a <code>404</code>; an admin sees every caller's jobs, but never their <code>result</code>: it can hold rows read
+under the owner's data scope, so it is the owner's alone (in <code>GET /jobs</code>, <code>GET /jobs/{id}</code>, <code>DELETE /jobs/{id}</code> and the
+<code>job.finished</code> event an admin gets <code>result: null</code>).</p>
 <h2 id="the-job">The <code>Job</code></h2>
 <table>
 <thead>
@@ -5974,7 +6004,7 @@ queue. Another user's job is a <code>404</code>; an admin sees every caller's.</
 </tr>
 <tr>
 <td><code>result</code></td>
-<td>Typed per kind once <code>succeeded</code>: <code>IndexResult</code>, <code>ProfileReport[]</code>, <code>EvalReport</code> or <code>{dashboard, run}</code></td>
+<td>Typed per kind once <code>succeeded</code>: <code>IndexResult</code>, <code>ProfileReport[]</code>, <code>EvalReport</code> or <code>{dashboard, run}</code>; <code>null</code> when the viewer is an admin looking at another caller's job</td>
 </tr>
 <tr>
 <td><code>error</code></td>
@@ -6009,7 +6039,22 @@ queue. Another user's job is a <code>404</code>; an admin sees every caller's.</
 </tr>
 </tbody>
 </table>
-<p>The routes that start a job (<code>POST /api/v1/jobs/&lt;kind&gt;</code>) arrive with the rows that own each kind.</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Starts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/v1/jobs/dashboard</code></td>
+<td>A starter dashboard for one datasource, as the caller; any caller. See <a href="../dashboards/#generate-a-starter-dashboard">Dashboards</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>Each <code>POST /api/v1/jobs/&lt;kind&gt;</code> answers <code>202</code> with the queued <code>Job</code> and a <code>409</code> when the caller already has a job
+queued or running. The other kinds arrive with the rows that own them.</p>
 <h2 id="events">Events</h2>
 <p><code>GET /jobs/{id}/events</code> sends one <code>job.progress</code> event (a <code>JobProgress</code> as <code>data</code>) for every step so far, then for each
 new one, then <code>job.finished</code> (the whole <code>Job</code>) and closes. A <code>: keep-alive</code> comment is sent every 15 seconds. The wire is

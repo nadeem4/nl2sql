@@ -2382,6 +2382,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#over-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over REST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5244,6 +5255,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/rest/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/rest/jobs/" class="md-nav__link">
         
   
@@ -6026,6 +6065,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#over-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over REST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6397,6 +6447,9 @@ first four wide); then bars (two wide); tables last. It is an ordinary dashboard
 a schedule, refresh, all by hand, exactly as for one built in chat.</p>
 <p>Each call publishes <code>dashboard.generated</code> (the counts, no titles) and the first run publishes
 <code>dashboard.refreshed</code> with the trigger <code>generate</code>.</p>
+<h2 id="over-rest">Over REST</h2>
+<p><code>nl2sql-api</code> serves each method above as a route, with the caller taken from the request: see
+<a href="../api/rest/dashboards/">Dashboards and workspaces API</a>.</p>
 <h2 id="configuration">Configuration</h2>
 <p><code>dashboards:</code> in <code>nl2sql.yaml</code> (<code>max_tiles</code>, <code>min_refresh_minutes</code>, <code>schedule_identity_max_age_days</code>) is
 accepted; <code>max_tiles</code> is read by <code>generate</code> and <code>suggest_questions</code>, <code>min_refresh_minutes</code> by <code>set_schedule</code> and
