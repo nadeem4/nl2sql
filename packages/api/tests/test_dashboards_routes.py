@@ -375,3 +375,35 @@ def test_starter_questions_for_an_unindexed_datasource_over_the_real_engine(real
     client, _, _ = real
     response = client.get(f"{API}/datasources/chinook/starter-questions")
     assert response.status_code == 422 and error_code(response) == "NOT_INDEXED"
+
+
+def test_refresh_with_an_unknown_approval_id_is_404(stub):
+    from nl2sql import ApprovalNotFound
+
+    client, dashboards, _ = stub
+    dashboards.returns["refresh"] = ApprovalNotFound("There is no approval request 'nope'.")
+    response = client.post(f"{API}/dashboards/d1/refresh", json={"approval_ids": ["nope"]})
+    assert response.status_code == 404 and error_code(response) == "NOT_FOUND"
+
+
+def test_the_dashboard_job_refuses_zero_max_tiles(stub):
+    client, _, _ = stub
+    response = client.post(f"{API}/jobs/dashboard", json={"datasource_id": "chinook", "max_tiles": 0})
+    assert response.status_code == 422
+
+
+def test_chart_body_matches_the_engines_chart_choices():
+    from typing import get_args
+
+    from nl2sql import Tile
+    from nl2sql_api.models.dashboards import ChartBody
+
+    assert set(get_args(ChartBody.model_fields["chart"].annotation)) == set(
+        get_args(Tile.model_fields["chart"].annotation))
+
+
+def test_filter_values_does_not_list_a_409():
+    from nl2sql_api.main import create_app
+
+    responses = create_app().openapi()["paths"]["/api/v1/dashboards/{dashboard_id}/filters/{filter_id}/values"]["get"]["responses"]
+    assert "409" not in responses and "404" in responses and "422" in responses

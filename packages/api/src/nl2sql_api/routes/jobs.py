@@ -51,14 +51,15 @@ def start_dashboard_job(body: DashboardJob, user: Caller, jobs: Queue, engine: E
 
 @router.get("/jobs", response_model=List[Job], summary="List jobs", responses=identity.AUTH_RESPONSES)
 def list_jobs(user: Caller, jobs: Queue, engine: Engine):
-    """The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's."""
+    """The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's, without their
+    `result`: that is the owner's alone."""
     return jobs.list(user, admin=_admin(user, engine))
 
 
 @router.get("/jobs/{job_id}", response_model=Job, summary="Read a job", responses=_NOT_FOUND)
 def get_job(job_id: str, user: Caller, jobs: Queue, engine: Engine):
     """One job: its `status`, `progress` so far, and `result` or `error` once it finished. Another user's job is
-    a 404."""
+    a 404, except to an admin, who sees its status and progress but never its `result`."""
     return jobs.get(job_id, user, admin=_admin(user, engine))
 
 
@@ -82,4 +83,4 @@ def cancel_job(job_id: str, user: Caller, jobs: Queue, engine: Engine):
 def job_events(job_id: str, user: Caller, jobs: Queue, engine: Engine):
     """The job's progress as Server-Sent Events. These are the API's events, not the engine's."""
     jobs.get(job_id, user, admin=_admin(user, engine))  # a 404 before the stream starts
-    return StreamingResponse(jobs.stream(job_id), media_type="text/event-stream", headers=SSE_HEADERS)
+    return StreamingResponse(jobs.stream(job_id, user), media_type="text/event-stream", headers=SSE_HEADERS)

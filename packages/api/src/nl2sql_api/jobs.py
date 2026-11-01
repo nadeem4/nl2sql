@@ -3,6 +3,9 @@
 A job is one facade call (index, profile, eval, dashboard) run by ``Jobs``' single worker, in submission order. A route
 submits a runner, a function of a :class:`JobContext`, which reports progress and watches its cancellation token. The
 last ``keep`` jobs are held; a restart loses them (what they produced is in the engine's stores).
+
+A job's ``result`` is the owner's alone: it can hold rows read under the owner's data scope. An admin who views another
+caller's job sees its status, kind, progress and error, with ``result`` null.
 """
 import asyncio
 import logging
@@ -12,7 +15,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql import (CancellationToken, Dashboard, DashboardRun, EvalReport, NL2SQLError, ProfileReport,
                     RunCancelled, UserContext)
@@ -48,7 +51,7 @@ class DashboardJob(BaseModel):
     datasource_id: str
     title: Optional[str] = None
     workspace_id: Optional[str] = None
-    max_tiles: Optional[int] = None
+    max_tiles: Optional[int] = Field(None, ge=1)
 
 
 class IndexResult(BaseModel):
@@ -160,14 +163,13 @@ class Jobs:
 
     def get(self, job_id: str, user: UserContext, *, admin: bool = False) -> Job:
         with self._lock:
-            return self._visible(job_id, user, admin).job.model_copy(deep=True)
+            return self._view(self._visible(job_id, user, admin), user)
 
     def list(self, user: UserContext, *, admin: bool = False) -> List[Job]:
         """The caller's jobs, newest first; an admin sees every caller's."""
         with self._lock:
             owner = _owner(user)
-            return [e.job.model_copy(deep=True) for e in reversed(list(self._entries.values()))
-                    if admin or e.owner == owner]
+            return [self._view(e, user) for e in reversed(list(self._entries.values())) if admin or e.owner == owner]
 
     def cancel(self, job_id: str, user: UserContext, *, admin: bool = False) -> Job:
         """A queued job is removed; a running one has its token cancelled and stops between items."""
@@ -177,18 +179,18 @@ class Jobs:
                 entry.job.status, entry.job.finished_at = "cancelled", self._clock()
             elif entry.job.status == "running" and not entry.returned:
                 entry.token.cancel()
-            return entry.job.model_copy(deep=True)
+            return self._view(entry, user)
 
-    async def stream(self, job_id: str):
+    async def stream(self, job_id: str, user: UserContext):
         """Every progress so far, then each new one, then ``job.finished`` with the job. An async generator over
-        the in-memory job: a waiting browser holds no thread."""
+        the in-memory job: a waiting browser holds no thread. ``job.finished`` carries ``result`` for the owner only."""
         sent, idle = 0, 0.0
         while True:
             with self._lock:
                 entry = self._entries.get(job_id)
                 if entry is None:
                     return
-                job = entry.job.model_copy(deep=True)
+                job = self._view(entry, user)
             for progress in job.progress[sent:]:
                 yield frame("job.progress", progress.model_dump_json())
                 idle = 0.0
@@ -220,6 +222,13 @@ class Jobs:
         if entry is None or not (admin or entry.owner == _owner(user)):
             raise RequestRefused(404, "NOT_FOUND", "No such job.")
         return entry
+
+    def _view(self, entry: _Entry, user: UserContext) -> Job:
+        """A copy of the job as ``user`` may see it: ``result`` only for the owner. Called under the lock."""
+        job = entry.job.model_copy(deep=True)
+        if entry.owner != _owner(user):
+            job.result = None
+        return job
 
     def _prune(self) -> None:
         finished = [i for i, e in self._entries.items() if e.job.status in _FINISHED]

@@ -19,7 +19,7 @@ those exist only in chat, and dashboards stay private.
 |---|---|
 | `GET /api/v1/dashboards` | The caller's dashboards, newest first. Query `workspace_id` and `status` (`saved`, the default, or `draft`). Returns `DashboardInfo[]`. |
 | `GET /api/v1/dashboards/{id}` | Opens one: a `DashboardView` with the stored `TileRun`s, `refreshed_at` and `due`. It only reads. Nothing is refreshed and no query runs; call the refresh route for the charts in `due`. A chart the caller can no longer read is `denied`, one whose plan no longer validates is `needs_fixing`, both with no rows. |
-| `POST /api/v1/dashboards/{id}/refresh` | Re-runs the stored plans as the caller. Body `{tile_id?, filters?, approval_ids?}`, all optional. `tile_id` limits it to one chart; `filters` maps a filter id to its values and the result is returned, never stored; `approval_ids` are request ids of approvals granted through `/approvals`. Returns a `DashboardRun`. Synchronous: it makes no model call. A dashboard someone else is refreshing is a `409`. |
+| `POST /api/v1/dashboards/{id}/refresh` | Re-runs the stored plans as the caller. Body `{tile_id?, filters?, approval_ids?}`, all optional. `tile_id` limits it to one chart; `filters` maps a filter id to its values and the result is returned, never stored; `approval_ids` are request ids of approvals granted through `/approvals`. Returns a `DashboardRun`. Synchronous: it makes no model call. A dashboard someone else is refreshing is a `409`; an id in `approval_ids` that is unknown, waiting, denied or expired is a `404` and nothing runs. |
 | `GET /api/v1/dashboards/{id}/filters/{filter_id}/values` | The distinct values of an `in` filter's column, or `[min, max]` of a `between` one, as the caller may read them. Query `limit` (1 to 1,000, default 100). Returns a list. |
 | `PUT /api/v1/dashboards/{id}/title` | Body `{title}`. Returns the `Dashboard`. |
 | `PUT /api/v1/dashboards/{id}/tiles/{tile_id}/title` | Body `{title}`. |
@@ -69,7 +69,7 @@ when the caller reaches no table; a datasource with no index (or one the caller 
 
 | Status | When |
 |---|---|
-| `404` `NOT_FOUND` | No such dashboard or workspace, or one that belongs to someone else. |
+| `404` `NOT_FOUND` | No such dashboard or workspace, or one that belongs to someone else; on refresh, also an unknown, waiting, denied or expired approval id. |
 | `409` `CONFLICT` | The dashboard is being refreshed or edited. |
 | `422` | `NOT_PINNABLE`, `CHART_NOT_SUPPORTED`, `UNKNOWN_TILE`, `UNKNOWN_FILTER`, `SCHEDULE_TOO_FREQUENT`, `WORKSPACE_NOT_EMPTY`, `NOT_INDEXED`, `NO_TILES`, `INVALID_ARGUMENT`, or `INVALID_REQUEST` for a body that does not validate. |
 

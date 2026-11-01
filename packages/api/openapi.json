@@ -891,6 +891,7 @@
           "max_tiles": {
             "anyOf": [
               {
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -4687,16 +4688,6 @@
             },
             "description": "No such dashboard (or one that is not the caller's)."
           },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "The dashboard is being refreshed or edited."
-          },
           "422": {
             "content": {
               "application/json": {
@@ -4705,7 +4696,7 @@
                 }
               }
             },
-            "description": "The request is refused: its message says why."
+            "description": "No such filter, `limit` out of range, or the caller cannot read the column: its message says why."
           }
         },
         "summary": "A filter's values",
@@ -5030,7 +5021,7 @@
                 }
               }
             },
-            "description": "No such dashboard (or one that is not the caller's)."
+            "description": "No such dashboard (or one that is not the caller's), or an id in `approval_ids` is unknown, waiting, denied or expired (`ApprovalNotFound`; nothing runs)."
           },
           "409": {
             "content": {
@@ -6156,7 +6147,7 @@
     },
     "/api/v1/jobs": {
       "get": {
-        "description": "The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's.",
+        "description": "The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's, without their\n`result`: that is the owner's alone.",
         "operationId": "list_jobs_api_v1_jobs_get",
         "responses": {
           "200": {
@@ -6315,7 +6306,7 @@
         ]
       },
       "get": {
-        "description": "One job: its `status`, `progress` so far, and `result` or `error` once it finished. Another user's job is\na 404.",
+        "description": "One job: its `status`, `progress` so far, and `result` or `error` once it finished. Another user's job is\na 404, except to an admin, who sees its status and progress but never its `result`.",
         "operationId": "get_job_api_v1_jobs__job_id__get",
         "parameters": [
           {

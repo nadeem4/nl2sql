@@ -23,6 +23,8 @@ Engine = Annotated[NL2SQL, Depends(get_engine)]
 
 _MISSING = {404: {**ERROR_RESPONSE, "description": "No such dashboard (or one that is not the caller's)."},
             **identity.AUTH_RESPONSES}
+_FILTER = {**_MISSING, 422: {**ERROR_RESPONSE, "description": "No such filter, `limit` out of range, or the caller "
+                                                              "cannot read the column: its message says why."}}
 _EDIT = {**_MISSING, 409: {**ERROR_RESPONSE, "description": "The dashboard is being refreshed or edited."},
          422: {**ERROR_RESPONSE, "description": "The request is refused: its message says why."}}
 
@@ -43,7 +45,10 @@ def open_dashboard(dashboard_id: str, user: Caller, engine: Engine):
 
 
 @router.post("/dashboards/{dashboard_id}/refresh", response_model=DashboardRun, summary="Refresh charts",
-             responses=_EDIT)
+             responses={**_EDIT, 404: {**ERROR_RESPONSE, "description": "No such dashboard (or one that is not the "
+                                                                          "caller's), or an id in `approval_ids` is "
+                                                                          "unknown, waiting, denied or expired "
+                                                                          "(`ApprovalNotFound`; nothing runs)."}})
 def refresh_dashboard(dashboard_id: str, user: Caller, engine: Engine, body: Optional[RefreshBody] = None):
     """Re-run the stored plans of one chart (`tile_id`) or all of them, as the caller. No model call. `filters`
     maps filter ids to values; a filtered refresh is returned and never stored. `approval_ids` are request ids
@@ -54,7 +59,7 @@ def refresh_dashboard(dashboard_id: str, user: Caller, engine: Engine, body: Opt
 
 
 @router.get("/dashboards/{dashboard_id}/filters/{filter_id}/values", response_model=List[Any],
-            summary="A filter's values", responses=_EDIT)
+            summary="A filter's values", responses=_FILTER)
 def filter_values(dashboard_id: str, filter_id: str, user: Caller, engine: Engine, limit: int = 100):
     """The distinct values of an `in` filter's column, or `[min, max]` of a `between` one, as the caller may read
     them (`limit` 1 to 1,000)."""

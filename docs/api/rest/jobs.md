@@ -8,7 +8,9 @@ memory; a restart loses them, and what they produced (an index, proposals, a das
 `nl2sql-api serve` therefore runs one Uvicorn worker and has no `--workers` option.
 
 A caller with a job queued or running gets a `409` naming it when it starts another, so one caller cannot stall the
-queue. Another user's job is a `404`; an admin sees every caller's.
+queue. Another user's job is a `404`; an admin sees every caller's jobs, but never their `result`: it can hold rows read
+under the owner's data scope, so it is the owner's alone (in `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}` and the
+`job.finished` event an admin gets `result: null`).
 
 ## The `Job`
 
@@ -21,7 +23,7 @@ queue. Another user's job is a `404`; an admin sees every caller's.
 | `created_by` | The caller's user id |
 | `created_at`, `started_at`, `finished_at` | Timestamps |
 | `progress` | `[{at, step, done, total}]`, one per item (a datasource, a case, a tile) |
-| `result` | Typed per kind once `succeeded`: `IndexResult`, `ProfileReport[]`, `EvalReport` or `{dashboard, run}` |
+| `result` | Typed per kind once `succeeded`: `IndexResult`, `ProfileReport[]`, `EvalReport` or `{dashboard, run}`; `null` when the viewer is an admin looking at another caller's job |
 | `error` | The error envelope's body once `failed`; never an exception's text |
 
 ## Endpoints
