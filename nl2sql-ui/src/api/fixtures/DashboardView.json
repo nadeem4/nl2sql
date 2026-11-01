@@ -1,0 +1,230 @@
+{
+  "dashboard": {
+    "conversation_id": null,
+    "created_at": "2026-01-02T03:04:05Z",
+    "filters": [
+      {
+        "column": "chinook.main.customers.country",
+        "id": "f1",
+        "kind": "text",
+        "label": "Country",
+        "op": "in"
+      }
+    ],
+    "id": "d1",
+    "schedule": null,
+    "status": "saved",
+    "tenant_id": null,
+    "tiles": [
+      {
+        "chart": "auto",
+        "id": "t1",
+        "layout": {
+          "h": 2,
+          "w": 2,
+          "x": 0,
+          "y": 0
+        },
+        "plan": {
+          "decomposition": null,
+          "plans": {},
+          "verified": {
+            "id": "v_revenue",
+            "params": {}
+          },
+          "verified_datasource_id": "chinook"
+        },
+        "question": "What is revenue by month?",
+        "title": "Revenue by month"
+      },
+      {
+        "chart": "auto",
+        "id": "t2",
+        "layout": {
+          "h": 2,
+          "w": 2,
+          "x": 2,
+          "y": 0
+        },
+        "plan": {
+          "decomposition": null,
+          "plans": {},
+          "verified": {
+            "id": "v_revenue",
+            "params": {}
+          },
+          "verified_datasource_id": "chinook"
+        },
+        "question": "What is revenue by month?",
+        "title": "Top countries"
+      },
+      {
+        "chart": "auto",
+        "id": "t3",
+        "layout": {
+          "h": 2,
+          "w": 2,
+          "x": 0,
+          "y": 0
+        },
+        "plan": {
+          "decomposition": null,
+          "plans": {},
+          "verified": {
+            "id": "v_revenue",
+            "params": {}
+          },
+          "verified_datasource_id": "chinook"
+        },
+        "question": "What is revenue by month?",
+        "title": "Refunds"
+      },
+      {
+        "chart": "auto",
+        "id": "t4",
+        "layout": {
+          "h": 2,
+          "w": 2,
+          "x": 2,
+          "y": 0
+        },
+        "plan": {
+          "decomposition": null,
+          "plans": {},
+          "verified": {
+            "id": "v_revenue",
+            "params": {}
+          },
+          "verified_datasource_id": "chinook"
+        },
+        "question": "What is revenue by month?",
+        "title": "Payroll"
+      }
+    ],
+    "title": "Sales overview",
+    "updated_at": "2026-01-02T03:04:05Z",
+    "user_id": "ann",
+    "workspace_id": "w1"
+  },
+  "due": [
+    "t1"
+  ],
+  "refreshed_at": "2026-01-02T03:04:05Z",
+  "runs": [
+    {
+      "approvals_needed": [],
+      "at": "2026-01-02T03:04:05Z",
+      "chart": {
+        "data": {
+          "columns": [
+            "month",
+            "revenue"
+          ],
+          "result_id": "sq1",
+          "rows": [
+            [
+              "2026-01",
+              120.5
+            ],
+            [
+              "2026-02",
+              98.0
+            ]
+          ],
+          "trace_id": "tr-1",
+          "truncated": false
+        },
+        "kind": "bar",
+        "reason": "a category and a number",
+        "series": null,
+        "takeaway": null,
+        "title": "What is revenue by month?",
+        "value": null,
+        "x": {
+          "field": "month",
+          "kind": "text",
+          "title": "Month"
+        },
+        "y": [
+          {
+            "field": "revenue",
+            "kind": "number",
+            "title": "Revenue"
+          }
+        ]
+      },
+      "column_kinds": {
+        "month": "text",
+        "revenue": "number"
+      },
+      "error": null,
+      "explanation": null,
+      "filtered": false,
+      "status": "ok",
+      "tile_id": "t1",
+      "trace_id": "tr-1"
+    },
+    {
+      "approvals_needed": [],
+      "at": "2026-01-02T03:04:05Z",
+      "chart": null,
+      "column_kinds": {},
+      "error": {
+        "code": "PLAN_INVALID",
+        "message": "A column it reads is gone."
+      },
+      "explanation": null,
+      "filtered": false,
+      "status": "needs_fixing",
+      "tile_id": "t2",
+      "trace_id": null
+    },
+    {
+      "approvals_needed": [],
+      "at": "2026-01-02T03:04:05Z",
+      "chart": null,
+      "column_kinds": {},
+      "error": {
+        "code": "SECURITY_VIOLATION",
+        "message": "You may not read this."
+      },
+      "explanation": null,
+      "filtered": false,
+      "status": "denied",
+      "tile_id": "t3",
+      "trace_id": null
+    },
+    {
+      "approvals_needed": [
+        {
+          "approver_roles": [
+            "lead"
+          ],
+          "asker_tenant_id": null,
+          "asker_user_id": null,
+          "datasource_id": "chinook",
+          "decomposition": null,
+          "hook": "big_reads",
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "plan": null,
+          "point": "execute.before",
+          "question": "What is revenue by month?",
+          "reason": "Reads a lot.",
+          "sql": "SELECT 1",
+          "sql_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sub_query": null,
+          "verified": null
+        }
+      ],
+      "at": "2026-01-02T03:04:05Z",
+      "chart": null,
+      "column_kinds": {},
+      "error": null,
+      "explanation": null,
+      "filtered": false,
+      "status": "needs_approval",
+      "tile_id": "t4",
+      "trace_id": null
+    }
+  ]
+}

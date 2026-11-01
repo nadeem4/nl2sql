@@ -96,7 +96,7 @@ def test_job_progress_replays_then_follows(jobs):
 
     async def follow():
         chunks = []
-        async for chunk in jobs.stream(job.id):
+        async for chunk in jobs.stream(job.id, ANN):
             chunks.append(chunk)
             if len(chunks) == 1:  # the replay of what happened before we connected
                 second.set()
@@ -114,7 +114,7 @@ def test_job_events_hold_no_worker_thread(jobs):
     wait_for(lambda: jobs.get(job.id, ANN).status == "running")
 
     async def wait_quietly():
-        stream = jobs.stream(job.id)
+        stream = jobs.stream(job.id, ANN)
         assert hasattr(stream, "__anext__"), "the stream must be an async generator"
         before = set(threading.enumerate())
         pending = asyncio.ensure_future(stream.__anext__())
@@ -300,3 +300,31 @@ def test_a_run_cancelled_error_ends_the_job_cancelled_without_a_traceback(jobs, 
 
     assert jobs.get(job.id, ANN).error is None
     assert "failed" not in caplog.text
+
+
+def test_an_admin_sees_another_users_job_without_its_result(api_client):
+    client, _ = api_client()
+    app.dependency_overrides[identity.caller] = _as({"ann": ANN, "root": ROOT})
+    app.dependency_overrides[identity.admin] = _as({"ann": ANN, "root": ROOT})
+    job = app.state.jobs.submit("index", IndexJob(), ANN, lambda ctx: IndexResult(ok=True, stats=[{"rows": 1}]))
+    wait_for(lambda: app.state.jobs.get(job.id, ANN).status == "succeeded")
+    url = f"/api/v1/jobs/{job.id}"
+    owner, admin = {"x-user": "ann"}, {"x-user": "root"}
+    assert client.get(url, headers=owner).json()["result"]["ok"] is True
+    seen = client.get(url, headers=admin).json()
+    assert seen["status"] == "succeeded" and seen["kind"] == "index" and seen["result"] is None
+    assert client.get("/api/v1/jobs", headers=owner).json()[0]["result"]["ok"] is True
+    assert client.get("/api/v1/jobs", headers=admin).json()[0]["result"] is None
+    finished = [data for name, data in _frames(client.get(url + "/events", headers=admin).text)
+                if name == "job.finished"]
+    assert finished[0]["status"] == "succeeded" and finished[0]["result"] is None
+    finished = [data for name, data in _frames(client.get(url + "/events", headers=owner).text)
+                if name == "job.finished"]
+    assert finished[0]["result"]["ok"] is True
+    assert client.delete(url, headers=admin).json()["result"] is None
+
+
+def test_max_tiles_below_one_is_refused():
+    with pytest.raises(ValueError):
+        DashboardJob(datasource_id="chinook", max_tiles=0)
+    assert DashboardJob(datasource_id="chinook", max_tiles=1).max_tiles == 1

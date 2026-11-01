@@ -407,10 +407,30 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
 | `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller |
 | `GET` | `/api/v1/about` | What the engine is: version and pipeline steps |
-| `GET` | `/api/v1/jobs` | The caller's background jobs, newest first (an admin sees all) |
+| `GET` | `/api/v1/jobs` | The caller's background jobs, newest first (an admin sees all, without their results) |
 | `GET` | `/api/v1/jobs/{job_id}` | One job: status, progress, result or error |
 | `DELETE` | `/api/v1/jobs/{job_id}` | Cancel a queued or running job |
 | `GET` | `/api/v1/jobs/{job_id}/events` | A job's progress as Server-Sent Events, ending with `job.finished` |
+| `POST` | `/api/v1/jobs/dashboard` | Queue a job that builds the no-model starter dashboard for a datasource (`202`) |
+| `GET` | `/api/v1/dashboards` | The caller's dashboards, saved or draft, optionally in one workspace |
+| `GET` | `/api/v1/dashboards/{dashboard_id}` | A dashboard and the stored results of its charts; reads only, runs no query |
+| `DELETE` | `/api/v1/dashboards/{dashboard_id}` | Delete a dashboard, its stored results and its schedule |
+| `POST` | `/api/v1/dashboards/{dashboard_id}/refresh` | Re-run the stored plans of one chart or all of them as the caller; no model call |
+| `GET` | `/api/v1/dashboards/{dashboard_id}/filters/{filter_id}/values` | The values a filter offers, as the caller may read them |
+| `PUT` | `/api/v1/dashboards/{dashboard_id}/title` | Rename a dashboard |
+| `PUT` | `/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}/title` | Rename a chart |
+| `PUT` | `/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}/chart` | Choose how a chart is drawn |
+| `DELETE` | `/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}` | Remove a chart and its stored result |
+| `PUT` | `/api/v1/dashboards/{dashboard_id}/layout` | Place the charts on the 4-column grid |
+| `PUT` | `/api/v1/dashboards/{dashboard_id}/filters` | Store the filter definitions |
+| `PUT` | `/api/v1/dashboards/{dashboard_id}/schedule` | Set or stop the refresh schedule |
+| `POST` | `/api/v1/dashboards/{dashboard_id}/pin` | Save a draft whole into a workspace |
+| `POST` | `/api/v1/dashboards/{dashboard_id}/move` | Move a dashboard to another workspace |
+| `GET` | `/api/v1/datasources/{datasource_id}/starter-questions` | The questions of the charts the starter dashboard would build; nothing runs |
+| `GET` | `/api/v1/workspaces` | The caller's workspaces, oldest first |
+| `POST` | `/api/v1/workspaces` | Create a workspace (`201`) |
+| `PUT` | `/api/v1/workspaces/{workspace_id}/name` | Rename a workspace |
+| `DELETE` | `/api/v1/workspaces/{workspace_id}` | Delete an empty workspace (`204`) |
 | `GET` | `/api/v1/datasource-types` | The adapters the engine can name, installed or not, each with its connection schema (the Connect a database form) |
 | `POST` | `/api/v1/datasource/test` | Connect to a datasource that is not added and report the stage that failed and the fix; registers nothing |
 | `POST` | `/api/v1/datasource` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...). `save: true` also writes `datasources/<id>.yaml`, with every secret as a reference. A body that does not validate is a 422 listing each problem by path |

@@ -241,6 +241,11 @@ a schedule, refresh, all by hand, exactly as for one built in chat.
 Each call publishes `dashboard.generated` (the counts, no titles) and the first run publishes
 `dashboard.refreshed` with the trigger `generate`.
 
+## Over REST
+
+`nl2sql-api` serves each method above as a route, with the caller taken from the request: see
+[Dashboards and workspaces API](../api/rest/dashboards.md).
+
 ## Configuration
 
 `dashboards:` in `nl2sql.yaml` (`max_tiles`, `min_refresh_minutes`, `schedule_identity_max_age_days`) is

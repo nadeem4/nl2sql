@@ -1,4 +1,5 @@
-"""The golden files the web app's node tests read: ``ApiError`` and ``Job`` (docs/architecture/wave_d.md, "Testing").
+"""The golden files the web app's node tests read: ``ApiError`` and ``Job``, the ``Dashboard`` and ``DashboardView``
+(docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
@@ -11,6 +12,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from itertools import count
 
+from dashboard_stubs import Recorder, dashboard, view
 from fastapi.testclient import TestClient
 
 from nl2sql import UserContext
@@ -30,6 +32,9 @@ def build() -> dict:
     with tempfile.TemporaryDirectory() as folder:
         class Engine:
             config = make_config(pathlib.Path(folder))
+            dashboards = Recorder()
+
+        Engine.dashboards.returns.update({"rename": dashboard(), "open": view()})
 
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine
@@ -48,7 +53,9 @@ def build() -> dict:
             while jobs.get(job.id, UserContext(user_id="ann")).status != "succeeded":
                 assert time.monotonic() < deadline, "the fixture job did not finish"
                 time.sleep(0.005)
-            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json()}
+            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
+                    "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
+                    "DashboardView.json": client.get("/api/v1/dashboards/d1").json()}
         finally:
             jobs.close()
 

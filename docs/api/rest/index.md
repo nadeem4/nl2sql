@@ -69,9 +69,10 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
 | [LLM](llm.md) | `routes/llm.py` | Replace the LLM (`PUT /settings/llm`) and inspect each agent's model. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
+| [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 
-The routers `approvals`, `conversations`, `dashboards`, `workspaces`, `datasources`, `index`, `knowledge`, `evals`, `settings` and `web` are empty
+The routers `approvals`, `conversations`, `datasources`, `index`, `knowledge`, `evals`, `settings` and `web` are empty
 for now: later rows fill them. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
 fails when a route changes without it (rewrite it with `python packages/api/tests/test_openapi_snapshot.py`).
 
