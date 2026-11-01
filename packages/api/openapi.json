@@ -369,6 +369,27 @@
         "title": "CaseWhen",
         "type": "object"
       },
+      "ChartBody": {
+        "additionalProperties": false,
+        "properties": {
+          "chart": {
+            "enum": [
+              "auto",
+              "line",
+              "bar",
+              "big_number",
+              "table"
+            ],
+            "title": "Chart",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chart"
+        ],
+        "title": "ChartBody",
+        "type": "object"
+      },
       "ChartData": {
         "additionalProperties": false,
         "properties": {
@@ -943,7 +964,60 @@
         "title": "DashboardFilter",
         "type": "object"
       },
+      "DashboardInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "refreshed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refreshed At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tiles": {
+            "title": "Tiles",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "workspace_id",
+          "status",
+          "tiles",
+          "updated_at"
+        ],
+        "title": "DashboardInfo",
+        "type": "object"
+      },
       "DashboardJob": {
+        "additionalProperties": false,
         "properties": {
           "datasource_id": {
             "title": "Datasource Id",
@@ -952,6 +1026,7 @@
           "max_tiles": {
             "anyOf": [
               {
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -1060,6 +1135,46 @@
           "trigger"
         ],
         "title": "DashboardRun",
+        "type": "object"
+      },
+      "DashboardView": {
+        "additionalProperties": false,
+        "description": "What ``open`` returns.",
+        "properties": {
+          "dashboard": {
+            "$ref": "#/components/schemas/Dashboard"
+          },
+          "due": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Due",
+            "type": "array"
+          },
+          "refreshed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refreshed At"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/TileRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dashboard"
+        ],
+        "title": "DashboardView",
         "type": "object"
       },
       "DatasourceResponse": {
@@ -1890,6 +2005,23 @@
         "title": "FilterSpec",
         "type": "object"
       },
+      "FiltersBody": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardFilter"
+            },
+            "title": "Filters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "filters"
+        ],
+        "title": "FiltersBody",
+        "type": "object"
+      },
       "GroupByItem": {
         "additionalProperties": false,
         "description": "Represents an item in the GROUP BY clause.\n\nAttributes:\n    expr (Expr): The expression to group by.",
@@ -2372,6 +2504,23 @@
         "title": "LLMCallUsage",
         "type": "object"
       },
+      "LayoutBody": {
+        "additionalProperties": false,
+        "properties": {
+          "arrangements": {
+            "items": {
+              "$ref": "#/components/schemas/TileArrangement"
+            },
+            "title": "Arrangements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "arrangements"
+        ],
+        "title": "LayoutBody",
+        "type": "object"
+      },
       "MetricSpec": {
         "properties": {
           "aggregation": {
@@ -2412,6 +2561,20 @@
           "name"
         ],
         "title": "MetricSpec",
+        "type": "object"
+      },
+      "MoveBody": {
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "title": "MoveBody",
         "type": "object"
       },
       "OrderBySpec": {
@@ -2457,6 +2620,35 @@
           "expr"
         ],
         "title": "OrderItem",
+        "type": "object"
+      },
+      "PinBody": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "title": "PinBody",
         "type": "object"
       },
       "PlanModel": {
@@ -3152,6 +3344,47 @@
         "title": "QuestionUsage",
         "type": "object"
       },
+      "RefreshBody": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Ids",
+            "type": "array"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {},
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filters"
+          },
+          "tile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tile Id"
+          }
+        },
+        "title": "RefreshBody",
+        "type": "object"
+      },
       "ResultManifest": {
         "description": "Which results a run produced, and who asked it, written as ``manifest.json`` in the run's folder.",
         "properties": {
@@ -3509,6 +3742,27 @@
           "state"
         ],
         "title": "Schedule",
+        "type": "object"
+      },
+      "ScheduleBody": {
+        "additionalProperties": false,
+        "properties": {
+          "every_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every Minutes"
+          }
+        },
+        "required": [
+          "every_minutes"
+        ],
+        "title": "ScheduleBody",
         "type": "object"
       },
       "ScheduleIdentity": {
@@ -3999,6 +4253,46 @@
         "title": "Tile",
         "type": "object"
       },
+      "TileArrangement": {
+        "additionalProperties": false,
+        "properties": {
+          "h": {
+            "minimum": 1.0,
+            "title": "H",
+            "type": "integer"
+          },
+          "tile_id": {
+            "title": "Tile Id",
+            "type": "string"
+          },
+          "w": {
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "W",
+            "type": "integer"
+          },
+          "x": {
+            "exclusiveMaximum": 4.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "integer"
+          },
+          "y": {
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h",
+          "tile_id"
+        ],
+        "title": "TileArrangement",
+        "type": "object"
+      },
       "TileLayout": {
         "additionalProperties": false,
         "description": "A place on a 4-column grid.",
@@ -4138,6 +4432,20 @@
           "status"
         ],
         "title": "TileRun",
+        "type": "object"
+      },
+      "TitleBody": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TitleBody",
         "type": "object"
       },
       "UnmappedSubQuery": {
@@ -4400,6 +4708,67 @@
         ],
         "title": "VerifiedRef",
         "type": "object"
+      },
+      "Workspace": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "title": "Workspace",
+        "type": "object"
+      },
+      "WorkspaceBody": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "WorkspaceBody",
+        "type": "object"
       }
     }
   },
@@ -4657,6 +5026,1156 @@
         "summary": "Grant an approval",
         "tags": [
           "approvals"
+        ]
+      }
+    },
+    "/api/v1/dashboards": {
+      "get": {
+        "description": "The caller's dashboards of one `status`, newest first, optionally in one workspace.",
+        "operationId": "list_dashboards_api_v1_dashboards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "saved",
+              "enum": [
+                "saved",
+                "draft"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardInfo"
+                  },
+                  "title": "Response List Dashboards Api V1 Dashboards Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List dashboards",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}": {
+      "delete": {
+        "description": "Deletes the dashboard, its stored results and its schedule.",
+        "operationId": "delete_dashboard_api_v1_dashboards__dashboard_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Delete a dashboard",
+        "tags": [
+          "dashboards"
+        ]
+      },
+      "get": {
+        "description": "The dashboard and the stored results of its charts, after the access check. It only reads: nothing is\nrefreshed and no query runs. `due` names the charts older than the schedule; call the refresh route for them.",
+        "operationId": "open_dashboard_api_v1_dashboards__dashboard_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open a dashboard",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/filters": {
+      "put": {
+        "description": "Stores the filter definitions (`in` and `between`); the refresh route applies their values.",
+        "operationId": "set_filters_api_v1_dashboards__dashboard_id__filters_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FiltersBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Set the filters",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/filters/{filter_id}/values": {
+      "get": {
+        "description": "The distinct values of an `in` filter's column, or `[min, max]` of a `between` one, as the caller may read\nthem (`limit` 1 to 1,000).",
+        "operationId": "filter_values_api_v1_dashboards__dashboard_id__filters__filter_id__values_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "filter_id",
+            "required": true,
+            "schema": {
+              "title": "Filter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "title": "Response Filter Values Api V1 Dashboards  Dashboard Id  Filters  Filter Id  Values Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such filter, `limit` out of range, or the caller cannot read the column: its message says why."
+          }
+        },
+        "summary": "A filter's values",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/layout": {
+      "put": {
+        "description": "A place on the 4-column grid for each chart named.",
+        "operationId": "arrange_api_v1_dashboards__dashboard_id__layout_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Arrange the charts",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/move": {
+      "post": {
+        "description": "Moves a saved dashboard into one of the caller's workspaces.",
+        "operationId": "move_dashboard_api_v1_dashboards__dashboard_id__move_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Move to another workspace",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/pin": {
+      "post": {
+        "description": "Saves a draft whole into a workspace (else the one it is in, else \"General\"). A saved dashboard or an empty\ndraft is a 422.",
+        "operationId": "pin_dashboard_api_v1_dashboards__dashboard_id__pin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PinBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Pin a draft",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/refresh": {
+      "post": {
+        "description": "Re-run the stored plans of one chart (`tile_id`) or all of them, as the caller. No model call. `filters`\nmaps filter ids to values; a filtered refresh is returned and never stored. `approval_ids` are request ids\ngranted through `/approvals`.",
+        "operationId": "refresh_dashboard_api_v1_dashboards__dashboard_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardRun"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's), or an id in `approval_ids` is unknown, waiting, denied or expired (`ApprovalNotFound`; nothing runs)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Refresh charts",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/schedule": {
+      "put": {
+        "description": "Refresh every `every_minutes`, as the caller; `null` stops it. A period below\n`dashboards.min_refresh_minutes` is a 422.",
+        "operationId": "set_schedule_api_v1_dashboards__dashboard_id__schedule_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Set the refresh schedule",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}": {
+      "delete": {
+        "description": "Removes the chart and its stored result: how a chart that needs fixing is taken off.",
+        "operationId": "remove_tile_api_v1_dashboards__dashboard_id__tiles__tile_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tile_id",
+            "required": true,
+            "schema": {
+              "title": "Tile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Remove a chart",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}/chart": {
+      "put": {
+        "description": "`auto`, `line`, `bar`, `big_number` or `table`; a kind the chart's last result cannot be drawn as is a 422\nthat names the kinds it can.",
+        "operationId": "set_tile_chart_api_v1_dashboards__dashboard_id__tiles__tile_id__chart_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tile_id",
+            "required": true,
+            "schema": {
+              "title": "Tile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChartBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Set how a chart is drawn",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/tiles/{tile_id}/title": {
+      "put": {
+        "description": "Sets one chart's title.",
+        "operationId": "rename_tile_api_v1_dashboards__dashboard_id__tiles__tile_id__title_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tile_id",
+            "required": true,
+            "schema": {
+              "title": "Tile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Rename a chart",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/title": {
+      "put": {
+        "description": "Sets the dashboard's title.",
+        "operationId": "rename_dashboard_api_v1_dashboards__dashboard_id__title_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such dashboard (or one that is not the caller's)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The dashboard is being refreshed or edited."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request is refused: its message says why."
+          }
+        },
+        "summary": "Rename a dashboard",
+        "tags": [
+          "dashboards"
         ]
       }
     },
@@ -5053,6 +6572,74 @@
         "summary": "Get a datasource",
         "tags": [
           "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasources/{datasource_id}/starter-questions": {
+      "get": {
+        "description": "The questions of the first `n` charts the starter dashboard would build, as the caller may read the\ndatasource. Nothing runs and nothing is saved. Empty when the caller reaches no table.",
+        "operationId": "starter_questions_api_v1_datasources__datasource_id__starter_questions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "n",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "minimum": 1,
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Starter Questions Api V1 Datasources  Datasource Id  Starter Questions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The datasource has no index, or the caller cannot reach it."
+          }
+        },
+        "summary": "Starter questions",
+        "tags": [
+          "dashboards"
         ]
       }
     },
@@ -5461,7 +7048,7 @@
     },
     "/api/v1/jobs": {
       "get": {
-        "description": "The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's.",
+        "description": "The caller's jobs, newest first (the last 100 the server kept). An admin sees every caller's, without their\n`result`: that is the owner's alone.",
         "operationId": "list_jobs_api_v1_jobs_get",
         "responses": {
           "200": {
@@ -5490,6 +7077,68 @@
           }
         },
         "summary": "List jobs",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/dashboard": {
+      "post": {
+        "description": "Builds the no-model starter dashboard for `datasource_id` as the caller and saves it in their workspace. The\njob's `result` is the new `Dashboard` and its first `DashboardRun`; `progress` is one step per chart.",
+        "operationId": "start_dashboard_job_api_v1_jobs_dashboard_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller already has a job queued or running."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate a starter dashboard",
         "tags": [
           "jobs"
         ]
@@ -5558,7 +7207,7 @@
         ]
       },
       "get": {
-        "description": "One job: its `status`, `progress` so far, and `result` or `error` once it finished. Another user's job is\na 404.",
+        "description": "One job: its `status`, `progress` so far, and `result` or `error` once it finished. Another user's job is\na 404, except to an admin, who sees its status and progress but never its `result`.",
         "operationId": "get_job_api_v1_jobs__job_id__get",
         "parameters": [
           {
@@ -6394,6 +8043,221 @@
         "summary": "Read a run's trace",
         "tags": [
           "query"
+        ]
+      }
+    },
+    "/api/v1/workspaces": {
+      "get": {
+        "description": "The caller's workspaces, oldest first.",
+        "operationId": "list_workspaces_api_v1_workspaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Workspace"
+                  },
+                  "title": "Response List Workspaces Api V1 Workspaces Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          }
+        },
+        "summary": "List workspaces",
+        "tags": [
+          "workspaces"
+        ]
+      },
+      "post": {
+        "description": "Names are unique per owner, ignoring case.",
+        "operationId": "create_workspace_api_v1_workspaces_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The name is empty or already used."
+          }
+        },
+        "summary": "Create a workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}": {
+      "delete": {
+        "description": "An empty workspace only; one that holds dashboards is a 422.",
+        "operationId": "delete_workspace_api_v1_workspaces__workspace_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such workspace (or one that is not the caller's)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "It still holds dashboards."
+          }
+        },
+        "summary": "Delete a workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/name": {
+      "put": {
+        "description": "Renames the workspace; names are unique per owner, ignoring case.",
+        "operationId": "rename_workspace_api_v1_workspaces__workspace_id__name_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such workspace (or one that is not the caller's)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The name is empty or already used."
+          }
+        },
+        "summary": "Rename a workspace",
+        "tags": [
+          "workspaces"
         ]
       }
     }
