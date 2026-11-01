@@ -38,7 +38,7 @@ the next turn), `needs_approval`, `stopped` or `error`. A tool that is not enabl
 
 | Status | When |
 |---|---|
-| `404` | The conversation is not the caller's, or does not exist |
+| `404` | The conversation is not the caller's, or does not exist; on `retry`, also an id in `approval_ids` that is unknown, waiting, denied or expired (`ApprovalNotFound`) |
 | `409` | The conversation is already running a turn (`ConversationBusy`) |
 | `422` | The body does not validate, or the facade refused an argument (`INVALID_ARGUMENT`: blank text, a `choice` that is not an option, nothing to retry, bad tool arguments, a report with nothing answered; `CONVERSATION_TOO_LONG` at `max_turns`) |
 
@@ -50,7 +50,8 @@ All use the [error envelope](errors.md). The turn routes also take the `X-NL2SQL
 `POST .../turns/stream` sends the run events of each question the model asks, a `conversation.step` after each step,
 and `conversation.turn` last, whose `data.stored` is the stored `Turn`. A `: keep-alive` comment is sent every 15
 seconds. A refusal (not the caller's, a bad body, a busy conversation) answers with the envelope and its status before
-the stream begins; once it has, a failure is the run's own `run.failed`.
+the stream begins; once it has, a failure is one last `run.failed` event: a named engine error keeps its `error_code`
+and message, any other is `UNKNOWN_ERROR` with a fixed message, never the exception text.
 
 Closing the connection cancels the turn and stores nothing. A step that is running finishes first, so the turn ends
 when the step in flight returns.

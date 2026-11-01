@@ -1458,8 +1458,10 @@ at the API; they are now `InvalidArgument` (422, still a `ValueError`), and "too
 is `201` and `DELETE` is `204`; `TurnRequest` is `{text | choice, execute}`; the stream ends with `conversation.turn`
 whose `data.stored` is the `Turn`; `RetryRequest` is `{approval_ids}` (request ids); `ToolRequest` is `{args}`; a tool
 that is not enabled is a stored error step (200), not a status; refusals (404, 409, 422) arrive before the stream
-begins, because the route waits 0.5 s for the first event (`SETTLE_S`), so a busy conversation that answers later than
-that shows as a `run.failed`-style event instead; a closed stream cancels the turn only once the step in flight
+begins, because the route waits 0.5 s for the first event (`SETTLE_S`); a failure that arrives later, once the 200 is
+sent, ends the stream with one `run.failed` frame (`sse.event_stream` catches it: a named error's code and message,
+else `UNKNOWN_ERROR` and a fixed message, D202); the helper is used by the conversation routes only (`/query/stream`
+and the job stream build their own frames); `retry` is also a 404 for an unknown approval id (`ApprovalNotFound`); a closed stream cancels the turn only once the step in flight
 returns; `GET /chat-tools` is a `ChatToolInfo` list. The report is `text/markdown`. Golden fixture `Turn.json` is
 written by `test_web_fixtures.py` from a `POST .../turns` response.
 

@@ -5176,7 +5176,7 @@
                 }
               }
             },
-            "description": "No such conversation for this caller."
+            "description": "No such conversation for this caller, or an id in `approval_ids` is unknown, waiting, denied or expired."
           },
           "409": {
             "content": {
@@ -5389,7 +5389,7 @@
     },
     "/api/v1/conversations/{conversation_id}/turns/stream": {
       "post": {
-        "description": "As `POST /turns`, as events. A refusal (not the caller's, a bad body, a busy conversation) answers with the\nerror envelope before the stream begins; once it has, a failure is the run's own `run.failed`.",
+        "description": "As `POST /turns`, as events. A refusal (not the caller's, a bad body, a busy conversation) answers with the\nerror envelope before the stream begins; once it has, a failure is a last `run.failed` event (its `error_code`, or\n`UNKNOWN_ERROR` with a fixed message).",
         "operationId": "post_turn_stream_api_v1_conversations__conversation_id__turns_stream_post",
         "parameters": [
           {
@@ -5417,7 +5417,7 @@
             "content": {
               "text/event-stream": {}
             },
-            "description": "Server-Sent Events: the run events of each question the model asks, a `conversation.step` after each step, and `conversation.turn` last, whose `data.stored` is the stored `Turn`. A `: keep-alive` comment every 15 seconds. Closing the connection cancels the turn and stores nothing."
+            "description": "Server-Sent Events: the run events of each question the model asks, a `conversation.step` after each step, and `conversation.turn` last, whose `data.stored` is the stored `Turn`. A `: keep-alive` comment every 15 seconds. Closing the connection cancels the turn and stores nothing. A failure after the stream has begun is a last `run.failed` event."
           },
           "401": {
             "content": {

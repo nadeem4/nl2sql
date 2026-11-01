@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict
 
 from nl2sql import NL2SQL, Event, Registry, UserContext
 from nl2sql.api.query_api import QueryAPI, QueryResult, RowSample, SubQueryResult
+from nl2sql.common.errors import ApprovalNotFound
 from nl2sql.chat_tools import ToolContext, ToolOutput
 from nl2sql.clarify.models import ClarificationOption, ClarificationRequest
 from nl2sql.execution.artifacts.results import ResultSummary
@@ -298,6 +299,52 @@ def test_closing_the_stream_cancels_the_turn(world):
     assert closed.wait(10), "the disconnect closed the facade's iterator once its step returned"
 
 
+def test_a_failure_after_the_settle_wait_is_a_final_run_failed_frame(world, monkeypatch):
+    """The route has answered 200 by then, so the failure is the stream's last frame, not a cut-off body."""
+    monkeypatch.setattr("nl2sql_api.routes.conversations.SETTLE_S", 0.05)
+
+    def stream(*args, **kwargs):
+        threading.Event().wait(0.3)  # past the wait: the 200 is already sent
+        raise RuntimeError("secret host db.internal")
+        yield  # pragma: no cover
+
+    world.engine.conversations = SimpleNamespace(stream=stream)
+
+    response = world.client.post(f"{URL}/cid/turns/stream", json={"text": "How many?"})
+
+    frames = events(response.text)
+    assert response.status_code == 200
+    assert frames[-1]["event"] == "run.failed" and len(frames) == 1
+    assert frames[-1]["data"]["data"]["error_code"] == "UNKNOWN_ERROR"
+    assert "secret" not in response.text
+
+
+def test_a_hung_up_turn_through_the_real_facade_stores_nothing(world):
+    cid = world.start()
+    world.model.say(ask("How many?"), reply("There are 59."))
+    inside, proceed, first_chunk = threading.Event(), threading.Event(), threading.Event()
+    world.gate = lambda: (inside.set(), proceed.wait(10))
+
+    def release_later():
+        inside.wait(10)
+        first_chunk.wait(10)  # the client has hung up while the ask step is running
+        threading.Event().wait(0.3)
+        proceed.set()
+
+    helper = threading.Thread(target=release_later)
+    helper.start()
+    _asgi_post(f"{URL}/{cid}/turns/stream", {"text": "How many?"}, hang_up_after_first_chunk=first_chunk)
+    helper.join(10)
+    for _ in range(50):  # the turn ends when the step in flight returns
+        if world.calls:
+            break
+        threading.Event().wait(0.1)
+    threading.Event().wait(0.5)
+
+    assert len(world.calls) == 1, "the step that was running finished"
+    assert world.client.get(f"{URL}/{cid}").json()["turns"] == [], "a turn nobody stayed for is not stored"
+
+
 # ------------------------------------------------------------------ busy, clarification, approvals
 
 def _hold_a_turn(world, cid):
@@ -365,6 +412,22 @@ def test_retry_with_approval_ids(world):
     assert world.calls[-1]["approvals"] == [need.id], "request ids go to the facade as they are"
     nothing = world.client.post(f"{URL}/{world.start()}/retry", json={})
     assert nothing.status_code == 422, "no question to run again"
+
+
+def test_retry_with_an_unknown_approval_id_is_404(world):
+    world.model.say(ask("Show customers"))
+    cid = world.start()
+    world.client.post(f"{URL}/{cid}/turns", json={"text": "Show customers"})
+
+    def unknown(question, kwargs):  # what the engine raises for an id that is unknown, waiting, denied or expired
+        raise ApprovalNotFound("No approval request no-such-request.")
+
+    world.respond = unknown
+
+    response = world.client.post(f"{URL}/{cid}/retry", json={"approval_ids": ["no-such-request"]})
+
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
 # ------------------------------------------------------------------ tools and the report

@@ -104,7 +104,7 @@ def build_report(conversation: Conversation, results: Any, *, user_context: Any,
     The rows are read as ``user_context``, the conversation's owner, who asked every run in it.
 
     Raises:
-        ValueError: a turn that does not exist, or no answered question to report.
+        InvalidArgument: a turn that does not exist, or no answered question to report.
     """
     steps = [s for t in _chosen(conversation, turns) for s in t.steps
              if s.call.name == "ask" and s.status == "ok" and s.result is not None]

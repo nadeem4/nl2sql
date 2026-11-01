@@ -158,7 +158,7 @@ class Conversations:
     def tool(self, conversation_id: str, name: str, args: Optional[Dict[str, Any]] = None, *,
              user_context: UserContext) -> Turn:
         """One registry chat tool, by name, as a turn of kind ``tool`` with no model call. Arguments that do not
-        validate raise ``ValueError`` and store nothing; a tool that is not enabled is a stored error step."""
+        validate raise ``InvalidArgument`` and store nothing; a tool that is not enabled is a stored error step."""
         call = ToolCall(name=name, args=dict(args or {}))
         conversation = self.get(conversation_id, user_context=user_context)
         if name in self._chat.names:
@@ -205,7 +205,7 @@ class Conversations:
     # ------------------------------------------------------------ the machinery
 
     def _prepare(self, conversation: Conversation, text: Optional[str], choice: Optional[str]):
-        """``(kind, text shown)`` of the turn asked for, or the ``ValueError`` that refuses it."""
+        """``(kind, text shown)`` of the turn asked for, or the ``InvalidArgument`` that refuses it."""
         if (text is None) == (choice is None):
             raise InvalidArgument("Pass the message as text or a choice, one of the two.")
         if choice is not None:

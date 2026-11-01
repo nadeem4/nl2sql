@@ -5,6 +5,7 @@ A thin layer over `engine.conversations` and `engine.chat_tools`: each handler p
 serves the facade's own models. The model decides what a turn does, so there is one `turns` route; a turn that
 needs a clarification is answered by a `choice` in the next one.
 """
+import contextvars
 import threading
 from concurrent.futures import Future, TimeoutError as FutureTimeout
 from typing import Annotated, Iterator, List, Optional
@@ -26,6 +27,8 @@ Engine = Annotated[NL2SQL, Depends(get_engine)]
 Override = Annotated[Optional[LLMOverride], Depends(llm_override)]
 
 _NOT_FOUND = {404: {**ERROR_RESPONSE, "description": "No such conversation for this caller."}}
+_RETRY_NOT_FOUND = {404: {**ERROR_RESPONSE, "description": "No such conversation for this caller, or an id in "
+                                                           "`approval_ids` is unknown, waiting, denied or expired."}}
 _REFUSED = {422: {**ERROR_RESPONSE, "description": "The request does not validate, or the facade refused an argument."}}
 _BUSY = {409: {**ERROR_RESPONSE, "description": "The conversation is already running a turn."}}
 _TURN = {**identity.AUTH_RESPONSES, **_NOT_FOUND, **_REFUSED, **_BUSY}
@@ -49,7 +52,8 @@ class _Settled:
         self._lock = threading.Lock()
         self._first: Future = Future()
         self._handed = False
-        threading.Thread(target=self._pull, name="nl2sql-first-event", daemon=True).start()
+        threading.Thread(target=contextvars.copy_context().run, args=(self._pull,), name="nl2sql-first-event",
+                         daemon=True).start()
         try:
             self._first.result(timeout=settle_s)
         except FutureTimeout:
@@ -135,13 +139,15 @@ def post_turn(conversation_id: str, body: TurnRequest, user: Caller, engine: Eng
                      "description": "Server-Sent Events: the run events of each question the model asks, a "
                                     "`conversation.step` after each step, and `conversation.turn` last, whose "
                                     "`data.stored` is the stored `Turn`. A `: keep-alive` comment every 15 seconds. "
-                                    "Closing the connection cancels the turn and stores nothing."},
+                                    "Closing the connection cancels the turn and stores nothing. A failure after the "
+                                    "stream has begun is a last `run.failed` event."},
                **_TURN},
 )
 def post_turn_stream(conversation_id: str, body: TurnRequest, request: Request, user: Caller, engine: Engine,
                      override: Override):
     """As `POST /turns`, as events. A refusal (not the caller's, a bad body, a busy conversation) answers with the
-    error envelope before the stream begins; once it has, a failure is the run's own `run.failed`."""
+    error envelope before the stream begins; once it has, a failure is a last `run.failed` event (its `error_code`, or
+    `UNKNOWN_ERROR` with a fixed message)."""
     events = engine.conversations.stream(conversation_id, body.text, user_context=user, choice=body.choice,
                                          execute=body.execute, llm_override=override)
     settled = _Settled(events, SETTLE_S)
@@ -149,7 +155,7 @@ def post_turn_stream(conversation_id: str, body: TurnRequest, request: Request, 
 
 
 @router.post("/conversations/{conversation_id}/retry", response_model=Turn, summary="Run the last question again",
-             responses=_TURN)
+             responses={**_TURN, **_RETRY_NOT_FOUND})
 def retry_turn(conversation_id: str, user: Caller, engine: Engine, override: Override,
                body: Optional[RetryRequest] = None):
     """Runs the conversation's last question again as a turn of kind `retry`, with no model call of its own. After a
