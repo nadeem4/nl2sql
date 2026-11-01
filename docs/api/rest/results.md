@@ -87,7 +87,7 @@ The chart the saved result is drawn as, chosen from its column kinds by five fix
 
 | parameter | in | default | meaning |
 | --- | --- | --- | --- |
-| `kind` | query | rules choose | Force `line`, `bar`, `big_number` or `table`. Anything else is a `422`; a kind the data cannot draw is a `422` naming the kinds it can. |
+| `kind` | query | rules choose | Force `line`, `bar`, `big_number` or `table`. Anything else is a `422`; a kind the data cannot draw is a `422` `CHART_NOT_SUPPORTED` (the engine's own code) naming the kinds it can. |
 | `format` | query | `spec` | `spec` is the engine's `ChartSpec` (kind, encodings, the rows in `data`, a one-line `reason`, a `takeaway`). `vega-lite` is a Vega-Lite v5 document, rows inline and no colour set, ready to render. A table has no Vega-Lite form: `format=vega-lite` on one is a `422`. |
 
 ```bash

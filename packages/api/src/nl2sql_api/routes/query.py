@@ -5,19 +5,20 @@ Every route calls the facade as the request's caller and nothing else: a run, re
 a 404, and `feedback/correct` never acts as the trusted in-process operator.
 """
 import logging
+import sys
 from datetime import datetime, timezone
 from typing import Annotated, Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
-from nl2sql import (NL2SQL, CancellationToken, ChartNotSupported, Event, LLMOverride, Proposal, QueryResult, ResultManifest,
+from nl2sql import (NL2SQL, CancellationToken, CorrectionRefused, Event, LLMOverride, Proposal, QueryResult, ResultManifest,
                     ResultNotFound, ResultPage, UserContext)
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.errors import ERROR_RESPONSE, RequestRefused
 from nl2sql_api.models.query import CorrectionRequest, FeedbackRequest, QueryRequest
-from nl2sql_api.overrides import llm_override
+from nl2sql_api.overrides import llm_override, masked
 from nl2sql_api.sse import event_stream
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,8 @@ def stream_query(payload: QueryRequest, request: Request, engine: Engine, user_c
         try:
             yield from events
         except Exception:
-            logger.exception("Unexpected failure while streaming a query")
+            error = sys.exc_info()[1]
+            logger.error("Unexpected failure while streaming a query\n%s", masked(request.headers, error))
             yield _stream_failed()
 
     return event_stream(guarded, request, token=token)
@@ -161,8 +163,6 @@ def get_result_chart(
         spec = engine.results.chart(trace_id, result_id, user_context=user_context, kind=kind)
     except ResultNotFound:
         raise RequestRefused(404, "NOT_FOUND", "No such result.") from None
-    except ChartNotSupported as error:  # its message names the kinds the data can draw; a bare ValueError's is never sent
-        raise RequestRefused(422, "INVALID_REQUEST", error.message, fix=error.fix) from None
     if format == "spec":
         return spec
     vega = spec.to_vega_lite()
@@ -224,15 +224,11 @@ def correct(payload: CorrectionRequest, engine: Engine, user_context: Caller):
     try:
         return engine.feedback.correct(payload.trace_id, sql=payload.sql, plan=payload.plan, question=payload.question,
                                        note=payload.note, user_context=user_context)
-    except ValueError as error:
-        code = getattr(error, "code", None)  # CorrectionRefused is not in the facade's namespace
-        if code is None:  # any other ValueError is the server's, and its text is never sent
-            raise
-        if code == "no_run":
+    except CorrectionRefused as error:
+        if error.code == "no_run":
             raise RequestRefused(404, "NOT_FOUND", "No such run.") from None
-        messages = list(getattr(error, "messages", []) or [])
         raise RequestRefused(422, "CORRECTION_REFUSED", str(error),
-                             details=[{"code": code, "msg": message} for message in messages]) from None
+                             details=[{"code": error.code, "msg": message} for message in error.messages]) from None
 
 
 @router.get("/feedback", summary="List the ratings", responses=identity.ADMIN_RESPONSES)

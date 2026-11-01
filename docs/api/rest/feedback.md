@@ -8,13 +8,17 @@ route never takes the trusted in-process operator path the CLI has). Source:
 ### `GET /api/v1/traces/{trace_id}`
 
 The run's trace document: its request, every node's input and output, and the result. An unknown trace, another
-caller's, or an id that is not a plain token is a `404`.
+caller's, or an id that is not a plain token is a `404`. The operator's `settings` block is left out, and
+`llm.configured` keeps only each agent's provider, model and temperature (no endpoint or header names). When a hook
+withheld the run's results (`answer.after` denied them, or they were never released) the trace also has none of their
+rows (`rows`, `terminal_results`) and none of its LLM calls' prompts or answers, which carry preview rows; the asker
+reads those rows only through the results routes, which refuse such a run.
 
 ### `POST /api/v1/feedback`
 
 Body `{"trace_id", "rating": "up" | "down", "note"?}`. The question, SQL and answer are read from the run's trace, never
-the body. Returns the stored rating. An unknown or another caller's run is a `404`; a bad rating, or an unknown body
-field, is a `422`.
+the body. Returns the stored rating. An unknown or another caller's run is a `404`; a bad rating, a `trace_id` that is
+not a plain token (letters, digits, `-`, `_`), or an unknown body field, is a `422`.
 
 ### `POST /api/v1/feedback/correct`
 
@@ -24,6 +28,7 @@ a verified query (`origin: "correction"`); nothing is saved until a reviewer acc
 | status | code | when |
 | --- | --- | --- |
 | 404 | `NOT_FOUND` | no such run for this caller |
+| 422 | `INVALID_REQUEST` | a `trace_id` that is not a plain token, or not exactly one of `sql` and `plan` |
 | 422 | `CORRECTION_REFUSED` | the fix is not read-only, reads what the caller may not, fails validation, or a hook denies it; `details` is one `{code, msg}` per reason |
 
 ### `GET /api/v1/feedback`

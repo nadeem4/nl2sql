@@ -200,7 +200,7 @@ def test_a_run_a_hook_allowed_is_readable_by_its_trace_id(monkeypatch, client):
 
 
 @pytest.mark.parametrize("suffix", ["", ".csv"])
-def test_a_run_is_readable_only_by_the_caller_who_asked_it(monkeypatch, client, suffix):
+def test_results_route_hides_another_users_rows(monkeypatch, client, suffix):
     from nl2sql.hooks import Allow
 
     body = _ran(monkeypatch, client, lambda ctx: Allow())
@@ -272,3 +272,14 @@ def test_chart_route_refuses_what_it_cannot_draw(client, params):
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+def test_trace_route_hides_rows_a_hook_withheld(monkeypatch, client):
+    from nl2sql.hooks import Deny
+
+    body = _ran(monkeypatch, client, lambda ctx: Deny(reason="Reviewed first"))
+
+    response = client.get(f"/api/v1/traces/{body['trace_id']}")
+
+    assert response.status_code == 200, response.text
+    assert "n1" not in response.text and "n44" not in response.text

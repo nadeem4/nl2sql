@@ -44,7 +44,7 @@ PUBLIC_SURFACE = {
     "ConversationNotFound", "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound", "NotIndexed", "NoTiles",
     "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
     "ConnectionInvalid",
-    "NL2SQLError", "NotAuthorized", "InvalidArgument", "ReplayMiss", "NotPinnable", "ChartNotSupported", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
+    "NL2SQLError", "NotAuthorized", "InvalidArgument", "ReplayMiss", "NotPinnable", "ChartNotSupported", "CorrectionRefused", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
     "LLMOverride", "resolve_mode", "provider_for_key", "provider_keys_in_environment",
 }
 

@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from nl2sql import ClarificationChoice
 
 
+TRACE_ID_PATTERN = r"^[A-Za-z0-9_-]+$"  # a plain token, as the engine reads a trace id
+
+
 class _Body(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -25,13 +28,13 @@ class QueryRequest(_Body):
 
 
 class FeedbackRequest(_Body):
-    trace_id: str
+    trace_id: str = Field(pattern=TRACE_ID_PATTERN)
     rating: Literal["up", "down"]
     note: Optional[str] = None
 
 
 class CorrectionRequest(_Body):
-    trace_id: str
+    trace_id: str = Field(pattern=TRACE_ID_PATTERN)
     sql: Optional[str] = None
     plan: Optional[Dict[str, Any]] = None
     question: Optional[str] = None

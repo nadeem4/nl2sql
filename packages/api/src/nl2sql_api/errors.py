@@ -70,7 +70,10 @@ def _response(request: Request, status: int, error: ApiError, headers: Optional[
 
 def _internal(request: Request, exc: BaseException) -> JSONResponse:
     request_id = request_id_of(request)
-    logger.error("Request %s failed: %s %s", request_id, request.method, request.url.path, exc_info=exc)
+    from nl2sql_api.overrides import masked  # a request's own keys never reach the log, even inside a traceback
+
+    logger.error("Request %s failed: %s %s\n%s", request_id, request.method, request.url.path,
+                 masked(request.headers, exc))
     return _response(request, 500, ApiError(
         code="INTERNAL", message=f"Something failed on the server. Request id: {request_id}",
         fix="Give the request id to whoever runs the server; the cause is in its log.", request_id=request_id))

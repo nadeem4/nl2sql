@@ -9,9 +9,8 @@ import pathlib
 import pytest
 from fastapi.testclient import TestClient
 
-from nl2sql import NL2SQL, Proposal, UserContext
+from nl2sql import NL2SQL, CorrectionRefused, DatasourceNotFound, Proposal, UserContext
 from nl2sql.execution.artifacts.results import ResultOwner
-from nl2sql.feedback.corrections import CorrectionRefused
 from nl2sql.storage.sqlite import SqliteState
 from nl2sql.testing.runtime import fake_runtime
 from nl2sql_api import identity
@@ -185,6 +184,45 @@ def test_a_refused_correction_is_422_with_its_reasons(api_client):
     error = response.json()["error"]
     assert error["code"] == "CORRECTION_REFUSED" and error["message"] == "The fix is not a read-only query."
     assert error["details"] == [{"code": "not_read_only", "msg": "Only SELECT is allowed."}]
+
+
+def test_another_error_from_correct_keeps_its_own_status_and_code(api_client):
+    client, engine = api_client()
+    engine.feedback = _Feedback(DatasourceNotFound("shop"))
+
+    response = client.post("/api/v1/feedback/correct", json={"trace_id": "run-1", "sql": "SELECT 1"})
+
+    assert response.status_code == DatasourceNotFound.status
+    assert response.json()["error"]["code"] == DatasourceNotFound.code
+
+
+@pytest.mark.parametrize("path,body", [("/api/v1/feedback", {"rating": "up"}),
+                                       ("/api/v1/feedback/correct", {"sql": "SELECT 1"})])
+@pytest.mark.parametrize("trace_id", ["../x", "a b", ""])
+def test_a_bad_trace_id_in_a_body_is_422(served, path, body, trace_id):
+    client, engine, _ = served
+
+    response = client.post(path, json={"trace_id": trace_id, **body})
+
+    assert response.status_code == 422
+    assert engine.feedback.list() == []
+
+
+def test_trace_route_hides_rows_a_hook_withheld(served):
+    client, engine, _ = served
+    doc = _trace("run-2", ResultOwner.of(ANN, engine._runtime.tenant_id).model_dump())
+    doc["results_withheld"] = True
+    doc["result"]["sub_queries"][0]["rows"] = {"rows": [["secret-n1"]], "total_rows": 1}
+    doc["nodes"] = [{"node": "aggregator", "outputs": {"aggregator_response": {"terminal_results": {"g": [{"n": "secret-n1"}]}}},
+                     "llm_calls": []}]
+    doc["settings"] = {"api": {"request_llm": True}}
+    engine._runtime.traces.write("run-2", doc)
+
+    response = client.get("/api/v1/traces/run-2")
+
+    assert response.status_code == 200, response.text
+    assert "secret-n1" not in response.text
+    assert "settings" not in response.json()
 
 
 def test_a_correction_needs_exactly_one_fix(api_client):

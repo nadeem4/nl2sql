@@ -785,6 +785,7 @@
             "title": "Sql"
           },
           "trace_id": {
+            "pattern": "^[A-Za-z0-9_-]+$",
             "title": "Trace Id",
             "type": "string"
           }
@@ -1812,6 +1813,7 @@
             "type": "string"
           },
           "trace_id": {
+            "pattern": "^[A-Za-z0-9_-]+$",
             "title": "Trace Id",
             "type": "string"
           }

@@ -215,7 +215,7 @@ def test_model_override_without_request_key_is_422_even_when_server_has_key(api_
     assert engine.calls == []
 
 
-def test_request_key_never_in_a_response_log_or_trace(api_client, caplog):
+def test_request_key_never_in_a_response_or_the_server_log(api_client, caplog):
     caplog.set_level(logging.DEBUG)
     client, engine = api_client(RuntimeError(f"provider said {KEY} is invalid"), api={"request_llm": True})
 
@@ -223,10 +223,24 @@ def test_request_key_never_in_a_response_log_or_trace(api_client, caplog):
 
     assert response.status_code == 500
     assert KEY not in response.text
-    # The engine's own redactor keeps the key out of the trace; here the override is the only holder of it.
     assert KEY not in repr(engine.calls[0]["llm_override"])
-    # An unhandled error is logged by its type and traceback, and the key was only in its message.
-    assert all(KEY not in record.getMessage() for record in caplog.records if record.name != "nl2sql_api")
+    # The unhandled error is logged with its traceback, whose message held the key: no logger may write it.
+    assert "RuntimeError" in caplog.text and KEY not in caplog.text
+
+
+def test_request_key_never_in_the_log_of_a_failed_stream(api_client, caplog, monkeypatch):
+    caplog.set_level(logging.DEBUG)
+    client, engine = api_client(None, api={"request_llm": True})
+
+    def broken(*args, **kwargs):
+        yield from ()
+        raise RuntimeError(f"provider said {KEY} is invalid")
+
+    engine.stream_query = broken
+    response = client.post("/api/v1/query/stream", json={"question": "q"}, headers={"X-NL2SQL-Api-Key-openai": KEY})
+
+    assert "run.failed" in response.text and KEY not in response.text
+    assert "RuntimeError" in caplog.text and KEY not in caplog.text
 
 
 def test_query_docs_name_no_removed_variable():

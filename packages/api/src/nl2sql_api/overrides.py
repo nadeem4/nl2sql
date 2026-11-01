@@ -22,6 +22,17 @@ def _invalid(message: str) -> RequestRefused:
                           fix=f'Send {MODELS_HEADER} as a JSON object of agent name to "provider:model".')
 
 
+def masked(headers: Mapping[str, str], exc: BaseException) -> str:
+    """The exception's traceback as text, with every key the request carried replaced, for the server log."""
+    import traceback
+
+    text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    for name, value in headers.items():
+        if name.lower().startswith(KEY_HEADER_PREFIX) and value.strip():
+            text = text.replace(value.strip(), "[redacted]")
+    return text
+
+
 def parse_override(headers: Mapping[str, str], *, request_llm: bool) -> Optional[LLMOverride]:
     """The override the headers ask for, or None when they ask for none.
 

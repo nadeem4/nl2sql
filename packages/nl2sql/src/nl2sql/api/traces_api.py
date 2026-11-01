@@ -21,7 +21,9 @@ class TracesAPI:
 
         With a ``user_context`` only the caller who asked the run reads it: a run another
         user (or the same user id in another tenant) asked, and a trace that records no
-        asker, are None, as a missing one. Without one, the caller is the trusted
+        asker, are None, as a missing one. The caller's trace has no ``settings`` and no model
+        endpoints, and when a hook withheld the run's results (``answer.after``) it has none of
+        their rows either. Without one, the caller is the trusted
         in-process operator and reads any run (``nl2sql trace``); the REST API, MCP and
         the terminal app always pass the caller.
 
@@ -37,7 +39,7 @@ class TracesAPI:
         """
         from nl2sql.execution.artifacts.results import ResultOwner
         from nl2sql.policies import UserContext
-        from nl2sql.tracing.document import validate_trace_id
+        from nl2sql.tracing.document import for_caller, validate_trace_id
 
         if user_context is not None and not isinstance(user_context, UserContext):
             raise TypeError("user_context must be a UserContext, or None for the in-process operator.")
@@ -46,7 +48,7 @@ class TracesAPI:
             return doc
         # The owner is worked out exactly as the writer works it out (``ResultOwner.of``).
         asker = ResultOwner.of(user_context, getattr(self._ctx, "tenant_id", None)).model_dump()
-        return doc if doc.get("owner") == asker else None
+        return for_caller(doc) if doc.get("owner") == asker else None
 
     def replay(self, trace: Dict[str, Any]):
         """Re-run a traced question, answering every LLM call from the recording. No model is called.
