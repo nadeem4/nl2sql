@@ -10,7 +10,8 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ValidationError
 
-from nl2sql import (ApprovalNotFound, DashboardBusy, InvalidArgument, NL2SQLError, NotAuthorized, UserContext)
+from nl2sql import (ApprovalNotFound, ConversationBusy, ConversationNotFound, DashboardBusy, InvalidArgument, NL2SQLError,
+                    NotAuthorized, UserContext)
 from nl2sql.testing.config import make_config
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
@@ -66,6 +67,9 @@ def test_error_envelope_shape(make_app):
     (NotAuthorized("Admins only."), 403, "NOT_AUTHORIZED"),
     (ApprovalNotFound("Gone."), 404, "NOT_FOUND"),
     (DashboardBusy("Refreshing."), 409, "CONFLICT"),
+    # LookupErrors by parentage, mapped by their own status: a busy conversation is not a 404
+    (ConversationBusy("Running a turn."), 409, "CONFLICT"),
+    (ConversationNotFound("Gone."), 404, "NOT_FOUND"),
     (InvalidArgument("Bad name."), 422, "INVALID_ARGUMENT"),
 ])
 def test_nl2sql_error_maps_to_its_status(make_app, error, status, code):

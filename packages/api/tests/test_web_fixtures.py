@@ -1,4 +1,4 @@
-"""The golden files the web app's node tests read: ``ApiError`` and ``Job`` (docs/architecture/wave_d.md, "Testing").
+"""The golden files the web app's node tests read: ``ApiError``, ``Job`` and ``Turn`` (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
@@ -14,6 +14,7 @@ from itertools import count
 from fastapi.testclient import TestClient
 
 from nl2sql import UserContext
+from nl2sql import ToolCall, ToolStep, Turn
 from nl2sql.testing.config import make_config
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
@@ -28,8 +29,18 @@ def build() -> dict:
     """``{file name: its JSON}``, from responses of an app with no real engine behind it."""
     ticks = count()
     with tempfile.TemporaryDirectory() as folder:
+        class Conversations:
+            """One stored turn that asked a question and was answered, as ``POST /conversations/{id}/turns`` serves it."""
+
+            def ask(self, conversation_id, text=None, **kwargs):
+                return Turn(index=1, at=START, kind="message", text=text, reply="There are 59 customers.",
+                            steps=[ToolStep(call=ToolCall(name="ask", args={"question": text}), status="ok",
+                                            question=text, trace_id="trace-0001-fixture")],
+                            status="answered", trace_id="trace-0001-turn")
+
         class Engine:
             config = make_config(pathlib.Path(folder))
+            conversations = Conversations()
 
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine
@@ -48,7 +59,10 @@ def build() -> dict:
             while jobs.get(job.id, UserContext(user_id="ann")).status != "succeeded":
                 assert time.monotonic() < deadline, "the fixture job did not finish"
                 time.sleep(0.005)
-            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json()}
+            turn = client.post("/api/v1/conversations/conv-0001/turns", json={"text": "How many customers are there?"})
+            assert turn.status_code == 200, turn.text
+            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
+                    "Turn.json": turn.json()}
         finally:
             jobs.close()
 

@@ -1448,6 +1448,21 @@ dict[provider, key]` are top-level exports. The old playground (`cli/demo/playgr
 directly; it is deleted by X1b, so it was not rewritten. Code on main wins over the row's file list: `api/llm_api.py`
 and `registry.py` needed no change beyond the docstring, and `api/types.py` was not touched.
 
+**A2a (conversations and chat tools routes).** `routes/conversations.py` and `models/conversations.py`; see
+[Conversations API](../api/rest/conversations.md). `main.py` already registered the namespace. Engine change: the
+conversation methods' argument errors (no question to retry, text xor choice, blank text, a `choice` that is not an
+option, nothing pending, bad tool arguments, a report with no turn or nothing answered) were plain `ValueError`, a 500
+at the API; they are now `InvalidArgument` (422, still a `ValueError`), and "too long" keeps `CONVERSATION_TOO_LONG`.
+`ConversationBusy` is already an `NL2SQLError`, so the handler found by MRO maps it to 409 with no change to
+`errors.py`; `test_errors.py` now pins it and `ConversationNotFound` (404). Shapes W1 must know: `POST /conversations`
+is `201` and `DELETE` is `204`; `TurnRequest` is `{text | choice, execute}`; the stream ends with `conversation.turn`
+whose `data.stored` is the `Turn`; `RetryRequest` is `{approval_ids}` (request ids); `ToolRequest` is `{args}`; a tool
+that is not enabled is a stored error step (200), not a status; refusals (404, 409, 422) arrive before the stream
+begins, because the route waits 0.5 s for the first event (`SETTLE_S`), so a busy conversation that answers later than
+that shows as a `run.failed`-style event instead; a closed stream cancels the turn only once the step in flight
+returns; `GET /chat-tools` is a `ChatToolInfo` list. The report is `text/markdown`. Golden fixture `Turn.json` is
+written by `test_web_fixtures.py` from a `POST .../turns` response.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below
