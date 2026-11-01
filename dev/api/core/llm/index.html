@@ -4813,6 +4813,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmrecorded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.recorded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmproviders" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6061,6 +6072,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmrecorded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.recorded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmproviders" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6203,6 +6225,11 @@ its class as <code>model</code> and no provider. Never a key.</p>
 <code>get(agent: str) -&gt; dict</code></p>
 <p>One agent's entry from <code>list()</code>. Raises <code>ValueError</code> for a name that is not an
 agent, listing the agents.</p>
+<h3 id="llmrecorded">llm.recorded</h3>
+<p>Signature:
+<code>recorded(questions: Sequence[str]) -&gt; list[str]</code></p>
+<p>The <code>questions</code> the <code>replay</code> provider can answer from its recordings, in the order asked. See
+<a href="../../../configuration/llm/#replay-recorded-answers-no-key">the <code>replay</code> provider</a>.</p>
 <h3 id="llmproviders">llm.providers</h3>
 <p>Signature:
 <code>providers() -&gt; list[dict]</code></p>

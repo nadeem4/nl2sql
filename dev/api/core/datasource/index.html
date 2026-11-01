@@ -5986,14 +5986,14 @@ forms, and a test of a datasource before it is added.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>list()</code></td>
+<td><code>list(*, user_context=None)</code></td>
 <td><code>list[DatasourceInfo]</code></td>
-<td>Every configured datasource, in config order, failed ones included.</td>
+<td>Every configured datasource, in config order, failed ones included. With <code>user_context</code>, only the datasources its roles reach (<code>policies.scope</code>), so a caller never sees the sample questions of one it may not use.</td>
 </tr>
 <tr>
-<td><code>get(datasource_id)</code></td>
+<td><code>get(datasource_id, *, user_context=None)</code></td>
 <td><code>DatasourceInfo</code></td>
-<td>One configured datasource. Raises <code>ValueError</code> for an unknown id.</td>
+<td>One configured datasource. Raises <code>ValueError</code> for an unknown id, or one <code>user_context</code> does not reach.</td>
 </tr>
 <tr>
 <td><code>types()</code></td>
@@ -6014,6 +6014,11 @@ forms, and a test of a datasource before it is added.</p>
 <td><code>add(datasource)</code></td>
 <td><code>None</code></td>
 <td>Validates <code>connection</code> against the adapter's connection model and <code>index</code> as an <code>IndexScope</code>, builds the adapter without connecting, registers it, and adds the <code>Datasource</code> to <code>engine.config</code>; its description and sample questions are what indexing reads. Raises <code>ValueError</code> if the id is taken, the type is unknown, a reference does not resolve, <code>index</code> does not validate (naming the <code>index.</code> field) or the adapter rejects its connection settings (<code>ConnectionInvalid</code>, a <code>ValueError</code> naming the field, with "did you mean" for an unknown key, and never a value; its <code>problems</code> list each as <code>{path, message}</code>). Index it next: <code>engine.index.build([datasource.id])</code>.</td>
+</tr>
+<tr>
+<td><code>add_demo(*, user_context=None, on_datasource=None)</code></td>
+<td><code>RebuildResult</code></td>
+<td>Try the demo: adds the three sample databases (read-only, from the installed package), their verified queries and the demo glossary (copied to <code>demo-glossary.yaml</code> in the project folder) as ordinary datasources and knowledge, skipping any already configured (a demo id that is another database raises <code>DatasourceExists</code> and adds nothing), saving it all in the project when the engine was loaded from a <code>nl2sql.yaml</code> (each added datasource under <code>datasources/</code>, the verified queries in the <code>curated</code> section's file, creating <code>curated.yaml</code> and its <code>curated:</code> line when the project has none, and the glossary as a source in the <code>knowledge</code> section's file), so it survives a restart; an inline section, or an engine built in code, keeps the verified queries and the glossary for that engine only. A demo id is the demo's own database only when it opens the packaged file or the project's <code>data/&lt;name&gt;</code>; another file of the same name raises <code>DatasourceExists</code>. Then runs <code>index.build</code> over them, passing <code>on_datasource</code> (an <code>IndexProgress</code> per datasource). With <code>user_context</code> the caller needs an admin role (<code>NotAuthorized</code>). Also <code>engine.add_demo(...)</code>.</td>
 </tr>
 <tr>
 <td><code>remove(datasource_id)</code></td>
@@ -6078,6 +6083,10 @@ forms, and a test of a datasource before it is added.</p>
 <tr>
 <td><code>reason</code></td>
 <td>Why it failed, or <code>None</code>.</td>
+</tr>
+<tr>
+<td><code>sample_questions</code></td>
+<td>The datasource's own <code>sample_questions</code>, then the accepted glossary <code>examples</code> not already there. Not scoped to a caller.</td>
 </tr>
 </tbody>
 </table>

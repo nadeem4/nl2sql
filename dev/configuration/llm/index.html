@@ -2451,6 +2451,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#replay-recorded-answers-no-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        replay: recorded answers, no key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#adding-a-provider" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6061,6 +6072,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#replay-recorded-answers-no-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        replay: recorded answers, no key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#adding-a-provider" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6488,9 +6510,30 @@ own.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="replay-recorded-answers-no-key"><code>replay</code>: recorded answers, no key</h3>
+<p><code>provider: replay</code> answers from model output recorded earlier, with no key and
+no network, so the demo runs the whole pipeline (routing, planning, checks, SQL,
+execution) on recorded model steps. It reads the files in
+<code>nl2sql/datasets/recordings/</code>, which ship with the engine and cover the demo's
+guided questions; <code>model</code> is only a label (<code>recorded</code>), and the call is named
+for the model the recordings were made with. It is meant for the demo, not for
+your own databases.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># llm.yaml</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replay</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recorded</span>
+</code></pre></div>
+<p>A call is found by the name of its structured output and the question in the
+prompt. A question that was not recorded fails with the error code
+<code>REPLAY_MISS</code> ("No recorded answer for this question. Add an API key to ask it
+live.") and is never retried. Answers arrive whole, and no token usage is
+reported. A caller's own key in a request
+(<a href="#per-request-keys-and-models">Per-request keys and models</a>) moves that one
+call to the key's provider. <code>engine.llm.recorded(questions)</code> lists which of
+<code>questions</code> replay can answer. <code>scripts/record_demo_answers.py</code> makes the
+recordings with a real Claude model.</p>
 <p>There is no Azure provider: Azure OpenAI's v1 endpoint is <code>openai_compatible</code>
 (see <a href="#any-other-openai-style-server-openai_compatible">the <code>base_url</code> table</a>).
-Any other name raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
+<code>replay</code> is listed above too, as a provider of its own. Any other name raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
 providers. Every agent picks its own provider, so one question can use several;
 see <a href="#per-node-models">Per-node models</a>.</p>
 <h3 id="adding-a-provider">Adding a provider</h3>
@@ -6519,22 +6562,22 @@ less than one question with a single retry needs (about 33,500 tokens).</p>
 <p>Every node asks for structured output as a tool call, OpenAI's default
 <code>structured_output</code>: it is what OpenRouter's and Ollama's models support most
 widely too. See <a href="#structured-output">Structured output</a>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 </code></pre></div>
 <h3 id="anthropic-claude">Anthropic (Claude)</h3>
 <p>Claude runs on Anthropic's own API through <code>ChatAnthropic</code>, not through an
 OpenAI-compatibility shim: prompt caching and reliable structured output need
 Anthropic's native API. <code>langchain-anthropic</code> is an optional extra:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[anthropic]"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[anthropic]"</span>
 </code></pre></div>
 <p>Selecting <code>provider: anthropic</code> without it fails on the first LLM call with
 <code>ValueError: ... Install the anthropic extra: pip install "nl2sql-engine[anthropic]"</code>,
 and <code>nl2sql doctor</code> reports the missing extra.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># Claude Opus 5 and Sonnet 5 reject any temperature</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># Claude Opus 5 and Sonnet 5 reject any temperature</span>
 </code></pre></div>
 <p><code>nl2sql init --provider anthropic</code> and <code>nl2sql demo</code> write <code>claude-opus-5</code> as the Claude default,
 with <code>temperature: null</code>. Current models:</p>
@@ -6628,18 +6671,18 @@ recordings are made this way; see
 API key reaches Anthropic, Google, Meta and hundreds of other models. Models are
 named <code>&lt;vendor&gt;/&lt;model&gt;</code>, for example <code>anthropic/claude-sonnet-4.5</code> or
 <code>google/gemini-2.5-pro</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 </code></pre></div>
 <h3 id="ollama">Ollama</h3>
 <p>A preset of <code>openai_compatible</code>. <a href="https://ollama.com">Ollama</a> exposes an
 OpenAI-compatible API on <code>http://localhost:11434/v1</code>, so it needs no <code>api_key</code>
 and no <code>base_url</code>: start
 the daemon, pull a model, and point <code>llm.yaml</code> at it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 </code></pre></div>
 <p>Set <code>base_url</code> if the daemon is not on <code>localhost:11434</code> (a remote box, or a
 different port).</p>
@@ -6691,11 +6734,11 @@ the engine's parameters of the time (<code>temperature=0</code>, <code>seed=42</
 <code>seed=42</code>), so only the temperature needs to go. When a model rejects it, the
 first LLM call fails with an error that names the model and the agent and says
 what to set, instead of the provider's raw response:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ValueError: Model 'gpt-5.5' (LLM agent 'default') rejected the temperature
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>parameter (HTTP 400: Unsupported value: 'temperature' does not support 0.0 with
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>this model. Only the default (1) value is supported.) Set 'temperature: null'
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>for agent 'default' in the LLM config file so no temperature is sent to this
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>model.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ValueError: Model 'gpt-5.5' (LLM agent 'default') rejected the temperature
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>parameter (HTTP 400: Unsupported value: 'temperature' does not support 0.0 with
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>this model. Only the default (1) value is supported.) Set 'temperature: null'
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>for agent 'default' in the LLM config file so no temperature is sent to this
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>model.
 </code></pre></div>
 <p>Nothing is retried without the parameter: what the config says is what is sent.</p>
 <div class="admonition note">
@@ -6767,17 +6810,17 @@ inherits the rest from the top level. Inheritance follows which fields were writ
 different provider, and so a different wire type. For example, plan on Claude
 and run everything else on OpenAI, with one cheaper node that only accepts its
 default temperature:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">ast_planner</span><span class="p">:</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># Claude Opus 5 rejects a temperature</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="nt">answer_synthesizer</span><span class="p">:</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-mini</span><span class="w">        </span><span class="c1"># on OpenAI, inherited</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># gpt-5-mini rejects temperature=0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">ast_planner</span><span class="p">:</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># Claude Opus 5 rejects a temperature</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">answer_synthesizer</span><span class="p">:</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-mini</span><span class="w">        </span><span class="c1"># on OpenAI, inherited</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># gpt-5-mini rejects temperature=0</span>
 </code></pre></div>
 <p>Here <code>curated_matcher</code>, <code>datasource_resolver</code>, <code>decomposer</code> and <code>refiner</code> run on the top level. With no <code>api_key</code>, the
 planner reads <code>ANTHROPIC_API_KEY</code> and the others <code>OPENAI_API_KEY</code>. Each node
@@ -6833,23 +6876,23 @@ start-up, so each step finds its own.</p>
 <code>${env:...}</code>) if the server needs one. Without one it sends a placeholder,
 because the OpenAI client refuses to start without a key; it never sends
 <code>OPENAI_API_KEY</code>, which belongs to OpenAI.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># llm.yaml</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://vllm:8000/v1</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3-32b</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:VLLM_KEY}"</span><span class="w">          </span><span class="c1"># optional for this provider</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nt">structured_output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json_schema</span><span class="w">      </span><span class="c1"># the default for openai_compatible</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">max_tokens</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="nt">timeout_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="nt">max_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> X-Team</span><span class="p">:</span><span class="w"> </span><span class="nv">analytics</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="nt">answer_synthesizer</span><span class="p">:</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span><span class="w">     </span><span class="c1"># Azure OpenAI's v1 endpoint</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://my-resource.openai.azure.com/openai/v1/</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:AZURE_OPENAI_API_KEY}"</span>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-4-prod</span><span class="w">             </span><span class="c1"># the Azure deployment name</span>
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">    </span><span class="nt">structured_output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tool_calling</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># llm.yaml</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://vllm:8000/v1</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3-32b</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:VLLM_KEY}"</span><span class="w">          </span><span class="c1"># optional for this provider</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nt">structured_output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json_schema</span><span class="w">      </span><span class="c1"># the default for openai_compatible</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nt">max_tokens</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nt">timeout_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="nt">max_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> X-Team</span><span class="p">:</span><span class="w"> </span><span class="nv">analytics</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="nt">answer_synthesizer</span><span class="p">:</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span><span class="w">     </span><span class="c1"># Azure OpenAI's v1 endpoint</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://my-resource.openai.azure.com/openai/v1/</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:AZURE_OPENAI_API_KEY}"</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-4-prod</span><span class="w">             </span><span class="c1"># the Azure deployment name</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">    </span><span class="nt">structured_output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tool_calling</span>
 </code></pre></div>
 <table>
 <thead>
@@ -6938,7 +6981,7 @@ automatically: the agent's setting is what runs.</p>
 the schema, or the model made no tool call) is asked for again, up to the
 agent's <code>parse_retries</code> times (default <code>1</code>). Each retry adds the model's answer
 and what was wrong with it to the messages:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Your answer did not match the schema: `steps[0].op`: Field required. Answer again with only PlanModel.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Your answer did not match the schema: `steps[0].op`: Field required. Answer again with only PlanModel.
 </code></pre></div>
 <p>If the last answer still does not parse, the node reports
 <code>MODEL_OUTPUT_INVALID</code>, whose message names the agent and suggests another
@@ -6977,9 +7020,9 @@ build one client.</p>
   calling a model. Using that agent raises the same error, naming the agent,
   the provider and the environment variable to set:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>key, but none could be resolved. Set OPENAI_API_KEY ... or in the environment,
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>or give the agent an 'api_key' in the LLM config file.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>key, but none could be resolved. Set OPENAI_API_KEY ... or in the environment,
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>or give the agent an 'api_key' in the LLM config file.
 </code></pre></div>
 <p>The key is read when the clients are built. A key set in the environment after
 the engine started is used only once the LLM is set again.</p>
@@ -7017,14 +7060,14 @@ provider's label, verified models and key shape; see
 <h2 id="replacing-the-llm-at-runtime">Replacing the LLM at runtime</h2>
 <p><code>engine.llm.replace</code> swaps the whole <code>llm</code> section at once, while the engine
 runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">AgentLLM</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">change</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">LLM</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"anthropic"</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"claude-sonnet-5-5"</span><span class="p">,</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>        <span class="n">agents</span><span class="o">=</span><span class="p">{</span><span class="s2">"ast_planner"</span><span class="p">:</span> <span class="n">AgentLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"claude-opus-5-5"</span><span class="p">)}),</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">by</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>          <span class="c1"># optional: the UserContext making the change</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="p">)</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">change</span><span class="o">.</span><span class="n">changes</span><span class="p">)</span>  <span class="c1"># {"default": {"old": "openai/gpt-5.4", "new": "anthropic/claude-sonnet-5-5"}, ...}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">AgentLLM</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">change</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">LLM</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"anthropic"</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"claude-sonnet-5-5"</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>        <span class="n">agents</span><span class="o">=</span><span class="p">{</span><span class="s2">"ast_planner"</span><span class="p">:</span> <span class="n">AgentLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"claude-opus-5-5"</span><span class="p">)}),</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">by</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>          <span class="c1"># optional: the UserContext making the change</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">)</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">change</span><span class="o">.</span><span class="n">changes</span><span class="p">)</span>  <span class="c1"># {"default": {"old": "openai/gpt-5.4", "new": "anthropic/claude-sonnet-5-5"}, ...}</span>
 </code></pre></div>
 <ul>
 <li><strong>Validated like the file.</strong> The new section is checked as the <code>llm</code>
@@ -7041,7 +7084,7 @@ runs:</p>
   agent whose provider or model changed, the old and the new one. They never
   hold a key, a key reference or a header.</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>INFO nl2sql.llm: LLM replaced by user=u42 roles=[admin] via api: default: openai/gpt-5.4 -&gt; anthropic/claude-sonnet-5-5; ast_planner: openai/gpt-5.4 -&gt; anthropic/claude-opus-5-5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>INFO nl2sql.llm: LLM replaced by user=u42 roles=[admin] via api: default: openai/gpt-5.4 -&gt; anthropic/claude-sonnet-5-5; ast_planner: openai/gpt-5.4 -&gt; anthropic/claude-opus-5-5
 </code></pre></div>
 <ul>
 <li><strong>Not saved.</strong> Nothing is written to disk, so a restart goes back to the
@@ -7074,8 +7117,8 @@ Switching embedding providers requires a re-index.</p>
 dated price table the engine ships (<code>nl2sql/llm/prices.py</code>, USD per million
 tokens, each row with its source), with <code>prices</code> in the config adding a model
 or replacing a row (a negotiated rate, a fine-tune):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">prices</span><span class="p">:</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">gpt-4o</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> input</span><span class="p">:</span><span class="w"> </span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nt"> cached_input</span><span class="p">:</span><span class="w"> </span><span class="nv">1.25</span><span class="p p-Indicator">,</span><span class="nt"> output</span><span class="p">:</span><span class="w"> </span><span class="nv">10</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">prices</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">gpt-4o</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> input</span><span class="p">:</span><span class="w"> </span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nt"> cached_input</span><span class="p">:</span><span class="w"> </span><span class="nv">1.25</span><span class="p p-Indicator">,</span><span class="nt"> output</span><span class="p">:</span><span class="w"> </span><span class="nv">10</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <table>
 <thead>

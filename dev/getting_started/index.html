@@ -6031,8 +6031,9 @@ schema, and decide what to keep:</p>
 <p>The profiler is deterministic and bounded (<a href="../schema/profiler/">Schema Profiler</a>);
 nothing it proposes reaches a prompt or the index until an admin accepts it
 (<a href="../configuration/review/">Review Queue</a>).</p>
-<p>From Python, <code>nl2sql.config.init_project(folder, demo=..., provider=..., force=...)</code>
-writes the same files, and <code>nl2sql.config.demo_config()</code> builds the demo's
+<p>From Python, <code>nl2sql.init_project(folder, demo=..., provider=..., force=...)</code>
+writes the same files (<code>nl2sql.prepare_demo(folder)</code> writes the demo once and indexes it; with no key it uses the
+<a href="../configuration/llm/#replay-recorded-answers-no-key"><code>replay</code> provider</a>), and <code>nl2sql.config.demo_config()</code> builds the demo's
 <code>Config</code> in code, with the databases opened read-only from the installed
 package. <code>nl2sql.config.write_project(config, folder)</code> writes any <code>Config</code> made of data the same way, never over
 an existing file, with every secret written as a <code>${env:...}</code> reference (see

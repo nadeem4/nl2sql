@@ -1971,6 +1971,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#recorded-answers-no-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recorded answers, no key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#api-keys-in-the-demo" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6110,6 +6121,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#recorded-answers-no-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recorded answers, no key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#api-keys-in-the-demo" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6458,6 +6480,35 @@ question requires." See
 <a href="../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.
 The playground's schema panel follows the <strong>Ask as</strong> role too: it lists only
 the tables that role may read (<code>engine.datasources.schema(..., user_context=)</code>).</p>
+<h3 id="recorded-answers-no-key">Recorded answers, no key</h3>
+<p>With no key anywhere and no local Ollama model, the project <code>nl2sql.prepare_demo(folder)</code>
+writes uses <code>provider: replay</code>: the demo's guided questions are answered by the
+real pipeline from the model output recorded with the engine
+(<a href="../../configuration/llm/#replay-recorded-answers-no-key">the <code>replay</code> provider</a>).
+Any other question fails with <code>REPLAY_MISS</code> until you add a key. A key in the
+environment is used first, then an Ollama daemon with a model pulled. The
+facade's <code>engine.add_demo()</code> does not touch the provider: it keeps the one the
+engine has, so a project answers the guided questions with no key only when its
+<code>llm</code> is <code>provider: replay</code>. From Python:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">load_config</span><span class="p">,</span> <span class="n">prepare_demo</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">config_path</span> <span class="o">=</span> <span class="n">prepare_demo</span><span class="p">(</span><span class="s2">"my-demo"</span><span class="p">)</span>   <span class="c1"># written once, indexed when the index is missing</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">load_config</span><span class="p">(</span><span class="n">config_path</span><span class="p">))</span>
+</code></pre></div>
+<p><code>engine.add_demo()</code> adds the three sample databases, their verified queries and the
+demo glossary (copied to <code>demo-glossary.yaml</code> in the project folder, so accepting a
+proposal writes into your project) to an engine you already have, then indexes them.
+When the engine was loaded from a <code>nl2sql.yaml</code> all of it is saved there and is still
+there after a restart: each database under <code>datasources/</code>, the verified queries in
+<code>curated.yaml</code> (with a <code>curated:</code> line in <code>nl2sql.yaml</code> if the project had none), and
+the glossary as a second source in <code>knowledge.yaml</code>. A section written inline in
+<code>nl2sql.yaml</code> is left alone. An engine built in code has no file, so for it the
+verified queries and the glossary are added to that engine only and <code>add_demo</code> has to
+run again after a restart. An id such as <code>chinook</code> that is already a database of
+yours (another file, even one named <code>chinook.db</code>) is refused with a <code>DatasourceExists</code>
+error and nothing is added;
+a second call changes nothing. A caller who is not an admin gets <code>NotAuthorized</code>.
+<code>engine.datasources.list()</code> shows each one's <code>sample_questions</code>.</p>
 <h3 id="api-keys-in-the-demo">API keys in the demo</h3>
 <p><code>embeddings.yaml</code> says <code>provider: local</code>, so schema chunks are
 embedded with the key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb
@@ -6850,29 +6901,29 @@ the refusal, retry, error and plan-cache rates, from the CLI (below). See
 <code>./nl2sql.yaml</code>. Paths inside it are relative to <code>nl2sql.yaml</code>, so from the demo
 folder (<code>cd nl2sql-demo</code>) no flag is needed; from anywhere else, add
 <code>--config nl2sql-demo/nl2sql.yaml</code> before the command.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Run a query against the demo</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Plan and validate without touching the database</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># Re-index after editing the demo's config</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>nl2sql<span class="w"> </span>index
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
-<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
-<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
-<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="c1"># After changing the embedding model: drop the old model's index</span>
-<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>prune
-<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="c1"># Check the install, the keys, and the engine: each datasource, each key, the index</span>
-<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>nl2sql<span class="w"> </span>doctor
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Run a query against the demo</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Plan and validate without touching the database</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># Re-index after editing the demo's config</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>nl2sql<span class="w"> </span>index
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="c1"># After changing the embedding model: drop the old model's index</span>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>prune
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="c1"># Check the install, the keys, and the engine: each datasource, each key, the index</span>
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>nl2sql<span class="w"> </span>doctor
 </code></pre></div>
 <p>The two flags that name a datasource are not the same flag: <code>run</code> takes
 <code>--ds-id</code>, which pins the datasource and makes the resolver skip its search;
@@ -6886,14 +6937,14 @@ answers with <code>nl2sql trace replay &lt;file&gt;</code>. See
 plan cache (in <code>.nl2sql/state.db</code>), so the SQL and rows are the same and the
 planner is not called; the playground's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>cache<span class="w"> </span>clear
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nl2sql<span class="w"> </span>cache<span class="w"> </span>clear
 </code></pre></div>
 <p>The playground's ratings, and the guardrail rates over every rated run and
 kept trace:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft eval cases, for review</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft eval cases, for review</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
 </code></pre></div>
 <p><code>export --good</code> writes <code>feedback_gold_drafts.yaml</code>, a suite of draft cases. A
 person must review each draft, approve it and run <code>engine.evals.regenerate</code>
