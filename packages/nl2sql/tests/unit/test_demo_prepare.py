@@ -71,7 +71,7 @@ def _engine(tmp_path, **changes):
     from nl2sql.registry import Registry
 
     registry = Registry.default()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
     config = starter_config(llm=default_llm("replay"), path=tmp_path / "store").model_copy(
         update={"knowledge": [], **changes})
     return nl2sql.NL2SQL(config, registry=registry)
@@ -244,7 +244,7 @@ def test_add_demo_saves_the_added_datasources_where_the_config_keeps_them(tmp_pa
     from nl2sql.registry import Registry
 
     registry = Registry.default()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
     with nl2sql.NL2SQL(nl2sql.load_config(config_path), registry=registry) as engine:
         engine.add_demo(user_context=UserContext(user_id="a", roles=["admin"]))
         files = sorted(p.name for p in (tmp_path / "p" / "datasources").glob("*.yaml"))
@@ -261,7 +261,7 @@ def _project_engine(folder):
     from nl2sql.registry import Registry
 
     registry = Registry.default()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
     return nl2sql.NL2SQL(nl2sql.load_config(folder / "nl2sql.yaml"), registry=registry)
 
 

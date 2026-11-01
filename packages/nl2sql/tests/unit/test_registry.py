@@ -180,7 +180,8 @@ def test_the_built_ins_are_declared_in_pyproject():
     from nl2sql.llm.registry import PROVIDER_PRESETS
 
     assert set(_declared("nl2sql.adapters")) == {"duckdb", "mssql", "mysql", "postgres", "sqlite"}
-    assert set(_declared("nl2sql.llms")) == set(PROVIDER_PRESETS)
+    # `replay` answers from recordings with no key and no key variable, so it is declared but is not a preset (G2b).
+    assert set(_declared("nl2sql.llms")) == set(PROVIDER_PRESETS) | {"replay"}
     assert set(_declared("nl2sql.embeddings")) == {"local", "openai", "openai_compatible"}
     assert set(_declared("nl2sql.secrets")) == {"env", "aws", "azure", "hashicorp"}
 

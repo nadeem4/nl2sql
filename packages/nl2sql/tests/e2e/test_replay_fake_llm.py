@@ -21,7 +21,7 @@ def _engine(demo_project, tmp_path, store=None):
     path = project_config(demo_project, "replay.yaml", llm={"provider": "replay", "model": "recorded"}, curated=True,
                           storage=private_storage(demo_project, tmp_path / "store"))
     registry = Registry.default()
-    registry.add_llm("replay", ReplayProvider(store if store is not None else packaged_store()))
+    registry.add_llm("replay", ReplayProvider(store if store is not None else packaged_store()), replace=True)
     return NL2SQL(load_config(path), registry=registry)
 
 
@@ -68,7 +68,7 @@ def test_every_recorded_question_replays_after_add_demo(tmp_path):
     from nl2sql.llm.replay import REPLAY
 
     registry = Registry.default()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
     config = starter_config(llm=default_llm("replay"), path=tmp_path / "store").model_copy(
         update={"knowledge": [], "embeddings": Embeddings(provider="local")})
     with NL2SQL(config, registry=registry) as engine:
@@ -93,7 +93,7 @@ def test_every_recorded_question_still_replays_after_a_restart(tmp_path):
 
     init_project(tmp_path, provider="replay")
     registry = Registry.default()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
     with NL2SQL(load_config(tmp_path / "nl2sql.yaml"), registry=registry) as engine:
         engine.add_demo(user_context=ADMIN)
 

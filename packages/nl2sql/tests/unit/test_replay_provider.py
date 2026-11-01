@@ -96,7 +96,7 @@ def test_replay_usage_names_the_recorded_model():
 
 def test_replay_is_a_registered_provider_that_needs_no_key():
     registry = Registry.empty()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
 
     provider = registry.load("llm", "replay")
 
@@ -110,7 +110,7 @@ def test_recorded_lists_covered_questions():
     """``engine.llm.recorded`` filters questions to those the replay provider can answer, in the order asked."""
     store = ReplayStore([Recording("DecomposerResponse", QUESTION, {})])
     registry = Registry.empty()
-    registry.add_llm("replay", ReplayProvider(store))
+    registry.add_llm("replay", ReplayProvider(store), replace=True)
     api = LLMAPI(fake_runtime(registry=registry))
 
     assert api.recorded([OTHER, QUESTION]) == [QUESTION]
@@ -131,7 +131,7 @@ def test_override_key_replaces_replay_for_one_call(monkeypatch):
     from nl2sql.secrets import SecretManager
 
     registry = Registry.empty()
-    registry.add_llm("replay", REPLAY)
+    registry.add_llm("replay", REPLAY, replace=True)
     registry.add_llm("anthropic", LLM_PROVIDERS["anthropic"])
     llms = LLMRegistry(SecretManager(), registry)
     llms.replace_llms(agents_from_config(LLM(provider="replay", model="recorded")))
