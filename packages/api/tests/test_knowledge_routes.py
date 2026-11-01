@@ -13,7 +13,7 @@ ADMIN = UserContext(roles=["admin"])
 @pytest.fixture
 def stub(api_client):
     client, engine = api_client()
-    engine.knowledge, engine.proposals = Recorder(), Recorder()
+    engine.knowledge, engine.proposals, engine.datasources = Recorder(), Recorder(), Recorder()
     return client, engine.knowledge, engine.proposals
 
 

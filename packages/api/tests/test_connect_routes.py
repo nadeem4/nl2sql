@@ -1,6 +1,6 @@
 """The Connect routes over a real engine built in a temp folder (docs/architecture/wave_c.md, section 7).
 
-``GET /datasource-types``, ``POST /datasource/test`` and ``POST /datasource`` (with ``save``) are admin-only.
+``GET /datasource-types``, ``POST /datasources/test`` and ``POST /datasources`` (with ``save``) are admin-only.
 Nothing here reads or writes a real ``.env``: every project is a ``tmp_path`` folder.
 """
 import sqlite3

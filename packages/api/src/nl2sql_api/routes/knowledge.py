@@ -34,6 +34,8 @@ def show_knowledge(engine: Engine, user: Caller, datasource_id: Optional[str] = 
     """The merged knowledge the engine uses for each datasource the caller may see, or for `datasource_id`: each
     item with where it came from, and the `problems` (names that do not resolve against the live schema, joins whose
     types cannot be compared)."""
+    if datasource_id is not None:
+        engine.datasources.get(datasource_id, user_context=user)  # unknown and hidden are the same 404
     return engine.knowledge.show(datasource_id, user_context=user)
 
 

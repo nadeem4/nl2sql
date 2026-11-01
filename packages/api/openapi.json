@@ -6803,7 +6803,7 @@
     },
     "/api/v1/datasources": {
       "get": {
-        "description": "The datasources the caller's scope reaches: `id`, `type`, `description`, `status` (`ready`, `failed` with a\n`reason`, or `unchecked`), `capabilities`, `connection` (every secret masked) and `sample_questions`.",
+        "description": "The datasources the caller's scope reaches: `id`, `type`, `description`, `status` (`ready`, `failed` with a\n`reason` (a generic sentence unless the caller is an admin: the driver's text stays with admins), or `unchecked`), `capabilities`, `connection` (every secret masked) and `sample_questions`.",
         "operationId": "list_datasources_api_v1_datasources_get",
         "responses": {
           "200": {
@@ -7456,7 +7456,7 @@
         ]
       },
       "get": {
-        "description": "The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by type, when it\nwas built, the embedding model, one entry per registered datasource and any problems found. Read from the live\nindex.",
+        "description": "The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by type, when it\nwas built, the embedding model, one entry per registered datasource and any problems found. Read from the live\nindex. A caller who is not an admin sees only the datasources their scope reaches, a failed one by its name\nwithout the driver's text, and no warning that names a table.",
         "operationId": "get_index_api_v1_index_get",
         "responses": {
           "200": {
@@ -7490,7 +7490,7 @@
     },
     "/api/v1/index/check": {
       "get": {
-        "description": "Compare each datasource's live schema with the one its index was built from: a `DriftReport` per datasource\n(`unchanged`, `changed` or `unreachable`, with the tables and columns that moved and what each touches).\nRepeat `datasource_id` to name some; leave it out for every one. Admin only: it reads every live database.",
+        "description": "Compare each datasource's live schema with the one its index was built from: a `DriftReport` per datasource\n(`unchanged`, `drifted`, `not_indexed` or `failed`, with the tables and columns that moved and what each touches).\nRepeat `datasource_id` to name some; leave it out for every one. Admin only: it reads every live database.",
         "operationId": "check_index_api_v1_index_check_get",
         "parameters": [
           {

@@ -95,7 +95,7 @@ embedding model needs no special build: its namespace starts empty.
 ### index.health
 
 Signature:
-`health() -> dict`
+`health(*, user_context=None) -> dict`
 
 Health of the configured embedding model's index: `status` (`ok`,
 `empty`, `stale`, `missing`), `total`, `counts` by entry type, `built_at`,
@@ -105,6 +105,11 @@ from, and `built_at`), `problems` and `warnings`. `missing` when the model has
 no namespace yet (never indexed, or the model changed): run `nl2sql index`.
 A datasource that failed to start is a warning: "Datasource 'x' is
 unavailable: <reason>". `check()` reports its `status`.
+
+Without `user_context` it is the whole report. With one that holds none of `policies.admin_roles` (and no
+`allow_all`), only the datasources its roles reach are listed, a failed one is named without the driver's text, and a
+warning about a preferred table (it names a table the scope may hide) is left out; `status` and `counts` stay the whole
+index's.
 
 ### index.clear
 
@@ -159,7 +164,7 @@ glossary items it breaks); `error` (redacted) for `failed`. Drift publishes `sch
 once per drift and engine.
 Nothing is stored and nothing is rebuilt. `user_context` is required: the
 caller sees drift only in tables its scope may read, a datasource it cannot
-reach is left out (or, named, is a `ValueError` like an unknown one). See
+reach is left out (or, named, is a `DatasourceNotFound` (a `ValueError`) like an unknown one). See
 [Schema Drift](../../schema/drift.md).
 
 ### index.versions

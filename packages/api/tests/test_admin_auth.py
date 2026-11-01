@@ -10,7 +10,9 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from nl2sql import AcceptReport, DatasourceStatus, LLMChange
+from datetime import datetime, timezone
+
+from nl2sql import AcceptReport, DatasourceStatus, LLMChange, Proposal
 
 from nl2sql.testing.config import make_config
 from nl2sql_api.dependencies import get_engine
@@ -32,6 +34,7 @@ ADMIN_ROUTES = [
     ("get", "/api/v1/index/check", None),
     ("post", "/api/v1/knowledge/reload", None),
     ("get", "/api/v1/proposals", None),
+    ("get", "/api/v1/proposals/p1", None),
     ("post", "/api/v1/proposals/accept", {"ids": ["p1"]}),
     ("post", "/api/v1/proposals/reject", {"ids": ["p1"]}),
     ("post", "/api/v1/proposals/examples", {"datasource_id": "ds", "questions": ["How many orders?"]}),
@@ -79,7 +82,9 @@ class AdminEngine:
                                                                        cancelled=False),
                                       "clear": None, "health": lambda: {"status": "ok"}, "check": list})
         self.knowledge = _Recorder(self, {"reload": list, "profile": list})
-        self.proposals = _Recorder(self, {"list": list, "accept": AcceptReport, "reject": list, "propose_examples": list})
+        self.proposals = _Recorder(self, {"list": list, "get": lambda: Proposal(
+            id="p1", kind="term", datasource_id="ds", target="revenue", change={"definition": "x"},
+            origin="clarification", created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)), "accept": AcceptReport, "reject": list, "propose_examples": list})
 
 
 @pytest.fixture

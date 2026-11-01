@@ -59,7 +59,7 @@ fields included) and every secret the engine knows are replaced by `***` in the 
 exact values: a validation message such as `connection.password: Field required` stays readable.
 
 Errors:
-- A body that does not validate -> `HTTP 422`, as for `POST /datasource`.
+- A body that does not validate -> `HTTP 422`, as for `POST /api/v1/datasources`.
 
 ### `POST /api/v1/datasources`
 
@@ -103,7 +103,7 @@ Errors:
 ### `GET /api/v1/datasources`
 
 Response: a list of `DatasourceInfo` from `engine.datasources.list(user_context=caller)`: the datasources the caller's
-scope reaches, each with `id`, `type`, `description`, `status` (`ready`, `failed` with a `reason`, or `unchecked`),
+scope reaches, each with `id`, `type`, `description`, `status` (`ready`, `failed` with a `reason`, or `unchecked`; the `reason` is the driver's text for an admin and a generic sentence for anyone else),
 `capabilities`, `connection` with every secret masked, and `sample_questions`. No role needed.
 
 ### `GET /api/v1/datasources/{datasource_id}`

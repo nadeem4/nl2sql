@@ -93,7 +93,7 @@ class IndexAPI:
             on_datasource=on_datasource,
         )
 
-    def health(self) -> Dict[str, Any]:
+    def health(self, *, user_context: Optional[UserContext] = None) -> Dict[str, Any]:
         """Health of the vector index of the configured embedding model.
 
         ``status`` (``ok``, ``empty``, ``stale`` or ``missing``; a glossary
@@ -102,6 +102,13 @@ class IndexAPI:
         that leave ``status`` alone (a ``curated.yaml`` changed since it was
         indexed, a preferred table missing from the indexed schema, a
         datasource that failed to start).
+
+        Without ``user_context`` the whole report. With one that holds none of
+        ``policies.admin_roles`` (and no ``allow_all``), only the datasources
+        its roles reach are listed, a datasource that failed to start is
+        reported by name without the driver's text, and a warning about a
+        preferred table (which names a table the caller's scope may hide) is
+        left out. ``status`` and the counts stay the whole index's.
         """
         from nl2sql.indexing.curated import curated_hashes
         from nl2sql.indexing.health import index_health
@@ -121,7 +128,32 @@ class IndexAPI:
             knowledge_digests={ds: knowledge.digest(ds) for ds in ids} if isinstance(knowledge, Knowledge) else None,
         )
         health.warnings.extend(down)
-        return health.to_dict()
+        report = health.to_dict()
+        if user_context is None or self._is_admin(user_context):
+            return report
+        return self._restricted(report, user_context)
+
+    def _is_admin(self, user_context: UserContext) -> bool:
+        policies = self._ctx.policy_engine.policies
+        return policies.allow_all or bool(set(user_context.roles) & set(policies.admin_roles))
+
+    def _restricted(self, report: Dict[str, Any], user_context: UserContext) -> Dict[str, Any]:
+        """``report`` as a caller who is not an admin may see it (see :meth:`health`)."""
+        engine = self._ctx.policy_engine
+        named = {d["datasource_id"] for d in report["datasources"]} | set(self._ctx.ds_registry.unavailable())
+        named |= {d.id for d in self._ctx.config.datasources} if hasattr(self._ctx, "config") else set()
+        mine = {ds for ds in named if engine.scope(user_context, ds).reaches_datasource()}
+
+        def about_only_mine(text: str) -> bool:
+            return all(ds in mine for ds in named if f"'{ds}'" in text)
+
+        warnings = [w for w in report["warnings"]
+                    if not w.startswith("Preferred table") and "is unavailable:" not in w and about_only_mine(w)]
+        warnings += [f"Datasource '{ds}' is unavailable." for ds in self._ctx.ds_registry.unavailable() if ds in mine]
+        problems = ["The vector index could not be read." if p.startswith("The vector index could not be read") else p
+                    for p in report["problems"]]
+        return {**report, "datasources": [d for d in report["datasources"] if d["datasource_id"] in mine],
+                "problems": [p for p in problems if about_only_mine(p)], "warnings": warnings}
 
     def check(self, datasource_ids: Optional[Iterable[str]] = None, *,
               user_context: UserContext) -> List["DriftReport"]:

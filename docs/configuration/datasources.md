@@ -232,7 +232,8 @@ from, and nothing else. It needs:
 - an admin `by` (`policies.admin_roles`; under `allow_all` any caller) - a caller without one gets `PermissionError`;
 - an engine loaded from a `nl2sql.yaml` whose `datasources` section is a folder (`datasources: { file: datasources/ }`,
   one `<id>.yaml` each, as `nl2sql init` writes it). An engine built in code, or with the datasources inline in
-  `nl2sql.yaml`, raises `ValueError`.
+  `nl2sql.yaml`, or one whose folder cannot be written, raises `ReviewError` with code `NOT_WRITABLE`
+  (not a `ValueError`; the REST API answers 403).
 
 **The file is checked before it is replaced.** The engine records each datasource file's SHA-256 when it loads the
 config, as an accept does for the glossary. If the file changed on disk since (somebody edited it), `save` raises

@@ -15,7 +15,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from nl2sql import (CancellationToken, Dashboard, DashboardRun, EvalReport, NL2SQLError, ProfileReport,
                     RunCancelled, UserContext)
@@ -40,6 +40,12 @@ class ProfileJob(BaseModel):
     datasource_ids: Optional[List[str]] = None
     draft: bool = False
     max_cost_usd: Optional[float] = Field(None, gt=0)
+
+    @model_validator(mode="after")
+    def _cap_needs_drafts(self) -> "ProfileJob":
+        if self.max_cost_usd is not None and not self.draft:
+            raise ValueError("max_cost_usd caps the drafting model's cost: it needs draft: true.")
+        return self
 
 
 class EvalJob(BaseModel):

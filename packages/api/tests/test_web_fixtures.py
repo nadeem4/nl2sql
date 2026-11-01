@@ -1,5 +1,5 @@
 """The golden files the web app's node tests read: ``ApiError`` and ``Job``, the ``Dashboard`` and
-``DashboardView``, the ``Proposal`` and the ``DriftReport`` (docs/architecture/wave_d.md, "Testing").
+``DashboardView``, the ``Proposal`` and the ``DriftReport`` (a ``drifted`` one with its diff and impact, and an ``unchanged`` one) (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 from nl2sql import UserContext
 from nl2sql.testing.config import make_config
 from nl2sql import DriftReport, Proposal
+from nl2sql.schema.impact import DriftImpact, ImpactedQuery
+from nl2sql_sdk.schema import ColumnChange, ColumnRef, SchemaDiff, TableRef
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.jobs import IndexJob, IndexResult, Jobs
@@ -41,8 +43,19 @@ def build() -> dict:
         Engine.proposals.returns["get"] = Proposal(
             id="p-1", kind="term", datasource_id="chinook", target="revenue",
             change={"definition": "Sum of invoice totals"}, origin="clarification", created_at=AT)
-        Engine.index.returns["check"] = [DriftReport(datasource_id="chinook", status="unchanged", live_version="v1",
-                                                     checked_at=AT)]
+        tracks, orders = TableRef(schema_name="main", table_name="tracks"), TableRef(schema_name="main",
+                                                                                 table_name="orders")
+        diff = SchemaDiff(datasource_id="chinook", from_version="v1", tables_added=[orders],
+                          columns_dropped=[ColumnRef(table=tracks, column_name="composer")],
+                          columns_changed=[ColumnChange(table=tracks, column="unit_price",
+                                                        changes={"type": ("NUMERIC(10,2)", "NUMERIC(12,2)")})])
+        impact = DriftImpact(verified_queries=[ImpactedQuery(datasource_id="chinook", query_id="top_composers",
+                                                             reasons=["reads dropped column tracks.composer"])],
+                             preferred_tables=[])
+        Engine.index.returns["check"] = [
+            DriftReport(datasource_id="chinook", status="drifted", live_version="v1", checked_at=AT, diff=diff,
+                        impact=impact),
+            DriftReport(datasource_id="support", status="unchanged", live_version="v1", checked_at=AT)]
 
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine
@@ -66,7 +79,8 @@ def build() -> dict:
                     "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
                     "DashboardView.json": client.get("/api/v1/dashboards/d1").json(),
                     "Proposal.json": client.get("/api/v1/proposals/p-1").json(),
-                    "DriftReport.json": client.get("/api/v1/index/check").json()[0]}
+                    "DriftReport.json": client.get("/api/v1/index/check").json()[0],
+                    "DriftReportUnchanged.json": client.get("/api/v1/index/check").json()[1]}
         finally:
             jobs.close()
 

@@ -2,7 +2,8 @@
 
 Indexing a datasource is a [job](jobs.md): it outlives its request. The routes here read the index, clear it, check
 it for drift and inspect retrieval. `DELETE /api/v1/index` and `GET /api/v1/index/check` are admin only (see
-[Admin routes](index.md#admin-routes)); `GET /api/v1/index` and the inspector are open to any caller.
+[Admin routes](index.md#admin-routes)); `GET /api/v1/index` and the inspector are open to any caller, and `GET /api/v1/index` is scoped to the
+caller: an admin sees the whole report; anyone else sees only the datasources their roles reach, a failed one by name without the driver's text, and no warning that names a table.
 
 ## Start an index build
 
@@ -18,7 +19,7 @@ The job's `result` (owner only) is `{"ok": bool, "stats": [...], "empty": [...],
 
 ## `GET /api/v1/index`
 
-`engine.index.health()` (see [Indexing API](../core/indexing.md#indexhealth)), the report the index panel shows.
+`engine.index.health(user_context=...)` (see [Indexing API](../core/indexing.md#indexhealth)), the report the index panel shows.
 
 ```json
 {

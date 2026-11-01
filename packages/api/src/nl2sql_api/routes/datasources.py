@@ -117,7 +117,7 @@ def add_datasource(engine: Engine, user: UserContext = Depends(identity.admin),
             responses=identity.AUTH_RESPONSES)
 def list_datasources(engine: Engine, user: Caller):
     """The datasources the caller's scope reaches: `id`, `type`, `description`, `status` (`ready`, `failed` with a
-    `reason`, or `unchecked`), `capabilities`, `connection` (every secret masked) and `sample_questions`."""
+    `reason` (a generic sentence unless the caller is an admin: the driver's text stays with admins), or `unchecked`), `capabilities`, `connection` (every secret masked) and `sample_questions`."""
     return engine.datasources.list(user_context=user)
 
 
@@ -142,6 +142,7 @@ def remove_datasource(datasource_id: str, engine: Engine):
 def get_schema(datasource_id: str, engine: Engine, user: Caller):
     """The datasource's tables and columns as the caller may see them: a table or column the caller's scope
     denies is left out."""
+    engine.datasources.get(datasource_id, user_context=user)  # 404 for an unknown or hidden id, as /datasources/{id}
     return engine.datasources.schema(datasource_id, user_context=user)
 
 
@@ -154,4 +155,5 @@ def get_diagram(datasource_id: str, engine: Engine, user: Caller,
     """The schema as a Mermaid entity-relationship diagram, for the caller's view of it. Repeat `tables` to draw
     those tables and the ones one relationship away; leave it out for the whole datasource (cut to the 30 with the
     most relationships)."""
+    engine.datasources.get(datasource_id, user_context=user)  # 404 for an unknown or hidden id
     return engine.datasources.diagram(datasource_id, user_context=user, tables=tables)

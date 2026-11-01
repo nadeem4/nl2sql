@@ -22,8 +22,9 @@ _UNKNOWN = {404: {**ERROR_RESPONSE, "description": "A named datasource is not co
 def get_index(engine: Engine, user: UserContext = Depends(identity.caller)):
     """The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by type, when it
     was built, the embedding model, one entry per registered datasource and any problems found. Read from the live
-    index."""
-    return engine.index.health()
+    index. A caller who is not an admin sees only the datasources their scope reaches, a failed one by its name
+    without the driver's text, and no warning that names a table."""
+    return engine.index.health(user_context=user)
 
 
 @router.delete("/index", response_model=Dict[str, Any], summary="Clear the index", **ADMIN)
@@ -39,7 +40,7 @@ def clear_index(engine: Engine):
 def check_index(engine: Engine, user: UserContext = Depends(identity.admin),
                 datasource_id: Annotated[Optional[List[str]], Query()] = None):
     """Compare each datasource's live schema with the one its index was built from: a `DriftReport` per datasource
-    (`unchanged`, `changed` or `unreachable`, with the tables and columns that moved and what each touches).
+    (`unchanged`, `drifted`, `not_indexed` or `failed`, with the tables and columns that moved and what each touches).
     Repeat `datasource_id` to name some; leave it out for every one. Admin only: it reads every live database."""
     return engine.index.check(datasource_id, user_context=user)
 

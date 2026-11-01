@@ -105,6 +105,18 @@ def test_index_job_progress_per_datasource(stub):
     assert args == (["chinook", "support"],) and kwargs["cancellation_token"] is not None
 
 
+def test_index_job_progress_ends_at_its_total_when_an_id_repeats(stub):
+    client, index, _ = stub
+
+    def build(datasource_ids, *, on_datasource, cancellation_token):
+        on_datasource(IndexProgress(datasource_id="chinook", state="done"))  # the build dedupes its ids
+        return built()
+
+    index.returns["build"] = build
+    done = wait_for(client, client.post(f"{API}/jobs/index", json={"datasource_ids": ["chinook", "chinook"]}).json()["id"])
+    assert [(p["done"], p["total"]) for p in done["progress"]] == [(1, 1)]
+
+
 def test_index_job_of_every_datasource_passes_none(stub):
     client, index, _ = stub
     index.returns["build"] = lambda ids, **kwargs: built()
@@ -234,6 +246,9 @@ def test_profile_job_defaults_and_validation(stub):
     assert args == (None,) and kwargs["draft"] is False and kwargs["max_cost_usd"] is None
     assert client.post(f"{API}/jobs/profile", json={"max_cost_usd": 0}).status_code == 422
     assert client.post(f"{API}/jobs/profile", json={"nope": 1}).status_code == 422
+    # a cost cap without drafts is a bad request now, not a job that fails later
+    assert client.post(f"{API}/jobs/profile", json={"max_cost_usd": 1}).status_code == 422
+    assert client.post(f"{API}/jobs/profile", json={"draft": True, "max_cost_usd": 1}).status_code == 202
 
 
 def test_jobs_are_admin_only(api_client):

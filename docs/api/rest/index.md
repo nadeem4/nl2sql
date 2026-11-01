@@ -43,8 +43,8 @@ Source: `packages/api/src/nl2sql_api/main.py`
 Source: `packages/api/src/nl2sql_api/dependencies.py`
 
 - `get_engine(request)` returns the singleton `NL2SQL` instance.
-- Service providers (`DatasourceService`, `QueryService`, `LLMService`,
-  `IndexingService`, `HealthService`) are created per-request with the engine.
+- Routes are thin over the engine's namespaces (`engine.datasources`, `engine.index`, ...); there are no service
+  classes between them.
 - `identity.caller` (in `nl2sql_api/identity.py`) returns the caller's
   `UserContext`; see [Identity](#identity).
 - `identity.admin` guards the routes that change datasources, LLMs or the

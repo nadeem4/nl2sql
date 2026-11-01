@@ -554,3 +554,23 @@ def test_datasource_info_lists_sample_questions(tmp_path):
                                                    "Who bought the most?"]
         assert engine.datasources.get("shop").sample_questions == listed["shop"].sample_questions
         assert listed["broken"].sample_questions == []
+
+
+# ------------------------------------------------- a failed datasource's reason is the admin's
+
+RAW = "FATAL: password authentication failed for user nl2sql at db.internal"
+ROLES = {"roles": {"analyst": {"description": "Reads shop", "allow": ["shop.main.customers"]},
+                   "admin": {"description": "Everything", "allow": ["*"]}}}
+
+
+def test_a_failed_datasources_reason_is_shown_to_an_admin_only(tmp_path, monkeypatch):
+    with _engine(tmp_path, policies=ROLES) as engine:
+        monkeypatch.setattr(engine._runtime.ds_registry, "unavailable", lambda: {"shop": RAW})
+        analyst, admin = UserContext(roles=["analyst"]), UserContext(roles=["admin"])
+
+        masked = engine.datasources.get("shop", user_context=analyst)
+        assert masked.status == "failed" and RAW not in str(masked) and masked.reason
+        assert RAW not in str(engine.datasources.list(user_context=analyst))
+        assert engine.datasources.get("shop", user_context=admin).reason == RAW
+        assert engine.datasources.list(user_context=admin)[0].reason == RAW
+        assert engine.datasources.get("shop").reason == RAW  # no caller: the whole report

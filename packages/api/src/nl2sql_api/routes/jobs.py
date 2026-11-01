@@ -24,6 +24,12 @@ Engine = Annotated[NL2SQL, Depends(get_engine)]
 _NOT_FOUND = {404: {**ERROR_RESPONSE, "description": "No such job for this caller."}, **identity.AUTH_RESPONSES}
 
 
+def _count(datasource_ids, engine: NL2SQL) -> int:
+    """How many datasources a job goes through: the named ones (a repeated id is one) or every configured one."""
+    return len(dict.fromkeys(datasource_ids if datasource_ids is not None else
+                             [d.id for d in engine.config.datasources]))
+
+
 def _admin(user: UserContext, engine: NL2SQL) -> bool:
     return identity.is_admin(user, engine)
 
@@ -66,7 +72,7 @@ def start_index_job(body: IndexJob, user: Annotated[UserContext, Depends(identit
     index (the reason is in the server log). Admin only."""
 
     def run(ctx: JobContext) -> IndexResult:
-        total = len(body.datasource_ids) if body.datasource_ids is not None else len(engine.config.datasources)
+        total = _count(body.datasource_ids, engine)
         finished = []
 
         def on_datasource(event) -> None:
@@ -74,8 +80,6 @@ def start_index_job(body: IndexJob, user: Annotated[UserContext, Depends(identit
                 return
             finished.append(event.datasource_id)
             failed = event.state == "failed"
-            if failed:
-                logger.error("Indexing %s failed: %s", event.datasource_id, event.reason)
             step = f"{event.datasource_id} (failed)" if failed else event.datasource_id
             ctx.progress(step, len(finished), total)
 
@@ -98,7 +102,7 @@ def start_profile_job(body: ProfileJob, user: Annotated[UserContext, Depends(ide
     each. Admin only."""
 
     def run(ctx: JobContext) -> List[ProfileReport]:
-        total = len(body.datasource_ids) if body.datasource_ids is not None else len(engine.config.datasources)
+        total = _count(body.datasource_ids, engine)
         done = []
 
         def on_datasource(report: ProfileReport) -> None:

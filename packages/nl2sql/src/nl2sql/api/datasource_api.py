@@ -36,20 +36,31 @@ class DatasourcesAPI:
         """Every configured datasource, in config order, failed ones included (``status == "failed"``).
 
         With ``user_context``, only the datasources its roles reach (``policies.scope``), so the sample
-        questions and examples of one it may not use are not shown. Without it, all of them.
+        questions and examples of one it may not use are not shown, and a failed one's ``reason`` (the driver's
+        text) is left to callers holding ``policies.admin_roles``. Without it, all of them, in full.
         """
-        return [self._info(d) for d in self._ctx.config.datasources if self._reaches(user_context, d.id)]
+        return [self._shown(self._info(d), user_context)
+                for d in self._ctx.config.datasources if self._reaches(user_context, d.id)]
 
     def get(self, datasource_id: str, *, user_context: Optional[UserContext] = None) -> DatasourceInfo:
-        """One configured datasource, its connection masked.
+        """One configured datasource, its connection masked (``reason`` as in :meth:`list`).
 
         Raises:
             DatasourceNotFound: it is not configured, or ``user_context`` does not reach it (a ``ValueError``).
         """
         for datasource in self._ctx.config.datasources:
             if datasource.id == datasource_id and self._reaches(user_context, datasource_id):
-                return self._info(datasource)
+                return self._shown(self._info(datasource), user_context)
         raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
+
+    def _shown(self, info: DatasourceInfo, user_context: Optional[UserContext]) -> DatasourceInfo:
+        """``info`` for ``user_context``: a failure's raw reason is for admins (and for no caller at all)."""
+        if user_context is None or info.reason is None:
+            return info
+        policies = self._ctx.policy_engine.policies
+        if policies.allow_all or set(user_context.roles) & set(policies.admin_roles):
+            return info
+        return replace(info, reason="The last connection check failed. An admin can see why.")
 
     def _reaches(self, user_context: Optional[UserContext], datasource_id: str) -> bool:
         if user_context is None:

@@ -1,9 +1,61 @@
 {
   "checked_at": "2026-01-02T03:04:05Z",
   "datasource_id": "chinook",
-  "diff": null,
+  "diff": {
+    "columns_added": [],
+    "columns_changed": [
+      {
+        "changes": {
+          "type": [
+            "NUMERIC(10,2)",
+            "NUMERIC(12,2)"
+          ]
+        },
+        "column": "unit_price",
+        "table": {
+          "schema_name": "main",
+          "table_name": "tracks"
+        }
+      }
+    ],
+    "columns_dropped": [
+      {
+        "column_name": "composer",
+        "table": {
+          "schema_name": "main",
+          "table_name": "tracks"
+        }
+      }
+    ],
+    "datasource_id": "chinook",
+    "engine_type": null,
+    "foreign_keys_added": [],
+    "foreign_keys_dropped": [],
+    "from_version": "v1",
+    "tables_added": [
+      {
+        "schema_name": "main",
+        "table_name": "orders"
+      }
+    ],
+    "tables_dropped": [],
+    "to_version": null
+  },
   "error": null,
-  "impact": null,
+  "impact": {
+    "glossary_items": [],
+    "policy_rules": [],
+    "preferred_tables": [],
+    "verified_queries": [
+      {
+        "datasource_id": "chinook",
+        "query_id": "top_composers",
+        "reasons": [
+          "reads dropped column tracks.composer"
+        ]
+      }
+    ]
+  },
   "live_version": "v1",
-  "status": "unchanged"
+  "status": "drifted"
 }

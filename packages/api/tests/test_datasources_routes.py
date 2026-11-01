@@ -96,3 +96,16 @@ def test_reads_need_a_caller(api_client):
     assert client.get(f"{API}/datasources").status_code == 401
     assert client.get(f"{API}/datasources/chinook/schema").status_code == 401
     assert engine.datasources.calls == []
+
+
+@pytest.mark.parametrize("path", ["schema", "diagram"])
+def test_schema_and_diagram_check_the_datasource_first(stub, path):
+    """An unknown or hidden datasource is a 404 before the facade reads anything (it would answer with no tables)."""
+    client, datasources = stub
+    datasources.returns["get"] = _not_found
+
+    response = client.get(f"{API}/datasources/nope/{path}")
+
+    assert response.status_code == 404 and response.json()["error"]["code"] == "NOT_FOUND"
+    assert datasources.called("get") == [(("nope",), {"user_context": ADMIN})]
+    assert datasources.called(path) == []
