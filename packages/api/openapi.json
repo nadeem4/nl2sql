@@ -100,6 +100,63 @@
         "title": "ApiError",
         "type": "object"
       },
+      "ApprovalRecord": {
+        "description": "One stored request: ``status`` is ``pending``, ``granted`` or ``denied``; ``id`` is the request's id.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ApprovalRequest"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "request",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ApprovalRecord",
+        "type": "object"
+      },
       "ApprovalRequest": {
         "description": "What a person is asked to approve: one sub-query's SQL, bound to the asker.\n\nThe generated path pins the run's ``decomposition``, the ``sub_query`` the\nSQL answers and its validated ``plan``; the verified path pins the\n``verified`` query and its values. ``id`` is a SHA-256, in hex, over every\nfield but ``reason`` and ``approver_roles``, so the engine can tell an\nedited request. ``approver_roles`` is for display: the engine checks the\nhook's configured roles.",
         "properties": {
@@ -484,6 +541,24 @@
         "title": "ChartSpec",
         "type": "object"
       },
+      "ClarificationChoice": {
+        "description": "The caller's pick, passed to ``run_query(choice=...)`` (from L2) to run that option's plan.",
+        "properties": {
+          "option_id": {
+            "title": "Option Id",
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ClarificationRequest"
+          }
+        },
+        "required": [
+          "request",
+          "option_id"
+        ],
+        "title": "ClarificationChoice",
+        "type": "object"
+      },
       "ClarificationOption": {
         "description": "One reading of the question: ``a`` is the default, each with a validated plan.",
         "properties": {
@@ -659,6 +734,65 @@
           "subquery_id"
         ],
         "title": "CombineInput",
+        "type": "object"
+      },
+      "CorrectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id"
+        ],
+        "title": "CorrectionRequest",
         "type": "object"
       },
       "Dashboard": {
@@ -1008,6 +1142,24 @@
           "combine_groups"
         ],
         "title": "DecomposerResponse",
+        "type": "object"
+      },
+      "DenyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "DenyRequest",
         "type": "object"
       },
       "Encoding": {
@@ -1635,6 +1787,40 @@
           "kind"
         ],
         "title": "Expr",
+        "type": "object"
+      },
+      "FeedbackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "rating"
+        ],
+        "title": "FeedbackRequest",
         "type": "object"
       },
       "FilterSpec": {
@@ -2570,8 +2756,181 @@
         "title": "ProfileReport",
         "type": "object"
       },
-      "QueryRequest": {
+      "Proposal": {
+        "additionalProperties": false,
+        "description": "One suggested change to a person's knowledge or curated answers, waiting in the review queue.\n\n``change`` holds the fields it would set, in ``glossary.yaml``'s or\n``curated.yaml``'s shape; ``tables`` every ``datasource.schema.table`` it\nnames, so a caller sees it only when their scope reaches all of them;\n``evidence`` counts and checks, never rows. Build one with ``build``,\nwhich computes ``id``.",
         "properties": {
+          "change": {
+            "additionalProperties": true,
+            "title": "Change",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "join",
+              "column",
+              "table",
+              "term",
+              "example",
+              "verified_query"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "profiler",
+              "draft",
+              "correction",
+              "thumbs_up",
+              "clarification",
+              "template"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "status": {
+            "default": "proposed",
+            "enum": [
+              "proposed",
+              "accepted",
+              "rejected",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "wrote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wrote"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "datasource_id",
+          "target",
+          "change",
+          "origin",
+          "created_at"
+        ],
+        "title": "Proposal",
+        "type": "object"
+      },
+      "QueryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_ids": {
+            "description": "Ids of approvals an approver granted, from an earlier `needs_approval` run.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Ids",
+            "type": "array"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClarificationChoice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The option picked from an earlier `clarification_request`; asks the same question again."
+          },
           "datasource_id": {
             "anyOf": [
               {
@@ -2588,19 +2947,19 @@
             "title": "Execute",
             "type": "boolean"
           },
-          "natural_language": {
-            "title": "Natural Language",
+          "question": {
+            "title": "Question",
             "type": "string"
           }
         },
         "required": [
-          "natural_language"
+          "question"
         ],
         "title": "QueryRequest",
         "type": "object"
       },
-      "QueryResponse": {
-        "description": "The engine's ``QueryResult``, served as is.\n\nIt derives from ``nl2sql.QueryResult``, so the HTTP response cannot drift\nfrom what the engine returns. ``sub_queries[].rows`` carries a capped\nsample only; the full result set lives in artifact storage, addressable\nthrough ``artifact_refs``. ``trace_path`` is where the run's trace was\nwritten on the server, or None.",
+      "QueryResult": {
+        "description": "Represents the result of a query execution.\n\nCarries everything a UI renders: the plan, the validation checks, a capped\nrow sample, the SQL, per-node timings and the question's LLM token usage.\nThe full result set still lives in artifact storage, addressable through\n``artifact_refs``. ``result_manifest`` lists the run's saved results (its\nmanifest: node id, columns, row count, truncated), never their rows; read\nthose by ``trace_id`` with ``engine.results.page`` or ``engine.results.csv``,\nas the caller who asked (``user_context``): nobody else can read them.\n``trace_path`` is where this run's trace file was written, or None when\n``settings.traces.mode`` did not keep one or the trace store is not the\n``files`` store (read it with ``engine.traces.get(trace_id)``).",
         "properties": {
           "approvals_needed": {
             "items": {
@@ -2715,7 +3074,7 @@
           },
           "sub_queries": {
             "items": {
-              "$ref": "#/components/schemas/SubQueryResponse"
+              "$ref": "#/components/schemas/SubQueryResult"
             },
             "title": "Sub Queries",
             "type": "array"
@@ -2759,7 +3118,7 @@
             "type": "array"
           }
         },
-        "title": "QueryResponse",
+        "title": "QueryResult",
         "type": "object"
       },
       "QuestionUsage": {
@@ -2789,6 +3148,74 @@
           }
         },
         "title": "QuestionUsage",
+        "type": "object"
+      },
+      "ResultManifest": {
+        "description": "Which results a run produced, and who asked it, written as ``manifest.json`` in the run's folder.",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/ResultOwner"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ResultSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "owner"
+        ],
+        "title": "ResultManifest",
+        "type": "object"
+      },
+      "ResultOwner": {
+        "description": "Who asked a run: the only caller its results are readable by.",
+        "properties": {
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roles"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "title": "ResultOwner",
         "type": "object"
       },
       "ResultPage": {
@@ -3254,8 +3681,8 @@
         "title": "SubQuery",
         "type": "object"
       },
-      "SubQueryResponse": {
-        "description": "One decomposed sub-query: its plan, validation checks, SQL and row sample.",
+      "SubQueryResult": {
+        "description": "Represents the result of a sub-query execution.",
         "properties": {
           "datasource_id": {
             "default": "",
@@ -3371,7 +3798,7 @@
             "type": "array"
           }
         },
-        "title": "SubQueryResponse",
+        "title": "SubQueryResult",
         "type": "object"
       },
       "SuccessResponse": {
@@ -3850,6 +4277,45 @@
         "title": "UsageTotals",
         "type": "object"
       },
+      "UserContext": {
+        "description": "Who is asking: the caller's id, tenant and roles.",
+        "properties": {
+          "roles": {
+            "description": "List of assigned roles.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Organization/Tenant identifier.",
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unique identifier for the user.",
+            "title": "User Id"
+          }
+        },
+        "title": "UserContext",
+        "type": "object"
+      },
       "ValidationCheck": {
         "description": "One named validation gate and how it went.\n\n``errors`` records what failed; ``checks`` records what was checked at all,\nso a caller can render \"structure passed, policy denied\" instead of an\nempty list meaning success.",
         "properties": {
@@ -3961,6 +4427,234 @@
         "summary": "The pipeline and its models",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/approvals": {
+      "get": {
+        "description": "The requests the caller asked, plus those their roles may decide, in `status` (default `pending`). Who granted\none is the engine's record and is not returned.",
+        "operationId": "list_approvals_api_v1_approvals_get",
+        "parameters": [
+          {
+            "description": "Only requests in this state.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "pending",
+              "description": "Only requests in this state.",
+              "enum": [
+                "pending",
+                "granted",
+                "denied"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalRecord"
+                  },
+                  "title": "Response List Approvals Api V1 Approvals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List approval requests",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/approvals/{request_id}/deny": {
+      "post": {
+        "description": "Deny the request, with an optional `reason`. A run that names it ends with `APPROVAL_NOT_GRANTED`.",
+        "operationId": "deny_approval_api_v1_approvals__request_id__deny_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DenyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds none of the roles that may approve this."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such approval request for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deny an approval",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/approvals/{request_id}/grant": {
+      "post": {
+        "description": "Grant the request. The asker then re-asks the question with `approval_ids: [request_id]`.",
+        "operationId": "grant_approval_api_v1_approvals__request_id__grant_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds none of the roles that may approve this."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such approval request for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant an approval",
+        "tags": [
+          "approvals"
         ]
       }
     },
@@ -4357,6 +5051,208 @@
         "summary": "Get a datasource",
         "tags": [
           "datasources"
+        ]
+      }
+    },
+    "/api/v1/feedback": {
+      "get": {
+        "description": "Every rating, newest first. Admin only: it spans all callers.",
+        "operationId": "list_feedback_api_v1_feedback_get",
+        "parameters": [
+          {
+            "description": "At most this many, newest first.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "At most this many, newest first.",
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Feedback Api V1 Feedback Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List the ratings",
+        "tags": [
+          "query"
+        ]
+      },
+      "post": {
+        "description": "Record a thumbs up or down for a run the caller asked. The question, SQL and answer come from the run's\ntrace, never from the body. Another caller's run is a 404.",
+        "operationId": "rate_api_v1_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rate Api V1 Feedback Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rate an answer",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/feedback/correct": {
+      "post": {
+        "description": "Turn the caller's fix (`sql` or `plan`, exactly one) for a run they asked into a proposal for a verified\nquery. Nothing is saved: a reviewer accepts the proposal elsewhere. The correction is checked as the caller, so it\nis refused (422 `CORRECTION_REFUSED`) when it is not read-only, reads what the caller may not, or a hook denies it.",
+        "operationId": "correct_api_v1_feedback_correct_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The correction was refused; `details` say why."
+          }
+        },
+        "summary": "Correct an answer",
+        "tags": [
+          "query"
         ]
       }
     },
@@ -4875,7 +5771,7 @@
     },
     "/api/v1/query": {
       "post": {
-        "description": "Run a natural-language question through the pipeline.\n\nReturns, per sub-query, the plan, the validation checks, the SQL and a capped row\nsample, plus the written answer, errors, timings and token usage. A pipeline\nfailure (a refusal included) comes back with status 200 and `status: \"error\"`.\n`execute: false` plans and validates without running SQL. The caller (user,\ntenant and roles) comes from the source `api.auth` names, never from the\nbody; no identity is a 401.",
+        "description": "Run a natural-language question through the pipeline.\n\nReturns, per sub-query, the plan, the validation checks, the SQL and a capped row sample, plus the written\nanswer, errors, timings and token usage. A pipeline failure (a refusal included) comes back with status 200 and\n`status: \"error\"`. `execute: false` plans and validates without running SQL. `choice` answers an earlier\n`clarification_request`; `approval_ids` names approvals an approver granted. The caller (user, tenant and roles)\ncomes from the source `api.auth` names, never from the body; no identity is a 401. Where `api.request_llm` is on,\na request may carry its own provider keys and models in headers.",
         "operationId": "execute_query_api_v1_query_post",
         "requestBody": {
           "content": {
@@ -4892,7 +5788,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueryResponse"
+                  "$ref": "#/components/schemas/QueryResult"
                 }
               }
             },
@@ -4907,6 +5803,16 @@
               }
             },
             "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request carries keys or models and `api.request_llm` is off."
           },
           "422": {
             "content": {
@@ -4927,7 +5833,7 @@
     },
     "/api/v1/query/stream": {
       "post": {
-        "description": "The same run as `POST /query`, reported as it happens, as Server-Sent Events.\n\nEach SSE `event` is the event's name and its `data` line the whole event as\nJSON (`name`, `at`, `trace_id`, `tenant_id`, `data`): `run.started`;\n`node.started` (`node`, `sub_query_id`) and `node.finished` (plus `seconds`,\n`ok`) per pipeline step; `result.manifest` (`results`) as soon as the results\nare saved, so a client can start paging them with the event's `trace_id`;\n`answer.delta` (`field`: `summary` or `content`, `text`) as the answer model\nwrites; `sanity.flagged` and `run.limit_reached`; then exactly one of\n`run.finished`, the run's summary whose `data.result` is the `/query`\nresponse, or `run.failed` (`message`, `error_code`, and the engine's `user_id` and `roles`) when the run could not\nfinish. A refusal or a provider error is a `run.finished` with\n`status: \"error\"`, as `/query` returns it. Same body and auth as `/query`;\nclosing the connection cancels the run before its next step.",
+        "description": "The same run as `POST /query`, reported as it happens, as Server-Sent Events.\n\nEach SSE `event` is the event's name and its `data` line the whole event as\nJSON (`name`, `at`, `trace_id`, `tenant_id`, `data`): `run.started`;\n`node.started` (`node`, `sub_query_id`) and `node.finished` (plus `seconds`,\n`ok`) per pipeline step; `result.manifest` (`results`) as soon as the results\nare saved, so a client can start paging them with the event's `trace_id`;\n`answer.delta` (`field`: `summary` or `content`, `text`) as the answer model\nwrites; `sanity.flagged` and `run.limit_reached`; then exactly one of\n`run.finished`, the run's summary whose `data.result` is the `/query`\nresponse, or `run.failed` (`message`, `error_code`) when the run could not\nfinish. A refusal or a provider error is a `run.finished` with\n`status: \"error\"`, as `/query` returns it. Same body, headers and auth as `/query`; a request the engine refuses\noutright (a bad choice, a key it may not take) is the error envelope, before any event. A comment line keeps the\nconnection open while nothing happens; closing the connection cancels the run before its next step.",
         "operationId": "stream_query_api_v1_query_stream_post",
         "requestBody": {
           "content": {
@@ -4956,6 +5862,16 @@
             },
             "description": "No identity: see `api.auth`."
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request carries keys or models and `api.request_llm` is off."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -4973,17 +5889,102 @@
         ]
       }
     },
-    "/api/v1/query/{request_id}/results/{result_id}": {
+    "/api/v1/ready": {
       "get": {
-        "description": "Rows `offset` to `offset + limit` of one saved result, read lazily from its\nparquet file. `request_id` is the run's `trace_id`; `result_id` is a `node_id`\nfrom the query response's `result_manifest`. `next_offset` is where the next page\nstarts, null at the end; a page past the end is empty. A run is readable only\nby the caller who asked it (the same user id and tenant): an unknown run,\nanother user's or another tenant's, or an id that is not a plain token is a 404.",
-        "operationId": "get_result_page_api_v1_query__request_id__results__result_id__get",
+        "description": "Returns `success: true`. It does not yet check datasources, the LLM or the index.",
+        "operationId": "readiness_check_api_v1_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/results/{trace_id}": {
+      "get": {
+        "description": "Which results the run saved: per result its id, columns, row count and whether it was capped, never the rows.\n`trace_id` is the run's `trace_id`. A run is readable only by the caller who asked it (the same user id and\ntenant): an unknown run, another user's or another tenant's, or an id that is not a plain token is a 404.",
+        "operationId": "get_result_manifest_api_v1_results__trace_id__get",
         "parameters": [
           {
             "in": "path",
-            "name": "request_id",
+            "name": "trace_id",
             "required": true,
             "schema": {
-              "title": "Request Id",
+              "title": "Trace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List a run's results",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/results/{trace_id}/{result_id}": {
+      "get": {
+        "description": "Rows `offset` to `offset + limit` of one saved result, read lazily from its parquet file. `result_id` is a\n`node_id` from the run's manifest. `next_offset` is where the next page starts, null at the end; a page past the\nend is empty. Another caller's run, or an id that is not a plain token, is a 404.",
+        "operationId": "get_result_page_api_v1_results__trace_id___result_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
               "type": "string"
             }
           },
@@ -5071,17 +6072,17 @@
         ]
       }
     },
-    "/api/v1/query/{request_id}/results/{result_id}.csv": {
+    "/api/v1/results/{trace_id}/{result_id}.csv": {
       "get": {
-        "description": "The whole of one saved result as CSV, streamed a slice at a time from its\nparquet file, never built in memory. `request_id` is the run's `trace_id`;\n`result_id` is a `node_id` from the query response's `result_manifest`. A run is\nreadable only by the caller who asked it (the same user id and tenant): an\nunknown run, another user's or another tenant's, or an id that is not a plain\ntoken is a 404.",
-        "operationId": "export_result_csv_api_v1_query__request_id__results__result_id__csv_get",
+        "description": "The whole of one saved result as CSV, streamed a slice at a time from its parquet file, never built in memory.\n`result_id` is a `node_id` from the run's manifest. Another caller's run, or an id that is not a plain token, is\na 404.",
+        "operationId": "export_result_csv_api_v1_results__trace_id___result_id__csv_get",
         "parameters": [
           {
             "in": "path",
-            "name": "request_id",
+            "name": "trace_id",
             "required": true,
             "schema": {
-              "title": "Request Id",
+              "title": "Trace Id",
               "type": "string"
             }
           },
@@ -5139,25 +6140,113 @@
         ]
       }
     },
-    "/api/v1/ready": {
+    "/api/v1/results/{trace_id}/{result_id}/chart": {
       "get": {
-        "description": "Returns `success: true`. It does not yet check datasources, the LLM or the index.",
-        "operationId": "readiness_check_api_v1_ready_get",
+        "description": "The chart a saved result is drawn as, chosen from its column kinds with no model call. `format=vega-lite`\nreturns a Vega-Lite v5 spec ready to render; a table has none, so asking for it is a 422.",
+        "operationId": "get_result_chart_api_v1_results__trace_id___result_id__chart_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "result_id",
+            "required": true,
+            "schema": {
+              "title": "Result Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Force a kind the data can draw; by default five rules choose from its columns.",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "line",
+                    "bar",
+                    "big_number",
+                    "table"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Force a kind the data can draw; by default five rules choose from its columns.",
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "`spec` is the engine's chart spec; `vega-lite` is a Vega-Lite v5 document, rows inline.",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "spec",
+              "description": "`spec` is the engine's chart spec; `vega-lite` is a Vega-Lite v5 document, rows inline.",
+              "enum": [
+                "spec",
+                "vega-lite"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
+                "schema": {}
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A kind or format the data cannot be drawn as."
           }
         },
-        "summary": "Readiness check",
+        "summary": "Chart a result",
         "tags": [
-          "health"
+          "query"
         ]
       }
     },
@@ -5238,6 +6327,71 @@
         "summary": "Replace the LLM",
         "tags": [
           "llm"
+        ]
+      }
+    },
+    "/api/v1/traces/{trace_id}": {
+      "get": {
+        "description": "The trace document of a run the caller asked: its request, every node's input and output, and the result. An\nunknown trace, another caller's, or an id that is not a plain token is a 404.",
+        "operationId": "get_trace_api_v1_traces__trace_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Trace Api V1 Traces  Trace Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a run's trace",
+        "tags": [
+          "query"
         ]
       }
     }

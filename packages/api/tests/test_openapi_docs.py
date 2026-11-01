@@ -2,14 +2,14 @@
 
 from fastapi.routing import APIRoute
 
-from nl2sql_api.routes import datasource, health, indexing, jobs, llm, query
+from nl2sql_api.routes import approvals, datasource, health, indexing, jobs, llm, query
 
 PREFIX = "/api/v1"
 
 
 def _routes():
     """Every (method, path) the routers declare, as main.py mounts them under /api/v1."""
-    return [(method, PREFIX + route.path) for module in (query, health, datasource, llm, indexing, jobs)
+    return [(method, PREFIX + route.path) for module in (query, approvals, health, datasource, llm, indexing, jobs)
             for route in module.router.routes if isinstance(route, APIRoute) for method in sorted(route.methods)]
 
 
@@ -24,7 +24,7 @@ def test_the_schema_lists_every_route_with_a_summary_and_a_description(api_clien
     client, _ = api_client()
     paths = client.get("/openapi.json").json()["paths"]
     routes = _routes()
-    assert len(routes) == 25
+    assert len(routes) == 34
     assert sum(len(ops) for ops in paths.values()) == len(routes)
     for method, path in routes:
         operation = paths[path][method.lower()]
@@ -38,5 +38,5 @@ def test_the_query_request_and_response_models_are_in_the_schema(api_client):
     schema = client.get("/openapi.json").json()
     query = schema["paths"]["/api/v1/query"]["post"]
     assert query["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith("/QueryRequest")
-    assert query["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/QueryResponse")
-    assert {"QueryRequest", "QueryResponse", "SubQueryResponse"} <= set(schema["components"]["schemas"])
+    assert query["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/QueryResult")
+    assert {"QueryRequest", "QueryResult", "SubQueryResult"} <= set(schema["components"]["schemas"])

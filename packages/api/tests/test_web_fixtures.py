@@ -1,4 +1,4 @@
-"""The golden files the web app's node tests read: ``ApiError`` and ``Job`` (docs/architecture/wave_d.md, "Testing").
+"""The golden files the web app's node tests read: ``ApiError``, ``Job`` and ``QueryResult`` (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
@@ -13,7 +13,7 @@ from itertools import count
 
 from fastapi.testclient import TestClient
 
-from nl2sql import UserContext
+from nl2sql import QueryResult, RowSample, SubQueryResult, UserContext
 from nl2sql.testing.config import make_config
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
@@ -31,6 +31,12 @@ def build() -> dict:
         class Engine:
             config = make_config(pathlib.Path(folder))
 
+            @staticmethod
+            def run_query(question, **_):
+                return QueryResult(trace_id="trace-fixture", status="success", sub_queries=[SubQueryResult(
+                    id="sq1", intent=question, sql="SELECT COUNT(*) AS n FROM Customer", datasource_id="chinook",
+                    rows=RowSample(columns=["n"], rows=[[59]], total_rows=1), status="success")])
+
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine
         app.dependency_overrides[identity.caller] = lambda: UserContext(user_id="ann", roles=["analyst"])
@@ -39,6 +45,8 @@ def build() -> dict:
                                      poll_s=0.01)
         try:
             client = TestClient(app, raise_server_exceptions=False)
+            answer = client.post("/api/v1/query", json={"question": "How many customers?"})
+            assert answer.status_code == 200, answer.text
             error = client.get("/api/v1/jobs/missing")
             assert error.status_code == 404
             job = jobs.submit("index", IndexJob(datasource_ids=["chinook"]), UserContext(user_id="ann"),
@@ -48,7 +56,8 @@ def build() -> dict:
             while jobs.get(job.id, UserContext(user_id="ann")).status != "succeeded":
                 assert time.monotonic() < deadline, "the fixture job did not finish"
                 time.sleep(0.005)
-            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json()}
+            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
+                    "QueryResult.json": answer.json()}
         finally:
             jobs.close()
 

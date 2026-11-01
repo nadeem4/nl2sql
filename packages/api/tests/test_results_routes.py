@@ -1,6 +1,6 @@
-"""GET /query/{request_id}/results/{result_id}: a page of a run's saved result, or all of it as CSV.
+"""``/results/{trace_id}``: a run's saved results, a page of one, all of it as CSV, or drawn as a chart.
 
-The routes call the facade's ``engine.results.page`` and ``engine.results.csv``,
+The routes call the facade's ``engine.results.manifest``, ``page``, ``csv`` and ``chart``,
 which read the run's parquet artifact lazily. The engine here is the real
 facade over a local artifact store holding one run, ``run-1`` of tenant
 ``t1``, with 45 rows in ``combine_g1``, asked by ``ann``; ``bob`` and tenant ``t2`` hold runs of their own. A run is
@@ -18,7 +18,7 @@ from nl2sql import NL2SQL, UserContext, ResultManifest, ResultSummary
 from nl2sql.execution.artifacts.results import ResultOwner
 from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql.storage.local import LocalResults
-from nl2sql.testing.config import make_config
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
@@ -32,7 +32,8 @@ def _save(store, tenant, request, rows, user_id="ann", asker_tenant="t1"):
     ref = store.write_lazy(pl.LazyFrame(rows), store.run_metadata(tenant, request, "result_combine_g1"))
     owner = ResultOwner(tenant_id=asker_tenant, user_id=user_id)
     store.write_manifest(tenant, request, ResultManifest(request_id=request, owner=owner, results=[
-        ResultSummary(node_id="combine_g1", columns=ref.columns, row_count=ref.row_count)]))
+        ResultSummary(node_id="combine_g1", columns=ref.columns, row_count=ref.row_count,
+                      column_kinds={"region": "text", "revenue": "number"} if "region" in ref.columns else {})]))
 
 
 @pytest.fixture
@@ -40,12 +41,11 @@ def client(tmp_path):
     store = ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
+    _save(store, "t1", "run-chart", [{"region": r, "revenue": float(i)} for i, r in enumerate("NESW")])
     _save(store, "t1", "bobs", [{"id": 1, "name": "secret"}], user_id="bob")
     _save(store, "t1", "acmes", [{"id": 1, "name": "secret"}], asker_tenant="acme")
     engine = NL2SQL.__new__(NL2SQL)
-    # The API reads its role settings from the engine's config.
-    engine._runtime = SimpleNamespace(config=make_config(tmp_path / "project"), closed=False,
-                                      tenant_id="t1", artifact_store=store)
+    engine._runtime = fake_runtime(settings={"tenant_id": "t1"}, artifact_store=store, closed=False)
     app.dependency_overrides[get_engine] = lambda: engine
     app.dependency_overrides[identity.caller] = lambda: ANN
     with_client = TestClient(app)
@@ -54,8 +54,17 @@ def client(tmp_path):
     with_client.close()
 
 
+def test_the_manifest_lists_the_results_without_rows(client):
+    response = client.get("/api/v1/results/run-1")
+
+    assert response.status_code == 200, response.text
+    [entry] = response.json()["results"]
+    assert (entry["node_id"], entry["columns"], entry["row_count"]) == ("combine_g1", ["id", "name"], 45)
+    assert "n1" not in response.text
+
+
 def test_a_page_of_the_result(client):
-    response = client.get("/api/v1/query/run-1/results/combine_g1", params={"offset": 40, "limit": 20})
+    response = client.get("/api/v1/results/run-1/combine_g1", params={"offset": 40, "limit": 20})
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -65,31 +74,31 @@ def test_a_page_of_the_result(client):
 
 
 def test_the_first_page_by_default(client):
-    body = client.get("/api/v1/query/run-1/results/combine_g1").json()
+    body = client.get("/api/v1/results/run-1/combine_g1").json()
 
     assert body["offset"] == 0 and body["limit"] == 100
     assert len(body["rows"]) == 45 and body["next_offset"] is None
 
 
 def test_a_page_past_the_end_is_empty(client):
-    body = client.get("/api/v1/query/run-1/results/combine_g1", params={"offset": 45}).json()
+    body = client.get("/api/v1/results/run-1/combine_g1", params={"offset": 45}).json()
 
     assert body["rows"] == [] and body["total_rows"] == 45
 
 
 def test_the_page_size_is_capped(client):
-    body = client.get("/api/v1/query/run-1/results/combine_g1", params={"limit": 5000}).json()
+    body = client.get("/api/v1/results/run-1/combine_g1", params={"limit": 5000}).json()
 
     assert body["limit"] == 1000
 
 
 @pytest.mark.parametrize("params", [{"offset": -1}, {"limit": 0}, {"offset": "x"}])
 def test_a_bad_offset_or_limit_is_422(client, params):
-    assert client.get("/api/v1/query/run-1/results/combine_g1", params=params).status_code == 422
+    assert client.get("/api/v1/results/run-1/combine_g1", params=params).status_code == 422
 
 
 def test_the_csv_is_the_whole_result(client):
-    response = client.get("/api/v1/query/run-1/results/combine_g1.csv")
+    response = client.get("/api/v1/results/run-1/combine_g1.csv")
 
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/csv")
@@ -100,17 +109,22 @@ def test_the_csv_is_the_whole_result(client):
 
 
 @pytest.mark.parametrize("path", [
-    "/api/v1/query/run-2/results/combine_g1",
-    "/api/v1/query/run-1/results/combine_nope",
-    "/api/v1/query/theirs/results/combine_g1",
-    "/api/v1/query/run-2/results/combine_g1.csv",
-    "/api/v1/query/theirs/results/combine_g1.csv",
-    "/api/v1/query/bobs/results/combine_g1",
-    "/api/v1/query/bobs/results/combine_g1.csv",
-    "/api/v1/query/acmes/results/combine_g1",
-    "/api/v1/query/acmes/results/combine_g1.csv",
-    "/api/v1/query/..%2Ft2%2Ftheirs/results/combine_g1",
-    "/api/v1/query/run-1/results/..%2F..%2Ft2%2Ftheirs%2Fresult_combine_g1",
+    "/api/v1/results/run-2",
+    "/api/v1/results/theirs",
+    "/api/v1/results/bobs",
+    "/api/v1/results/run-2/combine_g1/chart",
+    "/api/v1/results/bobs/combine_g1/chart",
+    "/api/v1/results/run-2/combine_g1",
+    "/api/v1/results/run-1/combine_nope",
+    "/api/v1/results/theirs/combine_g1",
+    "/api/v1/results/run-2/combine_g1.csv",
+    "/api/v1/results/theirs/combine_g1.csv",
+    "/api/v1/results/bobs/combine_g1",
+    "/api/v1/results/bobs/combine_g1.csv",
+    "/api/v1/results/acmes/combine_g1",
+    "/api/v1/results/acmes/combine_g1.csv",
+    "/api/v1/results/..%2Ft2%2Ftheirs/combine_g1",
+    "/api/v1/results/run-1/..%2F..%2Ft2%2Ftheirs%2Fresult_combine_g1",
 ])
 def test_an_unknown_foreign_or_crafted_id_is_404(client, path):
     response = client.get(path)
@@ -160,7 +174,7 @@ def _ran(monkeypatch, client, decision):
     hook = HookBinding(name="review", hook=decision, points=frozenset({"answer.after"}))
     engine._runtime = fake_runtime(settings={"tenant_id": "t1"}, artifact_store=engine._runtime.artifact_store,
                                    hooks=HookRunner([hook]), llm_registry=MagicMock(), closed=False)
-    response = client.post("/api/v1/query", json={"natural_language": "How many?"})
+    response = client.post("/api/v1/query", json={"question": "How many?"})
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -172,7 +186,7 @@ def test_a_run_a_hook_denied_is_404_by_its_trace_id(monkeypatch, client, suffix)
     body = _ran(monkeypatch, client, lambda ctx: Deny(reason="Reviewed first"))
 
     assert body["errors"][0]["error_code"] == "HOOK_DENIED"
-    response = client.get(f"/api/v1/query/{body['trace_id']}/results/combine_g1{suffix}")
+    response = client.get(f"/api/v1/results/{body['trace_id']}/combine_g1{suffix}")
     assert response.status_code == 404
     assert "n1" not in response.text
 
@@ -182,7 +196,7 @@ def test_a_run_a_hook_allowed_is_readable_by_its_trace_id(monkeypatch, client):
 
     body = _ran(monkeypatch, client, lambda ctx: Allow())
 
-    assert client.get(f"/api/v1/query/{body['trace_id']}/results/combine_g1").json()["total_rows"] == 45
+    assert client.get(f"/api/v1/results/{body['trace_id']}/combine_g1").json()["total_rows"] == 45
 
 
 @pytest.mark.parametrize("suffix", ["", ".csv"])
@@ -190,7 +204,7 @@ def test_a_run_is_readable_only_by_the_caller_who_asked_it(monkeypatch, client, 
     from nl2sql.hooks import Allow
 
     body = _ran(monkeypatch, client, lambda ctx: Allow())
-    path = f"/api/v1/query/{body['trace_id']}/results/combine_g1{suffix}"
+    path = f"/api/v1/results/{body['trace_id']}/combine_g1{suffix}"
     assert client.get(path).status_code == 200
 
     for other in (UserContext(user_id="bob", roles=["admin"]), UserContext(roles=["admin"]),
@@ -209,7 +223,7 @@ def test_an_anonymous_run_is_readable_only_with_the_same_roles(monkeypatch, clie
 
     app.dependency_overrides[identity.caller] = lambda: UserContext(roles=["admin"])
     body = _ran(monkeypatch, client, lambda ctx: Allow())
-    path = f"/api/v1/query/{body['trace_id']}/results/combine_g1{suffix}"
+    path = f"/api/v1/results/{body['trace_id']}/combine_g1{suffix}"
     assert client.get(path).status_code == 200
 
     for other in (UserContext(roles=["viewer"]), UserContext(roles=["admin", "viewer"])):
@@ -223,8 +237,8 @@ def test_the_routes_need_a_role_like_query_does(client):
     app.dependency_overrides.pop(identity.caller)
 
     # api.auth is none here and the client's Host is not localhost: not the local operator, so no identity.
-    assert client.get("/api/v1/query/run-1/results/combine_g1").status_code == 403
-    assert client.get("/api/v1/query/run-1/results/combine_g1.csv").status_code == 403
+    assert client.get("/api/v1/results/run-1/combine_g1").status_code == 403
+    assert client.get("/api/v1/results/run-1/combine_g1.csv").status_code == 403
 
 
 def test_the_query_response_carries_the_result_manifest_not_rows(api_client):
@@ -233,7 +247,28 @@ def test_the_query_response_carries_the_result_manifest_not_rows(api_client):
     summary = ResultSummary(node_id="combine_g1", columns=["id", "name"], row_count=45, truncated=True)
     client, _ = api_client(QueryResult(trace_id="run-1", result_manifest=[summary]))
 
-    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    body = client.post("/api/v1/query", json={"question": "q"}).json()
 
     assert body["result_manifest"] == [
         {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": True, "column_kinds": {}}]
+
+
+def test_chart_route_and_vega_lite_format(client):
+    spec = client.get("/api/v1/results/run-chart/combine_g1/chart")
+
+    assert spec.status_code == 200, spec.text
+    body = spec.json()
+    assert body["kind"] == "bar" and [e["field"] for e in body["y"]] == ["revenue"]
+    assert client.get("/api/v1/results/run-chart/combine_g1/chart", params={"kind": "table"}).json()["kind"] == "table"
+
+    vega = client.get("/api/v1/results/run-chart/combine_g1/chart", params={"format": "vega-lite"})
+    assert vega.status_code == 200, vega.text
+    assert "vega-lite" in vega.json()["$schema"] and vega.json()["data"]["values"][0]["region"] == "W"
+
+
+@pytest.mark.parametrize("params", [{"kind": "pie"}, {"format": "svg"}, {"kind": "table", "format": "vega-lite"}])
+def test_chart_route_refuses_what_it_cannot_draw(client, params):
+    response = client.get("/api/v1/results/run-chart/combine_g1/chart", params=params)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"

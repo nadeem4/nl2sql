@@ -497,7 +497,7 @@ Every answer says where it came from:
 
 - `QueryResult` (`nl2sql/api/query_api.py`) gains
   `source: AnswerSource`, `{type: "verified", id, datasource_id, params}` or
-  `{type: "generated"}`. The REST API's response model, `QueryResponse`,
+  `{type: "generated"}`. The REST API's response model, `QueryResult`,
   subclasses `QueryResult`, so `POST /query` and the final event of `POST /query/stream` carry it with
   no change to `nl2sql-api` beyond its docs.
 - `SubQueryResult.plan_source` and `SubgraphOutput.plan_source` gain the

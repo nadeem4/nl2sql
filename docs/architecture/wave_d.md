@@ -1448,6 +1448,29 @@ dict[provider, key]` are top-level exports. The old playground (`cli/demo/playgr
 directly; it is deleted by X1b, so it was not rewritten. Code on main wins over the row's file list: `api/llm_api.py`
 and `registry.py` needed no change beyond the docstring, and `api/types.py` was not touched.
 
+**A1 (query, results, traces, feedback, approvals routes).** `POST /query` and `/query/stream` take `question` (was
+`natural_language`; the old name is a 422, every body is `extra="forbid"`), `choice` and `approval_ids`; both together are
+a 422 `CLARIFICATION_INVALID` raised in the route before the engine is called. Both routes depend on
+`overrides.llm_override` and pass `llm_override=` to the facade. `QueryResponse` and `SubQueryResponse` are gone: the
+response model is the facade's own `QueryResult` (the openapi schema names are now `QueryResult`, `SubQueryResult`), and
+`services/query.py`, `QueryService` and `get_query_service` are deleted (the routes call `engine` directly). The stream route
+calls `engine.stream_query` in the handler, so a refusal (`CLARIFICATION_INVALID`, a key refused, a bad choice) is the
+error envelope before the 200, then hands a guarded iterator to `sse.event_stream`, which adds the keep-alive comment; a
+mid-stream exception is logged and ends in a generic `run.failed`. Results moved to `GET /results/{trace_id}` (manifest),
+`/results/{trace_id}/{result_id}` (page), `.csv`, and `/chart` (`?kind=line|bar|big_number|table`, 422 otherwise;
+`?format=vega-lite` returns `ChartSpec.to_vega_lite()`, 422 for a table); the old `/query/{id}/results/...` paths are
+removed, not aliased. `GET /traces/{trace_id}` maps a `None` or a non-plain id to 404. `POST /feedback` takes `rating`
+`up|down`; `POST /feedback/correct` takes exactly one of `sql` and `plan` (422 otherwise) and **never passes
+`as_operator`** (a test greps the API source for the word and pins that another caller's run is a 404 for the trace,
+the rating and the correction). `CorrectionRefused` is not a top-level `nl2sql` export, so the route treats any
+`ValueError` carrying a `.code` as it: `no_run` is a 404, every other code a 422 `CORRECTION_REFUSED` whose `details`
+are `{code, msg}` per `.messages`; a `ValueError` without a code is a plain 422. `GET /feedback` is admin only.
+`routes/approvals.py` has `GET /approvals?status=`, `POST /approvals/{id}/grant` and `/deny` (optional `{"reason"}`),
+all thin over `engine.approvals`; the 403 and 404 are the engine's. Web fixtures gained `QueryResult.json` and
+`openapi.json` was regenerated. The web app (`nl2sql-ui`) still calls the old result and feedback paths and the old
+body field; W1 and W2a rework it, so it was not touched. Code on main wins over the row's file list: the results
+routes stay in `routes/query.py` (no `routes/results.py`), and there is no `models/query.py` model for responses.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below

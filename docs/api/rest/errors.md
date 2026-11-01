@@ -32,4 +32,4 @@ Every response, error or not, carries the id in the `X-Request-ID` header.
 In an OpenAPI route, declare the envelope with `responses={404: ERROR_RESPONSE}` (from `nl2sql_api.errors`), or use
 `identity.AUTH_RESPONSES` and `identity.ADMIN_RESPONSES`.
 
-`POST /api/v1/query` is the exception for a pipeline failure: it is `200` with the errors in `QueryResponse.errors`.
+`POST /api/v1/query` is the exception for a pipeline failure: it is `200` with the errors in `QueryResult.errors`.

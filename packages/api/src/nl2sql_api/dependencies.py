@@ -4,7 +4,6 @@ from nl2sql import NL2SQL
 from nl2sql_api.jobs import Jobs
 from nl2sql_api.services import (
     DatasourceService,
-    QueryService,
     LLMService,
     IndexingService,
     HealthService,
@@ -23,12 +22,6 @@ def get_datasource_service(
     engine: NL2SQL = Depends(get_engine),
 ) -> DatasourceService:
     return DatasourceService(engine)
-
-
-def get_query_service(
-    engine: NL2SQL = Depends(get_engine),
-) -> QueryService:
-    return QueryService(engine)
 
 
 def get_llm_service(
