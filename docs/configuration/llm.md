@@ -80,9 +80,35 @@ own.
 | `openrouter` | preset of `openai_compatible` | `OPENROUTER_API_KEY` | fixed: `https://openrouter.ai/api/v1` | `tool_calling` |
 | `ollama` | preset of `openai_compatible` | none | fixed: `http://localhost:11434/v1` (a `base_url` may override it) | `tool_calling` |
 
+### `replay`: recorded answers, no key
+
+`provider: replay` answers from model output recorded earlier, with no key and
+no network, so the demo runs the whole pipeline (routing, planning, checks, SQL,
+execution) on recorded model steps. It reads the files in
+`nl2sql/datasets/recordings/`, which ship with the engine and cover the demo's
+guided questions; `model` is only a label (`recorded`), and the call is named
+for the model the recordings were made with. It is meant for the demo, not for
+your own databases.
+
+```yaml
+# llm.yaml
+provider: replay
+model: recorded
+```
+
+A call is found by the name of its structured output and the question in the
+prompt. A question that was not recorded fails with the error code
+`REPLAY_MISS` ("No recorded answer for this question. Add an API key to ask it
+live.") and is never retried. Answers arrive whole, and no token usage is
+reported. A caller's own key in a request
+([Per-request keys and models](#per-request-keys-and-models)) moves that one
+call to the key's provider. `engine.llm.recorded(questions)` lists which of
+`questions` replay can answer. `scripts/record_demo_answers.py` makes the
+recordings with a real Claude model.
+
 There is no Azure provider: Azure OpenAI's v1 endpoint is `openai_compatible`
 (see [the `base_url` table](#any-other-openai-style-server-openai_compatible)).
-Any other name raises `ValueError: Unsupported LLM provider`, naming the valid
+`replay` is listed above too, as a provider of its own. Any other name raises `ValueError: Unsupported LLM provider`, naming the valid
 providers. Every agent picks its own provider, so one question can use several;
 see [Per-node models](#per-node-models).
 

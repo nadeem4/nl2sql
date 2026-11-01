@@ -103,10 +103,13 @@ def dashboard_view(dashboard: Dashboard, runs: Mapping[str, TileRun]) -> Dict[st
 def block(turns: Sequence[Turn], text: str, *, context_turns: int, pending: Optional[ClarificationRequest],
           tools: Sequence[Mapping[str, Any]], calls_left: int, this_turn: Sequence[ToolStep],
           dashboard: Optional[Mapping[str, Any]] = None) -> str:
-    """The human message: ``[CONVERSATION]`` (one JSON object), then ``[USER_TEXT]`` (the text as a JSON string).
+    """The human message: ``[USER_QUERY]``, ``[CONVERSATION]`` (one JSON object), then ``[USER_TEXT]`` (the text
+    as a JSON string).
 
     Every piece of earlier text, the new text included, is a JSON string value, so none of it can start a
-    line of its own or pass for a marker.
+    line of its own or pass for a marker. ``[USER_QUERY]`` is the one-line key a recorded step is found by
+    (``nl2sql.llm.replay.extract_question``): the text with its turn and step number, since the same message
+    is answered differently at each step of a turn.
     """
     state = {
         "turns": [_turn_view(t) for t in turns[-context_turns:]],
@@ -119,7 +122,8 @@ def block(turns: Sequence[Turn], text: str, *, context_turns: int, pending: Opti
     }
     if dashboard is not None:  # the one the dashboard tools change; absent when the conversation has none
         state["dashboard"] = dashboard
-    return f"[CONVERSATION]\n{_dump(state)}\n\n[USER_TEXT]\n{_dump(text)}"
+    key = f"{_dump(text)} (turn {len(turns) + 1}, step {len(this_turn) + 1})"
+    return f"[USER_QUERY]\n{key}\n\n[CONVERSATION]\n{_dump(state)}\n\n[USER_TEXT]\n{_dump(text)}"
 
 
 def check_call(call: ToolCall, tools: Mapping[str, type], option_ids: Sequence[str], *, offered: bool) -> None:

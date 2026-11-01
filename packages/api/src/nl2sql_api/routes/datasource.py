@@ -109,11 +109,12 @@ def add_datasource(
 @router.get("/datasource", response_model=Dict[str, Any], summary="List datasources")
 def list_datasources(
     service: DatasourceSvc,
+    user: UserContext = Depends(identity.caller),
 ):
     """Every configured datasource as `{"datasources": [...]}`: its `id`, `type`, `description`,
     `status` (`ready`, `failed` with a `reason`, or `unchecked`), `capabilities` and `connection`,
     with every secret masked."""
-    return {"datasources": service.list_datasources()}
+    return {"datasources": service.list_datasources(user)}
 
 
 NOT_FOUND_404 = {404: {**ERROR_RESPONSE, "description": "No datasource has that id."}}
@@ -124,9 +125,10 @@ NOT_FOUND_404 = {404: {**ERROR_RESPONSE, "description": "No datasource has that 
 def get_datasource(
     datasource_id: str,
     service: DatasourceSvc,
+    user: UserContext = Depends(identity.caller),
 ):
-    """One configured datasource, as the list shows it, or 404 when it is not configured."""
-    return service.get_datasource(datasource_id)
+    """One configured datasource, as the list shows it, or 404 when it is not configured or the caller cannot reach it."""
+    return service.get_datasource(datasource_id, user)
 
 
 @router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Remove a datasource",

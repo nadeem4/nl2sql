@@ -224,7 +224,7 @@ def test_the_shipped_recordings_name_the_model_that_made_them():
     They were recorded with the Anthropic preset's default model (#205)."""
     from importlib.resources import files
 
-    shipped = ReplayStore.load(files("nl2sql.cli.demo") / "recordings" / "chinook.json")
+    shipped = ReplayStore.load(files("nl2sql.datasets") / "recordings" / "chinook.json")
 
     assert shipped.recorded_with == {"provider": "anthropic", "model": "claude-opus-5"}
 

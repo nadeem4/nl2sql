@@ -108,8 +108,9 @@ The profiler is deterministic and bounded ([Schema Profiler](../schema/profiler.
 nothing it proposes reaches a prompt or the index until an admin accepts it
 ([Review Queue](../configuration/review.md)).
 
-From Python, `nl2sql.config.init_project(folder, demo=..., provider=..., force=...)`
-writes the same files, and `nl2sql.config.demo_config()` builds the demo's
+From Python, `nl2sql.init_project(folder, demo=..., provider=..., force=...)`
+writes the same files (`nl2sql.prepare_demo(folder)` writes the demo once and indexes it; with no key it uses the
+[`replay` provider](../configuration/llm.md#replay-recorded-answers-no-key)), and `nl2sql.config.demo_config()` builds the demo's
 `Config` in code, with the databases opened read-only from the installed
 package. `nl2sql.config.write_project(config, folder)` writes any `Config` made of data the same way, never over
 an existing file, with every secret written as a `${env:...}` reference (see

@@ -64,7 +64,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          file=packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json
+          file=packages/nl2sql/src/nl2sql/datasets/recordings/chinook.json
           if git diff --quiet -- "$file" && git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
             echo "The recordings are unchanged; no pull request."
             exit 0

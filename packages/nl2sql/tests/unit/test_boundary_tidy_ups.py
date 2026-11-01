@@ -99,7 +99,6 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # Wave B's too (L2). Wave C's (wave_c.md, section 3 and 6) leave as D2 lands.
 # Wave D's are added by D0a-1 (wave_d.md, section 14).
 DECLARED_AHEAD: dict = {
-    "REPLAY_MISS": "G2b",
 }
 
 

@@ -36,7 +36,7 @@ on the command, and the container's `CMD` passes them.
 A visitor does not need a key to see the demo work. The guided questions are
 answered from **recordings of real runs**: every model step's actual reply to
 each guided question, captured once from a Claude model and shipped in the wheel
-at `nl2sql/cli/demo/recordings/chinook.json` (none ship until the first
+at `nl2sql/datasets/recordings/chinook.json` (none ship until the first
 recording run below has been made and merged). At start-up the hosted server loads
 them into a replay server on loopback (the same `FakeLLMServer` local replay
 mode uses) and, for a question that carries no key:
@@ -103,7 +103,7 @@ deliberate act, never part of CI. Either:
   an exported OpenAI or OpenRouter key never wins. The script writes nothing to
   the environment. The demo records through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
-  `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`, stamped with
+  `packages/nl2sql/src/nl2sql/datasets/recordings/chinook.json`, stamped with
   the provider and the model the proxy saw requested. A question is
   recorded only when its run succeeded -- rows, an answer, no error. A failed
   run's recordings are dropped, because every model call is recorded as it

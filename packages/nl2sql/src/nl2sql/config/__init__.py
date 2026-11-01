@@ -51,7 +51,7 @@ from nl2sql.config.models import (
     StoreConfig,
     TraceSettings,
 )
-from nl2sql.config.project import default_llm, demo_config, init_project, starter_config, write_project
+from nl2sql.config.project import default_llm, demo_config, init_project, prepare_demo, starter_config, write_project
 from nl2sql.config.writer import write_env_values
 
 __all__ = [
@@ -104,6 +104,7 @@ __all__ = [
     "default_llm",
     "demo_config",
     "init_project",
+    "prepare_demo",
     "load_config",
     "load_env_file",
     "starter_config",

@@ -4307,7 +4307,7 @@
         ]
       },
       "get": {
-        "description": "One configured datasource, as the list shows it, or 404 when it is not configured.",
+        "description": "One configured datasource, as the list shows it, or 404 when it is not configured or the caller cannot reach it.",
         "operationId": "get_datasource_api_v1_datasource__datasource_id__get",
         "parameters": [
           {

@@ -1364,6 +1364,50 @@ or `stale`; it carries no reason text, which can echo a secret. `index.refresh` 
 The code on `main` matched the design except that `index.build` and `evals.run` had their callbacks already, as the
 facade-gaps row says.
 
+**G2b (replay, demo and Try the demo).** The `replay` provider answers from recorded model output with no key and no
+network, so the demo and a keyless Try the demo run the real pipeline. Where the code on `main` differs from the row (code
+wins): the provider is `ReplayProvider` / `ReplayChatModel` in `llm/replay.py` (`llm/providers.py` is a module, so
+there is no `llm/providers/replay.py`); it is registered by the `nl2sql.llms` entry point (`replay = "nl2sql.llm.replay:REPLAY"`)
+and shows in `engine.llm.providers()` as "Recorded answers" with no key variable (A4a: it is selectable in Settings;
+filter it out of a key form on `key_variable is None`); it is not in `PROVIDER_PRESETS`. There is no `recordings:` config
+key: the provider reads every file in `nl2sql/datasets/recordings/` (moved there from `cli/demo/recordings/`), and a test or
+a caller passes `ReplayProvider(store)` to `Registry.add_llm`. A call is found by the structured-output name (the schema's
+class name, `plain` for text) and the line after `[USER_QUERY]` in the prompt; a call with no recording raises
+`ReplayMiss` (exported, an `NL2SQLError` but not a `ValueError`, so the parse-and-retry never retries it), which every
+caller reads as `ErrorCode.REPLAY_MISS` (status 422, message "No recorded answer for this question. Add an API key to ask it
+live."), also through a node's wrapped error. The answer arrives whole and reports no token usage; the model the store
+was recorded with names the call (`response_metadata["model_name"]`), with `model_provider` `"replay"`. `LLMCallUsage`
+gained no `provider` field. A caller's own key (`llm_override`) moves that one call off `replay` onto the key's provider
+(the registry needs that provider registered, as the default registry has). `engine.llm.recorded(questions)` returns
+the questions the replay store can answer, in the order asked.
+
+**Conversations.** `conversations.agent.block` now leads the human message with `[USER_QUERY]`, then one line
+`"<message as a JSON string>" (turn N, step M)`, so a recording is found per step (the same message is answered
+differently at each step of a turn). The system prompt says to ignore that line. Shape for CL0a and T1 recorders: a
+`ModelStep` recording's `when` is that line, `"<text>" (turn 1, step 1)`, `"<text>" (turn 1, step 2)`, and so on.
+
+**Datasources.** `DatasourceInfo.sample_questions` is the datasource's own `sample_questions` followed by the accepted
+glossary `examples` not already there. `datasources.list(*, user_context=None)` and `get(id, *, user_context=None)` drop the datasources the caller's roles do not reach (`policies.scope`), so the existing `GET /datasource` routes pass the caller and A3, `/meta` and `nl2sql chat` share the one filter.
+`nl2sql.prepare_demo(folder, *, provider=None) -> Path` (and `nl2sql.init_project`, both top-level exports) writes the
+demo project once, with `provider` or the first provider whose key variable is set, else Ollama when `llm.providers.ollama_models()` finds a pulled model (the check moved out of `cli/commands/demo.py`, which keeps its own copy until X1b), else `replay`, and builds the index
+when it is missing (indexing calls no model); it returns `nl2sql.yaml`. The Ollama check of today's `nl2sql demo` stays in
+`cli/commands/demo.py` until X1b deletes it. `engine.add_demo(*, user_context=None, on_datasource=None)` (D237; also
+`engine.datasources.add_demo`) adds the three sample databases (read-only, from the installed package), Chinook's verified queries (`replace_curated`) and the demo
+glossary (copied to `demo-glossary.yaml` in the project folder, else the storage folder, and added as a `yaml` knowledge source, so an accept never writes into the installed package) as ordinary datasources and knowledge, skipping any already there, then calls
+`index.build(demo ids, on_datasource=)` and returns its `RebuildResult` (the design said `IndexResult`; the build returns
+`RebuildResult`). With `user_context` it needs an admin role (`NotAuthorized`). A demo id (`chinook`, `support`, `web_analytics`) already configured with another database raises `DatasourceExists` (409) before anything is added. When the engine was loaded from a `nl2sql.yaml` the whole demo is saved and survives a restart (review fix, PR #411): each added datasource under `datasources/` (the same write as `datasources.save`, without its caller check); the verified queries through `write_curated` into the `curated` section's file, which is created with a `curated:` line in `nl2sql.yaml` when the project had no curated section; and the glossary source appended to the `knowledge` section's file, as `demo-glossary.yaml` beside `nl2sql.yaml`. A section written inline in `nl2sql.yaml`, and an engine built in code, keep the queries and the glossary in memory only (the code-built engine copies the glossary into its storage folder), so for those A4a's `POST /jobs/demo` is idempotent but a restart needs `add_demo` again. The conflict check compares the resolved database path, not the file name: a demo id is the demo's only when it opens the packaged file or the project's own `data/<name>` (what `init_project(demo=True)` copies), so a user's own `chinook.db` elsewhere is `DatasourceExists`. It keeps the engine's provider. A4a's `POST /jobs/demo` passes
+`ctx.token` as `cancellation_token` through a new keyword when it wants cancel: `add_demo` has none yet.
+
+**Recording.** `scripts/record_demo_answers.py` no longer starts `nl2sql demo --record`: it builds a demo project with
+`prepare_demo(provider="replay")`, registers `nl2sql.llm.replay.Recorder` (an LLM provider wrapping the Anthropic one;
+a callback writes each model answer into its `ReplayStore`) and asks every guided question through a real engine, keeping
+only the questions whose run succeeded. `RecordingProxy` and `nl2sql demo --record` stay until X1b. `test_replay_covered`
+(`tests/unit/test_demo_prepare.py`) asserts the packaged store covers every `DEMO_QUESTIONS` entry, and
+`test_every_recorded_question_replays_after_add_demo` (e2e) runs every question `llm.recorded` lists after `add_demo` with no `REPLAY_MISS`.
+The script also plays each guided question, the scripted follow-ups (`FOLLOW_UPS`) and one ambiguous question
+(`CLARIFICATION_QUESTION`) as conversations and keeps their `ModelStep` recordings when the turn ends answered or
+asking which reading. **The packaged `chinook.json` has no chat steps until R1 re-records it with a real key**, so
+keyless Chat misses until then.
 **G3a (stored approval grants).** Review fixes (PR #410): requests are tenant-bound (`list`, `grant` and `deny` never see another tenant's request, and a run's id of another tenant's request does not resolve); a caller with no `user_id` owns nothing; `approver` is excluded from what callers see; a granted record with no approver is still waiting, and a later `grant` fills it in. `nl2sql/approvals/api.py`: `Approvals(ctx)`, which is `engine.approvals`, and
 `ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `approver` (the granting
 `UserContext`, with the roles it held), `reason`), exported from `nl2sql`. `list(*, user_context, status="pending")` shows

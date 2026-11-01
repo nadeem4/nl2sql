@@ -538,3 +538,19 @@ def test_a_token_cancelled_before_the_build_stops_before_the_model_loads(engine)
     result = engine.index.build(on_progress=steps.append, cancellation_token=token)
 
     assert result.cancelled and not result.ok and steps == []
+
+
+def test_datasource_info_lists_sample_questions(tmp_path):
+    """The datasource's own ``sample_questions`` first, then the glossary ``examples`` a person accepted (D222)."""
+    glossary = tmp_path / "glossary.yaml"
+    glossary.write_text("version: 1\ndatasources:\n  shop:\n    examples:\n"
+                        "      - Who bought the most?\n      - How many customers?\n", encoding="utf-8")
+    shop = {**SHOP, "sample_questions": ["How many customers?", "What is the newest order?"]}
+    with _engine(tmp_path, datasources=[shop, BROKEN],
+                 knowledge=[{"type": "yaml", "path": str(glossary)}]) as engine:
+        listed = {d.id: d for d in engine.datasources.list()}
+
+        assert listed["shop"].sample_questions == ["How many customers?", "What is the newest order?",
+                                                   "Who bought the most?"]
+        assert engine.datasources.get("shop").sample_questions == listed["shop"].sample_questions
+        assert listed["broken"].sample_questions == []

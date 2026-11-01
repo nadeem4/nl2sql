@@ -20,7 +20,7 @@ PUBLIC_SURFACE = {
     # Errors
     "ErrorSeverity", "ErrorCode", "PipelineError", "RunWarning",
     # The config, and building an engine from it
-    "Config", "load_config", "load_env_file", "ConfigError", "Registry", "Datasource", "Limits", "LLM",
+    "Config", "load_config", "prepare_demo", "init_project", "load_env_file", "ConfigError", "Registry", "Datasource", "Limits", "LLM",
     "AgentLLM", "Embeddings", "Policies", "Role", "Storage", "StoreConfig", "Secrets", "Curated", "Settings",
     "ObserverConfig", "HookConfig", "EvalsConfig",
     "CheckReport", "DatasourceStatus", "EngineNotReady",
@@ -44,7 +44,7 @@ PUBLIC_SURFACE = {
     "ConversationNotFound", "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound", "NotIndexed", "NoTiles",
     "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
     "ConnectionInvalid",
-    "NL2SQLError", "NotAuthorized", "InvalidArgument", "NotPinnable", "ChartNotSupported", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
+    "NL2SQLError", "NotAuthorized", "InvalidArgument", "ReplayMiss", "NotPinnable", "ChartNotSupported", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
     "LLMOverride", "resolve_mode", "provider_for_key", "provider_keys_in_environment",
 }
 

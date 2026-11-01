@@ -22,6 +22,13 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import ConfigDict
+
+from nl2sql.common.errors import ReplayMiss
 from nl2sql.testing.fake_llm import Rule, classify_anthropic_request, classify_request
 
 # The markers each real prompt template puts in front of the user question (or,
@@ -83,7 +90,11 @@ class ReplayStore:
 
     @classmethod
     def load(cls, path: pathlib.Path) -> "ReplayStore":
-        raw = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+        return cls.from_json(pathlib.Path(path).read_text(encoding="utf-8"))
+
+    @classmethod
+    def from_json(cls, text: str) -> "ReplayStore":
+        raw = json.loads(text)
         meta: Dict[str, Any] = {}
         if isinstance(raw, dict):
             meta, raw = raw, raw.get("recordings") or []
@@ -109,8 +120,10 @@ class ReplayStore:
             self._recordings[existing] = recording
 
     def discard(self, question: str) -> None:
-        """Drops every recording made for ``question``; catch-alls (``when=None``) stay."""
-        self._recordings = [r for r in self._recordings if r.when != question]
+        """Drops every recording made for ``question``, a conversation step for it included; catch-alls (``when=None``) stay."""
+        turn = json.dumps(question, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + " (turn "
+        self._recordings = [r for r in self._recordings
+                            if r.when != question and not (r.when or "").startswith(turn)]
         self._index = {(r.name, r.when): i for i, r in enumerate(self._recordings)}
 
     def covered(self, questions: Iterable[str]) -> List[str]:
@@ -126,6 +139,17 @@ class ReplayStore:
                      and (r.payload or {}).get("query_id") not in (None, "none_of_these")}
         return [q for q in questions if q in recorded]
 
+    def find(self, name: str, prompt_text: str) -> Optional[Recording]:
+        """The recording a call named ``name`` with this prompt replays, or None.
+
+        The first recording made for a question the prompt contains, else the
+        catch-all (``when=None``). The same order ``rules()`` gives the fake server.
+        """
+        for recording in self._recordings:
+            if recording.name == name and recording.when is not None and recording.when in prompt_text:
+                return recording
+        return next((r for r in self._recordings if r.name == name and r.when is None), None)
+
     def rules(self) -> List[Rule]:
         """Rules for ``FakeLLMServer``, question-specific ones first.
 
@@ -136,6 +160,157 @@ class ReplayStore:
         specific = [r for r in self._recordings if r.when is not None]
         catch_all = [r for r in self._recordings if r.when is None]
         return [Rule(name=r.name, payload=r.payload, when=r.when) for r in specific + catch_all]
+
+
+def _text_of(messages: List[BaseMessage]) -> str:
+    """The prompt as one string, the way the fake server reads a request."""
+    parts = []
+    for message in messages:
+        content = message.content
+        if isinstance(content, list):
+            content = "".join(block.get("text", "") if isinstance(block, dict) else str(block) for block in content)
+        parts.append(str(content))
+    return "\n".join(parts)
+
+
+class ReplayChatModel(BaseChatModel):
+    """A chat model that answers from a :class:`ReplayStore`: no key, no network (D209).
+
+    An answer is found by the structured-output name (the schema's class name,
+    ``plain`` for text) and the question the prompt carries. A call with no
+    recording raises :class:`~nl2sql.common.errors.ReplayMiss`. The answer
+    lands whole: nothing is streamed, and no token usage is reported.
+    ``model`` is only the fallback label; the store's own model names the call.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    store: Any
+    model: str = "replay"
+
+    @property
+    def _llm_type(self) -> str:
+        return "replay"
+
+    def with_structured_output(self, schema: Any, **_kwargs: Any) -> Any:
+        from langchain_core.output_parsers.openai_tools import JsonOutputKeyToolsParser, PydanticToolsParser
+
+        name = schema.get("title", "the schema") if isinstance(schema, dict) else schema.__name__
+        parser = (JsonOutputKeyToolsParser(key_name=name, first_tool_only=True) if isinstance(schema, dict)
+                  else PydanticToolsParser(tools=[schema], first_tool_only=True))
+        return self.bind(schema_name=name) | parser
+
+    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager: Any = None,
+                  schema_name: Optional[str] = None, **_kwargs: Any) -> ChatResult:
+        text = _text_of(messages)
+        recording = self.store.find(schema_name or "plain", text)
+        if recording is None:
+            raise ReplayMiss(schema_name or "plain", extract_question(text))
+        meta = {"model_name": (self.store.model or self.model), "model_provider": "replay"}
+        if schema_name:
+            call = {"name": schema_name, "args": recording.payload, "id": "replay_call", "type": "tool_call"}
+            message = AIMessage(content="", tool_calls=[call], response_metadata=meta)
+        else:
+            payload = recording.payload
+            message = AIMessage(content=payload if isinstance(payload, str) else json.dumps(payload),
+                                response_metadata=meta)
+        return ChatResult(generations=[ChatGeneration(message=message)])
+
+
+class ReplayProvider:
+    """The ``replay`` LLM provider: the recordings that ship with the engine, or ``store``.
+
+    Registered under the ``nl2sql.llms`` entry point group as :data:`REPLAY`.
+    It needs no key and no client library.
+    """
+
+    interface_version = 2
+    label = "Recorded answers"
+    api_key_env = None
+    requires: Tuple[str, ...] = ()
+    install_hint = ""
+    structured_output = "tool_calling"
+
+    def __init__(self, store: Optional[ReplayStore] = None) -> None:
+        self._store = store
+
+    @property
+    def store(self) -> ReplayStore:
+        """The recordings in use, the packaged ones unless a store was given."""
+        if self._store is None:
+            self._store = packaged_store()
+        return self._store
+
+    def create(self, agent: Any) -> ReplayChatModel:
+        return ReplayChatModel(store=self.store, model=agent.model)
+
+
+def packaged_store() -> ReplayStore:
+    """Every recording file in ``nl2sql/datasets/recordings``, as one store."""
+    from importlib.resources import files
+
+    merged = ReplayStore()
+    for entry in sorted(files("nl2sql.datasets").joinpath("recordings").iterdir(), key=lambda e: e.name):
+        if not entry.name.endswith(".json"):
+            continue
+        part = ReplayStore.from_json(entry.read_text(encoding="utf-8"))
+        merged.provider, merged.model = merged.provider or part.provider, merged.model or part.model
+        for recording in part._recordings:
+            merged.add(recording)
+    return merged
+
+
+class _Tap(BaseCallbackHandler):
+    """Writes each model call's answer into a store, keyed by what the replay provider looks it up by."""
+
+    def __init__(self, store: ReplayStore) -> None:
+        self._store = store
+        self._prompts: Dict[Any, str] = {}
+
+    def on_chat_model_start(self, serialized: Any, messages: Any, *, run_id: Any, **_kwargs: Any) -> None:
+        self._prompts[run_id] = _text_of(messages[0])
+
+    def on_llm_end(self, response: Any, *, run_id: Any, **_kwargs: Any) -> None:
+        prompt = self._prompts.pop(run_id, "")
+        message = response.generations[0][0].message
+        question = extract_question(prompt)
+        if message.tool_calls:
+            call = message.tool_calls[0]
+            self._store.add(Recording(call["name"], question, call["args"]))
+        else:
+            self._store.add(Recording("plain", question, message.content))
+
+
+class Recorder:
+    """An LLM provider that calls ``upstream`` and keeps what it answered, for the replay provider to replay.
+
+    Internal, for ``scripts/record_demo_answers.py``. Register it under any
+    name; it takes the upstream's key variable and install hints, so the
+    config resolves a key as it would for the upstream. ``store`` collects a
+    recording per call, keyed by the structured-output name and the question
+    the prompt carries; ``store.provider`` and ``store.model`` name what answered.
+    """
+
+    def __init__(self, upstream: Any, store: Optional[ReplayStore] = None, *, provider: Optional[str] = None) -> None:
+        self.upstream = upstream
+        self.store = store if store is not None else ReplayStore()
+        self.provider = provider
+        self.interface_version = upstream.interface_version
+        self.label = upstream.label
+        self.api_key_env = upstream.api_key_env
+        self.requires = upstream.requires
+        self.install_hint = upstream.install_hint
+        self.structured_output = getattr(upstream, "structured_output", "tool_calling")
+
+    def create(self, agent: Any) -> Any:
+        client = self.upstream.create(agent)
+        self.store.provider = self.provider or self.store.provider
+        self.store.model = agent.model
+        client.callbacks = [*(client.callbacks or []), _Tap(self.store)]
+        return client
+
+
+REPLAY = ReplayProvider()
 
 
 class RecordingProxy:

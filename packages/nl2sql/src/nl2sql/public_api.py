@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import pathlib
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from nl2sql.api.api_keys_api import ApiKeysAPI
@@ -98,6 +98,15 @@ class NL2SQL:
         from nl2sql.config import demo_config
 
         return cls(demo_config(llm=llm if llm is not None else _demo_llm(), path=pathlib.Path(path)))
+
+    def add_demo(self, *, user_context: Optional["UserContext"] = None,
+                 on_datasource: Optional[Callable[[Any], None]] = None):
+        """Try the demo: add the sample databases and the demo glossary to this engine, then index them.
+
+        See :meth:`DatasourcesAPI.add_demo`. Returns the build's ``RebuildResult``.
+        """
+        self._ensure_open()
+        return self.datasources.add_demo(user_context=user_context, on_datasource=on_datasource)
 
     def _attach(self, runtime: "Runtime") -> None:
         self._runtime = runtime

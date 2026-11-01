@@ -82,6 +82,14 @@ Signature:
 One agent's entry from `list()`. Raises `ValueError` for a name that is not an
 agent, listing the agents.
 
+### llm.recorded
+
+Signature:
+`recorded(questions: Sequence[str]) -> list[str]`
+
+The `questions` the `replay` provider can answer from its recordings, in the order asked. See
+[the `replay` provider](../../configuration/llm.md#replay-recorded-answers-no-key).
+
 ### llm.providers
 
 Signature:
