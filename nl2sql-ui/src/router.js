@@ -68,8 +68,20 @@ export const PAGES = [
   // it fills it, and stays out of the nav until then. `param` is the one id a
   // route may carry: "optional" (#/chat and #/chat/{id}) or "required".
   stub("dashboards", "/dashboards", "Dashboards", "Whole dashboards in workspaces, each tile with its takeaway.", "optional"),
-  stub("connect", "/connect", "Connect", "Add a datasource, test it, index it and file its starter questions."),
-  stub("knowledge", "/knowledge", "Knowledge", "What the engine knows about each datasource, and the proposals waiting for review."),
+  {
+    id: "connect",
+    path: "/connect",
+    label: "Connect",
+    title: "Connect",
+    description: "Add a datasource, test it, index it and file its starter questions.",
+  },
+  {
+    id: "knowledge",
+    path: "/knowledge",
+    label: "Knowledge",
+    title: "Knowledge",
+    description: "What the engine knows about each datasource, and the proposals waiting for review.",
+  },
   page("approvals", "/approvals", "Approvals", "Questions waiting for someone to grant or deny them."),
   stub("evals", "/evals", "Evals", "Run a suite against the server and read the report."),
   stub("trace", "/trace", "Trace", "One run, node by node.", "required"),

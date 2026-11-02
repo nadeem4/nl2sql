@@ -152,8 +152,8 @@ test("the nav names every page, marks the current one and says which are off", (
   const items = navItems("settings", { retrieval: true });
 
   assert.deepEqual(items.map((i) => i.id), PAGES.filter((p) => !p.stub).map((p) => p.id));
-  assert.deepEqual(items.map((i) => i.href), ["#/", "#/chat", "#/pipeline", "#/settings", "#/retrieval", "#/approvals"]);
-  assert.deepEqual(items.map((i) => i.label), ["Home", "Chat", "Pipeline", "Settings", "Retrieval", "Approvals"]);
+  assert.deepEqual(items.map((i) => i.href), ["#/", "#/chat", "#/pipeline", "#/settings", "#/retrieval", "#/connect", "#/knowledge", "#/approvals"]);
+  assert.deepEqual(items.map((i) => i.label), ["Home", "Chat", "Pipeline", "Settings", "Retrieval", "Connect", "Knowledge", "Approvals"]);
   assert.equal(items.filter((i) => i.current).length, 1);
   assert.equal(items.find((i) => i.id === "settings").current, true);
   // An off page keeps its place in the nav: it opens and says why.
@@ -164,7 +164,7 @@ test("the nav names every page, marks the current one and says which are off", (
 
 test("nothing is marked off before the server has answered", () => {
   const items = navItems("chat", {});
-  assert.deepEqual(items.map((i) => i.off), [false, false, false, false, false, false]);
+  assert.deepEqual(items.map((i) => i.off), items.map(() => false));
   assert.equal(items.find((i) => i.id === "chat").current, true);
 });
 
@@ -204,7 +204,9 @@ test("the nav indicator sits under the current tab: moved and scaled, never resi
 });
 
 // Wave D's pages (wave_d.md, section 5). Each is a stub until its W-row fills it.
-const WAVE_D = ["chat", "dashboards", "connect", "knowledge", "approvals", "evals", "trace"];
+const WAVE_D = ["chat", "dashboards", "approvals", "evals", "trace"];
+// Pages W3 filled: real routes in the nav.
+const FILLED = ["connect", "knowledge"];
 
 // The rows that have shipped (W1: chat, approvals); the rest stay stubs the nav does not list.
 const SHIPPED = ["chat", "approvals"];
@@ -218,7 +220,11 @@ test("Wave D's routes are all there; the shipped ones are in the nav, the rest a
   }
   const listed = navItems("home").map((item) => item.id);
   for (const id of WAVE_D) assert.equal(listed.includes(id), SHIPPED.includes(id), `${id} nav listing`);
-  for (const id of ["home", "chat", "pipeline", "settings", "retrieval"]) assert.ok(listed.includes(id));
+  for (const id of ["home", "chat", "pipeline", "settings", "retrieval", ...FILLED]) assert.ok(listed.includes(id));
+  for (const id of FILLED) {
+    assert.ok(!PAGES.find((p) => p.id === id).stub);
+    assert.equal(pageFromHash(hashFor(id)), id);
+  }
 });
 
 test("a badge shows beside a page only when its count is above zero", () => {

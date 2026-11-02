@@ -1576,6 +1576,29 @@ route entry. Tool arguments use 1-based `turn` and `step`. A 409 from a turn mea
 
 **W2a (outputs and charts).** `src/outputs/Output.jsx` (`Output({ output })`, `output` a `ToolOutput`) now dispatches by kind: `Chart.jsx` (a `ChartSpec` object or its JSON text, via `chartSpecOf` in `output.js`), `Mermaid.jsx` (`import("mermaid")` is its own chunk, 697 kB; the main bundle grew by about 15 kB; `securityLevel: "strict"`, theme `neutral` or `dark` from `prefers-color-scheme`), `Report.jsx` (Markdown through `markdown.js`, a parser for headings, paragraphs, lists, tables, code and `<details>` that returns blocks, so no raw HTML passes), and `<pre>` text for `json` and unknown kinds. `chart.js` holds the pure geometry (`chartModel(spec, {width, height})`, `formatValue`, `niceTicks`, `truncatedNote`); bars are horizontal, a line breaks on a null, and a series column or several measures make one line each. `Chart` has a **Table** switch (`SampleRows`) and **Download Vega-Lite** (not for a table). `src/api/outputs.js`: `getChart(traceId, resultId, kind?)`, `getResultPage(traceId, resultId, offset, limit)`, `downloadCsv`, `downloadVegaLite` (both return `{blob, name}`) and `saveFile`. `RowsTable`/`PagedResult` use `getResultPage` and the `/results/...` routes; `results.js` lost its URL builders and the `role` parameter (gone from the API in A1). **Code won over the doc:** `http.js` gained `download(path)` (a GET with the page's headers, returning a `Blob`; `routes.test.js` reads `download(` calls too), because a plain link cannot carry the key headers; the series palette is four hues plus a neutral fifth (`--series-1..5` in `styles/outputs.css`), since the dataviz validator rejected a fifth hue on colour-blind separation, and its contrast test is `outputs/palette.test.js`, not `styles.test.js`; the legend shows for two or more series. New fixtures `ChartLine.json`, `ChartBar.json`, `ChartBigNumber.json` and `ResultPage.json`, written by `test_web_fixtures.py`. `docs/apps/web.md` is new (nav: Apps). **For W2b:** reuse `Chart` (`{ spec }`, a `ChartSpec`) for a tile's chart, `RowsTable` (`{ result }`) for its rows, and `formatValue` from `outputs/chart.js` for a big number; `Chart` sizes itself to its container with a `ResizeObserver`, so a grid cell needs only a width.
 
+**W3 (Connect, Knowledge, review, drift).** `#/connect` and `#/knowledge` are real pages in the nav (`router.js`; the
+stubs for them are gone). Connect (`pages/Connect.jsx`, `src/connect/`): the type list comes from `GET
+/datasource-types`; `schemaForm.js` turns a type's `connection_schema` into fields (it resolves `$ref` and
+`anyOf [T, null]`, hides `format: password` behind a password input with a note to type an `${env:NAME}` reference,
+puts `group: advanced` fields behind a disclosure, and sends only values that differ from the default).
+`flow.js` words the Test result (`POST /datasources/test` answers 200 even on failure, with `stage`, `reason`,
+`fix`) and the Add result. A `NOT_WRITABLE` answer is shown as added but not saved (D212: it works until the
+server restarts); a 422 puts each `loc` against its field. Add sends the "Save to the project config" checkbox as
+`save`. After Add the page offers Index (`POST /jobs/index`), Profile (`POST /jobs/profile`; "draft with the
+model" sends `draft` and the required `max_cost_usd`), and starter questions (`GET
+/datasources/{id}/starter-questions`, filed with `POST /proposals/examples`), each job followed with `followJob`
+and shown in `JobProgress`. Knowledge (`pages/Knowledge.jsx`, `src/knowledge/`): the merged knowledge from `GET
+/knowledge` (terms, rules, joins, tables, columns with their origin, problems), the schema from `GET
+/datasources/{id}/schema`, then, only when `GET /proposals` does not answer 403, the review list and the drift
+check. `proposals.js` groups by kind, sends only the edits that changed (`acceptBody`) and words the
+`AcceptReport`; `drift.js` words a `DriftReport` (changes, then what they may break). **No Connect page on the hosted
+demo or for a non-admin:** `GET /datasource-types` answers 403 and the page shows a note instead of a form. The
+page does not read the old `/api/meta`; admin and hosted are inferred from that 403. **Differs from the plan:** the
+schema diagram (`GET /datasources/{id}/diagram` is `text/plain`, which `request()` cannot read) waits for the
+`download()` helper and `Mermaid.jsx` of W2a, so Knowledge lists the tables and columns instead; one
+`schemaForm.js` test file covers the form, so `SchemaForm.jsx` and `Steps.jsx` have no test of their own;
+`SchemaPanel.jsx` and `datasources.js` were already in `src/connect/` from D0b. The schema diagram is a follow-up now that W2a (#422: `download()`, `Mermaid.jsx`) is on `main`. A drifted report points to `nl2sql index`; a button for it on a datasource that already exists is a follow-up too. Review fixes: the per-datasource state of the next steps resets on a new Add, origins are looked up per field (`tables.X.description`, `columns.X.Y.role`), a proposal shows every `change` entry, only a 403 from `GET /proposals` hides review and drift, and a typed secret is cleared after Add.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below
