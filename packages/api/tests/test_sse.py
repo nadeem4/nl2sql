@@ -1,9 +1,10 @@
 """``nl2sql_api.sse.event_stream``: one place an SSE response is built (docs/architecture/wave_d.md, D207)."""
 import asyncio
+import json
 import threading
 from datetime import datetime, timezone
 
-from nl2sql import CancellationToken, Event
+from nl2sql import CancellationToken, ConversationBusy, Event
 from nl2sql_api.sse import KEEP_ALIVE, SSE_HEADERS, event_stream
 
 
@@ -57,3 +58,34 @@ def test_sse_sends_every_event_then_ends():
         return [chunk async for chunk in response.body_iterator]
 
     assert asyncio.run(go()) == [_event("a").sse(), _event("b").sse()]
+
+
+def _failing(exc):
+    def events():
+        yield _event("run.started")
+        raise exc
+    return events
+
+
+def _frames(events):
+    async def go():
+        response = event_stream(events, _Request())
+        return [chunk async for chunk in response.body_iterator]
+    return asyncio.run(go())
+
+
+def test_sse_a_failure_mid_stream_is_a_final_run_failed_frame():
+    chunks = _frames(_failing(RuntimeError("secret host db.internal")))
+
+    assert chunks[0] == _event("run.started").sse()
+    assert len(chunks) == 2 and chunks[1].startswith("event: run.failed\n")
+    data = json.loads(chunks[1].split("data: ", 1)[1])["data"]
+    assert data["error_code"] == "UNKNOWN_ERROR" and "secret" not in chunks[1], "never the exception text (D202)"
+
+
+def test_sse_a_named_error_mid_stream_keeps_its_code_and_message():
+    chunks = _frames(_failing(ConversationBusy("A turn is already running.")))
+
+    data = json.loads(chunks[-1].split("data: ", 1)[1])["data"]
+    assert chunks[-1].startswith("event: run.failed\n")
+    assert data == {"message": "A turn is already running.", "error_code": "CONFLICT"}

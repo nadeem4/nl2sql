@@ -69,13 +69,14 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Results](results.md) | `routes/query.py` | A run's manifest, pages, CSV and chart (`/results/{trace_id}/...`). |
 | [Traces and feedback](feedback.md) | `routes/query.py` | A run's trace, ratings, and corrections as proposals. |
 | [Approvals](approvals.md) | `routes/approvals.py` | List, grant and deny the approvals a hook asked for. |
+| [Conversations](conversations.md) | `routes/conversations.py` | Conversations: start, list, read, delete, send a turn (whole or streamed), retry, run a chat tool, report. |
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
 | [LLM](llm.md) | `routes/llm.py` | Replace the LLM (`PUT /settings/llm`) and inspect each agent's model. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
 | [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 
-The routers `approvals`, `conversations`, `datasources`, `index`, `knowledge`, `evals`, `settings` and `web` are empty
+The routers `datasources`, `index`, `knowledge`, `evals`, `settings` and `web` are empty
 for now: later rows fill them. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
 fails when a route changes without it (rewrite it with `python packages/api/tests/test_openapi_snapshot.py`).
 

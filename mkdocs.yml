@@ -194,6 +194,7 @@ nav:
       - Indexing: api/rest/indexing.md
       - Dashboards: api/rest/dashboards.md
       - Jobs: api/rest/jobs.md
+      - Conversations: api/rest/conversations.md
       - Errors: api/rest/errors.md
   - Releases:
     - Overview: releases/index.md

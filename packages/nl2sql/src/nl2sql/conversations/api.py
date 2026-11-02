@@ -22,7 +22,7 @@ from nl2sql.api.results_api import ResultsAPI
 from nl2sql.clarify.models import ClarificationChoice, ClarificationRequest
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.context import current_conversation_id
-from nl2sql.common.errors import ConversationBusy, DashboardNotFound, ErrorCode
+from nl2sql.common.errors import ConversationBusy, DashboardNotFound, ErrorCode, InvalidArgument
 from nl2sql.conversations.agent import (
     ConversationAgent, block, check_call, checked_step, dashboard_view, ASK_SPEC, AskArgs,
 )
@@ -147,7 +147,7 @@ class Conversations:
         question = next((s.question for t in reversed(conversation.turns) for s in reversed(t.steps)
                          if s.call.name == "ask" and s.question), None)
         if question is None:
-            raise ValueError("This conversation has no question to run again.")
+            raise InvalidArgument("This conversation has no question to run again.")
 
         def body(run: _Run) -> Turn:
             self._ask(run, ToolCall(name="ask", args={"question": question}), approvals=approvals)
@@ -158,7 +158,7 @@ class Conversations:
     def tool(self, conversation_id: str, name: str, args: Optional[Dict[str, Any]] = None, *,
              user_context: UserContext) -> Turn:
         """One registry chat tool, by name, as a turn of kind ``tool`` with no model call. Arguments that do not
-        validate raise ``ValueError`` and store nothing; a tool that is not enabled is a stored error step."""
+        validate raise ``InvalidArgument`` and store nothing; a tool that is not enabled is a stored error step."""
         call = ToolCall(name=name, args=dict(args or {}))
         conversation = self.get(conversation_id, user_context=user_context)
         if name in self._chat.names:
@@ -205,13 +205,13 @@ class Conversations:
     # ------------------------------------------------------------ the machinery
 
     def _prepare(self, conversation: Conversation, text: Optional[str], choice: Optional[str]):
-        """``(kind, text shown)`` of the turn asked for, or the ``ValueError`` that refuses it."""
+        """``(kind, text shown)`` of the turn asked for, or the ``InvalidArgument`` that refuses it."""
         if (text is None) == (choice is None):
-            raise ValueError("Pass the message as text or a choice, one of the two.")
+            raise InvalidArgument("Pass the message as text or a choice, one of the two.")
         if choice is not None:
             shown = self._pending_option(conversation, choice).label
         elif not text.strip():
-            raise ValueError("Say what you want to ask.")
+            raise InvalidArgument("Say what you want to ask.")
         else:
             shown = text
         self._check_length(conversation)
@@ -219,17 +219,18 @@ class Conversations:
 
     def _check_length(self, conversation: Conversation) -> None:
         if len(conversation.turns) >= self._settings.max_turns:
-            raise ValueError(f"{ErrorCode.CONVERSATION_TOO_LONG.value}: this conversation has "
-                             f"{self._settings.max_turns} turns. Start a new conversation.")
+            raise InvalidArgument(f"{ErrorCode.CONVERSATION_TOO_LONG.value}: this conversation has "
+                                  f"{self._settings.max_turns} turns. Start a new conversation.",
+                                  code=ErrorCode.CONVERSATION_TOO_LONG.value)
 
     @staticmethod
     def _pending_option(conversation: Conversation, choice: str):
         pending = conversation.pending
         if pending is None:
-            raise ValueError("Nothing in this conversation is waiting for a choice.")
+            raise InvalidArgument("Nothing in this conversation is waiting for a choice.")
         option = next((o for o in pending.options if o.id == choice), None)
         if option is None:
-            raise ValueError(f"'{choice}' is not an option of the pending question: "
+            raise InvalidArgument(f"'{choice}' is not an option of the pending question: "
                              f"{', '.join(o.id for o in pending.options)}.")
         return option
 

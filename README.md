@@ -412,6 +412,16 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `GET` | `/api/v1/approvals` | Approval requests the caller asked or may decide (`status`) |
 | `POST` | `/api/v1/approvals/{request_id}/grant` | Grant a request (an approver role) |
 | `POST` | `/api/v1/approvals/{request_id}/deny` | Deny a request, with an optional reason |
+| `POST` | `/api/v1/conversations` | Start a conversation |
+| `GET` | `/api/v1/conversations` | The caller's conversations, newest first |
+| `GET` | `/api/v1/conversations/{conversation_id}` | One conversation with its turns |
+| `DELETE` | `/api/v1/conversations/{conversation_id}` | Delete a conversation |
+| `POST` | `/api/v1/conversations/{conversation_id}/turns` | Send a message (text or a choice); returns the stored turn |
+| `POST` | `/api/v1/conversations/{conversation_id}/turns/stream` | The same turn as Server-Sent Events, ending with the stored turn or a `run.failed` frame |
+| `POST` | `/api/v1/conversations/{conversation_id}/retry` | Run the last question again, with approved request ids |
+| `POST` | `/api/v1/conversations/{conversation_id}/tools/{name}` | Run one chat tool with its arguments |
+| `GET` | `/api/v1/conversations/{conversation_id}/report` | The conversation as a Markdown report |
+| `GET` | `/api/v1/chat-tools` | The chat tools a conversation can use |
 | `GET` | `/api/v1/health` | Liveness check |
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
 | `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller |

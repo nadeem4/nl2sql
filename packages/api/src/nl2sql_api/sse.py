@@ -5,13 +5,17 @@ nothing does, and stops the run when the client goes away. ``frame`` and ``KEEP_
 the API makes itself (a job's progress).
 """
 import asyncio
+import logging
+from datetime import datetime, timezone
 from typing import Callable, Iterator, Optional
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken, Event
+from nl2sql import CancellationToken, Event, NL2SQLError
+
+logger = logging.getLogger(__name__)
 
 HEARTBEAT_S = 15.0
 KEEP_ALIVE = ": keep-alive\n\n"
@@ -30,7 +34,9 @@ def event_stream(open_events: Callable[[], Iterator[Event]], request: Request, *
                  token: Optional[CancellationToken] = None, heartbeat_s: float = HEARTBEAT_S) -> StreamingResponse:
     """Stream ``open_events()`` as SSE. The iterator runs in the thread pool, so a blocking facade call never holds the
     event loop. When the client disconnects (or the run is over) the iterator is closed, which cancels a run that
-    cancels on close, and ``token`` is cancelled for one that takes a token."""
+    cancels on close, and ``token`` is cancelled for one that takes a token. An exception from the iterator ends the
+    stream with one ``run.failed`` frame. ``/query/stream`` catches its own failures first, so it can mask key text
+    in the log, and the job stream builds its own frames."""
 
     async def body():
         iterator = open_events()
@@ -45,7 +51,11 @@ def event_stream(open_events: Callable[[], Iterator[Event]], request: Request, *
                     if await request.is_disconnected():
                         return
                     yield KEEP_ALIVE
-                item = pending.result()
+                try:
+                    item = pending.result()
+                except Exception as exc:  # the 200 is sent: the failure is the stream's last frame, not a cut-off
+                    yield _failed(exc).sse()
+                    return
                 if item is _END:
                     return
                 yield item.sse()
@@ -55,6 +65,17 @@ def event_stream(open_events: Callable[[], Iterator[Event]], request: Request, *
             _close(iterator, pending)
 
     return StreamingResponse(body(), media_type="text/event-stream", headers=SSE_HEADERS)
+
+
+def _failed(exc: Exception) -> Event:
+    """The ``run.failed`` that ends a stream whose run raised. A named error keeps its code and message; any other
+    is ``UNKNOWN_ERROR`` with a fixed message, never the exception text (D202)."""
+    if isinstance(exc, NL2SQLError):
+        data = {"message": exc.message, "error_code": exc.code}
+    else:
+        logger.error("Unexpected failure while streaming events", exc_info=exc)
+        data = {"message": "The request failed.", "error_code": "UNKNOWN_ERROR"}
+    return Event(name="run.failed", at=datetime.now(timezone.utc), data=data)
 
 
 def _close(iterator, pending) -> None:
