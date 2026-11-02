@@ -249,10 +249,18 @@ key of `nl2sql.yaml`; `GET /api/v1/meta` reports it.
 
 In hosted mode every browser is an anonymous session: a random `nl2sql_demo_session` cookie (`HttpOnly`,
 `SameSite=Lax`) is its identity, it holds the one visitor role and is never an admin, so the admin routes answer
-`403`. Each session may have one job and two open streams at a time, besides the limits below; going over any of them
+`403`. Only the 32-character lowercase hex token this server mints is accepted as the cookie (anything else gets a
+new session), and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
+session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
+at a time, besides the limits below; going over any of them
 is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
 questions the session has asked (`limits`). The old `nl2sql demo --hosted` flags below stay until the CLI moves
 onto the API.
+
+`nl2sql-api serve` loads the `.env` beside the config (before it looks at the environment for a model key), except
+for a hosted server, which never loads one: it holds no model key, and a `.env` with one beside a hosted config is
+left alone. `uvicorn nl2sql_api.main:app` loads no `.env` at all, so export what it needs first, and it refuses to
+start over a config that says `mode: hosted`: the sessions and limits belong to `nl2sql-api serve`.
 
 ## Limits
 
@@ -272,6 +280,17 @@ all. The retrieval inspector spends from the same rate bucket (it costs no
 tokens, but it does embed text) and does not count against the session's
 questions.
 
+These limits hold an honest browser to its share; they do not stop a script. The session cap counts a cookie the
+client keeps or drops, and the rate bucket is keyed by the first hop of `X-Forwarded-For`, which the client writes
+(the proxy appends to the right of it), so a script that sends no cookie and a made-up address is not limited by
+either. They never spend a model key (the server holds none), but they do not protect the shared job worker or the
+sample databases from one.
+
+A refused or invalid request still spends a question (the charge comes before the route runs, so a `403` or a `422`
+costs one). Writes that start no model work spend none and are uncapped: workspaces, conversations, knowledge
+choices, corrections, example proposals, a dashboard refresh and the retrieval inspector (it spends from the rate
+bucket only); the disk is ephemeral.
+
 A question is charged when it arrives, before it runs, so one the visitor
 stops still counts toward both limits. Stopping does end the work: the page
 aborts its request, the server sees the connection close and cancels the run
@@ -279,8 +298,8 @@ before its next step or model call (the call already in flight finishes).
 
 The session cookie is a random token this process made up. It names no visitor,
 carries no key, and exists only so the session cap has something to count. A
-visitor who clears their cookies starts a new session; the rate limit, which is
-keyed by address, is what holds the pace down in the meantime.
+visitor who clears their cookies starts a new session; the rate limit, keyed by the
+address the client reports, is what holds an honest browser's pace down in the meantime.
 
 ## What is off, and what is on
 

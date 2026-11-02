@@ -98,7 +98,7 @@ beside it.
 | Sample | Files | Source | Licence |
 |---|---|---|---|
 | Pagila | `pagila-schema.sql`, `pagila-insert-data.sql` | github.com/devrimgunduz/pagila, pinned to commit `5ba5a57`, from before Pagila moved to PostgreSQL 18 | PostgreSQL License (copyright Devrim Gündüz) |
-| Sakila | `sakila-schema.sql`, `sakila-data.sql`, from `sakila-db.tar.gz` | downloads.mysql.com | New BSD |
+| Sakila | `sakila-schema.sql`, `sakila-data.sql`, from `sakila-db.tar.gz` | downloads.mysql.com, which is not versioned: MySQL re-publishes the archive in place (last on 2026-10-31), and then the `samples` service exits 1 with a checksum error until the pinned SHA-256 in `testbed/samples.py` is updated | New BSD |
 | AdventureWorksLT 2022 | `AdventureWorksLT2022.bak` | github.com/microsoft/sql-server-samples, release `adventureworks` | MIT |
 
 The server images have their own terms. The SQL Server image runs the free

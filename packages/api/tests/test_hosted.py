@@ -213,3 +213,61 @@ def test_hosted_one_job_per_session():
         app.state.jobs.close()
 
     asyncio.run(run())
+
+
+def test_hosted_parallel_job_starts_from_one_session_pass_one_at_a_time():
+    release = asyncio.Event()
+
+    async def inner(scope, receive, send):
+        await send({"type": "http.response.start", "status": 202, "headers": []})
+        await release.wait()  # the route has not submitted its job yet: the jobs list is still empty
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    async def run():
+        middleware, app, _ = _wired(inner)
+        path = "/api/v1/jobs/dashboard"
+        first = asyncio.create_task(_call(middleware, _scope("POST", path, app)))
+        await asyncio.sleep(0.05)
+        second = await _call(middleware, _scope("POST", path, app))
+        assert second[0] == 429 and json.loads(second[2])["error"]["code"] == "LIMIT_REACHED"
+        release.set()
+        assert (await first)[0] == 202
+        assert (await _call(middleware, _scope("POST", path, app)))[0] == 202  # the slot is given back
+        app.state.jobs.close()
+
+    asyncio.run(run())
+
+
+def test_a_refused_job_start_gives_its_slot_back():
+    async def inner(scope, receive, send):
+        await send({"type": "http.response.start", "status": 202, "headers": []})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    async def run():
+        hosted = Hosted(role="viewer", limits=Limits(1000, 1))
+        app = SimpleNamespace(state=SimpleNamespace(jobs=Jobs(poll_s=0.01), engine=None, hosted=hosted))
+        middleware = HostedMiddleware(inner, hosted=hosted)
+        path = "/api/v1/jobs/dashboard"
+        assert (await _call(middleware, _scope("POST", path, app)))[0] == 202
+        assert (await _call(middleware, _scope("POST", path, app)))[0] == 429  # the session cap, not the slot
+        assert hosted.job_starting(SESSION) is False
+        app.state.jobs.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("value", ["A" * 32, "a" * 31, "a" * 33, "g" * 32])
+def test_only_the_cookie_this_server_mints_is_accepted(make, value):
+    _, client = make()
+    response = client.get("/api/v1/health", headers={"Cookie": f"{SESSION_COOKIE}={value}"})
+    minted = re.search(rf"{SESSION_COOKIE}=([^;]+)", response.headers["set-cookie"]).group(1)
+    assert re.fullmatch(r"[0-9a-f]{32}", minted) and minted != value
+
+
+def test_the_session_cookie_is_secure_over_https_only(make):
+    _, client = make()
+    assert "secure" not in client.get("/api/v1/health").headers["set-cookie"].lower()
+    over_https = TestClient(client.app, base_url="https://testserver").get("/api/v1/health")
+    assert "secure" in over_https.headers["set-cookie"].lower()
+    proxied = TestClient(client.app).get("/api/v1/health", headers={"x-forwarded-proto": "https"})
+    assert "secure" in proxied.headers["set-cookie"].lower()

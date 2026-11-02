@@ -59,11 +59,27 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 # The key the demo's own .env holds; a hosted server holds none.
                 load_env_file(os.path.join(args.dir, "nl2sql.yaml"))
             config_path = prepare_demo(args.dir, provider="replay" if (flag or env_mode) == "hosted" else None)
-        config = load_config(config_path)
+        env_loaded = False
+        try:
+            config = load_config(config_path)
+        except ConfigError:
+            if args.demo or flag == "hosted" or (env_mode or "").strip() == "hosted":
+                raise
+            # A ${env:...} reference may need the .env beside the file (a hosted file with one that does is refused
+            # below if the .env holds a model key).
+            load_env_file(config_path)
+            env_loaded = True
+            config = load_config(config_path)
         try:
             mode = resolve_mode(flag, env_mode, config.mode)
         except ValueError as error:
             raise identity.StartRefused(str(error)) from None
+        if mode != "hosted" and not args.demo and not env_loaded:
+            # The .env beside the config, loaded here and nowhere else (the demo's was loaded above); a hosted
+            # server holds no model key, so it never loads one. Loaded before the config is read again, so a
+            # ${env:...} reference in the file can resolve from it.
+            load_env_file(config_path)
+            config = load_config(config_path)
         hosted = None
         if mode == "hosted":
             held = provider_keys_in_environment()

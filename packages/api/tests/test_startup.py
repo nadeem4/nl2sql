@@ -44,7 +44,7 @@ def test_the_api_starts_with_a_failed_required_datasource_and_is_not_ready(tmp_p
             del app.state.engine
 
 
-def test_the_api_starts_degraded_from_its_config_and_loads_the_env_file(tmp_path, monkeypatch):
+def test_the_api_starts_degraded_from_its_config_and_leaves_the_env_file_to_serve(tmp_path, monkeypatch):
     config = _project(tmp_path, required=False)
     (tmp_path / ".env").write_text("NL2SQL_API_TEST_FROM_FILE=file\nNL2SQL_API_TEST_SET=file\n", encoding="utf-8")
     monkeypatch.setenv("NL2SQL_CONFIG", str(config))
@@ -58,23 +58,20 @@ def test_the_api_starts_degraded_from_its_config_and_loads_the_env_file(tmp_path
             assert engine.config.api.static_role == "viewer"
             assert client.get("/api/v1/health").status_code == 200
         assert engine.closed
-        assert os.environ["NL2SQL_API_TEST_FROM_FILE"] == "file"
+        # The lifespan loads no .env: `nl2sql-api serve` does, and a hosted one never does (A4b).
+        assert "NL2SQL_API_TEST_FROM_FILE" not in os.environ
         assert os.environ["NL2SQL_API_TEST_SET"] == "shell"
     finally:
-        os.environ.pop("NL2SQL_API_TEST_FROM_FILE", None)
         if hasattr(app.state, "engine"):
             del app.state.engine
 
 
-def test_the_api_logs_at_the_level_its_env_file_names(tmp_path, monkeypatch):
+def test_the_api_logs_at_the_level_its_environment_names(tmp_path, monkeypatch):
     import logging
 
     config = _project(tmp_path, required=False)
-    (tmp_path / ".env").write_text("NL2SQL_LOG_LEVEL=DEBUG\n", encoding="utf-8")
     monkeypatch.setenv("NL2SQL_CONFIG", str(config))
-    # Set, then deleted, so whatever the .env adds is removed afterwards.
-    monkeypatch.setenv("NL2SQL_LOG_LEVEL", "")
-    monkeypatch.delenv("NL2SQL_LOG_LEVEL")
+    monkeypatch.setenv("NL2SQL_LOG_LEVEL", "DEBUG")
     root = logging.getLogger()
     level, handlers = root.level, root.handlers[:]
 
@@ -86,6 +83,20 @@ def test_the_api_logs_at_the_level_its_env_file_names(tmp_path, monkeypatch):
         root.handlers[:] = handlers
         if hasattr(app.state, "engine"):
             del app.state.engine
+
+
+def test_a_hosted_config_served_without_the_hosted_state_refuses_to_start(tmp_path, monkeypatch):
+    """`uvicorn nl2sql_api.main:app` over `mode: hosted` would serve a public demo with no sessions or limits."""
+    from nl2sql_api.identity import StartRefused
+    from nl2sql_api.main import create_app
+
+    make_config(tmp_path, mode="hosted", policies={"roles": {"viewer": {"description": "role", "allow": ["*"]}},
+                                                   "default_role": "viewer"},
+                api={"auth": "static", "static_role": "viewer"})
+    monkeypatch.setenv("NL2SQL_CONFIG", str(tmp_path / "nl2sql.yaml"))
+    with pytest.raises(StartRefused, match="nl2sql-api serve"):
+        with TestClient(create_app()):
+            pass
 
 
 def test_api_purges_at_startup(tmp_path, monkeypatch):

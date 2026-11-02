@@ -84,6 +84,10 @@ nl2sql-api serve --config /etc/nl2sql/nl2sql.yaml --host 127.0.0.1 --port 8000
 `--demo` prepares and serves the demo project, and `--hosted` makes it the public demo; `NL2SQL_MODE` or the
 `mode:` key picks the mode when no flag does (see [Hosted demo](../deployment/hosted-demo.md#serving-it-with-nl2sql-api)).
 
+`serve` loads the `.env` beside `nl2sql.yaml` (never overriding a variable already set), except for a hosted server,
+which never loads one. `uvicorn nl2sql_api.main:app` loads no `.env`: export the variables first. It also refuses
+to start over a config with `mode: hosted`, which needs `nl2sql-api serve`.
+
 `serve` runs one worker, and with `auth: none` it refuses to bind any host but
 loopback, naming `api.auth` in the message.
 

@@ -6,8 +6,10 @@
   :data:`SESSION_COOKIE`, used as the ``user_id`` with one non-admin role. It is not a value of ``api.auth``:
   :func:`nl2sql_api.identity.caller` asks :meth:`Hosted.user` first, so no header makes a visitor an admin and the
   admin routes answer 403 for the same reason they do anywhere else.
-* **Limits.** Questions, turns and ``POST /jobs/<kind>`` spend from a token bucket (per address, so dropping the cookie
-  does not lift it) and a per-session count. A session has at most one job and two open streams. A refusal is a 429
+* **Limits.** Questions, turns and ``POST /jobs/<kind>`` spend from a token bucket (per client address: the first hop
+  of ``X-Forwarded-For``, which the client writes) and a per-session count (per cookie, which the client keeps or
+  drops). They hold an honest browser to its share; they do not stop a script, which sends no cookie and a made-up
+  address. A session has at most one job and two open streams. A refusal is a 429
   ``LIMIT_REACHED`` with ``Retry-After``, sent before the route runs, so it never starts a model call.
 
 State is in this process's memory only; a visitor who has been idle for an hour is forgotten.
@@ -108,6 +110,7 @@ class Hosted:
         self.role = role
         self.limits = limits or Limits()
         self._streams: Dict[str, int] = {}
+        self._starting: set = set()  # sessions whose job start is being handled: the slot a parallel start cannot take
         self._lock = threading.Lock()
 
     def user(self, session: str, tenant_id: Optional[str] = None) -> UserContext:
@@ -130,6 +133,22 @@ class Hosted:
             else:
                 self._streams.pop(session, None)
 
+    def start_job(self, session: str) -> bool:
+        """Reserves the session's one job slot, atomically; False when a start is already under way."""
+        with self._lock:
+            if session in self._starting:
+                return False
+            self._starting.add(session)
+            return True
+
+    def end_job(self, session: str) -> None:
+        with self._lock:
+            self._starting.discard(session)
+
+    def job_starting(self, session: str) -> bool:
+        with self._lock:
+            return session in self._starting
+
     def describe(self, session: str) -> Dict[str, int]:
         """What ``GET /meta`` tells a visitor about the limits."""
         return {"questions_per_minute": self.limits.per_minute, "questions_per_session": self.limits.per_session,
@@ -141,11 +160,12 @@ _SPENDS = re.compile(r"^/api/v1/(query(/stream)?|conversations/[^/]+/(turns(/str
 _STREAMS_POST = re.compile(r"^/api/v1/(query/stream|conversations/[^/]+/turns/stream)$")
 _STREAMS_GET = re.compile(r"^/api/v1/jobs/[^/]+/events$")
 _JOB_START = re.compile(r"^/api/v1/jobs/[^/]+$")
+_MINTED = re.compile(r"[0-9a-f]{32}", re.ASCII)  # what secrets.token_hex(16) makes
 
 
 def _address(scope: Scope) -> str:
     """The address the bucket is keyed by: ``X-Forwarded-For``'s first hop (the Space's proxy puts the visitor there),
-    else the peer. A visitor can forge the header and lift their own pace; the session cap does not depend on it."""
+    else the peer. A visitor can write the header, so this paces an honest browser and nothing more."""
     for name, value in scope.get("headers", []):
         if name == b"x-forwarded-for":
             first = value.decode("latin-1").split(",")[0].strip()
@@ -153,6 +173,16 @@ def _address(scope: Scope) -> str:
                 return first[:64]
     client = scope.get("client")
     return (client[0] if client else None) or "unknown"
+
+
+def _https(scope: Scope) -> bool:
+    """Whether the visitor reached us over HTTPS: the scheme, or the proxy's ``X-Forwarded-Proto``."""
+    if scope.get("scheme") in ("https", "wss"):
+        return True
+    for name, value in scope.get("headers", []):
+        if name == b"x-forwarded-proto":
+            return value.decode("latin-1").split(",")[0].strip().lower() == "https"
+    return False
 
 
 def _cookie(scope: Scope) -> str:
@@ -180,7 +210,7 @@ class HostedMiddleware:
             await self.app(scope, receive, send)
             return
         session = _cookie(scope)
-        fresh = not (session.isalnum() and 16 <= len(session) <= 64)
+        fresh = not _MINTED.fullmatch(session)  # only the form this server mints; anything else gets a new session
         if fresh:
             session = secrets.token_hex(16)
         scope.setdefault("state", {})["hosted_session"] = session
@@ -188,12 +218,15 @@ class HostedMiddleware:
         async def send_with_session(message: Message) -> None:
             if fresh and message["type"] == "http.response.start":
                 cookie = f"{SESSION_COOKIE}={session}; HttpOnly; Max-Age=86400; Path=/; SameSite=lax"
+                if _https(scope):
+                    cookie += "; Secure"
                 message = {**message, "headers": [*message.get("headers", []), (b"set-cookie", cookie.encode())]}
             await send(message)
 
         method = scope["method"]
         streams = bool(_STREAMS_POST.match(path) if method == "POST" else method == "GET" and _STREAMS_GET.match(path))
-        refusal = self._refusal(scope, session, method, path, streams)
+        job = method == "POST" and bool(_JOB_START.match(path))
+        refusal = self._refusal(scope, session, method, path, streams, job)
         if refusal is not None:
             body = ErrorBody(error=ApiError(code="LIMIT_REACHED", message=refusal.message,
                                             fix="Wait and try again.")).model_dump(mode="json")
@@ -205,22 +238,35 @@ class HostedMiddleware:
         finally:
             if streams:
                 self.hosted.close_stream(session)
+            if job:
+                self.hosted.end_job(session)
 
-    def _refusal(self, scope: Scope, session: str, method: str, path: str, streams: bool) -> Optional[Refusal]:
-        """Why this request is refused, else None. A stream it reserves is the caller's to give back."""
+    def _refusal(self, scope: Scope, session: str, method: str, path: str, streams: bool,
+                 job: bool) -> Optional[Refusal]:
+        """Why this request is refused, else None. A stream or job slot it reserves is the caller's to give back
+        when it returns None, and is given back here when it refuses."""
         app = scope.get("app")
-        if method == "POST" and _JOB_START.match(path):
+        if job:
             jobs = getattr(getattr(app, "state", None), "jobs", None)
             engine = getattr(getattr(app, "state", None), "engine", None)
             tenant = engine.config.settings.tenant_id if engine is not None else None
             if jobs is not None and any(job.status in ("queued", "running")
                                         for job in jobs.list(self.hosted.user(session, tenant))):
                 return Refusal(JOB_MESSAGE, 5)
+            # The job is only submitted inside the route, so parallel starts would all pass the check above:
+            # one reserves the slot, the others are refused until the response is done.
+            if not self.hosted.start_job(session):
+                return Refusal(JOB_MESSAGE, 5)
         if streams and not self.hosted.open_stream(session):
+            if job:
+                self.hosted.end_job(session)
             return Refusal(STREAM_MESSAGE.format(cap=STREAMS_PER_SESSION), 5)
         if method == "POST" and _SPENDS.match(path):
             refusal = self.hosted.limits.take(address=_address(scope), session=session)
-            if refusal is not None and streams:
-                self.hosted.close_stream(session)
+            if refusal is not None:
+                if streams:
+                    self.hosted.close_stream(session)
+                if job:
+                    self.hosted.end_job(session)
             return refusal
         return None
