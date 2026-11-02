@@ -186,6 +186,9 @@ nav:
       - Overview: api/rest/index.md
       - Health: api/rest/health.md
       - Query: api/rest/query.md
+      - Results: api/rest/results.md
+      - Traces and feedback: api/rest/feedback.md
+      - Approvals: api/rest/approvals.md
       - Datasource: api/rest/datasource.md
       - LLM: api/rest/llm.md
       - Indexing: api/rest/indexing.md

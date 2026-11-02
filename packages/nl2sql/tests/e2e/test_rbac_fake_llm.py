@@ -184,7 +184,7 @@ def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_p
     try:
         with TestClient(app, client=("127.0.0.1", 50000)) as client:
             headers = {"X-Forwarded-User": "ann", "X-NL2SQL-Roles": role} if role else {}
-            response = client.post("/api/v1/query", json={"natural_language": QUESTION}, headers=headers)
+            response = client.post("/api/v1/query", json={"question": QUESTION}, headers=headers)
     finally:
         server.stop()
 

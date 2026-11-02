@@ -156,6 +156,40 @@ def cap(value: Any, limits: Limits, _rows: bool = False, _key: Optional[str] = N
     return value
 
 
+def _without_rows(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _without_rows(v) for k, v in value.items() if k not in _ROW_KEYS}
+    if isinstance(value, list):
+        return [_without_rows(v) for v in value]
+    return value
+
+
+_LLM_CALL_CONTENT = ("messages", "response", "parsed")
+_LLM_CONFIG_KEYS = ("provider", "model", "temperature")
+
+
+def for_caller(doc: dict) -> dict:
+    """The trace as a caller who is not the operator may read it.
+
+    The operator's settings are left out, and ``llm.configured`` keeps only provider, model and temperature (no
+    base URL or header names). A run whose results were withheld (``results_withheld``: a hook denied
+    ``answer.after``, or never released them) also loses its row samples, wherever they sit, and the content of
+    its LLM calls, whose prompts and answers carry preview rows.
+    """
+    out = {k: v for k, v in doc.items() if k != "settings"}
+    llm = dict(out.get("llm") or {})
+    llm["configured"] = {name: {k: cfg.get(k) for k in _LLM_CONFIG_KEYS if k in cfg}
+                         for name, cfg in (llm.get("configured") or {}).items()}
+    out["llm"] = llm
+    if doc.get("results_withheld"):
+        out = _without_rows(out)
+        for node in out.get("nodes") or []:
+            for call in node.get("llm_calls") or []:
+                for key in _LLM_CALL_CONTENT:
+                    call.pop(key, None)
+    return out
+
+
 def should_write(mode: str, failed: bool) -> bool:
     if mode == "always":
         return True

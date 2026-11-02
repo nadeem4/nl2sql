@@ -7,13 +7,17 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 ### `QueryRequest`
 | field | type | required | meaning |
 | --- | --- | --- | --- |
-| `natural_language` | `str` | yes | User query. |
+| `question` | `str` | yes | The question. (It was `natural_language`; that name is now a `422`.) |
 | `datasource_id` | `Optional[str]` | no | Datasource override. |
 | `execute` | `bool` | no | Execute SQL against datasource (default `true`). |
+| `choice` | `Optional[ClarificationChoice]` | no | The option picked from an earlier `clarification_request`: send `{"request_id", "option_id"}` with the same `question` to answer it. |
+| `approval_ids` | `List[str]` | no | Ids of [approvals](approvals.md) an approver granted, from an earlier run a hook held. `choice` and `approval_ids` together are a `422` `CLARIFICATION_INVALID`, before the engine is called. |
 
-### `SubQueryResponse`
+The body is strict: a field it does not name is a `422`, so a misspelt or removed field is never silently ignored.
 
-Derives from `nl2sql.SubQueryResult`, so it has exactly the engine's fields.
+### `SubQueryResult`
+
+The engine's own `nl2sql.SubQueryResult`, served as is.
 
 | field | type | required | meaning |
 | --- | --- | --- | --- |
@@ -31,14 +35,13 @@ Derives from `nl2sql.SubQueryResult`, so it has exactly the engine's fields.
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL, or `null` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result reached `row_cap`, so rows may be missing. |
 
-### `QueryResponse`
+### `QueryResult`
 
-Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
-`SubQueryResponse`), so the HTTP response cannot drift from what the engine returns.
+The engine's own `nl2sql.QueryResult`, served as is: the route's `response_model` is that class, so the HTTP response cannot drift from what the engine returns.
 
 | field | type | required | meaning |
 | --- | --- | --- | --- |
-| `sub_queries` | `List[SubQueryResponse]` | no | One entry per decomposed sub-query, each with its SQL. |
+| `sub_queries` | `List[SubQueryResult]` | no | One entry per decomposed sub-query, each with its SQL. |
 | `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`, `warnings`, `truncated`). |
 | `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `provider_response`). `provider` and `provider_response` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
@@ -56,22 +59,7 @@ Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set is written to artifact storage and addressed through `artifact_refs`
 (`uri`, `format`, `row_count`, `columns`). The run's combined results are listed in
-`result_manifest` and read back, a page at a time or as CSV, with
-[`GET /api/v1/query/{request_id}/results/{result_id}`](#get-apiv1queryrequest_idresultsresult_id)
-and [`.../{result_id}.csv`](#get-apiv1queryrequest_idresultsresult_idcsv).
-
-### `ResultPage`
-
-| field | type | meaning |
-| --- | --- | --- |
-| `request_id` | `str` | The run's `trace_id`. |
-| `result_id` | `str` | The result's `node_id` from `result_manifest`. |
-| `columns` | `List[str]` | Column names, in row order. |
-| `rows` | `List[List[Any]]` | `rows[i]` is row `offset + i` of the result. |
-| `offset` | `int` | The first row returned, from 0. |
-| `limit` | `int` | The page size used, after the cap of 1,000. |
-| `total_rows` | `int` | Rows in the whole result. |
-| `next_offset` | `Optional[int]` | Where the next page starts, or `null` when this page reaches the end. |
+`result_manifest` and read back, a page at a time or as CSV, with the [results routes](results.md).
 
 An `errors[]` entry for a key the provider rejected:
 
@@ -98,18 +86,25 @@ Source: `packages/api/src/nl2sql_api/routes/query.py`
 
 Request model: `QueryRequest`
 
-Response model: `QueryResponse`
+Response model: `QueryResult`
 
 Execution flow:
 - The `identity.caller` dependency supplies the caller's `UserContext` (see
   [Identity](index.md#identity)); with no identity it answers `HTTP 401`
   before the engine runs.
 - Delegates to `engine.run_query(...)`, which returns a `QueryResult`.
-- Returns that `QueryResult` as a `QueryResponse` (its subclass); there is no field mapping.
+- Returns that `QueryResult` unchanged; there is no field mapping.
 
 The handler is declared with `def`, not `async def`: the pipeline performs blocking
 LLM and database calls, so Starlette runs it in its threadpool instead of on the
 event loop.
+
+Keys and models in the request: where `api.request_llm` is on, a request may send `X-NL2SQL-Api-Key-<provider>`
+headers (one provider's key each) and `X-NL2SQL-Models` (a JSON object of agent name to `"provider:model"`, no secret)
+for this run only. A model is honoured only on a provider the same request sent a key for, so it can never move a step
+onto the operator's account, even if the server has a key for it (`422` `MISSING_PROVIDER_KEY`). With `request_llm`
+off the headers are a `403`. A key is never logged, stored in a trace or echoed in a response. The stream route takes
+the same headers.
 
 Errors:
 - Pipeline failures are a normal `HTTP 200` carrying `errors`; they are not HTTP failures.
@@ -199,7 +194,7 @@ are exactly those of `/query`. Delegates to `engine.stream_query(...)` (see
 The events are the engine's own run events
 ([Events](../../observability/events.md)), from the caller-safe allow-list. Each
 is an `event:` line naming it and one `data:` line holding the whole event as
-JSON: `name`, `at` (UTC), `trace_id` (the run's, its `request_id` for the result
+JSON: `name`, `at` (UTC), `trace_id` (the run's, its `trace_id` in the result
 routes), `tenant_id` and `data`. The table lists each event's `data`:
 
 | event | data | when |
@@ -207,10 +202,10 @@ routes), `tenant_id` and `data`. The table lists each event's `data`:
 | `run.started` | `question`, `user_id`, `tenant_id`, `roles`, `datasource_id`, `execute` | The run began. Always first. |
 | `node.started` | `node`, `sub_query_id` | A pipeline step began. The SQL agent's steps (`ast_planner`, `logical_validator`, `generator`, `executor`) come once per sub-query, and again on a retry. |
 | `node.finished` | `node`, `sub_query_id`, `seconds`, `ok` | The step ended; `ok` is `false` when it raised. |
-| `result.manifest` | `results` | The aggregator saved the run's results. `results` is the `result_manifest` the final response will carry, so a client can start paging the rows (with the event's `trace_id` as `request_id`) before the answer is written. |
+| `result.manifest` | `results` | The aggregator saved the run's results. `results` is the `result_manifest` the final response will carry, so a client can start paging the rows (with the event's `trace_id`) before the answer is written. |
 | `answer.delta` | `field`, `text` | The next piece of the answer's `summary` or `content`, as the answer model writes it. Joined in order, the pieces of a field are that field of `final_answer`. |
 | `sanity.flagged`, `run.limit_reached` | see [Events](../../observability/events.md) | A sanity check's finding; a cost or call cap reached. |
-| `run.finished` | the run's summary, plus `result`: the `QueryResponse` | The last event of a run that finished: `result` is exactly what `/query` returns for it. A refusal or a provider failure is a `run.finished` with `status: "error"`, as `/query` returns it. |
+| `run.finished` | the run's summary, plus `result`: the `QueryResult` | The last event of a run that finished: `result` is exactly what `/query` returns for it. A refusal or a provider failure is a `run.finished` with `status: "error"`, as `/query` returns it. |
 | `run.failed` | `message` (a key in it is redacted), `error_code`; and `user_id`, `roles` when the engine ended the run | The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server). |
 
 Every stream ends in exactly one `run.finished` or one `run.failed`. Policy
@@ -244,7 +239,7 @@ data: {"name": "run.finished", ..., "data": {"status": "success", "duration_s": 
 ```bash
 curl -N -X POST http://localhost:8000/api/v1/query/stream \
   -H "Content-Type: application/json" -H "Authorization: Bearer $NL2SQL_KEY" \
-  -d '{"natural_language": "Who are the top 5 customers by revenue?"}'
+  -d '{"question": "Who are the top 5 customers by revenue?"}'
 ```
 
 What streams token by token: only the answer. The answer model is asked to stream
@@ -264,71 +259,10 @@ The route answers `Cache-Control: no-cache` and `X-Accel-Buffering: no`, so a
 proxy passes each event on as it comes. Closing the connection cancels the run
 before its next step or model call.
 
-### `GET /api/v1/query/{request_id}/results/{result_id}`
-
-One page of a run's saved result.
-
-| parameter | in | default | meaning |
-| --- | --- | --- | --- |
-| `request_id` | path | | The run's `trace_id`. |
-| `result_id` | path | | A `node_id` from the run's `result_manifest`. |
-| `offset` | query | `0` | First row, from 0. Negative is `HTTP 422`. |
-| `limit` | query | `100` | Rows per page, at least 1 (else `HTTP 422`). Above 1,000 it is cut to 1,000; `limit` in the response says which. |
-
-Response model: `ResultPage`. Delegates to `engine.results.page(...)`, which
-reads the rows lazily from the result's parquet artifact: only the slice asked for
-is read. A page past the end has no rows.
-
-```bash
-curl -H "Authorization: Bearer $NL2SQL_KEY"   "http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&limit=100"
-```
-
-```json
-{"request_id": "0f1c...", "result_id": "combine_g1", "columns": ["customer", "revenue"],
- "rows": [["acme", 42], ["globex", 40]], "offset": 100, "limit": 100,
- "total_rows": 102, "next_offset": null}
-```
-
-### `GET /api/v1/query/{request_id}/results/{result_id}.csv`
-
-The whole of a run's saved result as `text/csv` (UTF-8, header first), sent as an
-attachment named `<request_id>_<result_id>.csv`. Delegates to
-`engine.results.csv(...)`, which reads the parquet artifact a slice at a time
-and streams each slice out, so the result is never built in memory on the server.
-
-### Errors and scope of the result routes
-
-- Both need a role, as `/query` does: no role is `HTTP 401`.
-- A run is readable only by the caller who asked it: the request's caller (from
-  the auth settings) is passed to `engine.results` as `user_context`, and must
-  match the run's recorded asker. Results are read from the engine's own
-  tenant folder (`TENANT_ID`, the `<tenant_id>` of the artifact path) and nowhere
-  else. An unknown `request_id`, another user's run, a run of another tenant, a
-  `result_id` the run's manifest does not list, and an id that is not a plain
-  token (letters, digits, `_` and `-`, so no `/`, `.` or `..`) are all
-  `HTTP 404`, so a caller cannot tell one from the other or reach a path outside
-  the run's folder.
-- A caller with a `user_id` (an API key, or a proxy that sets the user header) reads only its own runs. A
-  `static` caller has roles and no `user_id`, so its runs are anonymous: readable by any caller of the same tenant with the same
-  roles, and by no caller with other roles: a `viewer` holding an `admin` run's trace id
-  gets `HTTP 404`. See [Who can read a run](../core/results.md#who-can-read-a-run).
-- The request body never names the caller: `user_context` is not a field of `POST /query`.
-
 ## Tests
 
-`packages/api/tests/test_query_results_routes.py` covers the result routes over the
-real facade and a local artifact store: paging, the cap, `HTTP 422` for a bad
-offset or limit, the complete CSV, `HTTP 404` for unknown, foreign and crafted ids
-and for an anonymous run read with other roles, and `HTTP 401` without a role.
-
-`packages/api/tests/test_query_routes.py` and
-`packages/api/tests/test_query_response_shape.py` cover this endpoint with FastAPI's
-`TestClient` and a stubbed engine (`get_engine` dependency override) and a stubbed
-caller (`identity.caller` override, role `admin`), so no datasource, LLM or
-network access is required. `packages/api/tests/test_identity.py` covers the
-identity sources and the 401.
-
-`packages/api/tests/test_query_stream_route.py` covers the stream route the same
-way: the content type, the events in order, a `run.finished` whose `result` equals
-the `/query` response, the 401 and the `run.failed` event. `packages/nl2sql/tests/e2e/test_stream_fake_llm.py`
-streams a question on the demo databases through this route with no key.
+`packages/api/tests/test_query_routes.py`, `test_query_stream_route.py` and `test_query_response_shape.py` cover these
+routes with FastAPI's `TestClient`, a stubbed engine (`get_engine` override) and a stubbed caller, so no datasource, LLM
+or network access is required. `packages/api/tests/test_identity.py` covers the identity sources and the 401.
+`packages/nl2sql/tests/e2e/test_stream_fake_llm.py` streams a question on the demo databases through the stream route
+with no key. The results, traces, feedback and approvals routes have their own pages and test files.

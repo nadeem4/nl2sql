@@ -171,7 +171,7 @@ def test_no_route_returns_exception_text(tmp_path, kind):
     app.dependency_overrides[identity.caller] = lambda: UserContext(user_id="u", roles=["admin"])
     app.dependency_overrides[identity.admin] = lambda: UserContext(user_id="u", roles=["admin"])
     client = TestClient(app, raise_server_exceptions=False)
-    body = {"natural_language": "q", "config": {"id": "ds", "type": "sqlite", "connection": {"database": "x.db"}}}
+    body = {"question": "q", "config": {"id": "ds", "type": "sqlite", "connection": {"database": "x.db"}}}
     routes = [(method.upper(), path.replace("{", "").replace("}", "")) for path, operations in app.openapi()["paths"].items()
               if path.startswith("/api/v1") for method in operations if method in {"get", "post", "put", "delete"}]
     assert routes

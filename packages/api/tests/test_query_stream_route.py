@@ -33,10 +33,10 @@ def parse_sse(text):
     return events
 
 
-def test_query_stream_route(api_client):
+def test_query_stream_yields_wave_a_events(api_client):
     client, engine = api_client(_query_result())
 
-    response = client.post("/api/v1/query/stream", json={"natural_language": "revenue by region",
+    response = client.post("/api/v1/query/stream", json={"question": "revenue by region",
                                                           "datasource_id": "warehouse", "execute": False})
 
     assert response.status_code == 200
@@ -47,7 +47,7 @@ def test_query_stream_route(api_client):
                                             "run.finished"]
     assert events[-1][1]["status"] == "success"
     final = events[-1][1]["result"]
-    assert final == client.post("/api/v1/query", json={"natural_language": "revenue by region"}).json()
+    assert final == client.post("/api/v1/query", json={"question": "revenue by region"}).json()
     assert final["final_answer"]["summary"] == "Revenue by region"
     call = engine.calls[0]
     assert call["stream"] is True and call["datasource_id"] == "warehouse" and call["execute"] is False
@@ -57,7 +57,7 @@ def test_query_stream_route(api_client):
 def test_the_stream_needs_a_role_like_the_query_route(api_client):
     client, engine = api_client(QueryResult(status="success"), authenticated=False, api={"auth": "static"})
 
-    response = client.post("/api/v1/query/stream", json={"natural_language": "q"})
+    response = client.post("/api/v1/query/stream", json={"question": "q"})
 
     assert response.status_code == 401
     assert engine.calls == []
@@ -66,7 +66,7 @@ def test_the_stream_needs_a_role_like_the_query_route(api_client):
 def test_a_run_that_breaks_mid_stream_ends_in_run_failed(api_client):
     client, _ = api_client(RuntimeError("boom"))
 
-    response = client.post("/api/v1/query/stream", json={"natural_language": "q"})
+    response = client.post("/api/v1/query/stream", json={"question": "q"})
 
     assert response.status_code == 200
     events = parse_sse(response.text)

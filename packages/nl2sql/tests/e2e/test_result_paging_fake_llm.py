@@ -25,12 +25,15 @@ def _genres(demo_project):
         return [[name] for (name,) in conn.execute("SELECT Name FROM Genre ORDER BY GenreId")]
 
 
-def _read_back(client, prefix, body):
+def _read_back(client, prefix, body, base="query"):
     """Every page of the run's one result, then its CSV, as the role it was asked as (the playground needs it;
     nl2sql-api takes the role from its config and ignores the parameter)."""
     [entry] = body["result_manifest"]
     assert entry["row_count"] == 25 and entry["columns"] == ["genre_name"] and entry["truncated"] is False
-    url = f"{prefix}/query/{body['trace_id']}/results/{entry['node_id']}"
+    if base == "query":  # the playground's route; nl2sql-api's is /results/{trace_id}/{result_id}
+        url = f"{prefix}/query/{body['trace_id']}/results/{entry['node_id']}"
+    else:
+        url = f"{prefix}/results/{body['trace_id']}/{entry['node_id']}"
     rows, offset, pages = [], 0, 0
     while offset is not None:
         page = client.get(url, params={"offset": offset, "limit": 7, "role": "admin"})
@@ -66,9 +69,9 @@ def test_the_rest_api_pages_and_exports_the_whole_result(demo_project, fake_llm,
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
     with TestClient(app) as client:
-        body = client.post("/api/v1/query", json={"natural_language": QUESTION}).json()
+        body = client.post("/api/v1/query", json={"question": QUESTION}).json()
         assert body["status"] == "success", body["errors"]
-        rows, pages, lines = _read_back(client, "/api/v1", body)
+        rows, pages, lines = _read_back(client, "/api/v1", body, base="results")
 
     genres = _genres(demo_project)
     assert len(genres) == 25

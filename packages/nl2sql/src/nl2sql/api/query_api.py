@@ -298,6 +298,13 @@ _HOOK_ENDINGS = {ErrorCode.HOOK_DENIED.value, ErrorCode.HOOK_FAILED.value, Error
                  ErrorCode.COST_LIMIT_EXCEEDED.value}
 
 
+def results_withheld(state: Dict[str, Any], errors: List[Dict[str, Any]]) -> bool:
+    """True when the run's results were not released: a hook ended it, or the results were saved and never reviewed."""
+    unreleased = (state.get("results_released", True) is False
+                  and bool(_field(state.get("aggregator_response"), "results", None)))
+    return unreleased or any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
+
+
 def result_from_state(
     state: Dict[str, Any],
     artifact_store: Any = None,
@@ -330,9 +337,7 @@ def result_from_state(
     # no rows, no artifact references, no result manifest.
     # So does a run whose results were saved but never released (the answer failed while a hook sits at
     # answer.after): the hook never reviewed them. A state without the field is a released one.
-    unreleased = (state.get("results_released", True) is False
-                  and bool(_field(state.get("aggregator_response"), "results", None)))
-    withheld = unreleased or any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
+    withheld = results_withheld(state, errors)
     sub_queries = _sub_query_results(state, None if withheld else artifact_store, sample_rows, warnings)
     usage = QuestionUsage.model_validate(state.get("usage") or {})
     usage.plan_cache_hits = sum(1 for sq in sub_queries if sq.plan_source == "cache")

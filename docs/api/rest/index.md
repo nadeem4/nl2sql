@@ -65,7 +65,10 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | API | Router Path | Purpose |
 | --- | --- | --- |
 | [Health](health.md) | `routes/health.py` | Liveness (`/health`), readiness (`/ready`), `/meta` (mode, auth source, `request_llm`; no caller) and `/about`. |
-| [Query](query.md) | `routes/query.py` | Execute natural language queries, whole or streamed as Server-Sent Events; page through or download a run's saved result. |
+| [Query](query.md) | `routes/query.py` | Execute natural language queries, whole or streamed as Server-Sent Events, with a clarification `choice` or granted `approval_ids`, and a request's own keys and models. |
+| [Results](results.md) | `routes/query.py` | A run's manifest, pages, CSV and chart (`/results/{trace_id}/...`). |
+| [Traces and feedback](feedback.md) | `routes/query.py` | A run's trace, ratings, and corrections as proposals. |
+| [Approvals](approvals.md) | `routes/approvals.py` | List, grant and deny the approvals a hook asked for. |
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
 | [LLM](llm.md) | `routes/llm.py` | Replace the LLM (`PUT /settings/llm`) and inspect each agent's model. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
@@ -84,7 +87,7 @@ subclasses) is mapped to its status; anything else, a built-in `ValueError`, `Ke
 pydantic `ValidationError` included, is a `500` that names a request id and never the exception's text. Routes carry
 no `except Exception`.
 
-`POST /api/v1/query` still returns pipeline errors as a normal `HTTP 200` inside `QueryResponse.errors`.
+`POST /api/v1/query` still returns pipeline errors as a normal `HTTP 200` inside `QueryResult.errors`.
 
 Route handlers that call blocking engine code are declared with `def` rather than
 `async def`, so Starlette runs them in its threadpool instead of blocking the

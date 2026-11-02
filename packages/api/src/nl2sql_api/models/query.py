@@ -1,27 +1,51 @@
-from typing import List, Optional
+"""Request bodies of the query, feedback and approval routes (docs/architecture/wave_d.md, D201-D204).
 
-from pydantic import BaseModel, Field
+Every body forbids unknown fields, so a misspelt or removed field is a 422 rather than silently ignored. Responses are
+the facade's own models (``QueryResult``, ``ResultPage``, ``Proposal``, ``ApprovalRecord``), never a copy of them.
+"""
+from typing import Any, Dict, List, Literal, Optional
 
-from nl2sql import QueryResult, SubQueryResult
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from nl2sql import ClarificationChoice
 
 
-class QueryRequest(BaseModel):
-    natural_language: str
+TRACE_ID_PATTERN = r"^[A-Za-z0-9_-]+$"  # a plain token, as the engine reads a trace id
+
+
+class _Body(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class QueryRequest(_Body):
+    question: str
     datasource_id: Optional[str] = None
     execute: bool = True
+    choice: Optional[ClarificationChoice] = Field(
+        default=None, description="The option picked from an earlier `clarification_request`; asks the same question again.")
+    approval_ids: List[str] = Field(
+        default_factory=list, description="Ids of approvals an approver granted, from an earlier `needs_approval` run.")
 
 
-class SubQueryResponse(SubQueryResult):
-    """One decomposed sub-query: its plan, validation checks, SQL and row sample."""
+class FeedbackRequest(_Body):
+    trace_id: str = Field(pattern=TRACE_ID_PATTERN)
+    rating: Literal["up", "down"]
+    note: Optional[str] = None
 
 
-class QueryResponse(QueryResult):
-    """The engine's ``QueryResult``, served as is.
+class CorrectionRequest(_Body):
+    trace_id: str = Field(pattern=TRACE_ID_PATTERN)
+    sql: Optional[str] = None
+    plan: Optional[Dict[str, Any]] = None
+    question: Optional[str] = None
+    note: Optional[str] = None
 
-    It derives from ``nl2sql.QueryResult``, so the HTTP response cannot drift
-    from what the engine returns. ``sub_queries[].rows`` carries a capped
-    sample only; the full result set lives in artifact storage, addressable
-    through ``artifact_refs``. ``trace_path`` is where the run's trace was
-    written on the server, or None.
-    """
-    sub_queries: List[SubQueryResponse] = Field(default_factory=list)
+    @model_validator(mode="after")
+    def _exactly_one_fix(self):
+        if (self.sql is None) == (self.plan is None):
+            raise ValueError("send exactly one of sql or plan")
+        return self
+
+
+class DenyRequest(_Body):
+    reason: Optional[str] = None
