@@ -189,7 +189,7 @@ def test_asked_without_a_key_is_the_missing_key_error(stub):
     dashboards.returns["propose_tiles"] = MissingProviderKey("conversation", "anthropic")
     response = client.post(f"{API}/dashboard-builder/proposals",
                            json={"datasource_id": "chinook", "sources": ["asked"]})
-    assert code(response) == "MISSING_PROVIDER_KEY"
+    assert response.status_code == 422 and code(response) == "MISSING_PROVIDER_KEY"
 
 
 # ---- the build job
@@ -285,3 +285,19 @@ def test_two_saves_racing_for_one_owner_is_a_retryable_409(stub):
     assert response.status_code == 409 and code(response) == "CONFLICT"
     assert response.json()["error"]["fix"] == "Try again in a moment."
     assert "held by another" not in response.text
+
+
+def test_a_new_question_without_a_key_fails_the_build_job_with_the_missing_key_code(stub):
+    client, _, dashboards = stub
+    dashboards.returns["build"] = MissingProviderKey("conversation", "anthropic")
+    job = wait_for(client, client.post(f"{API}/jobs/dashboard-build", json=BUILD).json()["id"])
+    assert job["status"] == "failed" and job["error"]["code"] == "MISSING_PROVIDER_KEY"
+
+
+def test_skipped_questions_carry_the_engines_code_through(stub):
+    client, _, dashboards = stub
+    dashboards.returns["build"] = BuildReport(
+        dashboard=dashboard(), built=["t1"],
+        skipped=[SkippedQuestion(question="Payroll?", code="SECURITY_VIOLATION", message="You may not read this.")])
+    job = wait_for(client, client.post(f"{API}/jobs/dashboard-build", json=BUILD).json()["id"])
+    assert job["result"]["skipped"][0]["code"] == "SECURITY_VIOLATION"
