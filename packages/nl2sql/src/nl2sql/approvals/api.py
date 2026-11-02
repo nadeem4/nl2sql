@@ -31,6 +31,9 @@ class ApprovalRecord(BaseModel):
     # Who granted, with the roles they held then: the engine's own record, never shown to callers.
     approver: Optional[UserContext] = Field(default=None, exclude=True)
     reason: Optional[str] = None  # why it was denied
+    # Whether the caller asked it: set on the way out by ``list``, ``grant`` and ``deny`` (the same test ``list`` uses
+    # to show a caller their own requests), so a page never compares user ids itself. Never stored.
+    own: bool = False
 
 
 class Approvals:
@@ -84,7 +87,7 @@ class Approvals:
         """The stored requests with ``status`` (all when None), newest first: those the caller's roles may approve,
         and the caller's own."""
         records = [_record(doc) for doc in self._ctx.state.list_approvals(status) if not self._expired(doc)]
-        return [r for r in records if self._visible(r, user_context)]
+        return [self._for(r, user_context) for r in records if self._visible(r, user_context)]
 
     def grant(self, request_id: str, *, by: UserContext) -> ApprovalRecord:
         """Grant a pending request. ``NotAuthorized`` unless ``by`` holds one of the hook's approver roles;
@@ -94,7 +97,7 @@ class Approvals:
         if decided["status"] == "granted" and not decided.get("approver"):
             decided = {**decided, "approver": by.model_dump(mode="json"), "decided_by": by.user_id}
             self._ctx.state.put_approval(decided)
-        return _record(decided)
+        return self._for(_record(decided), by)
 
     def deny(self, request_id: str, *, by: UserContext, reason: Optional[str] = None) -> ApprovalRecord:
         """Deny a pending request; the same checks as :meth:`grant`."""
@@ -104,7 +107,7 @@ class Approvals:
                 and decided.get("reason") is None:
             decided = {**decided, "reason": reason}
             self._ctx.state.put_approval(decided)
-        return _record(decided)
+        return self._for(_record(decided), by)
 
     # -- internals -----------------------------------------------------------------
 
@@ -128,13 +131,19 @@ class Approvals:
             raise NotAuthorized("Only an approver may decide an approval request.",
                                 fix=f"Ask someone with one of these roles: {', '.join(roles) or 'none are configured'}.")
 
-    def _visible(self, record: ApprovalRecord, user: UserContext) -> bool:
+    @staticmethod
+    def _asked_by(record: ApprovalRecord, user: UserContext) -> bool:
         request = record.request
-        if request.asker_tenant_id != user.tenant_id:
+        return (request.asker_tenant_id == user.tenant_id and user.user_id is not None
+                and request.asker_user_id == user.user_id)
+
+    def _for(self, record: ApprovalRecord, user: UserContext) -> ApprovalRecord:
+        return record.model_copy(update={"own": self._asked_by(record, user)})
+
+    def _visible(self, record: ApprovalRecord, user: UserContext) -> bool:
+        if record.request.asker_tenant_id != user.tenant_id:
             return False
-        if user.user_id is not None and request.asker_user_id == user.user_id:
-            return True
-        return bool(set(user.roles) & set(self._roles(request)))
+        return self._asked_by(record, user) or bool(set(user.roles) & set(self._roles(record.request)))
 
     def _expired(self, doc: Dict[str, Any]) -> bool:
         hours = self._ctx.settings.approvals.max_age_hours

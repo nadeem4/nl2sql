@@ -141,8 +141,7 @@ export default function App() {
   // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
   const [starter, setStarter] = useState(null);
   const [waiting, setWaiting] = useState([]);
-  // Who the caller is, from GET /meta (A4c): their own approval requests are not theirs to decide, and Connect and
-  // Knowledge offer admin work only to an admin. Null until /meta answers, or when it names no caller.
+  // Who the caller is, from GET /meta (A4c): Connect and Knowledge offer admin work only to an admin. Null until /meta answers, or when it names no caller.
   const [caller, setCaller] = useState(null);
   // The hosted demo keys and step choices: this tab, never the server.
   const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
@@ -211,7 +210,7 @@ export default function App() {
     // Hosted, Settings is not off: it is where the visitor puts their own key.
     settings: settings && !settings.available && !settings.hosted,
     retrieval: retrieval && !retrieval.available,
-  }, { approvals: toDecide(waiting, caller && caller.id).length });
+  }, { approvals: toDecide(waiting).length });
 
   return (
     <div className="app">
@@ -274,7 +273,7 @@ export default function App() {
 
         {page === "approvals" && (
           <Suspense fallback={null}>
-            <Approvals callerId={caller && caller.id} />
+            <Approvals />
           </Suspense>
         )}
 

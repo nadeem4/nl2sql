@@ -83,7 +83,7 @@ def meta(request: Request, engine: Engine, user: Visitor):
     """Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and
     `request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key. With a caller, also
     `caller` (`{"user_id", "admin"}`: who the caller is and whether it holds a role in `policies.admin_roles`, the
-    check the admin routes make; no `user_id` on the hosted demo, where it is the session's secret), and
+    check the admin routes make; on the hosted demo `user_id` is a one-way id of the session, never its cookie), and
     `datasources`: each one the caller may reach, with its `id`, `description`, `sample_questions` and `recorded`
     (the ones the `replay` provider can answer with no key), and `recorded_with`, the provider and model those
     recordings came from (or null). On the hosted demo, also `limits`: `questions_per_minute`,
@@ -94,7 +94,7 @@ def meta(request: Request, engine: Engine, user: Visitor):
         return body
     hosted = getattr(request.app.state, "hosted", None)
     body["caller"] = {"admin": identity.is_admin(user, engine)}
-    if hosted is None and user.user_id is not None:  # a hosted visitor's id is its session cookie: a secret
+    if user.user_id is not None:  # on the hosted demo a one-way id, never the session cookie (A4d)
         body["caller"] = {"user_id": user.user_id, **body["caller"]}
     listed = engine.datasources.list(user_context=user)
     questions = [q for d in listed for q in d.sample_questions]

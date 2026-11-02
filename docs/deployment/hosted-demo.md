@@ -248,9 +248,13 @@ admin role. `NL2SQL_MODE` (`demo`, `your_data` or `hosted`) sets the mode when n
 key of `nl2sql.yaml`; `GET /api/v1/meta` reports it.
 
 In hosted mode every browser is an anonymous session: a random `nl2sql_demo_session` cookie (`HttpOnly`,
-`SameSite=Lax`) is its identity, it holds the one visitor role and is never an admin, so the admin routes answer
-`403`. Only the 32-character lowercase hex token this server mints is accepted as the cookie (anything else gets a
-new session), and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
+`SameSite=Lax`) finds it. The cookie is a secret and is never sent back: the server turns it into a one-way visitor id
+(`visitor-` and 32 hex characters of its SHA-256), and that id is the `user_id` of everything the visitor owns
+(conversations, dashboards, jobs, approvals), the key of the limits below, and what `GET /meta` shows as `caller.user_id`.
+The visitor holds the one visitor role and is never an admin, so the admin routes answer
+`403`. Only a token this server signed is accepted as the cookie (64 hex characters: a random nonce and its HMAC-SHA256;
+nothing is stored per visitor, so no number of requests can push a visitor out). A cookie it did not sign, such as one
+a visitor chose or changed, gets a new session, so no one can fix the token another browser will use, and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
 at a time, besides the limits below; going over any of them
 is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
@@ -270,7 +274,7 @@ no storage.
 | Limit | Default | Set by | Keyed by |
 | --- | --- | --- | --- |
 | Questions per minute | 6 | `--questions-per-minute` | client address (a token bucket) |
-| Questions per session | 30 | `--questions-per-session` | a random session cookie |
+| Questions per session | 30 | `--questions-per-session` | the visitor id (from the session cookie) |
 | Query timeout | 300s | `settings.pipeline.timeout_s` in the demo's `settings.yaml` | the run |
 | Rows returned | 10,000 | the demo datasources' `limits.row_limit`, bounded by `settings.results.row_limit` | the query |
 
@@ -296,10 +300,18 @@ stops still counts toward both limits. Stopping does end the work: the page
 aborts its request, the server sees the connection close and cancels the run
 before its next step or model call (the call already in flight finishes).
 
-The session cookie is a random token this process made up. It names no visitor,
-carries no key, and exists only so the session cap has something to count. A
+The session cookie is a random token this server signed. It carries no key and names no one; it is the visitor's
+only credential, so it appears in no response body, stored record or log line (only the id derived from it does). A
 visitor who clears their cookies starts a new session; the rate limit, keyed by the
 address the client reports, is what holds an honest browser's pace down in the meantime.
+
+**Restarts and workers.** The signing key is made once, as `hosted_session.key` (32 random bytes, mode 0600 where the
+OS supports it), in the storage directory (`storage.path`), beside the state store whose conversations, dashboards and
+approvals also survive a restart. So a restart or a redeploy on the same volume keeps every visitor's cookie, and with it
+their work. Jobs and the limits' counters are in memory and start again. Several workers sharing that directory share the
+key, so a cookie one signed is valid at all of them (the limits and job slots are still counted per worker). On a
+volume that is wiped, the key is made again and every visitor starts a new session. A key file that is not exactly 32 bytes stops the start with a message; delete it to make a new one. The key is never read from the
+environment and is not part of any response or log.
 
 ## What is off, and what is on
 

@@ -16,7 +16,7 @@ import uvicorn
 from nl2sql import (ConfigError, load_config, load_env_file, prepare_demo, provider_keys_in_environment,
                     resolve_mode)
 from nl2sql_api import identity
-from nl2sql_api.hosted import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION, Hosted, Limits
+from nl2sql_api.hosted import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION, Hosted, Limits, load_session_key
 from nl2sql_api.main import create_app
 
 
@@ -87,7 +87,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 raise identity.StartRefused(
                     "The hosted demo must hold no model key, and the environment has one for "
                     f"{', '.join(sorted(held))}. Unset it: visitors bring their own.")
-            hosted = Hosted(_visitor_role(config), Limits(args.questions_per_minute, args.questions_per_session))
+            hosted = Hosted(_visitor_role(config), Limits(args.questions_per_minute, args.questions_per_session),
+                            load_session_key(config.storage.path))
 
         def adjust(loaded):
             api = loaded.api

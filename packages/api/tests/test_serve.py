@@ -1,4 +1,6 @@
 """``nl2sql-api serve``: one worker, and D205's refusal to bind a non-loopback host with ``api.auth: none``."""
+from pathlib import Path
+
 import pytest
 
 from nl2sql.testing.config import make_config
@@ -197,3 +199,13 @@ def test_a_key_in_the_env_file_of_a_server_that_is_not_hosted_is_loaded(tmp_path
         assert os.environ[name] == "from-file"
     finally:
         os.environ.pop(name, None)
+
+
+def test_hosted_makes_its_session_key_under_the_storage_path_and_demo_alone_does_not(tmp_path, served):
+    config, path = _project(tmp_path, served)
+    key = Path(config.storage.path) / "hosted_session.key"
+
+    serve.main(["serve", "--demo", "--dir", str(tmp_path / "demo")])
+    assert not key.exists()
+    serve.main(["serve", "--demo", "--hosted", "--dir", str(tmp_path / "demo")])
+    assert key.exists() and len(key.read_bytes()) == 32

@@ -370,3 +370,30 @@ def test_refresh_facade_raises_before_any_chart_runs(ctx):
 
     with pytest.raises(ApprovalNotFound):
         api.refresh("d1", user_context=ANA, approvals=["nope"])
+
+
+def test_list_marks_the_callers_own_requests(approvals):
+    mine, theirs = _request(), _request(asker=BOB, question="Other?")
+    approvals.submit([mine, theirs])
+
+    ana = {r.id: r.own for r in approvals.list(user_context=ANA)}
+    dba = {r.id: r.own for r in approvals.list(user_context=DBA)}
+
+    assert ana == {mine.id: True}  # an analyst sees only what they asked
+    assert dba == {mine.id: False, theirs.id: False}  # an approver sees all, none are theirs
+
+
+def test_own_needs_the_same_tenant_and_a_user_id(approvals):
+    request = _request()
+    approvals.submit([request])
+
+    assert approvals.list(user_context=UserContext(user_id="ana", tenant_id="globex", roles=["dba"])) == []
+    nameless = approvals.list(user_context=UserContext(tenant_id="acme", roles=["dba"]))
+    assert [r.own for r in nameless] == [False]
+
+
+def test_a_decision_marks_own_for_the_decider(approvals):
+    request = _request(asker=DBA)
+    approvals.submit([request])
+
+    assert approvals.grant(request.id, by=DBA).own is True
