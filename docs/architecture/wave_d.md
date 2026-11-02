@@ -840,7 +840,7 @@ no W-PR deletes a file another imports:
 | `IndexPanel.jsx`, `indexHealth.js`, `NodeInspector.jsx`, `run.js` (its trace helpers), `SqlCard.jsx`, `Ledger.jsx` | `src/components/` | shared |
 | `JobProgress.jsx` (new), `outputs/Output.jsx` (new: a stub that dispatches a `ToolOutput` by kind) | `src/components/`, `src/outputs/` | W2a fills `Output.jsx`'s renderers |
 | `App.jsx` (the shell), `router.js`, `main.jsx` | kept | D0b |
-| `AskParts.jsx`, `Panes.jsx`, `stream.js` | kept until W1 | W1 replaces and deletes them |
+| `AskParts.jsx`, `Panes.jsx`, `stream.js` | deleted in W1 | W1 replaced them with `src/chat/` and `src/api/chat.js` |
 | `RowsTable.jsx`, `results.js` | `src/outputs/` | W2a |
 | `SchemaPanel.jsx`, `datasources.js` | `src/connect/` | W3 |
 | `Home.jsx`, `home.js`, `Clip.jsx`, `Pipeline.jsx`, `pipeline.js`, `pipelinePhases.js`, `Retrieval.jsx`, `retrieval.js`, `Settings.jsx`, `firstRun.js`, `status.js`, `faults.js`, `questions.js`, `railFade.js` | `src/pages/` and beside them | W4a (`Settings.jsx`) and W4b (the rest) |
@@ -1552,6 +1552,24 @@ the export has a clear name (no alias). `NL2SQLError`, `ProfileReport`, `Datasou
 and `init_project` were exported already; `RegistryError`, `load_trace`, `check_file_name` and the others above are new.
 **For CL1:** nothing in `nl2sql/cli/` (outside the playground) imports an engine module, so the move to
 `nl2sql_cli` is a rename plus repointing the boundary test; `demo/playground/` must be deleted by X1b first.
+
+**W1 (chat page).** `#/chat` and `#/chat/<id>` replace Ask, and `#/approvals` is new; `AskParts.jsx`, `Panes.jsx`,
+`stream.js` and `stream.test.js` are deleted. **The code won over the doc:** the doc's `Transcript.jsx` and
+`Correction.jsx` are not separate files (the transcript is in `pages/Chat.jsx`, the correction in
+`chat/Feedback.jsx`), and the bare-fragment landing page is Chat (`FRAGMENT_PAGE` in `router.js`). Every call is in
+`src/api/chat.js`: `listConversations`, `startConversation`, `getConversation`, `deleteConversation`, `chatTools`,
+`sendTurn`, `streamTurn` (POST, SSE), `retryTurn(id, approvalIds)`, `runTool(id, name, args)`, `rate`, `correct`,
+`getTrace`, `listApprovals(status)`, `grantApproval`, `denyApproval(id, reason)`, `listDatasources`, `saveChoice`. The
+report tool is not called there, because `request()` parses JSON and `GET .../report` is markdown (W2a's). Pure
+modules, each with a test: `chat/spine.js` (`spineOf`, `liveStations`, `liveResult`; `run.started` resets all but the
+steps), `chat/turns.js` (`answerOf`, `askSteps`, `pendingClarification`, `pendingApprovals`, `outputsOf`, `offersFor`,
+`toolButtons`, `toolArgs`, `statusLine`, `errorLine`), `chat/clarify.js`, `chat/approval.js`, `chat/warnings.js`,
+`chat/why.js`, `chat/feedback.js`. `Chat` takes `param` (the conversation id), `starter` (a question Home wants
+asked) and `onStarter`. `navItems(page, off, badges)` takes the Approvals count; `page()` in `router.js` builds a
+route entry. Tool arguments use 1-based `turn` and `step`. A 409 from a turn means the conversation is busy.
+**For W2a:** the rows table still fetches rows through `outputs/RowsTable.jsx` and `results.js` with the old URLs;
+repoint them to `GET /results/{id}`. **For W4:** Settings, Retrieval and Pipeline still call the old `/api/*` routes,
+`pages/Trace.jsx` is still a stub, and `ask-page.css` and `ask-run.css` are probably dead rules.
 
 ### Session batches
 

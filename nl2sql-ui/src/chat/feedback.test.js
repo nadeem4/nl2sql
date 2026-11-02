@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NOTE_CHOICES, NOTE_MAX, canRate, feedbackBody, ratedLine } from "./feedback.js";
+import { NOTE_CHOICES, NOTE_MAX, canRate, correctionBody, feedbackBody, ratedLine } from "./feedback.js";
 
 const RESULT = { trace_id: "0b8f7d2e-1111-4222-8333-944455556666", status: "success", replay_miss: false };
 
@@ -37,4 +37,10 @@ test("the quick notes are the plain reasons", () => {
 test("the saved line says what was recorded", () => {
   assert.equal(ratedLine("up", null), "Saved: good answer.");
   assert.equal(ratedLine("down", "wrong table"), "Saved: wrong answer, with the note “wrong table”.");
+});
+
+test("a correction carries the SQL the asker says is right, and the note, for review", () => {
+  assert.deepEqual(correctionBody(RESULT, " SELECT 1 ", " off by one "), { trace_id: RESULT.trace_id, sql: "SELECT 1", note: "off by one" });
+  assert.deepEqual(correctionBody(RESULT, "SELECT 1", ""), { trace_id: RESULT.trace_id, sql: "SELECT 1" });
+  assert.throws(() => correctionBody(RESULT, "  ", "x"), /SQL/);
 });

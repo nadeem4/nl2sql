@@ -39,16 +39,16 @@ test("every page has a route, a label, a title and one line saying what it does"
   assert.ok(PAGES.some((p) => p.id === DEFAULT_PAGE));
 });
 
-test("the default route is the home page, and Ask has a route of its own", () => {
+test("the default route is the home page, and Chat has a route of its own", () => {
   assert.equal(DEFAULT_PAGE, "home");
   for (const hash of ["", "#", "#/", "#/ "]) {
     assert.equal(pageFromHash(hash), "home", `${JSON.stringify(hash)} is not the default`);
   }
   assert.equal(pageFromHash(undefined), "home");
   assert.equal(hashFor("home"), "#/");
-  assert.equal(hashFor("ask"), "#/ask");
-  assert.equal(pageFromHash("#/ask"), "ask");
-  assert.equal(pageFromHash("#/ask/"), "ask");
+  assert.equal(hashFor("chat"), "#/chat");
+  assert.equal(pageFromHash("#/chat"), "chat");
+  assert.equal(pageFromHash("#/chat/"), "chat");
 });
 
 test("a deep link opens the page it names", () => {
@@ -67,11 +67,11 @@ test("an unknown route falls back to the home page", () => {
   }
 });
 
-test("an old link to a place on the Ask page still opens Ask", () => {
+test("an old link to a place on the Ask page opens Chat", () => {
   // Before the home page, Ask was the default, and a bookmark carrying one of
   // its bare fragments (#run, #question, a station) landed on it. It still does.
   for (const hash of ["#run", "#question", "#pane-sql", "#index-rebuild"]) {
-    assert.equal(pageFromHash(hash), "ask", `${hash} should open Ask`);
+    assert.equal(pageFromHash(hash), "chat", `${hash} should open Chat`);
   }
 });
 
@@ -82,16 +82,16 @@ test("back and forward move between pages", () => {
   router.subscribe(({ page }) => seen.push(page));
 
   assert.equal(router.page(), "home");
-  win.go("#/ask");
+  win.go("#/chat");
   win.go("#/settings");
   win.go("#/retrieval");
   // Back, then back again: the browser restores the earlier hash.
   win.go("#/settings");
-  win.go("#/ask");
+  win.go("#/chat");
   // Forward.
   win.go("#/settings");
 
-  assert.deepEqual(seen, ["ask", "settings", "retrieval", "settings", "ask", "settings"]);
+  assert.deepEqual(seen, ["chat", "settings", "retrieval", "settings", "chat", "settings"]);
   assert.equal(router.page(), "settings");
 });
 
@@ -103,7 +103,7 @@ test("a deep link is the page the router starts on", () => {
 
 test("a bare fragment lands on the question and answer view, so Back always moves", () => {
   // Nothing in the page links to a bare fragment, but an older bookmark can
-  // still carry one. It reads as Ask, where those fragments lived.
+  // still carry one. It reads as Chat, which took the Ask page's place.
   const win = fakeWindow("#/settings");
   const router = createRouter(win);
   const seen = [];
@@ -112,26 +112,26 @@ test("a bare fragment lands on the question and answer view, so Back always move
   win.go("#run");
   win.go("#index-rebuild");
 
-  assert.deepEqual(seen, ["ask"]);
-  assert.equal(router.page(), "ask");
+  assert.deepEqual(seen, ["chat"]);
+  assert.equal(router.page(), "chat");
 });
 
 test("moving to another page and back keeps the run: the router touches nothing but the hash", () => {
   // The question, the answer and the Debug choice are held above the page
   // switch, so the router never sees them. Frozen here: a write would throw.
   const run = Object.freeze({ question: "Which genre sells the most tracks?", answer: "Rock", debug: true });
-  const win = fakeWindow("#/ask");
+  const win = fakeWindow("#/chat");
   const router = createRouter(win);
   const seen = [];
   router.subscribe(({ page }) => seen.push(page));
 
   win.go("#/settings");
-  win.go("#/ask");
+  win.go("#/chat");
 
-  assert.deepEqual(seen, ["settings", "ask"]);
-  assert.equal(router.page(), "ask");
+  assert.deepEqual(seen, ["settings", "chat"]);
+  assert.equal(router.page(), "chat");
   assert.deepEqual(run, { question: "Which genre sells the most tracks?", answer: "Rock", debug: true });
-  assert.equal(win.location.hash, "#/ask");
+  assert.equal(win.location.hash, "#/chat");
 });
 
 test("leaving stops listening, so a stale page hears nothing", () => {
@@ -152,20 +152,20 @@ test("the nav names every page, marks the current one and says which are off", (
   const items = navItems("settings", { retrieval: true });
 
   assert.deepEqual(items.map((i) => i.id), PAGES.filter((p) => !p.stub).map((p) => p.id));
-  assert.deepEqual(items.map((i) => i.href), ["#/", "#/ask", "#/pipeline", "#/settings", "#/retrieval"]);
-  assert.deepEqual(items.map((i) => i.label), ["Home", "Ask", "Pipeline", "Settings", "Retrieval"]);
+  assert.deepEqual(items.map((i) => i.href), ["#/", "#/chat", "#/pipeline", "#/settings", "#/retrieval", "#/approvals"]);
+  assert.deepEqual(items.map((i) => i.label), ["Home", "Chat", "Pipeline", "Settings", "Retrieval", "Approvals"]);
   assert.equal(items.filter((i) => i.current).length, 1);
   assert.equal(items.find((i) => i.id === "settings").current, true);
   // An off page keeps its place in the nav: it opens and says why.
   assert.equal(items.find((i) => i.id === "retrieval").off, true);
   assert.equal(items.find((i) => i.id === "settings").off, false);
-  assert.equal(items.find((i) => i.id === "ask").off, false);
+  assert.equal(items.find((i) => i.id === "chat").off, false);
 });
 
 test("nothing is marked off before the server has answered", () => {
-  const items = navItems("ask", {});
-  assert.deepEqual(items.map((i) => i.off), [false, false, false, false, false]);
-  assert.equal(items.find((i) => i.id === "ask").current, true);
+  const items = navItems("chat", {});
+  assert.deepEqual(items.map((i) => i.off), [false, false, false, false, false, false]);
+  assert.equal(items.find((i) => i.id === "chat").current, true);
 });
 
 // ---------- route change motion ----------
@@ -206,16 +206,26 @@ test("the nav indicator sits under the current tab: moved and scaled, never resi
 // Wave D's pages (wave_d.md, section 5). Each is a stub until its W-row fills it.
 const WAVE_D = ["chat", "dashboards", "connect", "knowledge", "approvals", "evals", "trace"];
 
-test("Wave D's routes are all there, as stubs the nav does not list yet", () => {
+// The rows that have shipped (W1: chat, approvals); the rest stay stubs the nav does not list.
+const SHIPPED = ["chat", "approvals"];
+
+test("Wave D's routes are all there; the shipped ones are in the nav, the rest are stubs", () => {
   for (const id of WAVE_D) {
     const page = PAGES.find((p) => p.id === id);
     assert.ok(page, `${id} has no route`);
-    assert.equal(page.stub, true, `${id} should be a stub until its row fills it`);
+    assert.equal(Boolean(page.stub), !SHIPPED.includes(id), `${id} stub flag is wrong`);
     assert.equal(pageFromHash(hashFor(id)), id === "trace" ? DEFAULT_PAGE : id);
   }
   const listed = navItems("home").map((item) => item.id);
-  for (const id of WAVE_D) assert.ok(!listed.includes(id), `${id} should not be in the nav yet`);
-  for (const id of ["home", "ask", "pipeline", "settings", "retrieval"]) assert.ok(listed.includes(id));
+  for (const id of WAVE_D) assert.equal(listed.includes(id), SHIPPED.includes(id), `${id} nav listing`);
+  for (const id of ["home", "chat", "pipeline", "settings", "retrieval"]) assert.ok(listed.includes(id));
+});
+
+test("a badge shows beside a page only when its count is above zero", () => {
+  const items = navItems("home", {}, { approvals: 3, chat: 0 });
+  assert.equal(items.find((i) => i.id === "approvals").badge, 3);
+  assert.equal(items.find((i) => i.id === "chat").badge, null);
+  assert.equal(items.find((i) => i.id === "home").badge, null);
 });
 
 test("a route can carry one id: chat and dashboards optionally, a trace always", () => {

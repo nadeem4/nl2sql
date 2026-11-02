@@ -26,7 +26,7 @@ test("five steps, in the order a question travels, each marked model or code", (
 test("three features, each opening its own page, each with a light and dark clip", () => {
   assert.deepEqual(FEATURES.map((f) => f.heading),
     ["Ask, and get rows back", "Watch the plan become SQL", "See what it looked up"]);
-  assert.deepEqual(FEATURES.map((f) => f.href), ["#/ask", "#/pipeline", "#/retrieval"]);
+  assert.deepEqual(FEATURES.map((f) => f.href), ["#/chat", "#/pipeline", "#/retrieval"]);
   for (const f of FEATURES) {
     const clip = clipFor(f.id);
     assert.equal(clip.src, `${CLIP_ROOT}${f.id}.webm`);

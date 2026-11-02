@@ -1,35 +1,28 @@
 import React, { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import SchemaPanel from "./connect/SchemaPanel.jsx";
-import IndexPanel from "./components/IndexPanel.jsx";
-import { needsRebuild } from "./components/indexHealth.js";
-import Run from "./Panes.jsx";
 import Settings from "./pages/Settings.jsx";
 import Pipeline from "./pages/Pipeline.jsx";
 import RetrievalInspector from "./pages/Retrieval.jsx";
 import Home from "./pages/Home.jsx";
 import { sampleQuestion } from "./pages/home.js";
-import { answeredDatasources, datasourceNames } from "./connect/datasources.js";
-import { guidedGroups } from "./pages/questions.js";
+import { listApprovals } from "./api/chat.js";
 import { needsKey } from "./pages/firstRun.js";
-import { AskDock, Elapsed, FirstRun, Suggestions } from "./AskParts.jsx";
-import { STOP_AFTER_MS, askButton, runScroll } from "./lib/runState.js";
 import { modeStatus } from "./pages/status.js";
-import { askHeaders, readKeys, writeKeyFor } from "./lib/hostedKey.js";
+import { readKeys, writeKeyFor } from "./lib/hostedKey.js";
 import { readModels, writeModel } from "./lib/hostedModels.js";
 import {
   createRouter, hashFor, indicatorTransform, navItems, pageFor, routeFromHash, swapView,
 } from "./router.js";
-import { deniedTables, planTables } from "./components/run.js";
-import { EMPTY_PROGRESS, StreamUnavailable, progressOf, streamAsk } from "./stream.js";
 
-// Wave D's pages, each its own chunk and a stub until the row that owns it fills it (wave_d.md, section 14).
+// Wave D's pages, each its own chunk. Chat and Approvals are real (W1); the others are stubs until their rows fill them
+// (wave_d.md, section 14).
+const Chat = lazy(() => import("./pages/Chat.jsx"));
+const Approvals = lazy(() => import("./pages/Approvals.jsx"));
+
 const STUB_PAGES = {
-  chat: lazy(() => import("./pages/Chat.jsx")),
   dashboards: lazy(() => import("./pages/Dashboards.jsx")),
   connect: lazy(() => import("./pages/Connect.jsx")),
   knowledge: lazy(() => import("./pages/Knowledge.jsx")),
-  approvals: lazy(() => import("./pages/Approvals.jsx")),
   evals: lazy(() => import("./pages/Evals.jsx")),
   trace: lazy(() => import("./pages/Trace.jsx")),
 };
@@ -134,40 +127,20 @@ export default function App() {
   const { page, param } = useRoute();
   const { navRef, indRef } = useNavIndicator(page);
   const [meta, setMeta] = useState(null);
-  const [schema, setSchema] = useState(null);
-  const [question, setQuestion] = useState("");
   const [role, setRole] = useState("admin");
-  const [planOnly, setPlanOnly] = useState(false);
-  const [debug, setDebug] = useState(readDebug);
-  const [result, setResult] = useState(null);
-  const [asked, setAsked] = useState(null);
-  const [busy, setBusy] = useState(false);
-  // What the streamed run has reported so far (`stream.js`), or null when
-  // the page fell back to `/api/ask`, which reports nothing until it is done.
-  const [progress, setProgress] = useState(null);
-  // When the run in flight started, whether it may be stopped yet, and whether
-  // the visitor stopped the last one.
-  const [startedAt, setStartedAt] = useState(null);
-  const [stoppable, setStoppable] = useState(false);
-  const [stopped, setStopped] = useState(false);
   const [error, setError] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsError, setSettingsError] = useState(null);
-  const [index, setIndex] = useState(null);
-  const [indexError, setIndexError] = useState(null);
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
   const [pipeline, setPipeline] = useState(null);
   const [pipelineError, setPipelineError] = useState(null);
-  const [feedback, setFeedback] = useState(null);
-  // Which database the schema panel is showing. Null until something picks
-  // one, when the server serves the demo's own.
-  const [datasource, setDatasource] = useState(null);
-  // The hosted demo's keys and step choices: this tab's, never the server's.
+  // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
+  const [starter, setStarter] = useState(null);
+  const [pending, setPending] = useState(0);
+  // The hosted demo keys and step choices: this tab, never the server.
   const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
   const [stepModels, setStepModels] = useState(() => readModels(window.sessionStorage));
-  const runRef = useRef(null);
-  const abortRef = useRef(null);
   const pageRef = useRef(null);
   const firstPage = useRef(true);
 
@@ -179,30 +152,15 @@ export default function App() {
       })
       .catch((e) => setError(e.message));
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
-    getJson("/api/index").then(setIndex).catch((e) => setIndexError(e.message));
     getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
     getJson("/api/pipeline").then(setPipeline).catch((e) => setPipelineError(e.message));
-    // Without it the rating control stays hidden; nothing else depends on it.
-    getJson("/api/feedback").then(setFeedback).catch(() => {});
   }, []);
 
-  // The schema panel follows whichever database is picked (with none picked
-  // the server serves the demo's own) and the role asked as: it lists only
-  // the tables that role may read.
-  const schemaParams = new URLSearchParams({ role });
-  if (datasource) schemaParams.set("datasource", datasource);
-  const schemaUrl = `/api/schema?${schemaParams}`;
+  // The Approvals tab shows how many requests wait; it is read again on each page change, which is when a decision
+  // or a new request is most likely to have happened. A caller who may not see approvals simply sees no count.
   useEffect(() => {
-    // Two databases picked quickly are two requests in flight; only the one
-    // the rail is still showing may land.
-    let current = true;
-    getJson(schemaUrl)
-      .then((next) => current && setSchema(next))
-      .catch((e) => current && setError(e.message));
-    return () => {
-      current = false;
-    };
-  }, [schemaUrl]);
+    listApprovals("pending").then((records) => setPending(records.length)).catch(() => setPending(0));
+  }, [page]);
 
   // A new page starts at its top, with the keyboard on it: the browser does
   // neither of those for a view the hash swapped out.
@@ -216,33 +174,6 @@ export default function App() {
     if (pageRef.current) pageRef.current.focus();
   }, [page]);
 
-  // While a rebuild runs, follow its steps; when it ends, re-read the schema,
-  // which the rebuild re-read from the database too.
-  const rebuilding = index && index.job.state === "running";
-  useEffect(() => {
-    if (!rebuilding) return undefined;
-    const timer = setInterval(() => {
-      getJson("/api/index")
-        .then((next) => {
-          setIndex(next);
-          if (next.job.state !== "running") {
-            getJson(schemaUrl).then(setSchema).catch(() => {});
-          }
-        })
-        .catch((e) => setIndexError(e.message));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [rebuilding, schemaUrl]);
-
-  const rebuildIndex = async () => {
-    const response = await fetch("/api/index/rebuild", { method: "POST" });
-    const reply = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(typeof reply.detail === "string" ? reply.detail : `The server answered ${response.status}.`);
-    }
-    setIndex(reply);
-  };
-
   // A saved key can turn replay into live; the status pill follows the server.
   const settingsSaved = (next) => {
     setSettings(next);
@@ -252,140 +183,36 @@ export default function App() {
     getJson("/api/pipeline").then(setPipeline).catch(() => {});
   };
 
-  // `source` is the database a guided question belongs to: clicking one from
-  // another pile moves the schema panel to match, so what the rail shows is
-  // the database the question is about.
-  const ask = async (text, source) => {
-    const q = (text === undefined ? question : text).trim();
-    if (busy) return;
-    // An empty box looks ready rather than grey; pressing Ask then puts the
-    // keyboard where the question goes.
-    if (!q) {
-      focusById("question");
-      return;
-    }
-    if (source) setDatasource(source);
-    setQuestion(q);
-    setAsked({ question: q, role, planOnly });
-    setBusy(true);
-    setStopped(false);
-    setError(null);
-    setResult(null);
-    setProgress(EMPTY_PROGRESS);
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartedAt(performance.now());
-    setStoppable(false);
-    const stopTimer = setTimeout(() => setStoppable(true), STOP_AFTER_MS);
-    // On a single-column layout the run sits below the fold; bring it up,
-    // only as far as it must come.
-    // The target is the answer header, not the whole run: "nearest" leaves an
-    // element taller than the screen where it is.
-    const head = document.getElementById("pane-question") || runRef.current;
-    const scroll = head && runScroll(head.getBoundingClientRect(), window.innerHeight, { reduce: reducedMotion() });
-    if (scroll) head.scrollIntoView(scroll);
-    const request = {
-      method: "POST",
-      // The key travels in a header, never in the body: a body is what
-      // request logs and validation errors quote back.
-      headers: askHeaders(apiKeys, stepModels),
-      body: JSON.stringify({ question: q, role, execute: !planOnly }),
-      signal: controller.signal,
-    };
-    try {
-      // The run streams: each station lights as its step finishes, the rows
-      // load once the result is saved and the answer appears as it is
-      // written. Where the stream cannot be used, `/api/ask` answers whole.
-      let reply;
-      try {
-        reply = await streamAsk(window.fetch && window.fetch.bind(window), "/api/ask/stream", request,
-          (event) => setProgress((p) => progressOf(p || EMPTY_PROGRESS, event)));
-      } catch (e) {
-        if (!(e instanceof StreamUnavailable)) throw e;
-        setProgress(null);
-        reply = await getJson("/api/ask", request);
-      }
-      setResult(reply);
-    } catch (e) {
-      if (e.name === "AbortError") setStopped(true);
-      else setError(e.message);
-    } finally {
-      clearTimeout(stopTimer);
-      abortRef.current = null;
-      setProgress(null);
-      setBusy(false);
-      setStoppable(false);
-    }
-  };
-
-  // Stop aborts the request; the server sees it drop and cancels the run.
-  // Home's "Try a sample question": open Ask and ask one, a recorded one when
-  // the server has some, so it answers with no key on the hosted demo.
+  // Try a sample question on Home: open Chat and have it ask one, a recorded one when the server has some.
   const trySample = () => {
     const q = sampleQuestion(meta);
-    window.location.hash = hashFor("ask");
-    if (!q) return;
-    const group = ((meta && meta.question_groups) || []).find((g) => (g.questions || []).includes(q));
-    ask(q, group ? group.datasource : undefined);
-  };
-
-  const stop = () => {
-    if (abortRef.current) abortRef.current.abort();
-  };
-
-  const toggleDebug = (on) => {
-    setDebug(on);
-    writeDebug(on);
+    window.location.hash = hashFor("chat");
+    if (q) setStarter(q);
   };
 
   const saveKey = (provider, next) => setApiKeys(writeKeyFor(window.sessionStorage, provider, next));
-  // The first-run form: once the key is in, the question box is the next step.
-  const firstKey = (provider, next) => {
-    saveKey(provider, next);
-    setTimeout(() => focusById("question"), 0);
-  };
   const saveStepModel = (agent, choice) =>
     setStepModels((models) => writeModel(window.sessionStorage, models, agent, choice));
 
-  // The first sub-query decides each station's state; the Plan and SQL
-  // stations, and the tables the rail marks, cover every one.
-  const sub = result && result.sub_queries && result.sub_queries[0];
-  const used = [...new Set(((result && result.sub_queries) || []).flatMap((s) => planTables(s.plan)))];
-  const denied = deniedTables(result && result.errors);
   const replay = meta && meta.mode === "replay";
   const hosted = Boolean(meta && meta.hosted);
   const canSet = settings && settings.available;
-  const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
-  // Every registered database, and the one a run was answered from. With a
-  // single database neither is a fact worth printing: the rail's heading
-  // already names it and there is nothing for the resolver to choose.
-  const databases = datasourceNames(meta);
-  const answered = databases.length > 1 ? answeredDatasources(result) : [];
-  const onAsk = page === "ask";
-  // Hosted, with no key in this tab: the page says what a keyless visitor can
-  // do -- replay the recorded guided questions -- and leads with them. Nothing
-  // is held closed; a question without a recording answers with the way to
-  // add a key.
   const noKey = needsKey(meta, apiKeys);
   const status = modeStatus(meta, apiKeys, { canSet });
-  const groups = guidedGroups(meta);
-  const button = askButton({ busy, elapsedMs: stoppable ? STOP_AFTER_MS : 0 });
   const current = pageFor(page);
   const nav = navItems(page, {
-    // Hosted, Settings is not off: it is where the visitor's own key goes.
+    // Hosted, Settings is not off: it is where the visitor puts their own key.
     settings: settings && !settings.available && !settings.hosted,
     retrieval: retrieval && !retrieval.available,
-  });
+  }, { approvals: pending });
 
   return (
     <div className="app">
       {/* A button, not a fragment link: the hash belongs to the router. */}
-      <button className="skip" onClick={() => focusById(onAsk ? "run" : "page")}>
-        {onAsk ? "Skip to the run" : "Skip to the page"}
-      </button>
+      <button className="skip" onClick={() => focusById("page")}>Skip to the page</button>
 
       <header className="topbar">
-        {/* The product mark, not the page's heading: the page title is. */}
+        {/* The product mark, not the page heading: the page title is. */}
         <p className="wordmark">
           <span className="mono">nl2sql</span> <span className="wordmark-sub">playground</span>
         </p>
@@ -401,6 +228,7 @@ export default function App() {
                 >
                   {item.label}
                   {item.off && <span className="nav-off">off</span>}
+                  {item.badge && <span className="nav-badge" aria-label={`${item.badge} waiting`}>{item.badge}</span>}
                 </a>
               </li>
             ))}
@@ -418,28 +246,12 @@ export default function App() {
         )}
       </header>
 
-      {indexBroken && (
-        <p className="index-warning" id="index-warning" role="alert">
-          <strong>{index.health.status === "stale" ? "The search index is out of date." : "The search index is empty."}</strong>{" "}
-          {index.health.status === "stale"
-            ? "Answers may use an older schema. "
-            : "Every question will fail until it is rebuilt. "}
-          {!index.rebuild.available ? (
-            <>Run <code>nl2sql --env demo index</code> in the demo directory.</>
-          ) : onAsk ? (
-            <button className="linkish" onClick={() => focusById("index-rebuild")}>Rebuild it</button>
-          ) : (
-            <a href={hashFor("ask")}>Rebuild it</a>
-          )}
-        </p>
-      )}
-
       <main className="page" id="page" ref={pageRef} tabIndex={-1}
         aria-labelledby={page === "home" ? "home-title" : "page-title"}>
+        {error && <p className="fault" role="alert">{error}</p>}
         {page === "home" && <Home meta={meta} onTry={trySample} />}
-        {/* On Ask the open tab already says where you are; the heading stays
-            for the page's label and for screen readers. Home has its own. */}
-        {page !== "home" && <div className={onAsk ? "page-head visually-hidden" : "page-head"}>
+        {/* On Chat the conversation says where you are; the heading stays for screen readers. Home has its own. */}
+        {page !== "home" && <div className={page === "chat" ? "page-head visually-hidden" : "page-head"}>
           <h1 id="page-title">{current.title}</h1>
           <p className="page-lede">
             {(hosted && current.hostedDescription) || current.description}
@@ -447,103 +259,21 @@ export default function App() {
           {current.note && <p className="page-note">{current.note}</p>}
         </div>}
 
-        {onAsk && (
-          <div className="layout">
-            <section className="composer" aria-labelledby="ask-heading">
-              <h2 id="ask-heading" className="visually-hidden">Ask</h2>
-              {noKey && <FirstRun databases={databases} meta={meta} onKey={firstKey} />}
-              {noKey && (
-                <Suggestions groups={groups} selected={datasource} ran={Boolean(asked)} busy={busy}
-                  noKey meta={meta} onAsk={ask} />
-              )}
-              {/* The page title above already says Ask. With one database this
-                  names it; with three the resolver picks, so it must not. */}
-              <label className="question-label" htmlFor="question">
-                {groups.length > 1
-                  ? "Your question"
-                  : `Your question for the ${meta ? meta.dataset : "demo"} database`}
-              </label>
-              <textarea
-                id="question"
-                rows={2}
-                value={question}
-                placeholder="Which genre sells the most tracks?"
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask();
-                }}
-              />
-              <div className="controls">
-                <div className="field">
-                  <label htmlFor="role-select">Ask as</label>
-                  <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
-                    {(meta ? meta.roles : ["admin"]).map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-                <label className="check" htmlFor="plan-only">
-                  <input id="plan-only" type="checkbox" checked={planOnly} onChange={(e) => setPlanOnly(e.target.checked)} />
-                  Plan only
-                </label>
-                <label className="check" htmlFor="debug-toggle">
-                  <input id="debug-toggle" type="checkbox" checked={debug} onChange={(e) => toggleDebug(e.target.checked)} />
-                  Debug
-                  <span className="hint">per-node tokens and time</span>
-                </label>
-                {busy && startedAt !== null && <Elapsed since={startedAt} />}
-                {/* Keeps its fill while busy; after a moment it becomes Stop. */}
-                <button className="ask" id="ask" data-mode={button.action} aria-busy={busy || undefined}
-                  onClick={() => (button.action === "stop" ? stop() : button.action === "ask" ? ask() : null)}
-                  >
-                  {button.action === "wait" && <span className="spin" aria-hidden="true" />}
-                  {button.action === "stop" && (
-                    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-                      <rect x="2" y="2" width="8" height="8" rx="1.5" fill="currentColor" />
-                    </svg>
-                  )}
-                  {button.label}
-                  {button.action === "ask" && <kbd aria-hidden="true">Ctrl Enter</kbd>}
-                </button>
-              </div>
-              {!noKey && (
-                <Suggestions groups={groups} selected={datasource} ran={Boolean(asked)} busy={busy}
-                  meta={meta} onAsk={ask} />
-              )}
-            </section>
+        {page === "chat" && (
+          <Suspense fallback={null}>
+            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} />
+          </Suspense>
+        )}
 
-            <aside className="rail">
-              <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role}
-                datasources={databases} onDatasource={setDatasource} />
-              <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} hosted={hosted} />
-            </aside>
-
-            <section className="run" id="run" ref={runRef} aria-labelledby="run-heading" tabIndex={-1}>
-              <h2 id="run-heading" className="visually-hidden">The run</h2>
-              <Run
-                asked={asked}
-                result={result}
-                sub={sub}
-                busy={busy}
-                progress={progress}
-                stopped={stopped}
-                hosted={hosted}
-                error={error}
-                onAgain={asked ? () => ask(asked.question) : undefined}
-                debug={debug}
-                replay={replay}
-                meta={meta}
-                feedback={feedback}
-                answered={answered}
-              />
-            </section>
-            {!busy && (result || error || stopped) && <AskDock />}
-          </div>
+        {page === "approvals" && (
+          <Suspense fallback={null}>
+            <Approvals />
+          </Suspense>
         )}
 
         {page === "pipeline" && (
           <div className="sheet" id="pipeline-panel">
-            <Pipeline pipeline={pipeline} error={pipelineError} result={result} asked={asked}
+            <Pipeline pipeline={pipeline} error={pipelineError} result={null} asked={null}
               replaying={replay || noKey} />
           </div>
         )}
@@ -559,7 +289,7 @@ export default function App() {
 
         {page === "retrieval" && (
           <div className="sheet" id="retrieval-panel">
-            <RetrievalInspector options={retrieval} error={retrievalError} question={question} role={role} />
+            <RetrievalInspector options={retrieval} error={retrievalError} question="" role={role} />
           </div>
         )}
 

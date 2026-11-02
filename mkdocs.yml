@@ -96,6 +96,8 @@ nav:
     - Demo Data (CLI-first): getting_started/demo.md
     - MCP Server: getting_started/mcp.md
     - Launch: getting_started/launch.md
+  - Apps:
+    - Web app: apps/web.md
   - Conversations:
     - Conversations: conversations/index.md
     - Chat tools: conversations/tools.md

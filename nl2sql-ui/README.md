@@ -13,8 +13,8 @@ cascade order (`index.css`), `src/router.js` the hash routes.
 
 ## Pages
 
-Five pages, named across the top of each of them by one header nav
-(`.nav`, one `#nav-home`, `#nav-ask`, `#nav-pipeline`, `#nav-settings`,
+Six pages, named across the top of each of them by one header nav
+(`.nav`, one `#nav-home`, `#nav-chat`, `#nav-approvals`, `#nav-pipeline`, `#nav-settings`,
 `#nav-retrieval` link each). Every page but Home states its title and one line
 saying what it does, then gives its content the full width; Home is its own
 hero.
@@ -22,7 +22,8 @@ hero.
 | Route | Page | What it holds |
 | --- | --- | --- |
 | `#/` | Home | `#home`: the front page (see [Home](#home) below) |
-| `#/ask` | Ask | the composer, the rail (Database, with a switcher for which database, then the Search index as one line) and the run |
+| `#/chat` | Chat | the conversation list, the transcript and the composer |
+| `#/approvals` | Approvals | the requests waiting for a decision |
 | `#/pipeline` | What runs a question | `#pipeline-panel`: every step, and which five call a model |
 | `#/settings` | Settings | `#settings-panel`: keys and a model per step |
 | `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
@@ -30,8 +31,8 @@ hero.
 `src/router.js` is the whole of it: `pageFromHash` reads the hash, `navItems`
 builds the nav, and `createRouter` follows `hashchange`. A route nobody serves
 reads as `#/`, Home, so Back and Forward always land somewhere. A bare fragment
-from an older link (`#run`, `#question`, a station's id) named a place on Ask
-when Ask was `#/`, so it still opens Ask. The nav links are
+from an older link (`#run`, `#question`, a station's id) named a place on the old Ask page
+when Ask was `#/`; Chat took that job, so it opens Chat. The nav links are
 plain `<a href="#/...">`, so the keyboard reaches them and the browser keeps
 the history; the current one carries `aria-current="page"` and the accent under
 the top bar's rule. Nothing in the page links to a bare fragment -- the skip
@@ -167,55 +168,9 @@ with `record: clips` runs the same script in CI and opens a pull request.
 
 ## What the page shows
 
-- **Database** (left rail, or below the run on a narrow window): the indexed
-  schema from `/api/schema`, visible before any question. It shows one database
-  at a time, and with more than one registered the heading carries a switcher
-  (`#schema-datasource`, the names from `datasourceNames` over `meta.datasources`:
-  a segmented control of radio buttons for four or fewer, a select beyond that,
-  `switcherKind` in `datasources.js`) that re-reads `/api/schema?datasource=`; under it one line says plainly that
-  each question is answered from one database and that joining across them is
-  planned (`#schema-cross`). Clicking a guided question from another pile moves
-  the switcher to that pile's database, so the rail shows the schema the
-  question is about. With a single database none of that is printed: the
-  heading names it and the panel reads exactly as it always has.
-  Each table is a 40px row with its row count; open one for the tables it
-  refers to, columns, types, keys and foreign keys. Tables the current plan
-  reads are marked `in plan` with an accent bar; tables the role was refused
-  are marked `refused for <role>`. On a wide window the rail scrolls on its own:
-  its scroll is contained, its scrollbar is thin, and a fade shows only on an
-  edge that has more past it (`src/pages/railFade.js`). It reserves no scrollbar
-  gutter: `scrollbar-gutter: stable` beside the thin scrollbar left Chrome
-  painting over the first number on a line (the table count, the first index
-  stat). The rail's headings (Database, Search index) are small uppercase
-  labels like the composer's YOUR QUESTION.
-- **Search index** (`#index-panel`, foot of the rail): from `GET /api/index`,
-  the vector index the resolver searches, which the Database above does not
-  show. Folded to one line ("Search index fresh. 162 entries, built 3 minutes
-  ago.", `indexSummary` in `indexHealth.js`) that opens itself when the index
-  is empty, missing or stale or a rebuild is running or failed
-  (`indexExpanded`); `#index-heading` stays, visually hidden. Opened: a status line (`#index-status`), entries by type (`#index-counts`), the
-  schema version (`#index-version`) and when it was built (`#index-built`). The
-  index covers every database, so the heading names one only when there is one;
-  with several, `#index-sources` lists them ("Covers chinook, support and
-  webanalytics", from `coverageLine` in `indexHealth.js`) and
-  Rebuild's help names the single database it rebuilds. Hosted, that line is
-  always printed and says the index was built before anyone arrived ("Built
-  before this demo started, covering chinook, support and webanalytics"), so
-  the missing Rebuild reads as a decision rather than as something broken.
-  When the index is empty, missing or out of date, the panel turns to the fault
-  colour, a stale index lists why, and a warning under the top bar
-  (`#index-warning`) opens the panel and puts the keyboard on the button, or, from another page,
-  leads back to Ask. **Rebuild** (`#index-rebuild`) is
-  always offered; it posts to `POST /api/index/rebuild` and the page polls
-  `GET /api/index` for its steps (`#index-progress`) until it ends, then
-  re-reads the schema. A failure shows `#index-error`. Rebuild reads the
-  schema only; descriptions a model drafts are proposals for review, not part of the index.
-  Where Rebuild is off (a non-loopback `--host` without `--allow-settings`, or
-  the hosted demo) the panel says why in the server's own words
-  (`#index-unavailable`, `rebuild.reason` from `/api/index`); hosted, that
-  sentence already says the sample data never changes and what to run instead,
-  so the terminal command is left off. A demo folder written by an older
-  engine shows `#index-folder-warning`.
+- **Database and Search index** (the old Ask rail) are gone with the Ask page. `src/components/IndexPanel.jsx`
+  stays for the page that takes the index over (Settings and Retrieval, row W4).
+
 - **Status pill** (`.status`, top bar, on the same row as the wordmark and the
   nav at 1061px and wider): the mode in a few words, from `modeStatus` in
   `src/pages/status.js`, with a green dot when a question can be answered live and an
@@ -230,165 +185,18 @@ with `record: clips` runs the same script in CI and opens a pull request.
   visually-hidden text a screen reader reads. A question replay has no answer
   for shows "No recorded answer for this question. Add an API key to ask it
   live." (`replay_miss` from `/api/ask`).
-- **Composer** (Ask page): the question box, the role selector
-  (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
-  and the guided questions from `/api/meta` as a chip row (`#guided-heading`):
-  four from the database the rail is showing (three once a run is on the
-  page) and a **N more** chip (`aria-controls="guided-all"`) that opens every
-  pile, one `.guided-group` per datasource headed by its id (`#guided-<ds>`,
-  always in the page, visually hidden with a single database). Under 640px the
-  row is a horizontal scroll-snap strip of 44px chips. `chipRow` in
-  `src/lib/runState.js` picks the chips; `src/pages/questions.js` does the grouping and
-  falls back to the flat `questions` list when a server sends no
-  `question_groups`. With a single database the question box names it; with
-  several it does not, because the resolver picks. An empty box with a key
-  leaves **Ask** looking ready; pressing it puts the keyboard in the box.
-- **Streaming**: Ask posts to `/api/ask/stream` (`streamAsk` in
-  `src/stream.js`) and reads its Server-Sent Events as they arrive, the
-  engine's run events (each `data` line is the whole event; `parseSse` hands
-  on its `data` and `trace_id`): `run.started`, `node.started` /
-  `node.finished` per step, `result.manifest` once the results are saved,
-  `answer.delta` as the answer is written, then `run.finished` (its
-  `data.result` is exactly the `/api/ask` reply) or `run.failed`. `progressOf` folds them into
-  `progress` in `App`; `liveStations` lights each station as its step
-  finishes (the next unfinished one is live, Cost & time goes live once the
-  rows are in) and `liveTimings` gives the done ones their time; the Rows
-  station pages the saved result from the manifest (`liveResult`) before the
-  answer exists, and the same table stays when the run is back; the answer
-  sentence grows as the summary streams (`liveAnswer`, `#answer-live`, in
-  `--ink-2` until the result is back). The stations hold their body (plan,
-  checks, SQL) until `run.finished`, and say nothing about it being missing while the
-  run is live. `StreamUnavailable` -- no fetch streaming in the browser, a
-  404 or 405 from an older server, a network failure before the reply, or a
-  stream that ends without `run.finished` or `run.failed` -- falls back to
-  `/api/ask`; a refusal (4xx with a `detail`), a `run.failed` event and Stop
-  are not fallbacks.
-  A browser that cannot read the body as it arrives reads it whole, without
-  asking twice.
-- **Busy and Stop**: while a run is out without a stream (the `/api/ask`
-  fallback), only the first unfinished station is live (that reply reports
-  no per-node progress, so that is Plan) and the rest are queued at 40%
-  opacity; streamed, the stations follow `progress` as above. Either way the
-  live one carries skeleton bars, a 2px
-  accent segment travelling down the spine (`.spine-run`, held still under reduced
-  motion) and `#elapsed` beside the button: **Running · 3.4 s**, drawn on
-  `requestAnimationFrame`, with a visually hidden status that changes once a
-  second. **Ask** (`#ask`) keeps its fill; after 600ms (`STOP_AFTER_MS`) it
-  becomes **Stop**, which aborts the fetch through an `AbortController`. The
-  run then reads **Stopped** and every station is marked not reached. The
-  server watches the connection and cancels the run when it closes
-  (`cancel_when_disconnected` in `app.py`, an `nl2sql.CancellationToken`
-  underneath): no further step or model call starts. A stopped question still
-  counts toward the hosted limits, which charge it on arrival. The answer
-  header says so (`stoppedNote` in `src/lib/runState.js`).
-- **The answer header** (`#pane-question`, the first block of the run): before
-  a question, one line saying the answer will lead here. Once asked, the
-  question with its role tag, then the answer sentence at 28px (the largest
-  text in the run; the Rows station keeps only the table), then a mono strip
-  such as `10 rows / 3 of 3 checks / 2 plans / 5.04 s / $0.0187`. Each strip
-  item is a button that scrolls to its station and focuses it; none is a hash
-  link, because the hash is the router's. A refusal gets the same header
-  ("Refused at the checks. No SQL was written."). `answerHead` and
-  `statusStrip` in `src/lib/runState.js` decide the words. On the Ask page
-  `#page-title` is visually hidden, kept for `aria-labelledby`.
-- **Faults**: a failed run turns the header into the fault card, a 3px
-  `--fault` rule on the raised card. `describeFault` in `src/pages/faults.js` gives
-  the headline (the only `role="alert"`), the body and an action, such as
-  **Replace the key** to `#/settings` for `PROVIDER_AUTH_FAILED`; **Ask again**
-  sits beside it, and the provider's own reply (`provider_response`) is folded
-  under **Provider response** in 12px mono. `runFault` picks the entry: any
-  `PROVIDER_*` error, or the first error when no sub-query came back.
-- **The run**: one spine, read top to bottom: Plan (`#pane-plan`), Checks
-  (`#pane-validation`), SQL (`#pane-sql`), Rows (`#pane-rows`), Cost & time
-  (`#pane-usage`). Each station's head is a 12px uppercase label, a kind tag
-  (**Model · gpt-5.4** from `usage.nodes`, or **Code**) and the step's time on
-  the right (`stationHeads`). Marks are round for a model step and square for
-  code; filled with a tick is done, an outline is pending, dashed was not
-  reached. The checks are a gate band: a timeline of the plans the checks saw
-  (**Plan 1 refused**, **Plan 2 passed**, `gateTimeline`), the reason in one
-  sentence (`gateReason`: the refusal, the tables the role may not read, or
-  what sent a plan back and the refiner's hint), and each check as a tile with a
-  tick or a cross, passed in `--ok` and refused in `--fault`. The SQL and Rows
-  stations then show that nothing was written or run. With more than one
-  database registered, the answer header also says which one answered
-  (`#answered-from`, from each sub-query's `datasource_id` in `/api/ask` via
-  `answeredDatasources`); with one there is nothing for the resolver to have
-  picked, so the line is not printed.
-- **SQL and rows** are raised cards. The SQL card (`src/components/SqlCard.jsx`) has a
-  header strip, **Generated SQL** and the plan it came from (`from plan 2` after
-  a retry), a **Copy** button (the clipboard, or the text selected where the
-  browser refuses; it reads "Copied" for about 1.4s), numbered lines and a
-  keyword tint: keywords, function names and numbers take `--kw`, `--fn` and
-  `--num`. The tint comes from `src/lib/sqlHighlight.js`, a small tokenizer with no
-  library, rendered as React text so the SQL is never parsed as markup; a long
-  line scrolls inside the card. The rows card (`src/outputs/RowsTable.jsx`) reads the
-  run's saved results from `result_manifest` in `/api/ask`, never the sample
-  in `sub_queries[].rows`. With more than one result it opens with one tab per
-  result (`#rows-tabs`, the database switcher's segmented control, each tab
-  **Result 1**, **Result 2** with its row count and the internal `node_id`
-  only as the tooltip; arrow keys move between them); with one there are no
-  tabs. Picking a tab starts that result at its first page and fetches its
-  own rows (`rowsView` in `src/outputs/results.js`). The head says **Result** and the whole result's row count
-  (`#rows-total`) and offers **Download CSV** (`#rows-csv`), a plain link to
-  `GET /api/query/{trace_id}/results/{node_id}.csv?role=`, so the file is every row,
-  streamed by the server. A result cut at its row ceiling gets one line under
-  the head in the warn ink (`#rows-truncated`: "Cut at 1,000 rows, so some are
-  missing. Narrow the question to get them all."). The rows come a page of 100
-  at a time from `GET /api/query/{trace_id}/results/{node_id}?role=&offset=&limit=`
-  (both send the role the run was asked as: a playground run is anonymous, so
-  the server serves its rows to that role only);
-  the foot says **Rows 101–200 of 3,340** (`#rows-range`, out of the selected
-  result's own `row_count`, the number its tab and head show) beside **Previous**
-  and **Next** (`#rows-prev`, `#rows-next`, the latter following the server's
-  `next_offset`). While a page loads the one on screen stays, dimmed; the
-  first one shows skeleton lines, and a failed request says so with **Try
-  again**. A result with no rows makes no request and shows its columns over
-  "No rows came back." A run that saved nothing (an empty manifest) falls back
-  to the response's sample, with no paging and no download. The table fills
-  the column with 38px rows (44px on a phone) and a header that sticks. The
-  first numeric column carries an in-cell bar, a 6px track and fill sized to
-  the page's largest magnitude (a negative is drawn by its size, in ink),
-  beside the right-aligned number. NULL stays dimmed.
-- **Every sub-query.** The first sub-query decides each station's state, but
-  with several the Plan and SQL stations show every one, each under a head
-  (`.sub-head`: **Sub-query 1 of 2**, its intent and database,
-  `subQueryHeads`), and the rail marks the tables of all of them.
-- **Cost & time**: five figures (total time, waiting on the model, model calls,
-  input tokens with the cached count, cost). With **Debug** on, a per-node
-  ledger follows (`src/components/Ledger.jsx`): one row per node that ran, in execution
-  order, code nodes included, with calls, input, cached and output tokens
-  (reasoning too when any node spent some), LLM time and node wall-clock time.
-  Beside each node time is a 72x6px bar sized to the slowest node: a model
-  node's bar is in the accent, a code node's in dimmed ink. A node that needed
-  more than one call is tagged **retried**. The SQL agent is a subgraph, so its
-  nodes are nested under it and its time includes theirs. When a sub-query's plan came from the
-  plan cache (`plan_source: "cache"` in `/api/ask`), Debug also shows
-  `#plan-cache-hit`: no planner call was made, and the plan was validated again
-  for the role. Debug is on by default; the choice is
-  kept in `localStorage` (`nl2sql.playground.debug`) and the page works the same
-  when storage is unavailable.
-- **Node drill-down**: when the run wrote a trace (`trace_path` in the
-  response; the demo writes one for every run), each node name in the Debug
-  table is a button. It fetches the trace once from `GET /api/trace/{trace_id}`
-  and shows that node's executions (attempts and sub-queries) with errors and
-  warnings, the state it read, the update it returned and, for LLM nodes, the
-  exact prompt, the raw response and the parsed result, each folded. A
-  **Download trace** link sits above the table. Opening a node scrolls the
-  inspector (`#node-inspector`) just into view and moves focus to its title
-  (`#inspect-title`); **Close** returns focus to the node that opened it.
-- **Ask another question** (`.ask-dock`, phones only): once a run is on the
-  page, a bar fixed to the bottom of the screen scrolls back to `#question`
-  and focuses it. It hides while `#question` is in view.
-- **Was this answer right?** (`#feedback`, below Cost & time once a run is
-  back): **👍 Right** (`#feedback-up`) and **👎 Wrong** (`#feedback-down`) save
-  a rating at once through `POST /api/feedback`; a note is optional, from the
-  quick choices or typed (`#feedback-note`, up to 280 characters), saved with
-  **Save note** (`#feedback-save`). The page sends only the trace id, the
-  rating and the note; the server stores the question, role, SQL and models
-  from its own copy of the run. Whether it is on comes from `GET /api/feedback`;
-  where it is off (the same rule as Settings, or `FEEDBACK_ENABLED=false`) a
-  line says why. See
-  [Feedback and Signals](../../docs/observability/feedback.md).
+- **Chat** (`#nav-chat`, route `#/chat` or `#/chat/<conversation id>`; `src/pages/Chat.jsx`): a list of your
+  conversations beside one transcript. A question goes to `POST /conversations/{id}/turns/stream` (`streamTurn`
+  in `src/api/chat.js`); `spineOf` in `src/chat/spine.js` folds the events into the live run spine, and the
+  last event, the stored turn, replaces it. A turn shows its answer and rows first, then the folds **Why this
+  answer**, **SQL**, **Plan** and **Trace and cost**, and the **Right** / **Wrong** rating (`src/chat/Feedback.jsx`).
+  A clarification shows one **Use this reading** button per option, an approval wait shows **Run it now** once
+  every request is granted, and the tool buttons (Chart, Diagram, Report, Pin to dashboard) call
+  `POST /conversations/{id}/tools/{name}`. A 409 (a turn is still running) is told to the asker. `turns.js` reads
+  a stored turn; the page keeps no other state. See [Web app](../docs/apps/web.md).
+- **Approvals** (`#nav-approvals`, route `#/approvals`; `src/pages/Approvals.jsx`): the pending requests, with
+  **Grant** and **Deny**; the nav item carries the count of requests waiting.
+
 
 - **Pipeline** (`#nav-pipeline` in the header nav, route `#/pipeline`; the
   page's content is `#pipeline-panel`): every step of a run in order, in three
@@ -599,8 +407,9 @@ npm run dev
 
 Vite serves the page on its own port. Run `nl2sql demo --no-browser` alongside
 it and proxy or point `fetch` at `http://127.0.0.1:8765` to exercise the real
-API; the app calls `/api/meta`, `/api/schema`, `/api/ask/stream` (and `/api/ask`
-when it cannot stream), `/api/trace/{id}`
+API; the chat and approvals pages call the REST routes through `src/api/chat.js`
+(`/conversations`, `/approvals`, `/feedback`, `/traces/{id}`); the other pages still call
+`/api/meta`, `/api/schema`, `/api/trace/{id}`
 the settings routes (`GET /api/settings`, `POST /api/settings/key`,
 `POST /api/settings/models`) and the index routes (`GET /api/index`,
 `POST /api/index/rebuild`), the inspector's (`GET /api/retrieval`,
