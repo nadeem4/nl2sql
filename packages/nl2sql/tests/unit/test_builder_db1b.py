@@ -403,6 +403,15 @@ def test_build_mixes_the_three_sources_into_an_ordinary_saved_dashboard(engine, 
     assert server.calls == [], "the model is only reached through the pipeline, which the canned run replaces"
 
 
+def test_build_refuses_more_than_three_asked_tiles_before_any_model_call(engine, runs, server):
+    tiles = tiles_of(*[("asked", None, f"Question {i}?") for i in range(4)])
+
+    with pytest.raises(InvalidArgument, match="At most 3 new questions"):
+        engine.dashboards.build("shop", tiles, user_context=ANALYST)
+
+    assert server.calls == []
+
+
 def test_the_asked_tiles_share_one_builder_conversation_which_is_removed(engine, runs):
     before = len(engine.conversations.list(user_context=ANALYST))
     seen = []
