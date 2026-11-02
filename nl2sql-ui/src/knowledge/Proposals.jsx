@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { acceptProposals, rejectProposals } from "../api/knowledge.js";
 import {
-  acceptBody, acceptOutcome, editableFields, evidenceLines, groupByKind, rejectBody, summaryOf,
+  acceptBody, acceptOutcome, changeLines, editableFields, evidenceLines, groupByKind, rejectBody, summaryOf,
 } from "./proposals.js";
 
 // The review list: proposals by kind, each with its evidence. Accept (optionally with edited text) and Reject act on
@@ -53,6 +53,7 @@ export default function Proposals({ proposals, onChanged }) {
                   <span>{summaryOf(p)}</span>
                 </label>
                 <span className="art-meta">{p.origin}</span>
+                {changeLines(p).length > 0 && <p className="art-meta kn-evidence">Writes {changeLines(p).join("; ")}</p>}
                 {evidenceLines(p).length > 0 && <p className="art-meta kn-evidence">{evidenceLines(p).join("; ")}</p>}
                 <div className="conn-actions">
                   <button type="button" className="index-rebuild" onClick={() => setOpen(open === p.id ? null : p.id)} aria-expanded={open === p.id}>Edit and accept</button>

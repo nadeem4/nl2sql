@@ -129,3 +129,15 @@ export function buildConnection(fields, values) {
   }
   return out;
 }
+
+// The form with every secret field emptied, once the datasource is added: the typed secret should not outlive the click.
+export function clearSecrets(fields, values) {
+  const out = { ...values };
+  for (const f of leaves(fields)) if (f.secret) out[f.key] = "";
+  return out;
+}
+
+// A select's choices. An optional enum with no default starts empty, so the form does not show a choice it will not send.
+export function selectOptions(field) {
+  return !field.required && field.default === null ? ["", ...field.options] : field.options;
+}

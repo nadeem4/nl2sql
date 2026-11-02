@@ -20,7 +20,7 @@ export function groupByKind(proposals) {
     .filter((group) => group.items.length);
 }
 
-const joinEnd = (end) => (Array.isArray(end) ? end.join(", ") : String(end ?? ""));
+export const joinEnd = (end) => (Array.isArray(end) ? end.join(", ") : String(end ?? ""));
 
 // One line for what the proposal would write.
 export function summaryOf(p) {
@@ -32,6 +32,15 @@ export function summaryOf(p) {
   if (p.kind === "example") return c.question || p.target;
   const said = c.definition || c.description || c.question || c.notes;
   return said ? `${p.target}: ${said}` : p.target;
+}
+
+// Every entry of the change as `key: value`, so the reviewer sees all of what accepting would write (a profiler's
+// column proposal may carry only a role, a unit or code values).
+export function changeLines(p) {
+  return Object.entries(p.change || {}).map(([key, value]) => {
+    if (Array.isArray(value)) return `${key}: ${value.join(", ")}`;
+    return `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`;
+  });
 }
 
 const EDITABLE = ["definition", "description", "notes", "question", "sql", "text"];

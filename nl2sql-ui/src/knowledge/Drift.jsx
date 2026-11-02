@@ -31,7 +31,7 @@ export default function Drift({ datasourceIds }) {
                 <ul className="kn-list">{i.lines.map((l) => <li key={l}>{l}</li>)}</ul>
               </div>
             ))}
-            {r.status === "drifted" && <p className="quiet">Rebuild the index from Connect to bring it up to date.</p>}
+            {r.status === "drifted" && <p className="quiet">Run `nl2sql index` to bring the index up to date.</p>}
           </article>
         );
       })}

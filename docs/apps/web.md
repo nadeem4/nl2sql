@@ -12,10 +12,10 @@ The web app (`nl2sql-ui/`) is the one browser interface to the REST API. It is b
 4. **Add** registers the datasource. Tick "Save to the project config" to write it to `nl2sql.yaml`. Where the config is read-only (the Docker image), the datasource is added but not saved: it works until the server restarts, and you add it to the mounted config to keep it.
 5. After Add the page offers **Index**, **Profile** (optionally drafting descriptions with the model, under a spending cap you set) and **Suggest starter questions**, which are filed as proposals for review. Each job shows its progress and can be cancelled.
 
-Connect needs an administrator. On the hosted demo, and for anyone who is not an administrator, the page says it is off instead of showing a form.
+Removing a datasource asks first. Once a datasource is added, secrets typed into the form are cleared. Connect needs an administrator. On the hosted demo, and for anyone who is not an administrator, the page says it is off instead of showing a form.
 
 **Knowledge** (`#/knowledge`) shows, for one datasource:
 
-- **What the engine knows:** terms, rules, joins, tables and columns, each marked with where it came from (a knowledge file, the database, or derived), any problems found while loading, and the schema.
-- **Waiting for review** (administrators): the proposals from profiling and starter questions, grouped by kind with the counts and checks that back each one, never rows of data. Accept or reject one or many; "Edit and accept" lets you change a proposal's text first. Accepting writes to the knowledge files; the page names the files and shows any proposal the server refused and why.
-- **Drift** (administrators): **Check for drift** compares each live database with its index and lists what changed (tables, columns, types, foreign keys) and what the change may break: verified queries, glossary items, policy rules and preferred tables.
+- **What the engine knows:** terms, rules, joins, tables and columns. Tables and columns are marked with where their description or role came from (a knowledge file, the database, or derived). Any problems found while loading, and the schema.
+- **Waiting for review** (administrators): the proposals from profiling and starter questions, grouped by kind. Each shows everything accepting would write (a role, a unit, code values, text), and the counts and checks that back it, never rows of data. Accept or reject one or many; "Edit and accept" lets you change a proposal's text first. Accepting writes to the knowledge files; the page names the files and shows any proposal the server refused and why.
+- **Drift** (administrators): **Check for drift** compares each live database with its index and lists what changed (tables, columns, types, foreign keys) and what the change may break: verified queries, glossary items, policy rules and preferred tables. To bring a drifted index up to date, run `nl2sql index`.

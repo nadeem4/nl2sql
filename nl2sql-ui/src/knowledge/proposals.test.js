@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  acceptBody, acceptOutcome, editableFields, evidenceLines, groupByKind, rejectBody, summaryOf,
+  acceptBody, acceptOutcome, changeLines, editableFields, evidenceLines, groupByKind, joinEnd, rejectBody, summaryOf,
 } from "./proposals.js";
 
 const term = JSON.parse(readFileSync(new URL("../api/fixtures/Proposal.json", import.meta.url), "utf8"));
@@ -87,4 +87,16 @@ test("an accept report says what was written, what was refused and why, and the 
   assert.equal(acceptOutcome({ accepted: [], files_written: [], warnings: [], refused: { "p-4": "No such proposal." } }).summary,
     "Nothing was accepted.");
   assert.equal(acceptOutcome({ accepted: [term], files_written: [], warnings: [], refused: {} }).summary, "Accepted 1.");
+});
+
+test("every entry of a change is shown, so a role-only proposal says what it would write", () => {
+  const roleOnly = { ...term, id: "p-5", kind: "column", target: "Invoice.Total", change: { role: "money", unit: "USD", values: { a: 1 } } };
+  assert.deepEqual(changeLines(roleOnly), ["role: money", "unit: USD", 'values: {"a":1}']);
+  assert.deepEqual(changeLines({ ...term, change: { synonyms: ["amount", "total"] } }), ["synonyms: amount, total"]);
+  assert.deepEqual(changeLines({ ...term, change: {} }), []);
+});
+
+test("a join's composite ends are listed apart", () => {
+  assert.equal(joinEnd(["a", "b"]), "a, b");
+  assert.equal(joinEnd("a"), "a");
 });

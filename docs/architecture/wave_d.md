@@ -1574,7 +1574,7 @@ page does not read the old `/api/meta`; admin and hosted are inferred from that 
 schema diagram (`GET /datasources/{id}/diagram` is `text/plain`, which `request()` cannot read) waits for the
 `download()` helper and `Mermaid.jsx` of W2a, so Knowledge lists the tables and columns instead; one
 `schemaForm.js` test file covers the form, so `SchemaForm.jsx` and `Steps.jsx` have no test of their own;
-`SchemaPanel.jsx` and `datasources.js` were already in `src/connect/` from D0b.
+`SchemaPanel.jsx` and `datasources.js` were already in `src/connect/` from D0b. The schema diagram is a follow-up once W2a (#422: `download()`, `Mermaid.jsx`) is on `main`. A drifted report points to `nl2sql index`; a button for it on a datasource that already exists is a follow-up too. Review fixes: the per-datasource state of the next steps resets on a new Add, origins are looked up per field (`tables.X.description`, `columns.X.Y.role`), a proposal shows every `change` entry, only a 403 from `GET /proposals` hides review and drift, and a typed secret is cleared after Add.
 
 ### Session batches
 

@@ -2,7 +2,7 @@
 // tests use that shape: `$ref` into `$defs`, `anyOf` with null for an optional field, `format: password`, `group`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildConnection, fieldsOf, initialValues, validate } from "./schemaForm.js";
+import { buildConnection, clearSecrets, fieldsOf, initialValues, selectOptions, validate } from "./schemaForm.js";
 
 const POOL = {
   type: "object",
@@ -142,4 +142,29 @@ test("a schema with no properties is an empty form", () => {
   assert.deepEqual(fieldsOf({ type: "object" }), []);
   assert.deepEqual(fieldsOf(null), []);
   assert.deepEqual(buildConnection([], {}), {});
+});
+
+test("after a successful add the secret fields are emptied and the rest stay", () => {
+  const fields = fieldsOf(SCHEMA);
+  const values = { ...initialValues(fields), host: "db.internal", password: "typed-here" };
+  const out = clearSecrets(fields, values);
+  assert.equal(out.password, "");
+  assert.equal(out.host, "db.internal");
+  assert.equal(values.password, "typed-here");
+});
+
+test("an optional select with no default offers an empty choice first; a required or defaulted one does not", () => {
+  const schema = {
+    type: "object",
+    required: ["mode"],
+    properties: {
+      mode: { enum: ["a", "b"], type: "string" },
+      ssl: { anyOf: [{ enum: ["on", "off"], type: "string" }, { type: "null" }], default: null },
+      level: { enum: ["x", "y"], type: "string", default: "y" },
+    },
+  };
+  const by = Object.fromEntries(fieldsOf(schema).map((f) => [f.name, f]));
+  assert.deepEqual(selectOptions(by.mode), ["a", "b"]);
+  assert.deepEqual(selectOptions(by.ssl), ["", "on", "off"]);
+  assert.deepEqual(selectOptions(by.level), ["x", "y"]);
 });

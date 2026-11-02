@@ -6,12 +6,17 @@ import Glossary from "../knowledge/Glossary.jsx";
 import Proposals from "../knowledge/Proposals.jsx";
 
 // Knowledge: what the engine knows about a datasource (anyone), the proposals waiting for review and the drift check
-// (admins; the routes answer 403 to everyone else, so those sections are not shown).
+// (admins; GET /proposals answers 403 to everyone else, and only that answer hides those sections). A response for a
+// datasource that is no longer selected is dropped.
+const message = (err) => (err && err.message) || "Something went wrong.";
+
 function Schema({ id }) {
   const [schema, setSchema] = useState(null);
   useEffect(() => {
+    let current = true;
     setSchema(null);
-    getSchema(id).then(setSchema).catch(() => setSchema(false));
+    getSchema(id).then((s) => current && setSchema(s)).catch(() => current && setSchema(false));
+    return () => { current = false; };
   }, [id]);
   if (schema === false) return <p className="quiet">The schema could not be read.</p>;
   if (!schema) return null;
@@ -20,8 +25,8 @@ function Schema({ id }) {
       <summary>Schema <span className="art-meta">{schema.tables.length} tables</span></summary>
       <ul className="kn-list">
         {schema.tables.map((t) => (
-          <li key={t.name}>
-            <span className="mono">{t.name}</span>
+          <li key={`${t.schema}.${t.name}`}>
+            <span className="mono">{t.schema ? `${t.schema}.${t.name}` : t.name}</span>
             <span className="art-meta"> {t.columns.map((c) => c.name).join(", ")}</span>
           </li>
         ))}
@@ -34,21 +39,41 @@ export default function Knowledge() {
   const [sources, setSources] = useState(null);
   const [current, setCurrent] = useState("");
   const [view, setView] = useState(null);
+  const [viewFault, setViewFault] = useState(null);
   const [proposals, setProposals] = useState(null);
+  const [proposalFault, setProposalFault] = useState(null);
   const [fault, setFault] = useState(null);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     listDatasources()
       .then((list) => { setSources(list); if (list.length) setCurrent(list[0].id); })
-      .catch((err) => setFault(err.message || "Something went wrong."));
+      .catch((err) => setFault(message(err)));
   }, []);
 
-  const load = useCallback(() => {
-    if (!current) return;
-    showKnowledge(current).then((views) => setView(views[0] || null)).catch((err) => setFault(err.message));
-    listProposals(current).then(setProposals).catch(() => setProposals(null)); // 403: not an admin
+  useEffect(() => {
+    if (!current) return undefined;
+    let live = true;
+    setView(null); setViewFault(null);
+    showKnowledge(current)
+      .then((views) => live && setView(views[0] || null))
+      .catch((err) => live && setViewFault(message(err)));
+    return () => { live = false; };
   }, [current]);
-  useEffect(() => { setView(null); setProposals(null); load(); }, [load]);
+
+  useEffect(() => {
+    if (!current) return undefined;
+    let live = true;
+    setProposalFault(null);
+    listProposals(current)
+      .then((list) => live && setProposals(list))
+      .catch((err) => { if (live && err.status !== 403) setProposalFault(message(err)); });
+    return () => { live = false; };
+  }, [current, reload]);
+
+  useEffect(() => { setProposals(null); }, [current]);
+
+  const changed = useCallback(() => setReload((n) => n + 1), []);
 
   if (fault) return <p className="fault" role="alert">{fault}</p>;
   if (!sources) return <p className="quiet" role="status">Loading.</p>;
@@ -64,13 +89,15 @@ export default function Knowledge() {
       </div>
       <section className="conn-card" aria-labelledby="kn-known-h">
         <h3 id="kn-known-h">What the engine knows</h3>
-        {view ? <Glossary view={view} /> : <p className="quiet" role="status">Loading.</p>}
+        {viewFault && <p className="fault" role="alert">{viewFault}</p>}
+        {!viewFault && (view ? <Glossary view={view} /> : <p className="quiet" role="status">Loading.</p>)}
         <Schema id={current} />
       </section>
+      {proposalFault && <p className="fault" role="alert">{proposalFault}</p>}
       {proposals && (
         <section className="conn-card" aria-labelledby="kn-prop-h">
           <h3 id="kn-prop-h">Waiting for review</h3>
-          <Proposals proposals={proposals} onChanged={load} />
+          <Proposals key={current} proposals={proposals} onChanged={changed} />
         </section>
       )}
       {proposals && (

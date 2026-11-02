@@ -8,7 +8,7 @@ import JobProgress from "../components/JobProgress.jsx";
 import SchemaForm from "../connect/SchemaForm.jsx";
 import Steps from "../connect/Steps.jsx";
 import { buildConfig, describeAdd, describeTest, fieldErrors } from "../connect/flow.js";
-import { buildConnection, fieldsOf, initialValues, validate } from "../connect/schemaForm.js";
+import { buildConnection, clearSecrets, fieldsOf, initialValues, validate } from "../connect/schemaForm.js";
 
 // Connect: add a datasource, test it, index it, profile it and file its starter questions for review. Everything
 // here is an admin call; on the hosted demo, and for anyone who is not an admin, the routes answer 403 and the page
@@ -84,6 +84,7 @@ function Questions({ id }) {
   const [picked, setPicked] = useState({});
   const [note, setNote] = useState(null);
   const [fault, setFault] = useState(null);
+  const [filing, setFiling] = useState(false);
   const load = async () => {
     setFault(null);
     try {
@@ -97,11 +98,14 @@ function Questions({ id }) {
   const file = async () => {
     const chosen = list.filter((q) => picked[q]);
     if (!chosen.length) return;
+    setFiling(true);
     try {
       await fileExamples(id, chosen);
       setNote(`Filed ${chosen.length} for review.`);
     } catch (err) {
       setFault(message(err));
+    } finally {
+      setFiling(false);
     }
   };
   return (
@@ -121,7 +125,7 @@ function Questions({ id }) {
               </li>
             ))}
           </ul>
-          <button type="button" className="index-rebuild is-primary" onClick={file}>File for review</button>
+          <button type="button" className="index-rebuild is-primary" disabled={filing} onClick={file}>File for review</button>
         </>
       )}
       {note && <p className="settings-status" role="status">{note} <a href="#/knowledge">Review them</a></p>}
@@ -216,15 +220,17 @@ export default function Connect() {
     try {
       const reply = await addDatasource(config(), save);
       setAdded({ id: reply.datasource_id, message: reply.message });
+      setValues((v) => clearSecrets(fields, v));
       refresh();
     } catch (err) {
       const outcome = describeAdd(err);
-      if (outcome.added) { setAdded({ id: id.trim(), message: `${outcome.message} ${outcome.fix}` }); refresh(); }
+      if (outcome.added) { setAdded({ id: id.trim(), message: `${outcome.message} ${outcome.fix}` }); setValues((v) => clearSecrets(fields, v)); refresh(); }
       else { setErrors(outcome.fields); setFault(`${outcome.message}${outcome.fix ? ` ${outcome.fix}` : ""}`); }
     } finally { setBusy(false); }
   };
 
   const remove = async (name) => {
+    if (!window.confirm(`Remove ${name} from the running server?`)) return;
     try { await removeDatasource(name); if (added && added.id === name) setAdded(null); refresh(); }
     catch (err) { setFault(message(err)); }
   };
@@ -280,7 +286,7 @@ export default function Connect() {
         {fault && <p className="fault" role="alert">{fault}</p>}
       </form>
 
-      {added && <Next id={added.id} />}
+      {added && <Next key={added.id} id={added.id} />}
     </div>
   );
 }

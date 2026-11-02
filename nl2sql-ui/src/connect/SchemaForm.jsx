@@ -1,4 +1,5 @@
 import React from "react";
+import { selectOptions } from "./schemaForm.js";
 
 // One datasource type's connection form, built from its JSON Schema (`fieldsOf` in schemaForm.js). Secret fields
 // are password inputs with a note to type an ${env:NAME} reference; advanced fields sit behind a disclosure.
@@ -25,14 +26,14 @@ function Field({ field, values, errors, onChange }) {
     control = (
       <select id={id} value={value ?? ""} aria-describedby={described} aria-invalid={error ? true : undefined}
               onChange={(e) => onChange(field.key, e.target.value)}>
-        {field.options.map((o) => <option key={String(o)} value={o}>{String(o)}</option>)}
+        {selectOptions(field).map((o) => <option key={String(o)} value={o}>{o === "" ? "Not set" : String(o)}</option>)}
       </select>
     );
   } else {
     control = (
       <input id={id} type={field.kind === "password" ? "password" : "text"}
              inputMode={field.kind === "number" ? "numeric" : undefined}
-             autoComplete="off" spellCheck={false} value={value ?? ""} placeholder={field.example || ""}
+             autoComplete={field.kind === "password" ? "new-password" : "off"} spellCheck={false} value={value ?? ""} placeholder={field.example || ""}
              aria-describedby={described} aria-invalid={error ? true : undefined}
              onChange={(e) => onChange(field.key, e.target.value)} />
     );

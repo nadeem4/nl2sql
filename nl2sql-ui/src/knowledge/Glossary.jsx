@@ -1,11 +1,13 @@
 import React from "react";
+import { originOf } from "./origin.js";
+import { joinEnd } from "./proposals.js";
 
 // What the engine knows about one datasource (`DatasourceKnowledgeView`): terms, rules, joins, then the tables and
 // columns. `origins` says where each piece came from: a knowledge file, the database, or derived.
 const ORIGIN = { knowledge: "file", database: "database", derived: "derived" };
 
-function Origin({ origins, path }) {
-  const origin = origins && origins[path];
+function Origin({ origins, kind, name }) {
+  const origin = originOf(origins, kind, name);
   return origin ? <span className="art-meta kn-origin">{ORIGIN[origin] || origin}</span> : null;
 }
 
@@ -47,7 +49,7 @@ export default function Glossary({ view }) {
         <ul className="kn-list">
           {k.joins.map((j, i) => (
             <li key={i}>
-              <span className="mono">{j.from} to {j.to}</span>
+              <span className="mono">{joinEnd(j.from)} to {joinEnd(j.to)}</span>
               {j.cardinality && j.cardinality !== "unknown" ? ` (${j.cardinality})` : ""}
               {j.notes ? `: ${j.notes}` : ""}
             </li>
@@ -58,7 +60,7 @@ export default function Glossary({ view }) {
         <ul className="kn-list">
           {tables.map(([name, t]) => (
             <li key={name}>
-              <span className="mono">{name}</span> <Origin origins={view.origins} path={`tables.${name}`} />
+              <span className="mono">{name}</span> <Origin origins={view.origins} kind="tables" name={name} />
               {t.description ? `: ${t.description}` : ""}
             </li>
           ))}
@@ -68,7 +70,7 @@ export default function Glossary({ view }) {
         <ul className="kn-list">
           {columns.map(([name, c]) => (
             <li key={name}>
-              <span className="mono">{name}</span> <Origin origins={view.origins} path={`columns.${name}`} />
+              <span className="mono">{name}</span> <Origin origins={view.origins} kind="columns" name={name} />
               {c.description ? `: ${c.description}` : ""}
             </li>
           ))}
