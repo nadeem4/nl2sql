@@ -34,10 +34,8 @@ from typing_extensions import Annotated
 
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
-from nl2sql.evaluation import presets
-from nl2sql.evaluation.records import BENCHMARKS_DIR, HISTORY_PATH, README_PATH, import_records, publish, \
-    run_stamp, write_records
-from nl2sql.llm.models import LLMFileConfig
+from nl2sql import (BENCHMARKS_DIR, HISTORY_PATH, README_PATH, LLMFileConfig, import_records, load_llm_file,
+                    publish_records, resolve_llm_spec, run_stamp, write_records)
 
 app = typer.Typer(help="Evals: run suites and gate them against a baseline, regenerate expected rows, "
                        "publish recorded runs.", no_args_is_help=True)
@@ -56,9 +54,9 @@ def _llm_file_or_preset(value: str) -> tuple:
     """``(name, config)`` for a preset name or an ``llm`` section file."""
     path = pathlib.Path(value)
     if value.lower().endswith((".yaml", ".yml")) or path.is_file():
-        return path.stem, presets.load_llm_file(path)
-    name, preset = presets.resolve_llm_spec(value)
-    return name, presets.load_llm_file(preset)
+        return path.stem, load_llm_file(path)
+    name, preset = resolve_llm_spec(value)
+    return name, load_llm_file(preset)
 
 
 def llm_configs(specs: List[str]) -> Dict[str, LLMFileConfig]:
@@ -325,7 +323,7 @@ def publish_command(
         for rel in conflicts:
             console.print(f"[bold red]Conflict:[/bold red] {escape(rel)} is already here with other content; "
                           "kept the one here.", soft_wrap=True)
-    count = publish(results_dir, history_path, readme_path)
+    count = publish_records(results_dir, history_path, readme_path)
     console.print(f"[green]Published {count} record(s) from {escape(str(results_dir))} to "
                   f"{escape(str(history_path))} and {escape(str(readme_path))}.[/green]", soft_wrap=True)
     if conflicts:

@@ -312,6 +312,26 @@ class NL2SQL:
             raise EngineNotReady("No datasource is ready.", report)
         return report
 
+    def serve_mcp(self, identity: Optional["UserContext"], *, http: bool = False, host: Optional[str] = None,
+                  port: Optional[int] = None) -> None:
+        """Serve this engine to an MCP client (the ``mcp`` extra): over stdio until the client closes the
+        stream, or with ``http=True`` over HTTP until stopped.
+
+        ``identity`` is who the stdio caller is; over HTTP with ``mcp.auth: api_keys`` it is ``None`` and each
+        caller comes from its key. ``host`` and ``port`` override ``mcp.http`` for HTTP.
+
+        Raises:
+            ImportError: the ``mcp`` extra is not installed.
+        """
+        from nl2sql.mcp import server
+
+        if http:
+            from nl2sql.mcp import http as http_server
+
+            http_server.serve(self, identity, host=host, port=port)
+        else:
+            server.build_server(self, identity).run("stdio")
+
     def close(self) -> None:
         """Dispose the adapters' pools and close the stores. The engine cannot be used afterwards.
 

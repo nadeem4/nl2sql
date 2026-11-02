@@ -1,7 +1,7 @@
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
-from nl2sql.registry import Registry, RegistryError
+from nl2sql import Registry, RegistryError
 
 from nl2sql.cli.common.decorators import handle_cli_errors
 

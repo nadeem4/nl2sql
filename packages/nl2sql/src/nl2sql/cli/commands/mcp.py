@@ -16,7 +16,7 @@ from nl2sql.cli.common.engine import config_option
 
 if TYPE_CHECKING:
     from nl2sql import UserContext
-    from nl2sql.config import Policies
+    from nl2sql import Policies
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +55,7 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str], http:
                 host: Optional[str] = None, port: Optional[int] = None) -> None:
     """Build the engine and serve it: over stdio until the client closes the stream, or with ``http`` over HTTP
     until stopped. HTTP with ``mcp.auth: api_keys`` takes each caller from its key, so no role is given."""
-    from nl2sql import NL2SQL, ConfigError, EngineNotReady
-    from nl2sql.config import load_config
+    from nl2sql import NL2SQL, ConfigError, EngineNotReady, load_config
 
     try:
         config = load_config(config_option(ctx))
@@ -69,12 +68,6 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str], http:
             identity = caller(config.policies, list(roles), user)
     except (ConfigError, ValueError) as error:
         _fail(str(error))
-    try:
-        from nl2sql.mcp import server
-        from nl2sql.mcp import http as http_server
-    except ImportError:
-        _fail('nl2sql mcp needs the mcp extra: pip install "nl2sql-engine[mcp]"')
-
     try:
         engine = NL2SQL(config)
     except ConfigError as error:
@@ -89,11 +82,13 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str], http:
         if http:
             logger.info("Serving %d datasource(s) over HTTP with %s", len(config.datasources),
                         "API keys" if identity is None else f"no keys, as role(s) {', '.join(identity.roles) or '(allow_all)'}")
-            http_server.serve(engine, identity, host=host, port=port)
+            engine.serve_mcp(identity, http=True, host=host, port=port)
         else:
             logger.info("Serving %d datasource(s) over stdio as role(s) %s", len(config.datasources),
                         ", ".join(identity.roles) or "(allow_all)")
-            server.build_server(engine, identity).run("stdio")
+            engine.serve_mcp(identity)
+    except ImportError:
+        _fail('nl2sql mcp needs the mcp extra: pip install "nl2sql-engine[mcp]"')
     except (EngineNotReady, ValueError) as error:
         _fail(str(error))
     finally:

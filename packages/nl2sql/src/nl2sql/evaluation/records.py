@@ -730,7 +730,7 @@ def replace_block(text: str, block: str) -> str:
     return text[:start] + block + text[end + len(END):]
 
 
-def publish(benchmarks_dir: pathlib.Path = BENCHMARKS_DIR, history_path: pathlib.Path = HISTORY_PATH,
+def publish_records(benchmarks_dir: pathlib.Path = BENCHMARKS_DIR, history_path: pathlib.Path = HISTORY_PATH,
             readme_path: pathlib.Path = README_PATH) -> int:
     """Rewrites the history page and the README block from the records; returns how many there are.
 

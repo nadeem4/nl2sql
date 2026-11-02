@@ -57,7 +57,12 @@ import urllib.request
 import webbrowser
 from typing import Dict, List, Optional, Tuple
 
-from nl2sql.llm.providers import (
+from nl2sql import (
+    DEMO_QUESTIONS,
+    DEMO_QUESTIONS_BY_DATASOURCE,
+    FakeLLMServer,
+    RecordingProxy,
+    ReplayStore,
     ANTHROPIC_UPSTREAM,
     KEYED_PROVIDERS,
     OLLAMA_BASE_URL,
@@ -71,7 +76,6 @@ from nl2sql.llm.providers import (
 )
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
-from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
 from nl2sql.cli.demo.llm_config import ENV_FILE, read_llm, with_api_keys
 from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
 from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
@@ -79,8 +83,6 @@ from nl2sql.cli.demo.defaults import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUEST
 from nl2sql.cli.demo.stamp import outdated_warning, write_stamp
 from rich.markup import escape
 from nl2sql import configure_logging, load_env_file
-from nl2sql.llm.replay import RecordingProxy, ReplayStore
-from nl2sql.testing.fake_llm import FakeLLMServer
 
 # Seconds between the words of a recorded answer the playground streams
 # (``/api/ask/stream``): a recording replays at once, and an answer that lands
@@ -203,7 +205,7 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
     A folder written by an older engine is used as it is, with a warning:
     demo folders are never upgraded in place.
     """
-    from nl2sql.config import init_project
+    from nl2sql import init_project
 
     directory.mkdir(parents=True, exist_ok=True)
     config_path = directory / "nl2sql.yaml"
