@@ -2480,6 +2480,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-guided-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guided builder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-starter-dashboard" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6415,6 +6426,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-guided-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guided builder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-starter-dashboard" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6578,7 +6600,7 @@ never purged.</p>
 none</strong>: if one edit is refused, nothing is saved. A draft and a saved dashboard take the same edits. Stored
 chart results stay valid across a rename, a redraw, an arrange, a move and a schedule; removing a chart or
 changing the filters discards the results they invalidate. <code>add_tile</code> and <code>replace_plan</code>, which change what
-data a chart shows, are only for a conversation (<code>add_verified_tile</code> and <code>add_saved_tile</code> add a chart from a verified query or a saved answer without asking a model; the guided builder uses them) (see <a href="#building-in-chat">Building in chat</a>).</p>
+data a chart shows, are only for a conversation (<code>add_verified_tile</code> and <code>add_saved_tile</code> add a chart from a verified query or a saved answer without asking a model; the guided builder uses them) (see <a href="#building-in-chat">Building in chat</a> and <a href="#the-guided-builder">The guided builder</a>).</p>
 <p>Each change publishes <code>dashboard.changed</code> (the kinds, never the values), <code>set_schedule</code> also
 <code>dashboard.schedule_set</code> (it saves a role snapshot, so it is audited) and the workspace calls publish
 <code>workspace.changed</code>.</p>
@@ -6738,11 +6760,30 @@ nothing refreshes.</p>
 </code></pre></div>
 <p><code>--user</code> and <code>--tenant</code> act as that owner: the command is for the operator, who holds the config and the
 credentials. <code>--dashboard</code> needs <code>--user</code>, since a dashboard belongs to a user. <code>--due</code> runs each schedule as its saved owner, so it refuses <code>--as</code>, <code>--user</code> and <code>--tenant</code>.</p>
+<h2 id="the-guided-builder">The guided builder</h2>
+<p>The guided builder makes a dashboard from questions a person picks, without chat. Three facade calls, each with
+the caller's <code>user_context</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">opts</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">builder_options</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>     <span class="c1"># what it offers; no model, nothing run</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">tiles</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">propose_tiles</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s2">"curated"</span><span class="p">,</span> <span class="s2">"asked"</span><span class="p">],</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                                        <span class="n">curated_ids</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="n">dimensions</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>   <span class="c1"># TileProposal list</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">board</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">tiles</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Sales"</span><span class="p">)</span>   <span class="c1"># answers each ticked tile</span>
+</code></pre></div>
+<p><code>builder_options</code> lists the verified queries the caller's scope reaches, their saved answers, and the glossary
+metrics, breakdowns, periods and date columns. <code>propose_tiles</code> turns the chosen sources into tiles to tick,
+untick or reword; only the <code>asked</code> source uses a model (at most 3 new questions) and so needs a key. <code>build</code>
+adds each ticked tile (a verified or saved one without asking a model) and reports the questions it could not
+answer. Over REST these are <code>GET /dashboard-builder/options</code>, <code>POST /dashboard-builder/proposals</code> and the job
+<code>POST /jobs/dashboard-build</code>.</p>
+<p>The web app's <strong>Build a dashboard</strong> panel (beside Generate) walks four steps: sources (curated, your saved
+answers, "tell us what matters"), the chips <code>builder_options</code> offers, a review of the proposed charts, and the
+build. In the review, a new question can be reworded and any chart can be set to auto, line, bar, big number or
+table; a curated or saved chart keeps its stored query, so its question is shown as text. If the build fails or
+is cancelled, <strong>Back to review</strong> keeps the ticked list. See <a href="../apps/web/">the web app</a>.</p>
 <h2 id="the-starter-dashboard">The starter dashboard</h2>
 <p><code>generate</code> makes a first dashboard from a datasource's schema, with no model and no profile run: it needs an
 index.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">board</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>          <span class="c1"># saved in your "General" workspace</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">suggest_questions</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>         <span class="c1"># the first five questions, nothing run</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">board</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>          <span class="c1"># saved in your "General" workspace</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">suggest_questions</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>         <span class="c1"># the first five questions, nothing run</span>
 </code></pre></div>
 <p><strong>What it reads.</strong> Each column gets a role from the indexed snapshot alone (no query): what the schema proves (a
 key is an <em>identifier</em>, a date type a <em>date</em>), then Wave B's name and statistics rules (<code>money</code>, <code>quantity</code>,
