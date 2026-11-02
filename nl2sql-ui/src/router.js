@@ -1,11 +1,11 @@
 // Where you are in the playground, kept in the address bar.
 //
-// A route is a hash that starts with "#/": "#/" is the home page, "#/ask" the
-// question and answer view, "#/pipeline", "#/settings" and "#/retrieval" pages
+// A route is a hash that starts with "#/": "#/" is the home page, "#/chat" the
+// chat, "#/pipeline", "#/settings" and "#/retrieval" pages
 // of their own. So a reload lands where you were and a link can be shared,
 // with no server route to add. A route nobody serves reads as the home page; a
 // bare fragment left by an older link (#run, #question, a station) was a place
-// on the Ask page when Ask was the default, so it still opens Ask. Back and
+// on the Ask page when Ask was the default, so it opens Chat, which took that page's place. Back and
 // Forward always land somewhere. Nothing in the page links to a bare fragment: the skip
 // control and the index warning move focus instead, which keeps the hash a
 // route and keeps the history honest.
@@ -18,6 +18,11 @@ function stub(id, path, label, description, param = null) {
   return { id, path, label, title: label, description, stub: true, param };
 }
 
+// A Wave D page whose row has shipped: it is in the nav.
+function page(id, path, label, description, param = null) {
+  return { id, path, label, title: label, description, param };
+}
+
 export const PAGES = [
   {
     id: "home",
@@ -27,14 +32,7 @@ export const PAGES = [
     description:
       "Ask a database a question and see the typed plan, the checks and the SQL before any rows come back.",
   },
-  {
-    id: "ask",
-    path: "/ask",
-    label: "Ask",
-    title: "Ask",
-    description:
-      "Put a question to the demo database and follow the run: the plan, the checks, the SQL, the rows and what it cost.",
-  },
+  page("chat", "/chat", "Chat", "Ask in conversation: the model picks the steps, and every answer shows how it was made.", "optional"),
   {
     id: "pipeline",
     path: "/pipeline",
@@ -69,7 +67,6 @@ export const PAGES = [
   // Wave D's pages. Each is a stub (pages/<Name>.jsx) until the row that owns
   // it fills it, and stays out of the nav until then. `param` is the one id a
   // route may carry: "optional" (#/chat and #/chat/{id}) or "required".
-  stub("chat", "/chat", "Chat", "Ask in conversation: the model picks the steps, and every answer shows how it was made.", "optional"),
   stub("dashboards", "/dashboards", "Dashboards", "Whole dashboards in workspaces, each tile with its takeaway.", "optional"),
   {
     id: "connect",
@@ -85,15 +82,15 @@ export const PAGES = [
     title: "Knowledge",
     description: "What the engine knows about each datasource, and the proposals waiting for review.",
   },
-  stub("approvals", "/approvals", "Approvals", "Questions waiting for someone to grant or deny them."),
+  page("approvals", "/approvals", "Approvals", "Questions waiting for someone to grant or deny them."),
   stub("evals", "/evals", "Evals", "Run a suite against the server and read the report."),
   stub("trace", "/trace", "Trace", "One run, node by node.", "required"),
 ];
 
 export const DEFAULT_PAGE = "home";
 
-// Where a bare fragment from an older link lands: those all named places on Ask.
-const FRAGMENT_PAGE = "ask";
+// Where a bare fragment from an older link lands: those all named places on the old Ask page, whose job Chat took over.
+const FRAGMENT_PAGE = "chat";
 
 const byId = new Map(PAGES.map((page) => [page.id, page]));
 const byPath = new Map(PAGES.map((page) => [page.path, page]));
@@ -142,13 +139,15 @@ export function pageFromHash(hash) {
 
 // One row of the header nav. A page the server has turned off keeps its place
 // and is marked; opening it is how you read the reason.
-export function navItems(currentId, off = {}) {
+// `badges` maps a page id to a count shown beside its name (the approvals waiting); 0 or none shows nothing.
+export function navItems(currentId, off = {}, badges = {}) {
   return PAGES.filter((page) => !page.stub).map((page) => ({
     id: page.id,
     label: page.label,
     href: hashFor(page.id),
     current: page.id === currentId,
     off: Boolean(off[page.id]),
+    badge: badges[page.id] > 0 ? badges[page.id] : null,
   }));
 }
 

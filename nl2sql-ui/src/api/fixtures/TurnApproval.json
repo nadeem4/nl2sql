@@ -1,0 +1,101 @@
+{
+  "at": "2026-01-01T00:00:00Z",
+  "error": null,
+  "index": 1,
+  "kind": "message",
+  "offers": [],
+  "reply": null,
+  "status": "needs_approval",
+  "steps": [
+    {
+      "call": {
+        "args": {
+          "question": "Run the report"
+        },
+        "name": "ask"
+      },
+      "error": null,
+      "output": null,
+      "question": "Run the report",
+      "result": {
+        "approvals_needed": [
+          {
+            "approver_roles": [],
+            "asker_tenant_id": null,
+            "asker_user_id": null,
+            "datasource_id": "chinook",
+            "decomposition": null,
+            "hook": "review",
+            "id": "ap-1",
+            "plan": null,
+            "point": "execute.before",
+            "question": "Delete old rows?",
+            "reason": "A reviewer must approve this query.",
+            "sql": "SELECT 1",
+            "sql_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "sub_query": null,
+            "verified": null
+          }
+        ],
+        "artifact_refs": {},
+        "clarification": null,
+        "decomposition": null,
+        "errors": [],
+        "explanation": null,
+        "final_answer": null,
+        "reasoning": [],
+        "result_manifest": [],
+        "source": {
+          "datasource_id": null,
+          "id": null,
+          "params": null,
+          "type": "generated"
+        },
+        "status": "needs_approval",
+        "stop": null,
+        "sub_queries": [],
+        "timings": {},
+        "trace_id": "trace-wait",
+        "trace_path": null,
+        "truncated": false,
+        "usage": {
+          "calls": [],
+          "nodes": {},
+          "plan_cache_hits": 0,
+          "total": {
+            "cache_write_input_tokens": null,
+            "cached_input_tokens": null,
+            "calls": 0,
+            "cost": null,
+            "input_tokens": null,
+            "latency_s": 0.0,
+            "output_tokens": null,
+            "reasoning_tokens": null,
+            "total_tokens": null
+          }
+        },
+        "warnings": []
+      },
+      "status": "needs_approval",
+      "trace_id": "trace-wait"
+    }
+  ],
+  "text": "Run the report",
+  "trace_id": null,
+  "usage": {
+    "calls": [],
+    "nodes": {},
+    "plan_cache_hits": 0,
+    "total": {
+      "cache_write_input_tokens": null,
+      "cached_input_tokens": null,
+      "calls": 0,
+      "cost": null,
+      "input_tokens": null,
+      "latency_s": 0.0,
+      "output_tokens": null,
+      "reasoning_tokens": null,
+      "total_tokens": null
+    }
+  }
+}
