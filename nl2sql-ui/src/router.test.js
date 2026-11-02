@@ -152,8 +152,8 @@ test("the nav names every page, marks the current one and says which are off", (
   const items = navItems("settings", { retrieval: true });
 
   assert.deepEqual(items.map((i) => i.id), PAGES.filter((p) => !p.stub).map((p) => p.id));
-  assert.deepEqual(items.map((i) => i.href), ["#/", "#/ask", "#/pipeline", "#/settings", "#/retrieval"]);
-  assert.deepEqual(items.map((i) => i.label), ["Home", "Ask", "Pipeline", "Settings", "Retrieval"]);
+  assert.deepEqual(items.map((i) => i.href), ["#/", "#/ask", "#/pipeline", "#/settings", "#/retrieval", "#/dashboards"]);
+  assert.deepEqual(items.map((i) => i.label), ["Home", "Ask", "Pipeline", "Settings", "Retrieval", "Dashboards"]);
   assert.equal(items.filter((i) => i.current).length, 1);
   assert.equal(items.find((i) => i.id === "settings").current, true);
   // An off page keeps its place in the nav: it opens and says why.
@@ -164,7 +164,7 @@ test("the nav names every page, marks the current one and says which are off", (
 
 test("nothing is marked off before the server has answered", () => {
   const items = navItems("ask", {});
-  assert.deepEqual(items.map((i) => i.off), [false, false, false, false, false]);
+  assert.deepEqual(items.map((i) => i.off), [false, false, false, false, false, false]);
   assert.equal(items.find((i) => i.id === "ask").current, true);
 });
 
@@ -204,7 +204,7 @@ test("the nav indicator sits under the current tab: moved and scaled, never resi
 });
 
 // Wave D's pages (wave_d.md, section 5). Each is a stub until its W-row fills it.
-const WAVE_D = ["chat", "dashboards", "connect", "knowledge", "approvals", "evals", "trace"];
+const WAVE_D = ["chat", "connect", "knowledge", "approvals", "evals", "trace"];
 
 test("Wave D's routes are all there, as stubs the nav does not list yet", () => {
   for (const id of WAVE_D) {
@@ -215,7 +215,7 @@ test("Wave D's routes are all there, as stubs the nav does not list yet", () => 
   }
   const listed = navItems("home").map((item) => item.id);
   for (const id of WAVE_D) assert.ok(!listed.includes(id), `${id} should not be in the nav yet`);
-  for (const id of ["home", "ask", "pipeline", "settings", "retrieval"]) assert.ok(listed.includes(id));
+  for (const id of ["home", "ask", "pipeline", "settings", "retrieval", "dashboards"]) assert.ok(listed.includes(id));
 });
 
 test("a route can carry one id: chat and dashboards optionally, a trace always", () => {
