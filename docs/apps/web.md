@@ -117,7 +117,8 @@ routes](../api/rest/dashboards.md) and never a model.
 - **Edit** turns on, per chart: rename, chart type (automatic, line, bar, big number, table; the chart runs once so the new type shows), move earlier or later,
   wider or narrower, taller or shorter, and remove. It also renames the dashboard, **moves** it to another workspace
   (or **pins** a draft into one; with no workspace yet, **Pin** makes "General"), removes a filter, and deletes the dashboard. The grid has four columns; charts are
-  packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here, and so is generating a dashboard for a datasource.
+  packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here.
+- **Generate a starter dashboard** (at the top of the page) builds one for a datasource from what the project already knows, with no model and no key. Pick the datasource, and optionally a title, the workspace to save into (the chosen one by default) and how many charts. Progress shows as "tile 3 of 8" and can be cancelled; when it is saved the new dashboard opens. Only one job per person runs at a time, so a second start is told to wait.
 
 ## Connect and review
 
