@@ -22,6 +22,7 @@ included, and no route acts as the in-process operator. On the hosted demo the o
 | `404` | `ANSWER_NOT_FOUND` | No such answer, or not the caller's. |
 | `409` | `ANSWER_LIMIT_REACHED` | The caller is at `answers.max_per_user` (default 100). |
 | `422` | `NOT_SAVABLE` | The step did not answer, kept no plan, or is not the run named. |
+| `409` | `CONFLICT` | Two saves by the same owner raced; the second can try again at once. |
 | `422` | `INVALID_REQUEST` | A body that does not validate. |
 
 See [Errors](errors.md) for the envelope.

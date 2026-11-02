@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from nl2sql import NL2SQLError
+from nl2sql import LockHeld, NL2SQLError
 
 logger = logging.getLogger("nl2sql_api")
 
@@ -86,6 +86,13 @@ def _nl2sql_error(request: Request, exc: NL2SQLError) -> JSONResponse:
     return _response(request, exc.status, error, getattr(exc, "headers", None))
 
 
+def _lock_held(request: Request, exc: LockHeld) -> JSONResponse:
+    """Two writers raced for the same lease (two saves by one owner): the second may simply try again."""
+    return _response(request, 409, ApiError(
+        code="CONFLICT", message="Another request for the same thing is still being written.",
+        fix="Try again in a moment."))
+
+
 def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     # Only where and why, never the value: a rejected field may be a password.
     details = [{"loc": list(problem["loc"]), "msg": problem["msg"]} for problem in exc.errors()]
@@ -137,6 +144,7 @@ class RequestIdMiddleware:
 def install(app: FastAPI) -> None:
     """Register the handlers and the request-id middleware on ``app``."""
     app.add_exception_handler(NL2SQLError, _nl2sql_error)
+    app.add_exception_handler(LockHeld, _lock_held)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(StarletteHTTPException, _http_error)
     app.add_exception_handler(Exception, _internal_handler)

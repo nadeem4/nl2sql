@@ -6,7 +6,7 @@ import time
 import pytest
 from dashboard_stubs import AT, Recorder, dashboard
 
-from nl2sql import (AnswerLimitReached, AnswerNotFound, BuilderOptions, BuildReport, ChartPlan, LLMOverride,
+from nl2sql import (LockHeld, AnswerLimitReached, AnswerNotFound, BuilderOptions, BuildReport, ChartPlan, LLMOverride,
                     MissingProviderKey, NoTiles, NotIndexed, NotSavable, QueryResult, SavedAnswer, SaveReport,
                     SkippedQuestion, TileProgress, TileProposal, UserContext, VerifiedRef)
 from nl2sql_api import identity
@@ -276,3 +276,12 @@ def test_build_result_is_the_owners_alone(api_client):
     wait_for(client, job["id"])
     app.dependency_overrides[identity.caller] = lambda: UserContext(user_id="bob", roles=["analyst"])
     assert client.get(f"{API}/jobs/{job['id']}").status_code == 404
+
+
+def test_two_saves_racing_for_one_owner_is_a_retryable_409(stub):
+    client, answers, _ = stub
+    answers.returns["save"] = LockHeld("'answers:ann' is held by another process.")
+    response = client.post(f"{API}/answers", json={"trace_id": "t", "conversation_id": "c", "step": STEP})
+    assert response.status_code == 409 and code(response) == "CONFLICT"
+    assert response.json()["error"]["fix"] == "Try again in a moment."
+    assert "held by another" not in response.text
