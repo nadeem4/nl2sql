@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import pytest
+from nl2sql.storage.sqlite import LockHeld
 from test_review_queue import ADMIN, ANALYST, _engine, _project
 
 from nl2sql import UserContext
@@ -320,6 +321,53 @@ def test_a_plan_that_does_not_parse_comes_back_needs_fixing(engine):
     result = engine.answers.run(mine.id, user_context=ANALYST)
 
     assert result.status == "error" and result.errors[0]["error_code"] == "TILE_NEEDS_FIXING"
+
+
+def test_run_needs_no_model(engine):
+    # A saved answer re-runs as a tile does (answer=False): rows come back with no model reachable.
+    mine = save(engine, cid=ready(engine)).answer
+
+    result = engine.answers.run(mine.id, user_context=ANALYST)
+
+    assert result.status == "success", result.errors
+    assert result.sub_queries[0].rows or result.result_manifest
+
+
+def test_a_verified_step_without_a_datasource_is_not_savable(engine):
+    keep_trace(engine, "t1")
+    verified = answered("t1", verified=True).model_copy(
+        update={"source": AnswerSource(type="verified", id="order_count")})
+    converse(engine, result=verified)
+
+    with pytest.raises(NotSavable):
+        save(engine)
+
+
+def test_a_save_holds_the_owners_lock_around_the_count_and_the_put(engine):
+    cid = ready(engine)
+    state = engine._runtime.state
+
+    with state.lock(f"answers:{engine._runtime.tenant_id}:bob", ttl_s=30):
+        with pytest.raises(LockHeld):
+            save(engine, cid=cid)
+    assert engine.answers.list(user_context=ANALYST) == []
+
+
+def test_concurrent_saves_never_pass_the_cap(engine):
+    from concurrent.futures import ThreadPoolExecutor
+
+    cids = [ready(engine, f"t{n}") for n in range(6)]
+
+    def attempt(n: int) -> None:
+        try:
+            save(engine, cid=cids[n], trace_id=f"t{n}")
+        except (AnswerLimitReached, LockHeld):
+            pass
+
+    with ThreadPoolExecutor(6) as pool:
+        list(pool.map(attempt, range(6)))
+
+    assert len(engine.answers.list(user_context=ANALYST)) <= 3
 
 
 # ---------------------------------------------------------------- the store

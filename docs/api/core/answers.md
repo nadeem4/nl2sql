@@ -20,7 +20,7 @@ Every method takes `user_context` keyword-only and required. A missing caller, o
 | `list(*, user_context, datasource_id=None)` | `List[SavedAnswer]` | Newest first. |
 | `get(id, *, user_context)` | `SavedAnswer` | |
 | `delete(id, *, user_context)` | `None` | |
-| `run(id, *, user_context, llm_override=None, approvals=None)` | `QueryResult` | Runs the plan again as the caller. |
+| `run(id, *, user_context, llm_override=None, approvals=None)` | `QueryResult` | Runs the plan again as the caller, with no model call (`answer=False`, as a tile), so it works with no key. |
 
 `SavedAnswer` has `id`, `tenant_id`, `user_id`, `question`, `datasource_id`, `plan` (a `ChartPlan`, as a dashboard
 tile holds), `chart` (`auto` by default), `created_at` and `trace_id`. `SaveReport` has `answer`, `proposed`,
@@ -37,6 +37,8 @@ tile holds), `chart` (`auto` by default), `created_at` and `trace_id`. `SaveRepo
   can (origin `thumbs_up`). The answer is saved either way (D241): `proposed` is `False` and
   `not_proposed_reason` says why (`verified`, `multiple_statements`, `failed`, `no_sql`, `no_trace` when the run's
   trace was not kept, and the other reasons `skip_reason` gives). `note` is stored on the rating.
+- **A cross-database answer is filed under its first sub-query's datasource**, so `list(datasource_id=...)` for its other datasources does not return it.
+- **The cap never overflows.** `save` counts and stores under the owner's lock; a save that meets another in flight raises `LockHeld` and can be retried. A verified answer whose source names no datasource is `NotSavable`.
 - **Saving the same run twice** is one answer and one proposal.
 - **The cap.** At most `answers.max_per_user` answers (default 100) per person. The next save is refused with
   `AnswerLimitReached` (`ANSWER_LIMIT_REACHED`, 409) before anything is rated; deleting one frees a place (D242).
