@@ -270,7 +270,7 @@ Config(..., conversations=Conversations(context_turns=5), chat_tools=["chart", "
 mode: your_data    # demo | your_data | hosted (default your_data)
 ```
 
-What the project is for: the bundled `demo`, your own data, or a `hosted` public demo ([Wave D](../architecture/wave_d.md), D229). It is a top-level key, not a section. The engine only validates it. `nl2sql.resolve_mode(flag, env, file)` picks the mode a process runs in: the launcher flag, else the value of `NL2SQL_MODE`, else this key. It is a pure function; the entry point reads the environment and passes the value in (`nl2sql-api` does this in a later Wave D PR). An unknown value is an error naming the three.
+What the project is for: the bundled `demo`, your own data, or a `hosted` public demo ([Wave D](../architecture/wave_d.md), D229). It is a top-level key, not a section. The engine only validates it. `nl2sql.resolve_mode(flag, env, file)` picks the mode a process runs in: the launcher flag, else the value of `NL2SQL_MODE`, else this key. It is a pure function; the entry point reads the environment and passes the value in: `nl2sql-api serve` is the one place that reads `NL2SQL_MODE`, resolves it with the `--demo` and `--hosted` flags and the file, and builds the engine with the result in its `Config`. An unknown value is an error naming the three.
 
 ### Strict keys and errors
 

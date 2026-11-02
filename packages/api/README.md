@@ -13,6 +13,7 @@ stops it from starting; any other one that fails is left out.
 pip install nl2sql-api
 nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000     # 127.0.0.1, one worker
 # or: python -m nl2sql_api serve ..., or: NL2SQL_CONFIG=... uvicorn nl2sql_api.main:app
+nl2sql-api serve --demo                  # the demo project; add --hosted for the public demo (anonymous sessions, limits)
 ```
 
 Interactive docs: Swagger UI at `/docs`, ReDoc at `/redoc`, the schema at

@@ -81,6 +81,9 @@ nl2sql-api serve --config /etc/nl2sql/nl2sql.yaml --host 127.0.0.1 --port 8000
 # or: NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml uvicorn nl2sql_api.main:app
 ```
 
+`--demo` prepares and serves the demo project, and `--hosted` makes it the public demo; `NL2SQL_MODE` or the
+`mode:` key picks the mode when no flag does (see [Hosted demo](../deployment/hosted-demo.md#serving-it-with-nl2sql-api)).
+
 `serve` runs one worker, and with `auth: none` it refuses to bind any host but
 loopback, naming `api.auth` in the message.
 

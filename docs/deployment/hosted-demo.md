@@ -233,6 +233,27 @@ malformed key answers `400` without quoting what was sent, and no refusal
 ever repeats something shaped like a key, not even when one was pasted into the
 model header by hand.
 
+## Serving it with `nl2sql-api`
+
+The same demo is served by the API server, which also serves the web app:
+
+```bash
+nl2sql-api serve --demo --hosted --host 0.0.0.0 --port 7860 --questions-per-minute 6 --questions-per-session 30
+```
+
+`--demo` prepares the demo project in `--dir` (default `nl2sql-demo`) and serves it; with `--hosted` the project is
+prepared on the `replay` provider, and the server refuses to start while a model key is in its environment (the
+message names the provider, never the key) or when the visitor role (`policies.default_role`, else `viewer`) is an
+admin role. `NL2SQL_MODE` (`demo`, `your_data` or `hosted`) sets the mode when no flag does, and beats the `mode:`
+key of `nl2sql.yaml`; `GET /api/v1/meta` reports it.
+
+In hosted mode every browser is an anonymous session: a random `nl2sql_demo_session` cookie (`HttpOnly`,
+`SameSite=Lax`) is its identity, it holds the one visitor role and is never an admin, so the admin routes answer
+`403`. Each session may have one job and two open streams at a time, besides the limits below; going over any of them
+is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
+questions the session has asked (`limits`). The old `nl2sql demo --hosted` flags below stay until the CLI moves
+onto the API.
+
 ## Limits
 
 Both live in this one process's memory. There are no accounts, no analytics and

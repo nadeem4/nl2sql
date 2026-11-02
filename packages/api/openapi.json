@@ -10950,7 +10950,7 @@
     },
     "/api/v1/meta": {
       "get": {
-        "description": "Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and\n`request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key. With a caller, also\n`datasources`: each one the caller may reach, with its `id`, `description`, `sample_questions` and `recorded`\n(the ones the `replay` provider can answer with no key), and `recorded_with`, the provider and model those\nrecordings came from (or null).",
+        "description": "Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and\n`request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key. With a caller, also\n`datasources`: each one the caller may reach, with its `id`, `description`, `sample_questions` and `recorded`\n(the ones the `replay` provider can answer with no key), and `recorded_with`, the provider and model those\nrecordings came from (or null). On the hosted demo, also `limits`: `questions_per_minute`,\n`questions_per_session`, `asked` (this session's count), and `jobs` and `streams` (the most at once).",
         "operationId": "meta_api_v1_meta_get",
         "responses": {
           "200": {
