@@ -39,7 +39,7 @@ SAMPLES: Tuple[Sample, ...] = (
     Sample("pagila-insert-data.sql", f"{PAGILA}/pagila-insert-data.sql",
            "136f3105263a1338a9805da4c06b6b37b60f1abc15ce7dbc8d6f5501f506aa22"),
     Sample("sakila-db.tar.gz", "https://downloads.mysql.com/docs/sakila-db.tar.gz",
-           "683e957d456341e48cccd66135ddb0d5701a8436523ed0a6366279f8e8719a68",
+           "d8e848e1c7530d6f246684bdfdaeab12f744011df513bb210df0e898788af193",
            extract=("sakila-db/sakila-schema.sql", "sakila-db/sakila-data.sql")),
     Sample("AdventureWorksLT2022.bak",
            "https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorksLT2022.bak",
