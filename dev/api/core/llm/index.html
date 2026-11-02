@@ -6475,7 +6475,7 @@ form). Both are top-level exports, so an app never imports <code>nl2sql.llm.prov
 So are the stateless facts a command-line tool prints before any engine exists:
 <code>nl2sql.KEYED_PROVIDERS</code> (the providers that read a key), <code>nl2sql.env_var_for_provider(provider)</code>,
 <code>nl2sql.api_key_from_env(provider)</code> (the key, or None; print it masked) and
-<code>nl2sql.ANTHROPIC_EXTRA_HINT</code> (what to install when <code>langchain-anthropic</code> is missing).</p>
+<code>nl2sql.ANTHROPIC_EXTRA_HINT</code> (what to install when <code>langchain-anthropic</code> is missing). So are <code>looks_like_api_key</code> and <code>KEY_SHAPE_MESSAGE</code>, the config writers (<code>default_llm</code>, <code>starter_config</code>, <code>write_env_values</code>, <code>write_project</code>, <code>check_file_name</code>), the eval tools (<code>LLMFileConfig</code>, <code>load_llm_file</code>, <code>resolve_llm_spec</code>, <code>write_records</code>, <code>import_records</code>, <code>publish_records</code>, <code>run_stamp</code>), <code>load_trace</code> and <code>RegistryError</code>. The provider tables and the replay and recording tools <code>nl2sql demo</code> uses are not exported: that command keeps its internal imports until X1a and X1b remove them.</p>
 <h3 id="llmprices">llm.prices</h3>
 <p>Signature:
 <code>prices() -&gt; dict</code></p>

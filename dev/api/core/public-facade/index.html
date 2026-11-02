@@ -6441,6 +6441,10 @@ the environment, so two engines in one process share nothing. The CLI,
 <td>Disposes each adapter's connection pool (an adapter's optional <code>close()</code>) and closes the state store and the vector store client. <code>run_query</code>, <code>stream_query</code> and <code>check</code> raise afterwards. Calling it twice is fine.</td>
 </tr>
 <tr>
+<td><code>serve_mcp(identity, *, http=False, host=None, port=None)</code></td>
+<td>Serves the engine to an MCP client (the <code>mcp</code> extra): over stdio until the client closes the stream, or with <code>http=True</code> over HTTP until stopped. <code>identity</code> is the stdio caller's <code>UserContext</code>; over HTTP with <code>mcp.auth: api_keys</code> it is <code>None</code> and each caller comes from its key. <code>host</code> and <code>port</code> override <code>mcp.http</code>. Raises <code>ImportError</code> without the extra. <code>nl2sql mcp</code> calls it.</td>
+</tr>
+<tr>
 <td><code>clear_plan_cache() -&gt; int</code></td>
 <td>Removes every cached plan from the state store and returns how many there were. Schema snapshots and feedback stay; the next run of each question calls the planner. <code>nl2sql cache clear</code> calls it.</td>
 </tr>

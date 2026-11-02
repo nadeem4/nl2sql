@@ -6983,6 +6983,20 @@ top-level exports (the code on main wins over the plan: <code>engine.llm.provide
 <code>default_llm</code>, <code>starter_config</code>, <code>write_env_values</code>, <code>write_project</code>, <code>check_file_name</code>, <code>Policies</code>-loading in <code>mcp.py</code>,
 <code>looks_like_api_key</code>/<code>KEY_SHAPE_MESSAGE</code> and the <code>nl2sql.mcp</code> start are the names still to expose. The <code>STILL_IMPORTED_FROM_INSIDE</code>
 list is unchanged (the playground and <code>demo.py</code>, X1b).</p>
+<p><strong>CL0b (CLI on the facade: the rest).</strong> The whole CLI imports only the top-level <code>nl2sql</code> (and <code>nl2sql.cli</code>):
+<code>CLI_FILES_STILL_IMPORTING_INSIDE</code> is deleted from <code>test_boundaries.py</code> and <code>test_the_cli_imports_only_the_public_nl2sql</code>
+has no exception but the playground (<code>demo/playground/</code>, <code>demo/</code> and <code>commands/demo.py</code>, which X1a/X1b remove; <code>STILL_IMPORTED_FROM_INSIDE</code> is unchanged). <strong>Where the code
+won over the doc:</strong> the design names facade methods for the provider catalogue, evals, traces and so on, but those
+commands read stateless tables and files before or without an engine, so plain top-level exports were added instead of
+namespace methods (the full list is in <code>docs/api/core/llm.md</code>); the replay, recording and provider-table names that only
+<code>nl2sql demo</code> uses are not exported (X1a/X1b delete that code); only the MCP start is a method, <code>NL2SQL.serve_mcp(identity,
+*, http=False, host=None, port=None)</code> (D232), which <code>nl2sql mcp</code> calls and which raises <code>ValueError</code> for stdio without an
+identity; the "needs the mcp extra" hint comes from <code>importlib.util.find_spec("mcp")</code>, checked before the engine is built.
+The eval path defaults (<code>BENCHMARKS_DIR</code>, <code>HISTORY_PATH</code>, <code>README_PATH</code>) live in <code>cli/commands/eval.py</code>. <code>evaluation.records.publish</code> is renamed <code>publish_records</code> so
+the export has a clear name (no alias). <code>NL2SQLError</code>, <code>ProfileReport</code>, <code>DatasourceKnowledgeView</code>, <code>Policies</code>, <code>Registry</code>
+and <code>init_project</code> were exported already; <code>RegistryError</code>, <code>load_trace</code>, <code>check_file_name</code> and the others above are new.
+<strong>For CL1:</strong> nothing in <code>nl2sql/cli/</code> (outside the playground) imports an engine module, so the move to
+<code>nl2sql_cli</code> is a rename plus repointing the boundary test; <code>demo/playground/</code> must be deleted by X1b first.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at

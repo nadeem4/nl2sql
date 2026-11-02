@@ -6428,9 +6428,10 @@ data or glossary has outdated is <code>CLARIFICATION_STALE</code>: ask again wit
   reaches it. Do not name tables there that some role may not read.</li>
 </ul>
 <h2 id="in-python">In Python</h2>
-<p><code>nl2sql.mcp.server.build_server(engine, identity)</code> returns the server (a
-<code>FastMCP</code>); <code>nl2sql mcp</code> builds the engine and calls
-<code>build_server(engine, identity).run("stdio")</code>. <code>identity</code> is a <code>UserContext</code>,
+<p><code>engine.serve_mcp(identity)</code> serves the engine over stdio until the client closes the
+stream; <code>nl2sql mcp</code> builds the engine and calls it. Over stdio <code>identity</code> is required (a
+<code>ValueError</code> otherwise). <code>nl2sql.mcp.server.build_server(engine, identity)</code> returns the server (a
+<code>FastMCP</code>) if you need to run it yourself. <code>identity</code> is a <code>UserContext</code>,
 or a function returning one that is called on every tool call, inside the
 tool's guard: a function that raises gives <code>INTERNAL_ERROR</code>, never its
 exception's text. The engine stays yours to close.</p>
@@ -6438,15 +6439,15 @@ exception's text. The engine stays yours to close.</p>
 working directory's <code>.env</code>; every setting is passed explicitly when the server
 is built, so neither can change it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.mcp.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_server</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">build_server</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"stdio"</span><span class="p">)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">engine</span><span class="o">.</span><span class="n">serve_mcp</span><span class="p">(</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]))</span>
 </code></pre></div>
-<p>For HTTP, <code>build_server(engine, identity, over_http=True)</code> sets the server up for
+<p>For HTTP, <code>engine.serve_mcp(None, http=True)</code> runs it with Uvicorn (<code>host</code> and <code>port</code> override
+<code>mcp.http</code>). <code>identity</code> is only used with <code>mcp.auth: none</code>. To build the app yourself,
+<code>build_server(engine, identity, over_http=True)</code> sets the server up for
 <code>streamable_http_app()</code>, and <code>nl2sql.mcp.http.build_app(engine, identity)</code> wraps it in the key
-check; <code>nl2sql.mcp.http.serve(engine, identity)</code> runs it with Uvicorn. <code>identity</code> is only used
-with <code>mcp.auth: none</code>.</p>
+check.</p>
 <h2 id="over-http">Over HTTP</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>keys<span class="w"> </span>create<span class="w"> </span>--as<span class="w"> </span>admin<span class="w"> </span>--user<span class="w"> </span>ana<span class="w"> </span>--role<span class="w"> </span>analyst<span class="w"> </span>--label<span class="w"> </span>laptop<span class="w">   </span><span class="c1"># prints the token once</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>my-project/nl2sql.yaml<span class="w"> </span>mcp<span class="w"> </span>--http<span class="w">                        </span><span class="c1"># http://127.0.0.1:8765/mcp</span>
