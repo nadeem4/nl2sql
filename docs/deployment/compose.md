@@ -7,7 +7,8 @@ Self-host NL2SQL with the web app: one `api` service, one data volume, API keys 
 deploy/compose/
   docker-compose.yml    one service, one volume, a /ready healthcheck
   config/nl2sql.yaml    the example config: the Chinook sample, api.auth: api_keys
-  .env.example          the provider key, NL2SQL_DATA_DIR and NL2SQL_MODE
+  README.md             the three commands
+  .env.example          the provider key and NL2SQL_MODE
 ```
 
 The image is built from the `Dockerfile` at the repository root: a Node stage builds the web app, and the API
@@ -65,8 +66,10 @@ server refuses to listen beyond loopback with `auth: none`.
 
 ## Demo or your data
 
-`mode:` in `nl2sql.yaml` and `NL2SQL_MODE` in `.env` choose between `demo`, `your_data` and `hosted`; the
-variable wins. The example uses `your_data`.
+`mode:` in `nl2sql.yaml` and `NL2SQL_MODE` in `.env` choose between `demo` and `your_data`; the
+variable wins. The example uses `your_data`. The public demo is a different deployment: see
+[Hosted demo](hosted-demo.md) (`hosted` drops `api_keys` for anonymous sessions and refuses to start with a
+provider key set).
 
 ## TLS
 

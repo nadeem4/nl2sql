@@ -148,6 +148,7 @@ def test_compose_file_shape():
     assert list(compose["volumes"]) == ["nl2sql-data"]
     assert "/api/v1/ready" in str(api["healthcheck"]["test"])
     assert "env_file" in api
+    assert api["environment"]["NL2SQL_DATA_DIR"] == "/data"
 
 
 def test_compose_example_config_uses_api_keys(monkeypatch):
@@ -168,7 +169,8 @@ def test_compose_env_example_lists_the_variables_and_holds_no_key():
     lines = (COMPOSE / ".env.example").read_text(encoding="utf-8").splitlines()
     names = {line.split("=")[0].lstrip("# ") for line in lines if "=" in line}
 
-    assert {"OPENAI_API_KEY", "NL2SQL_DATA_DIR", "NL2SQL_MODE"} <= names
+    assert {"OPENAI_API_KEY", "NL2SQL_MODE"} <= names
+    assert "NL2SQL_DATA_DIR" not in names  # the service sets it: it must equal the volume mount
     for line in lines:
         if line.startswith("OPENAI_API_KEY=") or line.startswith("ANTHROPIC_API_KEY="):
             assert line.split("=", 1)[1] == ""
@@ -196,3 +198,5 @@ def test_api_image_job_checks_the_driver_the_size_and_the_page():
     assert "pyodbc.drivers()" in steps
     assert "GITHUB_STEP_SUMMARY" in steps
     assert "curl" in steps and "docker run -d" in steps
+    assert "failure()" in [s.get("if") for s in jobs["api-image"]["steps"]] and "docker logs api" in steps
+    assert "--user" not in steps

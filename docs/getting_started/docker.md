@@ -49,9 +49,9 @@ auth: static
 static_role: admin      # one role for every request
 ```
 
-`api.auth: static` pins the RBAC role for every request; the default, `none`,
-answers only requests made straight to `localhost`, so a request through a
-published Docker port is HTTP 403. See [Identity](../api/rest/index.md#identity)
+`api.auth: static` pins the RBAC role for every request. The image runs
+`nl2sql-api serve --host 0.0.0.0`, which refuses to start while `api.auth` is
+the default, `none`, so the container needs `api_keys`, `proxy` or `static`. See [Identity](../api/rest/index.md#identity)
 and [API settings](../configuration/api.md).
 
 The routes that register datasources or LLMs and build or clear the index need a

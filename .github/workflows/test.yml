@@ -325,11 +325,16 @@ jobs:
       - name: GET / answers the built page
         run: |
           mkdir -p /tmp/cfg /tmp/data
+          chmod 777 /tmp/data   # the image runs as its own uid 1000, as Compose does
           cp deploy/compose/config/nl2sql.yaml /tmp/cfg/
-          docker run -d --name api -p 8000:8000 -v /tmp/cfg:/etc/nl2sql:ro -v /tmp/data:/data             -e NL2SQL_DATA_DIR=/data -e OPENAI_API_KEY=ci-placeholder --user "$(id -u)" nl2sql-api:ci
+          docker run -d --name api -p 8000:8000 -v /tmp/cfg:/etc/nl2sql:ro -v /tmp/data:/data             -e NL2SQL_DATA_DIR=/data -e OPENAI_API_KEY=ci-placeholder nl2sql-api:ci
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/ -o /tmp/index.html && break; sleep 2; done
           grep -qi '<div id="root"' /tmp/index.html
           docker logs api | tail -20
+
+      - name: Show the container logs
+        if: failure()
+        run: docker logs api
 
   # Installs the wheels `build` just made into an empty virtualenv the way a
   # user does -- `pip install "nl2sql-engine[demo]"` -- and boots

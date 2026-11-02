@@ -12,6 +12,9 @@ services:
       context: ../..
       dockerfile: Dockerfile
     env_file: .env
+    environment:
+      # Must equal the volume mount below; config/nl2sql.yaml reads it as storage.path.
+      NL2SQL_DATA_DIR: /data
     volumes:
       - ./config:/etc/nl2sql:ro
       - nl2sql-data:/data
