@@ -8,8 +8,7 @@ from typing import Optional, List
 from typing_extensions import Annotated
 
 # Core Library Imports
-from nl2sql.common.logger import configure_logging
-from nl2sql.config import load_env_file
+from nl2sql import configure_logging, load_env_file
 
 # Local CLI Imports
 from nl2sql.cli.commands.indexing import run_indexing

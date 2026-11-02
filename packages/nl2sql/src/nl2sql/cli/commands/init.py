@@ -1,6 +1,6 @@
 """``nl2sql init``: write a new config folder, non-interactively.
 
-The engine writes and checks the files (``nl2sql.config.init_project``); this
+The engine writes and checks the files (``nl2sql.init_project``); this
 command prints what was written and what to do next.
 """
 from pathlib import Path
@@ -9,8 +9,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from nl2sql.config import init_project
-from nl2sql.llm.providers import env_var_for_provider
+from nl2sql import env_var_for_provider, init_project
 
 
 def init_command(directory: Path, demo: bool, provider: str, force: bool) -> None:

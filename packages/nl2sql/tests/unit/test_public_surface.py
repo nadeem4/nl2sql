@@ -46,6 +46,8 @@ PUBLIC_SURFACE = {
     "ConnectionInvalid",
     "NL2SQLError", "NotAuthorized", "InvalidArgument", "ReplayMiss", "NotPinnable", "ChartNotSupported", "CorrectionRefused", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
     "LLMOverride", "resolve_mode", "provider_for_key", "provider_keys_in_environment",
+    # The CLI is a client of the facade (CL0a): the config check and the provider key facts it prints
+    "check_config", "KEYED_PROVIDERS", "api_key_from_env", "env_var_for_provider", "ANTHROPIC_EXTRA_HINT",
 }
 
 
@@ -57,3 +59,14 @@ def test_nl2sql_exports_exactly_the_public_surface():
 def test_every_public_name_resolves():
     for name in PUBLIC_SURFACE:
         assert getattr(nl2sql, name) is not None, name
+
+
+def test_the_facade_gives_the_cli_its_config_check_and_provider_facts(monkeypatch):
+    from nl2sql.config.check import check_config as engine_check_config
+
+    assert nl2sql.check_config is engine_check_config
+    assert nl2sql.env_var_for_provider("openai") == "OPENAI_API_KEY"
+    assert "openai" in nl2sql.KEYED_PROVIDERS and "ollama" not in nl2sql.KEYED_PROVIDERS
+    monkeypatch.setenv("OPENAI_API_KEY", "x" * 24)
+    assert nl2sql.api_key_from_env("openai") == "x" * 24
+    assert "nl2sql-engine[anthropic]" in nl2sql.ANTHROPIC_EXTRA_HINT
