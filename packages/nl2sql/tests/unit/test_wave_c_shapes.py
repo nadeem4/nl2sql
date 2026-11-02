@@ -363,7 +363,7 @@ def test_dashboard_edit_union_is_strict():
     from nl2sql.dashboards.models import EDIT_KINDS, DashboardEdit
 
     assert EDIT_KINDS == ("rename", "rename_tile", "set_tile_chart", "remove_tile", "arrange", "set_filters",
-                          "set_schedule", "move", "add_tile", "replace_plan")
+                          "set_schedule", "move", "add_tile", "replace_plan", "add_verified_tile", "add_saved_tile")
     edits = TypeAdapter(list[DashboardEdit])
     valid = [
         {"kind": "rename", "title": "Sales"},
@@ -378,6 +378,8 @@ def test_dashboard_edit_union_is_strict():
         {"kind": "move", "workspace_id": "w2"},
         {"kind": "add_tile", "title": "Revenue", "from_step": {"turn": 1, "step": 1}},
         {"kind": "replace_plan", "tile_id": "t1", "from_step": {"turn": 2, "step": 1}},
+        {"kind": "add_verified_tile", "datasource_id": "shop", "verified_id": "top_products", "title": "Top"},
+        {"kind": "add_saved_tile", "saved_id": "a1", "title": "Mine"},
     ]
     parsed = edits.validate_python(valid)
     assert [e.kind for e in parsed] == [v["kind"] for v in valid]

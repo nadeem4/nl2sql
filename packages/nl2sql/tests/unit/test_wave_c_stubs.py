@@ -26,7 +26,8 @@ STUBS = {
 FILLED = {"workspaces": {"create", "rename", "list", "delete"},
           "dashboards": {"get", "list", "delete", "pin", "move", "edit", "rename", "rename_tile", "set_tile_chart",
                          "remove_tile", "arrange", "set_filters", "set_schedule", "open", "refresh", "run_scheduled",
-                         "generate", "suggest_questions", "create_draft", "filter_values"}}
+                         "generate", "suggest_questions", "create_draft", "filter_values",
+                         "builder_options", "propose_tiles", "build"}}
 # Methods added to namespaces that already exist.
 ADDED: dict[tuple[str, str], str] = {}  # K2 filled `diagram` and L2 `save`; nothing is left
 
