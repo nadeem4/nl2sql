@@ -6389,8 +6389,14 @@ them, in this order:</p>
   planner chose; the planner's note is marked as the model's own words);</li>
 <li><strong>SQL</strong> and <strong>Plan</strong>, the typed plan and the query it produced;</li>
 <li><strong>Trace and cost</strong>, the run's stations, timings and token use;</li>
-<li>a rating (<strong>Right</strong> or <strong>Wrong</strong>, with a note), and a corrected SQL that
-  <strong>Send for review</strong> files (<code>POST /feedback</code>, <code>POST /feedback/correct</code>).</li>
+<li><strong>Did this answer it?</strong>, a light bar with <strong>Yes</strong> and <strong>Not quite</strong>. <strong>Yes</strong>
+  keeps the answer in <strong>My answers</strong> (<code>POST /answers</code>; the server also rates the
+  run up) and says so, adding "sent for review" only when a proposal was filed.
+  A full <strong>My answers</strong> (100), a save racing another ("try again") and an answer
+  that cannot be kept are shown in place. <strong>Not quite</strong> rates the run down and
+  opens a note and a corrected SQL that <strong>Send for review</strong> files
+  (<code>POST /feedback</code>, <code>POST /feedback/correct</code>). A one-line hint explains both
+  until the first click; that it was seen is a browser-local flag only.</li>
 </ul>
 <p><strong>Only the last turn is live.</strong> A clarification pick answers the conversation's
 pending question, and <strong>Run it now</strong> re-runs the last question, so those buttons
@@ -6478,6 +6484,13 @@ routes</a> and never a model.</p>
   packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here.</li>
 <li><strong>Generate a starter dashboard</strong> (at the top of the page) builds one for a datasource from what the project already knows, with no model and no key. Pick the datasource, and optionally a title, the workspace to save into (the chosen one by default) and how many charts. Progress shows as "tile 3 of 8" and can be cancelled; when it is saved the new dashboard opens. Only one job per person runs at a time: the form locks while the start request is in flight, a job already running (after a reload, say) comes back with its progress and Cancel, and leaving the page stops following it without opening anything.</li>
 </ul>
+<p><strong>My answers.</strong> A fold at the top of the Dashboards page lists the answers you kept
+with <strong>Yes</strong> in chat (<code>GET /answers</code>): the question, its datasource and the day it
+was kept. <strong>Run</strong> answers the saved plan again as you (<code>POST /answers/{id}/run</code>):
+your data scope, hooks and approvals apply, and no model is called; the rows show
+in the usual result table. An answer the schema has outgrown says it needs fixing,
+and one waiting for an approval offers <strong>Run again</strong> once it is granted.
+<strong>Delete</strong> forgets it (<code>DELETE /answers/{id}</code>). The list is yours alone.</p>
 <h2 id="connect-and-review">Connect and review</h2>
 <p><strong>Connect</strong> (<code>#/connect</code>) adds a datasource to the running server.</p>
 <ol>
