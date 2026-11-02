@@ -1,6 +1,7 @@
-import React, { useCallback, useRef, useState } from "react";
-import { downloadVegaLite, saveFile } from "../api/outputs.js";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { downloadVegaLite, getChart, saveFile } from "../api/outputs.js";
 import { chartModel, truncatedNote } from "./chart.js";
+import { mergeFetched, needsRows } from "./output.js";
 import { SampleRows } from "./RowsTable.jsx";
 
 // A ChartSpec as an SVG card: the engine chose the kind and the encodings, chart.js places them, this draws them in
@@ -90,7 +91,39 @@ function Bars({ model }) {
   );
 }
 
-export default function Chart({ spec }) {
+// A spec saved without its rows is fetched again by its result, then drawn; the card says so while it waits.
+export default function Chart({ spec: given }) {
+  const [fetched, setFetched] = useState(null);
+  const [failure, setFailure] = useState(null);
+  const refetch = needsRows(given);
+  useEffect(() => {
+    if (!refetch) return undefined;
+    let cancelled = false;
+    setFetched(null);
+    setFailure(null);
+    getChart(given.data.trace_id, given.data.result_id, given.kind)
+      .then((fresh) => !cancelled && setFetched(mergeFetched(given, fresh)))
+      .catch((e) => !cancelled && setFailure(e.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [refetch, given.data && given.data.trace_id, given.data && given.data.result_id, given.kind]);
+  if (refetch && !fetched) {
+    return (
+      <div className="art art-chart">
+        <div className="art-head"><span className="art-label">{given.title}</span></div>
+        {failure ? (
+          <p className="output-error" role="alert">Could not load this chart. {failure}</p>
+        ) : (
+          <p className="mermaid-wait" aria-live="polite">Loading the chart</p>
+        )}
+      </div>
+    );
+  }
+  return <ChartCard spec={refetch ? fetched : given} />;
+}
+
+function ChartCard({ spec }) {
   const [box, width] = useWidth();
   const [asTable, setAsTable] = useState(spec.kind === "table");
   const [error, setError] = useState(null);
