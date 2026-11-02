@@ -33,15 +33,22 @@ export const needsFixing = (result) =>
 
 // How a re-run is shown: its rows, or the reason there are none.
 export function runView(result) {
+  const first = (result.errors || [])[0];
   if (needsFixing(result)) {
-    return { kind: "needs_fixing", message: "This answer needs fixing: the schema has changed since it was saved." };
+    const base = "This answer needs fixing: the schema has changed since it was saved.";
+    return { kind: "needs_fixing", message: first && first.message ? `${base} ${first.message}` : base };
   }
   if (result.status === "needs_approval") return { kind: "approval", approvalIds: (result.approvals_needed || []).map((a) => a.id) };
-  if (result.status === "error" || result.status === "failed") {
-    const first = (result.errors || [])[0];
-    return { kind: "error", message: (first && first.message) || "The answer could not be run." };
+  if (["error", "failed", "stopped", "needs_clarification"].includes(result.status)) {
+    return { kind: "error", message: (first && first.message) || result.final_answer || "The answer could not be run." };
   }
   return { kind: "rows" };
+}
+
+// The approvals a run again must carry: those the last run is waiting for, else none.
+export function rerunApprovalIds(result) {
+  const view = result ? runView(result) : null;
+  return view && view.kind === "approval" ? view.approvalIds : undefined;
 }
 
 export const answerDate = (answer) => String(answer.created_at || "").slice(0, 10);
@@ -63,4 +70,23 @@ export function markHintSeen(storage) {
   } catch {
     // Not kept: the hint shows again next time.
   }
+}
+
+// The hint is shown under every answer until the first click anywhere dismisses it for all of them (D249).
+export function createHintStore(storage) {
+  let visible = !hintSeen(storage);
+  const listeners = new Set();
+  return {
+    visible: () => visible,
+    dismiss() {
+      if (!visible) return;
+      visible = false;
+      markHintSeen(storage);
+      listeners.forEach((l) => l());
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
 }

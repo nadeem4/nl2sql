@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useSyncExternalStore } from "react";
 import { NOTE_CHOICES, NOTE_MAX, canRate, correctionBody, feedbackBody, ratedLine } from "./feedback.js";
 import { correct, rate } from "../api/chat.js";
 import { saveAnswer } from "../api/answers.js";
-import { describeSaveError, hintSeen, markHintSeen, saveBody, savedLine } from "./answers.js";
+import { createHintStore, describeSaveError, saveBody, savedLine } from "./answers.js";
 
 // The browser's own storage, or nothing where it is blocked: the hint helpers cope with both.
 const storage = () => { try { return window.localStorage; } catch { return undefined; } };
+// One store for the page: the first click under any answer hides the hint under all of them.
+const hintStore = createHintStore(storage());
 
 // "Did this answer it?" under the run it belongs to. Yes keeps the answer in My answers (and the server rates the run
 // up and may file it for review); Not quite rates it down and opens the note, where a wrong answer can also carry the
@@ -19,7 +21,7 @@ export default function Feedback({ result, conversationId = null, stepRef = null
   const [proposal, setProposal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [hint, setHint] = useState(() => !hintSeen(storage()));
+  const hint = useSyncExternalStore(hintStore.subscribe, hintStore.visible);
 
   if (!canRate(result, false)) return null;
 
@@ -35,7 +37,7 @@ export default function Feedback({ result, conversationId = null, stepRef = null
     }
   };
   const choose = (go) => {
-    if (hint) { markHintSeen(storage()); setHint(false); }
+    hintStore.dismiss();
     go();
   };
   const yes = () => run(async () => {
