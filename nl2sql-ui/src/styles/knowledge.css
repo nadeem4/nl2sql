@@ -1,0 +1,23 @@
+/* ---------- knowledge: what the engine knows, proposals, drift ---------- */
+
+.kn-section { border-top: 1px solid var(--rule); padding: var(--sp-2) 0; }
+.kn-section > summary { font-size: var(--fs-2); font-weight: var(--fw-medium); padding: 4px 0; }
+.kn-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-1); font-size: var(--fs-2); }
+.kn-terms { margin: var(--sp-2) 0 0; display: grid; gap: var(--sp-2); font-size: var(--fs-2); }
+.kn-terms dt { font-weight: var(--fw-medium); }
+.kn-terms dd { margin: 0; color: var(--ink-2); max-width: 68ch; }
+.kn-origin { margin-left: var(--sp-1); }
+.kn-problems { list-style: none; padding-top: 0; padding-bottom: 0; }
+
+.kn-prop-list { list-style: none; margin: var(--sp-2) 0 var(--sp-3); padding: 0; border-top: 1px solid var(--rule); }
+.kn-prop-list > li { display: grid; gap: var(--sp-1); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); font-size: var(--fs-2); }
+.kn-evidence { max-width: 68ch; }
+.kn-edit { display: grid; gap: var(--sp-2); justify-items: start; padding-top: var(--sp-2); }
+.kn-edit .conn-field { width: 100%; }
+
+.kn-drift { display: grid; gap: var(--sp-3); justify-items: start; }
+.kn-report { width: 100%; display: grid; gap: var(--sp-1); padding-left: var(--sp-3); border-left: 2px solid var(--rule-strong); }
+.kn-report[data-tone="warn"] { border-left-color: var(--warn); }
+.kn-report[data-tone="fault"] { border-left-color: var(--fault); }
+.kn-report[data-tone="ok"] { border-left-color: var(--ok); }
+.kn-tone { margin-left: var(--sp-2); font-size: var(--fs-2); font-weight: var(--fw-regular); color: var(--ink-2); }

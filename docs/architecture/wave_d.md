@@ -840,7 +840,7 @@ no W-PR deletes a file another imports:
 | `IndexPanel.jsx`, `indexHealth.js`, `NodeInspector.jsx`, `run.js` (its trace helpers), `SqlCard.jsx`, `Ledger.jsx` | `src/components/` | shared |
 | `JobProgress.jsx` (new), `outputs/Output.jsx` (new: a stub that dispatches a `ToolOutput` by kind) | `src/components/`, `src/outputs/` | W2a fills `Output.jsx`'s renderers |
 | `App.jsx` (the shell), `router.js`, `main.jsx` | kept | D0b |
-| `AskParts.jsx`, `Panes.jsx`, `stream.js` | kept until W1 | W1 replaces and deletes them |
+| `AskParts.jsx`, `Panes.jsx`, `stream.js` | deleted in W1 | W1 replaced them with `src/chat/` and `src/api/chat.js` |
 | `RowsTable.jsx`, `results.js` | `src/outputs/` | W2a |
 | `SchemaPanel.jsx`, `datasources.js` | `src/connect/` | W3 |
 | `Home.jsx`, `home.js`, `Clip.jsx`, `Pipeline.jsx`, `pipeline.js`, `pipelinePhases.js`, `Retrieval.jsx`, `retrieval.js`, `Settings.jsx`, `firstRun.js`, `status.js`, `faults.js`, `questions.js`, `railFade.js` | `src/pages/` and beside them | W4a (`Settings.jsx`) and W4b (the rest) |
@@ -879,7 +879,7 @@ no W-PR deletes a file another imports:
 |---|---|
 | `node --test` over `src/**/*.test.js` (CI0 runs it in CI, fixing B202) | Every pure module: the router, the transport's envelope parsing and SSE reader, chart scales and paths, the schema form generator, filters, key handling, the hosted first run |
 | `src/api/routes.test.js` | Every path in `src/api/*.js` exists in `packages/api/openapi.json` with that method (D217) |
-| Golden fixtures | `nl2sql-ui/src/api/fixtures/*.json`: an `ApiError` and a `Job` (D0a-3), a `QueryResult` (A1), a `Turn` (A2a), a `Dashboard` and a `DashboardView` with its runs (A2b), a `Proposal` and a `DriftReport` (A3), a `Job` with an `EvalReport` and `/meta` (A4a). Each is written by that PR's route test from a real response, and `test_web_fixtures_are_current` fails when one is stale, as `openapi.json`'s test does. `turns.js`, `chart.js`, `status.js` and the other node tests read them. |
+| Golden fixtures | `nl2sql-ui/src/api/fixtures/*.json`: an `ApiError` and a `Job` (D0a-3), a `QueryResult` (A1), a `Turn` (A2a) and two waiting turns, `TurnClarification` and `TurnApproval` (W1), a `Dashboard` and a `DashboardView` with its runs (A2b), a `Proposal` and a `DriftReport` (A3), a `Job` with an `EvalReport` and `/meta` (A4a). Each is written by that PR's route test from a real response, and `test_web_fixtures_are_current` fails when one is stale, as `openapi.json`'s test does. `turns.js`, `chart.js`, `status.js` and the other node tests read them. |
 | `test_openapi_snapshot_is_current` | `openapi.json` is what the app serves |
 | `npm run build` in the CI job | The page builds; the job summary records the size of the built page and of the Mermaid chunk |
 | `scripts/fresh_install_check.py` (changed) | A fresh install of the three wheels serves the page and the v1 routes, demo and hosted |
@@ -1553,6 +1553,27 @@ and `init_project` were exported already; `RegistryError`, `load_trace`, `check_
 **For CL1:** nothing in `nl2sql/cli/` (outside the playground) imports an engine module, so the move to
 `nl2sql_cli` is a rename plus repointing the boundary test; `demo/playground/` must be deleted by X1b first.
 
+**W1 (chat page).** `#/chat` and `#/chat/<id>` replace Ask, and `#/approvals` is new; `AskParts.jsx`, `Panes.jsx`,
+`stream.js` and `stream.test.js` are deleted. **The code won over the doc:** the doc's `Transcript.jsx` and
+`Correction.jsx` are not separate files (the transcript is in `pages/Chat.jsx`, the correction in
+`chat/Feedback.jsx`), and the bare-fragment landing page is Chat (`FRAGMENT_PAGE` in `router.js`). Every call is in
+`src/api/chat.js`: `listConversations`, `startConversation`, `getConversation`, `deleteConversation`, `chatTools`,
+`sendTurn`, `streamTurn` (POST, SSE), `retryTurn(id, approvalIds)`, `runTool(id, name, args)`, `rate`, `correct`,
+`getTrace`, `listApprovals(status)`, `grantApproval`, `denyApproval(id, reason)`, `listDatasources`, `saveChoice`. The
+Report button calls `POST /tools/report` through `runTool` (JSON, with the markdown in `output.body`); only the `GET
+.../report` download is unwired. Pure
+modules, each with a test: `chat/spine.js` (`spineOf`, `liveStations`; `run.started` resets all but the
+steps), `chat/turns.js` (`answerOf`, `askSteps`, `pendingClarification`, `pendingApprovals`, `outputsOf`, `offersFor`,
+`toolButtons`, `toolArgs`, `statusLine`, `errorLine`, `waitsOf`: a clarification or approval wait is live on the last turn
+only), `chat/convstate.js` (`withTurn`, `withConversation`, `addressChange`: a late result goes to the conversation it was
+sent for), `chat/clarify.js`, `chat/approval.js` (`approvalState`, `ownRequest`, `toDecide`), `chat/warnings.js`,
+`chat/why.js`, `chat/feedback.js`. `Chat` takes `param` (the conversation id), `starter` (a question Home wants
+asked), `onStarter` and `onCaller` (the owner of a conversation is the caller; `App` uses it to leave their own requests
+out of the Approvals badge). The `TurnClarification.json` and `TurnApproval.json` fixtures are real waiting turns. `navItems(page, off, badges)` takes the Approvals count; `page()` in `router.js` builds a
+route entry. Tool arguments use 1-based `turn` and `step`. A 409 from a turn means the conversation is busy.
+**For W4:** Settings, Retrieval and Pipeline still call the old `/api/*` routes,
+`pages/Trace.jsx` is still a stub, and `ask-page.css` and `ask-run.css` are probably dead rules.
+
 **W2a (outputs and charts).** `src/outputs/Output.jsx` (`Output({ output })`, `output` a `ToolOutput`) now dispatches by kind: `Chart.jsx` (a `ChartSpec` object or its JSON text, via `chartSpecOf` in `output.js`), `Mermaid.jsx` (`import("mermaid")` is its own chunk, 697 kB; the main bundle grew by about 15 kB; `securityLevel: "strict"`, theme `neutral` or `dark` from `prefers-color-scheme`), `Report.jsx` (Markdown through `markdown.js`, a parser for headings, paragraphs, lists, tables, code and `<details>` that returns blocks, so no raw HTML passes), and `<pre>` text for `json` and unknown kinds. `chart.js` holds the pure geometry (`chartModel(spec, {width, height})`, `formatValue`, `niceTicks`, `truncatedNote`); bars are horizontal, a line breaks on a null, and a series column or several measures make one line each. `Chart` has a **Table** switch (`SampleRows`) and **Download Vega-Lite** (not for a table). `src/api/outputs.js`: `getChart(traceId, resultId, kind?)`, `getResultPage(traceId, resultId, offset, limit)`, `downloadCsv`, `downloadVegaLite` (both return `{blob, name}`) and `saveFile`. `RowsTable`/`PagedResult` use `getResultPage` and the `/results/...` routes; `results.js` lost its URL builders and the `role` parameter (gone from the API in A1). **Code won over the doc:** `http.js` gained `download(path)` (a GET with the page's headers, returning a `Blob`; `routes.test.js` reads `download(` calls too), because a plain link cannot carry the key headers; the series palette is four hues plus a neutral fifth (`--series-1..5` in `styles/outputs.css`), since the dataviz validator rejected a fifth hue on colour-blind separation, and its contrast test is `outputs/palette.test.js`, not `styles.test.js`; the legend shows for two or more series. New fixtures `ChartLine.json`, `ChartBar.json`, `ChartBigNumber.json` and `ResultPage.json`, written by `test_web_fixtures.py`. `docs/apps/web.md` is new (nav: Apps). **For W2b:** reuse `Chart` (`{ spec }`, a `ChartSpec`) for a tile's chart, `RowsTable` (`{ result }`) for its rows, and `formatValue` from `outputs/chart.js` for a big number; `Chart` sizes itself to its container with a `ResizeObserver`, so a grid cell needs only a width.
 
 **W2b (dashboards page).** `src/pages/Dashboards.jsx` is the page (route `#/dashboards[/{id}]`, now in the nav) and
@@ -1567,6 +1588,29 @@ for display. Filters apply values through a refresh body and store nothing; **Ed
 gained `filters.js`, `tile.js`, `schedule.js` and `fakeApi.js` (a test helper) beside `layout.js`; drafts are listed with
 `GET /dashboards?status=draft`; `router.js` lists Dashboards in the nav (no longer a stub) and `router.test.js` follows.
 **Run again** on a gated tile refreshes once to learn the request ids (a stored run has none), then refreshes with `approval_ids`; an `ApprovalNotFound` shows "still waiting". Replies that arrive after the page has moved to another dashboard are dropped. Not built: the approval grant itself (Approvals is W1/W3's), and **Generate for a datasource** (a job with progress), which the Pages table lists for this page but no W2 row owns yet; it needs a row.
+
+**W3 (Connect, Knowledge, review, drift).** `#/connect` and `#/knowledge` are real pages in the nav (`router.js`; the
+stubs for them are gone). Connect (`pages/Connect.jsx`, `src/connect/`): the type list comes from `GET
+/datasource-types`; `schemaForm.js` turns a type's `connection_schema` into fields (it resolves `$ref` and
+`anyOf [T, null]`, hides `format: password` behind a password input with a note to type an `${env:NAME}` reference,
+puts `group: advanced` fields behind a disclosure, and sends only values that differ from the default).
+`flow.js` words the Test result (`POST /datasources/test` answers 200 even on failure, with `stage`, `reason`,
+`fix`) and the Add result. A `NOT_WRITABLE` answer is shown as added but not saved (D212: it works until the
+server restarts); a 422 puts each `loc` against its field. Add sends the "Save to the project config" checkbox as
+`save`. After Add the page offers Index (`POST /jobs/index`), Profile (`POST /jobs/profile`; "draft with the
+model" sends `draft` and the required `max_cost_usd`), and starter questions (`GET
+/datasources/{id}/starter-questions`, filed with `POST /proposals/examples`), each job followed with `followJob`
+and shown in `JobProgress`. Knowledge (`pages/Knowledge.jsx`, `src/knowledge/`): the merged knowledge from `GET
+/knowledge` (terms, rules, joins, tables, columns with their origin, problems), the schema from `GET
+/datasources/{id}/schema`, then, only when `GET /proposals` does not answer 403, the review list and the drift
+check. `proposals.js` groups by kind, sends only the edits that changed (`acceptBody`) and words the
+`AcceptReport`; `drift.js` words a `DriftReport` (changes, then what they may break). **No Connect page on the hosted
+demo or for a non-admin:** `GET /datasource-types` answers 403 and the page shows a note instead of a form. The
+page does not read the old `/api/meta`; admin and hosted are inferred from that 403. **Differs from the plan:** the
+schema diagram (`GET /datasources/{id}/diagram` is `text/plain`, which `request()` cannot read) waits for the
+`download()` helper and `Mermaid.jsx` of W2a, so Knowledge lists the tables and columns instead; one
+`schemaForm.js` test file covers the form, so `SchemaForm.jsx` and `Steps.jsx` have no test of their own;
+`SchemaPanel.jsx` and `datasources.js` were already in `src/connect/` from D0b. The schema diagram is a follow-up now that W2a (#422: `download()`, `Mermaid.jsx`) is on `main`. A drifted report points to `nl2sql index`; a button for it on a datasource that already exists is a follow-up too. Review fixes: the per-datasource state of the next steps resets on a new Add, origins are looked up per field (`tables.X.description`, `columns.X.Y.role`), a proposal shows every `change` entry, only a 403 from `GET /proposals` hides review and drift, and a typed secret is cleared after Add.
 
 ### Session batches
 

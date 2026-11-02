@@ -36,16 +36,16 @@ export const STEPS = [
 export const FEATURES = [
   {
     id: "ask",
-    page: "Ask",
-    href: "#/ask",
+    page: "Chat",
+    href: "#/chat",
     heading: "Ask, and get rows back",
-    what: "Pick a guided question or type your own. The answer comes first, with the plan, the checks, the SQL "
-      + "and the rows under it.",
+    what: "Pick a guided question or type your own. The answer comes first, with why the engine chose it, "
+      + "the plan, the SQL and the rows under it.",
     points: [
-      "Ask as admin, analyst or viewer, and watch a role be refused.",
+      "A question that needs a decision waits for an approval, or asks which meaning you want.",
       "Every run says what it cost, and the rows download as CSV.",
     ],
-    caption: "Ask a guided question and read the run",
+    caption: "Ask a guided question and read the answer",
   },
   {
     id: "pipeline",
@@ -56,7 +56,7 @@ export const FEATURES = [
       + "and after a run each one shows its model, tokens and time.",
     points: [
       "The SQL is rendered from the checked plan by code, never written by the model.",
-      "Debug on Ask opens any step's exact prompt and raw reply.",
+      "The Trace panel on a Chat answer opens any step's exact prompt and raw reply.",
     ],
     caption: "Every step of a run, and which ones call a model",
   },

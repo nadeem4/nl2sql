@@ -21,3 +21,12 @@ export function ratedLine(rating, note) {
   const what = rating === "up" ? "good answer" : "wrong answer";
   return note ? `Saved: ${what}, with the note “${note}”.` : `Saved: ${what}.`;
 }
+
+// "This is wrong, here is the SQL that is right": filed as a proposal for review, never applied by itself.
+export function correctionBody(result, sql, note) {
+  const text = (sql || "").trim();
+  if (!text) throw new Error("A correction needs the SQL that is right.");
+  const body = { trace_id: result.trace_id, sql: text };
+  const n = (note || "").trim().slice(0, NOTE_MAX);
+  return n ? { ...body, note: n } : body;
+}

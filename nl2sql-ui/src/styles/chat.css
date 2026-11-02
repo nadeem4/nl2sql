@@ -1,0 +1,49 @@
+/* The Chat and Approvals pages. They reuse the shared pieces (.composer, .spine, .station, .answer-text, .fold,
+   .notice, .fault, .rate-*) and add only the layout of a transcript. */
+.chat { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+.chat-list ul { list-style: none; margin: var(--sp-3) 0 0; padding: 0; }
+.chat-list-item { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-2) 0; border-top: 1px solid var(--rule); }
+.chat-list-item a { color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.chat-list-item a[aria-current="page"] { font-weight: var(--fw-medium); }
+.chat-list-item button { font-size: var(--fs-1); }
+.chat-new { display: inline-block; text-decoration: none; }
+.chat-main { min-width: 0; display: grid; gap: var(--sp-5); }
+.chat-transcript { display: grid; gap: var(--sp-6); }
+.chat-turn { display: grid; gap: var(--sp-3); padding-top: var(--sp-4); border-top: 1px solid var(--rule); }
+.chat-turn:first-child { border-top: 0; padding-top: 0; }
+.chat-said { font-size: var(--fs-4); color: var(--ink-2); max-width: 60ch; overflow-wrap: anywhere; }
+.chat-reply { display: grid; gap: var(--sp-4); min-width: 0; }
+.chat-step { display: grid; gap: var(--sp-3); min-width: 0; }
+.chat-step-q { font-size: var(--fs-3); color: var(--ink-2); }
+.chat-spine { list-style: none; margin: 0; }
+.chat-empty { max-width: 60ch; }
+.chat-starters { display: flex; flex-wrap: wrap; gap: var(--sp-2); list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
+.chat-tools { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.chat-warnings { list-style: none; }
+.chat-rate .rate-note { display: grid; gap: var(--sp-2); max-width: 60ch; }
+
+.why-step { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-1) var(--sp-4); margin: 0; font-size: var(--fs-2); }
+.why-step dt { color: var(--ink-3); }
+.why-step dd { margin: 0; }
+.why-step ul { margin: 0; padding-left: var(--sp-4); }
+.why-step .kind-tag { margin-left: var(--sp-2); }
+.why-source { grid-column: 1 / -1; color: var(--ink); font-weight: var(--fw-medium); }
+
+.clarify, .approval-wait { display: grid; gap: var(--sp-3); max-width: 70ch; padding: var(--sp-4); border-radius: var(--r-well); background: var(--well); }
+.clarify-q { font-size: var(--fs-4); }
+.clarify-options { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); }
+.clarify-label { font-weight: var(--fw-medium); }
+.clarify-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.approval-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-6); }
+.approval { display: grid; gap: var(--sp-3); padding-top: var(--sp-4); border-top: 1px solid var(--rule); }
+.approval-q { font-size: var(--fs-4); max-width: 60ch; overflow-wrap: anywhere; }
+
+.nav-badge { margin-left: var(--sp-2); padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: var(--fs-1); }
+
+@media (max-width: 760px) {
+  .chat { grid-template-columns: minmax(0, 1fr); }
+}
+@media (pointer: coarse) {
+  .chat-new, .chat-list-item button, .rate-choice, .chat-tools button, .clarify-actions button { min-height: 44px; }
+}

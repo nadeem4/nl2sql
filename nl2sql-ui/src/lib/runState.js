@@ -4,7 +4,7 @@
 // test runner.
 
 import { deniedTables } from "../components/run.js";
-import { liveStations } from "../stream.js";
+import { liveStations } from "../chat/spine.js";
 
 export const STATIONS = ["plan", "checks", "sql", "rows", "cost"];
 
