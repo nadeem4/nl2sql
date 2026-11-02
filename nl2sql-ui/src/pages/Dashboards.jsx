@@ -7,6 +7,7 @@ import { hashFor } from "../router.js";
 import MyAnswers from "../answers/MyAnswers.jsx";
 import Grid from "../dashboards/Grid.jsx";
 import Filters from "../dashboards/Filters.jsx";
+import Builder from "../dashboards/Builder.jsx";
 import Generate from "../dashboards/Generate.jsx";
 import Schedule from "../dashboards/Schedule.jsx";
 import Workspaces from "../dashboards/Workspaces.jsx";
@@ -239,6 +240,7 @@ export default function Dashboards({ param }) {
         onChanged={(id) => loadSide(id || selected)} onError={fail} />
       <section className="dash-main" aria-live="polite">
         <Generate workspaces={workspaces} selected={selected} onOpen={(hash) => { window.location.hash = hash; }} />
+        <Builder workspaces={workspaces} selected={selected} onOpen={(hash) => { window.location.hash = hash; }} />
         <MyAnswers />
         <Notice error={error} />
         {!param && <p className="page-note">Pick a dashboard, or ask the chat to build one and pin it to a workspace.</p>}

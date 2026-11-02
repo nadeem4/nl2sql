@@ -59,7 +59,7 @@ Every change a person can make is a typed edit, and no edit calls a model or tak
 none**: if one edit is refused, nothing is saved. A draft and a saved dashboard take the same edits. Stored
 chart results stay valid across a rename, a redraw, an arrange, a move and a schedule; removing a chart or
 changing the filters discards the results they invalidate. `add_tile` and `replace_plan`, which change what
-data a chart shows, are only for a conversation (`add_verified_tile` and `add_saved_tile` add a chart from a verified query or a saved answer without asking a model; the guided builder uses them) (see [Building in chat](#building-in-chat)).
+data a chart shows, are only for a conversation (`add_verified_tile` and `add_saved_tile` add a chart from a verified query or a saved answer without asking a model; the guided builder uses them) (see [Building in chat](#building-in-chat) and [The guided builder](#the-guided-builder)).
 
 Each change publishes `dashboard.changed` (the kinds, never the values), `set_schedule` also
 `dashboard.schedule_set` (it saves a role snapshot, so it is audited) and the workspace calls publish
@@ -189,6 +189,31 @@ nl2sql dashboards refresh --due                                                 
 
 `--user` and `--tenant` act as that owner: the command is for the operator, who holds the config and the
 credentials. `--dashboard` needs `--user`, since a dashboard belongs to a user. `--due` runs each schedule as its saved owner, so it refuses `--as`, `--user` and `--tenant`.
+
+## The guided builder
+
+The guided builder makes a dashboard from questions a person picks, without chat. Three facade calls, each with
+the caller's `user_context`:
+
+```python
+opts = engine.dashboards.builder_options("sales", user_context=me)     # what it offers; no model, nothing run
+tiles = engine.dashboards.propose_tiles("sales", user_context=me, sources=["curated", "asked"],
+                                        curated_ids=[...], metrics=[...], dimensions=[...])   # TileProposal list
+board = engine.dashboards.build("sales", tiles, user_context=me, title="Sales")   # answers each ticked tile
+```
+
+`builder_options` lists the verified queries the caller's scope reaches, their saved answers, and the glossary
+metrics, breakdowns, periods and date columns. `propose_tiles` turns the chosen sources into tiles to tick,
+untick or reword; only the `asked` source uses a model (at most 3 new questions) and so needs a key. `build`
+adds each ticked tile (a verified or saved one without asking a model) and reports the questions it could not
+answer. Over REST these are `GET /dashboard-builder/options`, `POST /dashboard-builder/proposals` and the job
+`POST /jobs/dashboard-build`.
+
+The web app's **Build a dashboard** panel (beside Generate) walks four steps: sources (curated, your saved
+answers, "tell us what matters"), the chips `builder_options` offers, a review of the proposed charts, and the
+build. In the review, a new question can be reworded and any chart can be set to auto, line, bar, big number or
+table; a curated or saved chart keeps its stored query, so its question is shown as text. If the build fails or
+is cancelled, **Back to review** keeps the ticked list. See [the web app](../apps/web.md).
 
 ## The starter dashboard
 
