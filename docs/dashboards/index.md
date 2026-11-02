@@ -104,6 +104,10 @@ engine.conversations.tool(chat.id, "dashboard_pin", {"title": "Sales"}, user_con
   edits when it is given a conversation of the caller's; without one they are a `ValueError`. The named methods
   take no question and no plan.
 
+### The guided builder in the web app
+
+The Dashboards page has a **Build a dashboard** panel beside Generate. It walks four steps: pick sources (curated, your saved answers, and "tell us what matters"), choose from the chips `GET /dashboard-builder/options` offers, review the proposed charts (`POST /dashboard-builder/proposals`) and build them (`POST /jobs/dashboard-build`). Only the third source uses a model, so it needs a key; questions the build could not answer are listed with the reason. See [the web app](../apps/web.md).
+
 ## Open, refresh and stored results
 
 A chart is re-run from the plan it keeps, never by asking the question again, so **refreshing costs no

@@ -69,3 +69,15 @@ export const deleteWorkspace = (id) => request("DELETE", `/workspaces/${enc(id)}
 // Starts the no-model starter dashboard job; answers the queued `Job`. Follow it with `followJob` (jobs.js).
 // `body` is `{datasource_id, title?, workspace_id?, max_tiles?}` (generate.js `generateBody`).
 export const startDashboardJob = (body) => request("POST", "/jobs/dashboard", body);
+
+// ---- guided builder (wave_d.md, section 18)
+// The chips for one datasource: `{curated, saved, metrics, dimensions, time_columns, ranges}`. No model call.
+export const builderOptions = (datasourceId) =>
+  request("GET", `/dashboard-builder/options?datasource_id=${enc(datasourceId)}`);
+
+// `{datasource_id, sources, curated_ids, saved_ids, metrics, dimensions, time_range?, text?}` (builder.js `proposalsBody`).
+// Answers the tiles to tick. Only the model source calls a model, and needs a key (422 MISSING_PROVIDER_KEY without one).
+export const proposeTiles = (body) => request("POST", "/dashboard-builder/proposals", body);
+
+// Starts the build job; answers the queued `Job`. Follow it with `followJob`; its result is a `BuildReport`.
+export const startBuildJob = (body) => request("POST", "/jobs/dashboard-build", body);
