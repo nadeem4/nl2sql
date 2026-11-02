@@ -52,6 +52,12 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   its owner is checked against the caller, so it is for SDK code holding the caller's own `Conversation` and is
   not exposed over REST or MCP; the plan's access check still runs as the caller. The lock lasts as long as the
   edit's checks (one time limit per `add_tile` or `replace_plan`).
+  Two more edits add a chart without a conversation step and call no model: `add_verified_tile`
+  (`datasource_id`, `verified_id`, `title`, `params`, `question`) from a verified query of the curated section (an
+  unknown id or parameter, or a missing parameter without a default, is `InvalidArgument`), and `add_saved_tile`
+  (`saved_id`, `title`) from the caller's own saved answer (another user's is `AnswerNotFound`); the saved plan is
+  copied, so later changes to the answer do not touch the chart. Both get the same access check as `add_tile`,
+  and the chat tool `dashboard_edit` accepts them.
 - **`set_tile_chart`** with a kind the chart's last result cannot be drawn as raises a `ValueError` naming the
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.
@@ -118,6 +124,35 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
   saved dashboards are never purged.
 
+## Guided builder (DB1b)
+
+`engine.dashboards.builder_options`, `propose_tiles` and `build` build a dashboard from choices, not from a
+description. Design: [Wave D, section 18](../../architecture/wave_d.md). All take `user_context`, and the ids
+they offer are limited to what the caller's scope reaches.
+
+- **`builder_options(datasource_id, *, user_context) -> BuilderOptions`** returns `curated` (the datasource's
+  verified queries with no required parameter, `VerifiedQueryInfo`), `saved` (the caller's own saved answers),
+  `metrics` (glossary terms whose columns the caller may read; a term with any hidden column is left out whole),
+  `dimensions` and `time_columns` (from the column roles) and `ranges` (`last_7_days`, `last_30_days`,
+  `last_90_days`, `last_12_months`, `this_year`). It calls no model.
+- **`propose_tiles(datasource_id, *, user_context, sources, curated_ids=(), saved_ids=(), metrics=(),
+  dimensions=(), time_range=None, text=None, llm_override=None) -> list[TileProposal]`** reads and writes
+  nothing. `sources` is any of `curated`, `saved`, `asked`. Curated and saved proposals use no model. `asked` makes
+  one model call for at most 3 new questions (from the chosen metrics and dimensions, the time range and the
+  free `text`). The list is capped at `dashboards.max_tiles`. Without a key, `asked` raises `MissingProviderKey`;
+  curated and saved still work. `llm_override` is the caller's own key, as for `ask`.
+- **`build(datasource_id, tiles, *, user_context, title=None, workspace_id=None, time_column=None, on_tile=None,
+  cancellation_token=None, llm_override=None) -> BuildReport`** takes the ticked `TileProposal`s (more than
+  `max_tiles` is `InvalidArgument`) and makes a draft: curated and saved tiles through the two edits above, asked
+  tiles as `ask` steps of one builder conversation joined through `add_tile` (that conversation is deleted
+  afterwards). A question that cannot be answered is reported in `BuildReport.skipped` (`question`, `code`,
+  `message`) and the rest are kept; nothing built raises `NoTiles`; a cancel or failure leaves nothing behind.
+  With `time_column` a `between` filter on it is added. It then pins the draft, publishes `dashboard.generated`
+  and returns `BuildReport(dashboard, built, skipped)`. It does not run the tiles; opening refreshes them. `on_tile`
+  receives a `TileProgress` per tile.
+- **`engine.curated.list(*, user_context, datasource_id=None) -> list[VerifiedQueryInfo]`** lists the verified
+  queries the caller's scope reaches, with their parameters.
+
 ## Methods
 
 | Method | Row |
@@ -132,3 +167,4 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 | `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` | D2 |
 | `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)` | D3, `on_tile` and `cancellation_token` G3b |
 | `dashboards.suggest_questions(datasource_id, *, user_context, n=5) -> list[str]` | D3 |
+| `dashboards.builder_options(...)`, `propose_tiles(...)`, `build(...)`; edits `add_verified_tile`, `add_saved_tile`; `curated.list(...)` | DB1b |

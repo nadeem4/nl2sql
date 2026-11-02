@@ -146,6 +146,8 @@ query, and exits 1 on any error, so it can run in CI:
 | SQL `:name` placeholders are exactly the params | yes | yes |
 | Tables the SQL reads are in the indexed schema | no | yes, when indexed |
 
+`engine.curated.list(user_context=...)` returns the verified queries a caller can reach (used by the dashboard builder).
+
 From Python, the same check is `engine.curated`, on the engine's own config:
 
 ```python

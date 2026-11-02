@@ -20,7 +20,7 @@ from nl2sql.chat_tools.dashboard_edit import DashboardEditArgs
 from nl2sql.common.errors import ConversationNotFound
 from nl2sql.conversations.agent import step_view
 from nl2sql.dashboards.models import (
-    AddTile, Arrange, Dashboard, DashboardFilter, EDIT_KINDS, MoveDashboard, RemoveTile, RenameDashboard, RenameTile,
+    AddSavedTile, AddTile, AddVerifiedTile, Arrange, Dashboard, DashboardFilter, EDIT_KINDS, MoveDashboard, RemoveTile, RenameDashboard, RenameTile,
     ReplacePlan, SetFilters, SetSchedule, SetTileChart, StepRef, TileArrangement, TileRun,
 )
 from nl2sql.dashboards.store import DashboardStore
@@ -277,7 +277,9 @@ def test_every_manual_edit_is_available_through_dashboard_edit():
         "arrange": Arrange(layouts=[TileArrangement(tile_id="t1", x=0, y=0, w=2, h=2)]),
         "set_filters": SetFilters(filters=[]), "set_schedule": SetSchedule(every_minutes=60),
         "move": MoveDashboard(workspace_id="w"), "add_tile": AddTile(title="T", from_step=StepRef(turn=1, step=1)),
-        "replace_plan": ReplacePlan(tile_id="t1", from_step=StepRef(turn=1, step=1))}
+        "replace_plan": ReplacePlan(tile_id="t1", from_step=StepRef(turn=1, step=1)),
+        "add_verified_tile": AddVerifiedTile(datasource_id="d", verified_id="v", title="T"),
+        "add_saved_tile": AddSavedTile(saved_id="a", title="T")}
     assert set(one_of_each) == {m.model_fields["kind"].default for m in members}, "a new edit needs a case here"
     for kind, edit_ in one_of_each.items():
         parsed = DashboardEditArgs.model_validate({"edits": [edit_.model_dump(mode="json")]})

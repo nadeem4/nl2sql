@@ -743,6 +743,10 @@ def test_registry_tools_and_the_report_make_no_model_call():
 DASHBOARDS = ENGINE / "dashboards"
 # The one shape from the model-side packages a dashboard may import: QuestionUsage, a pydantic model of tokens.
 DASHBOARDS_MAY_IMPORT = {"nl2sql.services.callbacks.token_handler"}
+# The guided builder (DB1b) is the one dashboards module that asks the model, once, for new question text when the
+# caller types what matters; a refresh, an edit and a pin never reach it. It still runs no plan itself: new
+# questions go through the conversation's ask step.
+DASHBOARDS_MODEL_MODULES = {"builder.py"}
 
 
 def _run_query_problems(source: str) -> list[str]:
@@ -772,7 +776,7 @@ def test_dashboards_make_no_model_call():
     offenders, calls = [], 0
     for path in python_files(DASHBOARDS):
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
-                      if name.startswith(NO_MODEL_PREFIXES) and not name.startswith(tuple(DASHBOARDS_MAY_IMPORT))]
+                      if path.name not in DASHBOARDS_MODEL_MODULES and name.startswith(NO_MODEL_PREFIXES) and not name.startswith(tuple(DASHBOARDS_MAY_IMPORT))]
         source = path.read_text(encoding="utf-8")
         calls += source.count(".run_query(")
         offenders += [f"{_where(path)}: {problem}" for problem in _run_query_problems(source)]
@@ -1070,7 +1074,7 @@ WAVE_C_CALLER_METHODS = {
     ("api/dashboards_api.py", "DashboardsAPI"): ("user_context", (
         "get", "list", "open", "refresh", "edit", "rename", "rename_tile", "set_tile_chart", "remove_tile",
         "arrange", "set_filters", "set_schedule", "move", "pin", "delete", "generate", "filter_values",
-        "suggest_questions", "create_draft")),
+        "suggest_questions", "create_draft", "builder_options", "propose_tiles", "build")),
     ("api/answers_api.py", "AnswersAPI"): ("user_context", ("save", "list", "get", "delete", "run")),
     ("api/api_keys_api.py", "ApiKeysAPI"): ("by", ("create", "list", "revoke")),
     ("api/datasource_api.py", "DatasourcesAPI"): ("user_context", ("diagram",)),

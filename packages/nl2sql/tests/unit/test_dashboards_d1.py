@@ -481,7 +481,7 @@ def test_manual_edit_methods_take_no_question_or_plan():
         parameters = set(inspect.signature(getattr(DashboardsAPI, name)).parameters)
         assert not parameters & {"question", "plan", "plans", "decomposition", "from_step", "sql"}, name
     # and the edits a facade method builds are exactly the ones that change no data
-    chat_only = {"add_tile", "replace_plan"}
+    chat_only = {"add_tile", "replace_plan", "add_verified_tile", "add_saved_tile"}
     assert set(EDIT_KINDS) - chat_only == {"rename", "rename_tile", "set_tile_chart", "remove_tile", "arrange",
                                            "set_filters", "set_schedule", "move"}
     assert all(hasattr(DashboardsAPI, kind) for kind in set(EDIT_KINDS) - chat_only)

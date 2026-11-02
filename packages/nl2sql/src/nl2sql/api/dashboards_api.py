@@ -9,7 +9,7 @@ runs each dashboard as its stored owner (D134).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from nl2sql.api.types import TileProgress
 from nl2sql.approvals.api import Approvals
@@ -18,6 +18,7 @@ from nl2sql.common.errors import ApprovalNotFound, NotIndexed
 from nl2sql.common.planned import arrives_with
 from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.api import Dashboards
+from nl2sql.dashboards.builder import BuilderOptions, BuildReport, TileProposal
 from nl2sql.dashboards.models import (
     ChartChoice,
     Dashboard,
@@ -32,6 +33,9 @@ from nl2sql.dashboards.roles import Source
 from nl2sql.hooks.approval import Approval
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
+
+if TYPE_CHECKING:
+    from nl2sql.llm.override import LLMOverride
 
 
 def resolve_refresh_approvals(ctx: Runtime, approvals: Sequence[Union[Approval, str]],
@@ -266,6 +270,72 @@ class DashboardsAPI:
             ValueError: ``n`` is below 1.
         """
         return self._service.suggest_questions(self._source(datasource_id, user_context), n=n)
+
+    # ---- DB1b: the guided builder
+
+    def builder_options(self, datasource_id: str, *, user_context: UserContext) -> BuilderOptions:
+        """What the guided builder offers this caller on one datasource, with no model call and nothing run.
+
+        ``curated`` are the verified queries the caller's scope reaches (those that need a value are left out),
+        ``saved`` the caller's own saved answers, ``metrics`` the glossary terms that name readable columns,
+        ``dimensions`` and ``time_columns`` the columns the starter dashboard would break down and trend by
+        (D115), and ``ranges`` five fixed time ranges. Everything listed exists and is readable by the caller.
+
+        Raises:
+            NotIndexed: the datasource has no index, or the caller cannot reach it.
+        """
+        return self._service.builder.options(self._source(datasource_id, user_context), user_context)
+
+    def propose_tiles(self, datasource_id: str, *, user_context: UserContext, sources: Sequence[str],
+                      curated_ids: Sequence[str] = (), saved_ids: Sequence[str] = (), metrics: Sequence[str] = (),
+                      dimensions: Sequence[str] = (), time_range: Optional[str] = None, text: Optional[str] = None,
+                      llm_override: Optional["LLMOverride"] = None) -> List[TileProposal]:
+        """The tiles a dashboard could have, to tick, untick and reword. Read-only: nothing is run or saved.
+
+        ``sources`` is any of ``"curated"``, ``"saved"`` and ``"asked"``. Curated and saved ids become proposals
+        directly and call no model; an id the caller was not offered is left out. With ``"asked"``, one model call
+        turns the chips (``metrics``: glossary terms; ``dimensions``: column names from the options; ``time_range``:
+        a range id) and ``text`` into at most 3 questions (D246). The proposal never exceeds
+        ``dashboards.max_tiles``.
+
+        Raises:
+            NotIndexed: the datasource has no index, or the caller cannot reach it.
+            InvalidArgument: an unknown source or time range.
+            MissingProviderKey: ``"asked"`` without a key for the model (D248); pass ``llm_override`` with one.
+        """
+        return self._service.builder.propose(
+            self._source(datasource_id, user_context), user_context, sources=sources, curated_ids=curated_ids,
+            saved_ids=saved_ids, metrics=metrics, dimensions=dimensions, time_range=time_range, text=text,
+            llm_override=llm_override)
+
+    def build(self, datasource_id: str, tiles: Sequence[TileProposal], *, user_context: UserContext,
+              title: Optional[str] = None, workspace_id: Optional[str] = None, time_column: Optional[str] = None,
+              on_tile: Optional[Callable[[TileProgress], None]] = None,
+              cancellation_token: Optional[CancellationToken] = None,
+              llm_override: Optional["LLMOverride"] = None) -> BuildReport:
+        """Make an ordinary dashboard from the ticked tiles. A job: it can take as long as its questions do.
+
+        Curated and saved tiles are added by no-model edits; a new question runs as an ``ask`` step of one builder
+        conversation (removed afterwards) and joins by ``add_tile``. Every tile is checked as the caller before it is
+        kept: one the engine cannot answer, or the caller may not read, is listed in ``BuildReport.skipped`` with its
+        code and the rest are built. The dashboard is saved, owned by the caller, in ``workspace_id`` (else
+        "General"). ``time_column`` (from the options) adds a ``between`` filter on it.
+
+        ``on_tile`` gets a :class:`~nl2sql.TileProgress` after each tile (``ok`` or ``skipped``). Cancel
+        ``cancellation_token`` to stop before the next tile: the call raises ``RunCancelled`` with nothing saved.
+
+        Raises:
+            NoTiles: no tile could be built; the message gives the reasons.
+            InvalidArgument: more ticked tiles than ``dashboards.max_tiles``, or a ``time_column`` that is not offered.
+            MissingProviderKey: a new question without a key for the model.
+            NotIndexed: the datasource has no index, or the caller cannot reach it.
+        """
+        from nl2sql.conversations.api import Conversations
+
+        return self._service.builder.build(
+            self._source(datasource_id, user_context), tiles, user_context, conversations=Conversations(self._ctx, None),
+            title=title, workspace_id=workspace_id, time_column=time_column, on_tile=on_tile,
+            token=cancellation_token, llm_override=llm_override)
 
     def _source(self, datasource_id: str, user_context: UserContext) -> Source:
         """What the starter reads, as the caller may see it: the live snapshot, the merged glossary, the caller's scope."""

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from nl2sql.charts.choose import choose
 from nl2sql.charts.spec import ChartSpec, ColumnKind
@@ -18,9 +18,9 @@ from nl2sql.common.errors import InvalidArgument, ScheduleTooFrequent, UnknownTi
 from nl2sql.config.models import ChartSettings
 from nl2sql.conversations.models import Conversation, ToolStep
 from nl2sql.dashboards.models import (
-    GRID_COLUMNS, AddTile, Arrange, ChartPlan, Dashboard, DashboardEdit, MoveDashboard, RemoveTile, RenameDashboard,
-    RenameTile, ReplacePlan, Schedule, ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, StepRef, Tile,
-    TileLayout, TileRun,
+    GRID_COLUMNS, AddSavedTile, AddTile, AddVerifiedTile, Arrange, ChartChoice, ChartPlan, Dashboard, DashboardEdit,
+    MoveDashboard, RemoveTile, RenameDashboard, RenameTile, ReplacePlan, Schedule, ScheduleIdentity, SetFilters,
+    SetSchedule, SetTileChart, StepRef, Tile, TileLayout, TileRun,
 )
 from nl2sql.hooks.approval import VerifiedRef
 
@@ -39,6 +39,10 @@ class EditEnv:
     # ``ValueError`` when its plan is refused. Absent, ``add_tile`` and ``replace_plan`` are refused.
     step: Optional[Callable[[StepRef], Tuple[str, ChartPlan]]] = None
     check: Optional[Callable[[Tile], None]] = None
+    # No conversation needed (DB1b): a verified query by datasource, id and params, and a saved answer of the caller
+    # by id, each as ``(question, plan, chart)``; they raise when there is no such thing for this caller.
+    verified: Optional[Callable[[str, str, Dict[str, Any]], Tuple[str, ChartPlan]]] = None
+    saved: Optional[Callable[[str], Tuple[str, ChartPlan, ChartChoice]]] = None
 
 
 @dataclass
@@ -234,6 +238,26 @@ def _add_tile(d: Dashboard, e: AddTile, env: EditEnv, out: Applied) -> Dashboard
     return d.model_copy(update={"tiles": [*d.tiles, tile]})
 
 
+def _add_verified_tile(d: Dashboard, e: AddVerifiedTile, env: EditEnv, out: Applied) -> Dashboard:
+    if env.verified is None or env.check is None:
+        raise InvalidArgument("The 'add_verified_tile' edit needs the engine's curated answers.")
+    question, plan = env.verified(e.datasource_id, e.verified_id, dict(e.params))
+    tile = Tile(id=_free_id(d.tiles), title=_title(e.title, "chart"), question=e.question or question, plan=plan,
+                layout=_next_layout(d.tiles))
+    env.check(tile)
+    return d.model_copy(update={"tiles": [*d.tiles, tile]})
+
+
+def _add_saved_tile(d: Dashboard, e: AddSavedTile, env: EditEnv, out: Applied) -> Dashboard:
+    if env.saved is None or env.check is None:
+        raise InvalidArgument("The 'add_saved_tile' edit needs the engine's saved answers.")
+    question, plan, chart = env.saved(e.saved_id)
+    tile = Tile(id=_free_id(d.tiles), title=_title(e.title, "chart"), question=question, plan=plan.model_copy(deep=True),
+                chart=chart, layout=_next_layout(d.tiles))
+    env.check(tile)
+    return d.model_copy(update={"tiles": [*d.tiles, tile]})
+
+
 def _replace_plan(d: Dashboard, e: ReplacePlan, env: EditEnv, out: Applied) -> Dashboard:
     old = _tile(d, e.tile_id)
     question, plan = _from_step(env, e.kind, e.from_step)
@@ -244,4 +268,5 @@ def _replace_plan(d: Dashboard, e: ReplacePlan, env: EditEnv, out: Applied) -> D
 
 _HANDLERS = {"rename": _rename, "rename_tile": _rename_tile, "set_tile_chart": _set_tile_chart,
              "remove_tile": _remove_tile, "arrange": _arrange, "set_filters": _set_filters,
-             "set_schedule": _set_schedule, "move": _move, "add_tile": _add_tile, "replace_plan": _replace_plan}
+             "set_schedule": _set_schedule, "move": _move, "add_tile": _add_tile, "replace_plan": _replace_plan,
+             "add_verified_tile": _add_verified_tile, "add_saved_tile": _add_saved_tile}

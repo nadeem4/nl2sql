@@ -59,7 +59,7 @@ Every change a person can make is a typed edit, and no edit calls a model or tak
 none**: if one edit is refused, nothing is saved. A draft and a saved dashboard take the same edits. Stored
 chart results stay valid across a rename, a redraw, an arrange, a move and a schedule; removing a chart or
 changing the filters discards the results they invalidate. `add_tile` and `replace_plan`, which change what
-data a chart shows, are only for a conversation (see [Building in chat](#building-in-chat)).
+data a chart shows, are only for a conversation (`add_verified_tile` and `add_saved_tile` add a chart from a verified query or a saved answer without asking a model; the guided builder uses them) (see [Building in chat](#building-in-chat)).
 
 Each change publishes `dashboard.changed` (the kinds, never the values), `set_schedule` also
 `dashboard.schedule_set` (it saves a role snapshot, so it is audited) and the workspace calls publish
