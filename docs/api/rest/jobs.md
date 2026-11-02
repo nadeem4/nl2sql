@@ -8,7 +8,9 @@ memory; a restart loses them, and what they produced (an index, proposals, a das
 `nl2sql-api serve` therefore runs one Uvicorn worker and has no `--workers` option.
 
 A caller with a job queued or running gets a `409` naming it when it starts another, so one caller cannot stall the
-queue. Another user's job is a `404`; an admin sees every caller's.
+queue. Another user's job is a `404`; an admin sees every caller's jobs, but never their `result`: it can hold rows read
+under the owner's data scope, so it is the owner's alone (in `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}` and the
+`job.finished` event an admin gets `result: null`).
 
 ## The `Job`
 
@@ -21,7 +23,7 @@ queue. Another user's job is a `404`; an admin sees every caller's.
 | `created_by` | The caller's user id |
 | `created_at`, `started_at`, `finished_at` | Timestamps |
 | `progress` | `[{at, step, done, total}]`, one per item (a datasource, a case, a tile) |
-| `result` | Typed per kind once `succeeded`: `IndexResult`, `ProfileReport[]`, `EvalReport` or `{dashboard, run}` |
+| `result` | Typed per kind once `succeeded`: `IndexResult`, `ProfileReport[]`, `EvalReport` or `{dashboard, run}`; `null` when the viewer is an admin looking at another caller's job |
 | `error` | The error envelope's body once `failed`; never an exception's text |
 
 ## Endpoints
@@ -33,7 +35,12 @@ queue. Another user's job is a `404`; an admin sees every caller's.
 | `DELETE /api/v1/jobs/{job_id}` | Cancel: a queued job is removed; a running one stops between items. Returns the job |
 | `GET /api/v1/jobs/{job_id}/events` | Progress as Server-Sent Events |
 
-The routes that start a job (`POST /api/v1/jobs/<kind>`) arrive with the rows that own each kind.
+| Route | Starts |
+|---|---|
+| `POST /api/v1/jobs/dashboard` | A starter dashboard for one datasource, as the caller; any caller. See [Dashboards](dashboards.md#generate-a-starter-dashboard). |
+
+Each `POST /api/v1/jobs/<kind>` answers `202` with the queued `Job` and a `409` when the caller already has a job
+queued or running. The other kinds arrive with the rows that own them.
 
 ## Events
 

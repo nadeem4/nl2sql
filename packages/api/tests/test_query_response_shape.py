@@ -44,7 +44,7 @@ def _stub_result() -> QueryResult:
 def test_query_response_carries_plan_validation_rows_status_and_timings(api_client):
     client, _engine = api_client(_stub_result())
 
-    response = client.post("/api/v1/query", json={"natural_language": "how many customers?"})
+    response = client.post("/api/v1/query", json={"question": "how many customers?"})
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -73,7 +73,7 @@ def test_the_response_says_when_a_plan_came_from_the_plan_cache(api_client):
         usage=QuestionUsage(plan_cache_hits=1),
     ))
 
-    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    body = client.post("/api/v1/query", json={"question": "q"}).json()
 
     assert body["sub_queries"][0]["plan_source"] == "cache"
     assert body["usage"]["plan_cache_hits"] == 1
@@ -87,7 +87,7 @@ def test_the_response_says_where_the_answer_came_from(api_client):
         source=AnswerSource(type="verified", id="top", datasource_id="chinook", params={"n": 5}),
     ))
 
-    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    body = client.post("/api/v1/query", json={"question": "q"}).json()
 
     assert body["source"] == {"type": "verified", "id": "top", "datasource_id": "chinook", "params": {"n": 5}}
     assert body["sub_queries"][0]["plan_source"] == "verified"
@@ -96,7 +96,7 @@ def test_the_response_says_where_the_answer_came_from(api_client):
 def test_a_generated_answer_says_so(api_client):
     client, _engine = api_client(QueryResult(status="success"))
 
-    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    body = client.post("/api/v1/query", json={"question": "q"}).json()
 
     assert body["source"]["type"] == "generated"
 
@@ -110,7 +110,7 @@ def test_plan_only_run_reports_no_rows(api_client):
     )
 
     response = client.post(
-        "/api/v1/query", json={"natural_language": "how many customers?", "execute": False}
+        "/api/v1/query", json={"question": "how many customers?", "execute": False}
     )
 
     assert response.status_code == 200, response.text
@@ -122,14 +122,14 @@ def test_plan_only_run_reports_no_rows(api_client):
 def test_the_response_says_where_the_run_trace_was_written(api_client):
     client, _engine = api_client(QueryResult(status="error", trace_id="t-1",
                                              trace_path="traces/20260921T101112000000Z_t-1.json"))
-    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    body = client.post("/api/v1/query", json={"question": "q"}).json()
     assert body["trace_id"] == "t-1"
     assert body["trace_path"] == "traces/20260921T101112000000Z_t-1.json"
 
 
 def test_no_trace_path_when_no_trace_was_written(api_client):
     client, _engine = api_client(QueryResult(status="success"))
-    assert client.post("/api/v1/query", json={"natural_language": "q"}).json()["trace_path"] is None
+    assert client.post("/api/v1/query", json={"question": "q"}).json()["trace_path"] is None
 
 
 def test_a_provider_failure_reaches_the_caller_with_its_code_provider_and_provider_response(api_client):
@@ -139,7 +139,7 @@ def test_a_provider_failure_reaches_the_caller_with_its_code_provider_and_provid
              "provider_response": "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]."}
     client, _engine = api_client(QueryResult(errors=[entry], status="error"))
 
-    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    body = client.post("/api/v1/query", json={"question": "q"}).json()
 
     assert body["status"] == "error"
     assert body["errors"] == [entry]

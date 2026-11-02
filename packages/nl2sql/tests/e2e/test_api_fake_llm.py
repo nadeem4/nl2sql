@@ -40,7 +40,7 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch, tmp_path):
     with TestClient(app, client=("127.0.0.1", 50000)) as client:
         response = client.post(
             "/api/v1/query",
-            json={"natural_language": "How many customers are there?"},
+            json={"question": "How many customers are there?"},
             headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"},
         )
 
@@ -74,7 +74,7 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
     with TestClient(app, client=("127.0.0.1", 50000)) as client:
         response = client.post(
             "/api/v1/query",
-            json={"natural_language": "Who are the top customers by total spend?"},
+            json={"question": "Who are the top customers by total spend?"},
             headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "viewer"},
         )
 
@@ -104,7 +104,7 @@ def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, 
     with TestClient(app, client=("127.0.0.1", 50000)) as client:
         response = client.post(
             "/api/v1/query",
-            json={"natural_language": "What is the weather in Paris?"},
+            json={"question": "What is the weather in Paris?"},
             headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"},
         )
 
@@ -198,7 +198,7 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
             "How many customers are there?", user_context=UserContext(roles=["admin"]))
         response = client.post(
             "/api/v1/query",
-            json={"natural_language": "How many customers are there?"},
+            json={"question": "How many customers are there?"},
             headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"},
         )
 

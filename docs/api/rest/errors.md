@@ -33,5 +33,4 @@ In an OpenAPI route, declare the envelope with `responses={404: ERROR_RESPONSE}`
 `identity.AUTH_RESPONSES` and `identity.ADMIN_RESPONSES`.
 
 A conversation that is running a turn is a `409` (`ConversationBusy`); a refused conversation argument is a `422`.
-
-`POST /api/v1/query` is the exception for a pipeline failure: it is `200` with the errors in `QueryResponse.errors`.
+`POST /api/v1/query` is the exception for a pipeline failure: it is `200` with the errors in `QueryResult.errors`.

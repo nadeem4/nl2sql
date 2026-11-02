@@ -35,8 +35,8 @@ def event_stream(open_events: Callable[[], Iterator[Event]], request: Request, *
     """Stream ``open_events()`` as SSE. The iterator runs in the thread pool, so a blocking facade call never holds the
     event loop. When the client disconnects (or the run is over) the iterator is closed, which cancels a run that
     cancels on close, and ``token`` is cancelled for one that takes a token. An exception from the iterator ends the
-    stream with one ``run.failed`` frame. Only the conversation routes use this helper; ``/query/stream`` and the
-    job stream build their own failure frames."""
+    stream with one ``run.failed`` frame. ``/query/stream`` catches its own failures first, so it can mask key text
+    in the log, and the job stream builds its own frames."""
 
     async def body():
         iterator = open_events()

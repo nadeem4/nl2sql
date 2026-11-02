@@ -214,3 +214,50 @@ def test_a_truncated_sql_is_rated_but_not_proposed(tmp_path):
     stored = api.record("run-1", "up", user_context=ANN)
 
     assert stored["rating"] == "up" and proposed == []
+
+
+def _rich_trace(withheld):
+    doc = _trace("run-1", ResultOwner.of(ANN, "acme").model_dump())
+    rows = [{"name": "secret-n1"}]
+    doc.update({
+        "results_withheld": withheld,
+        "settings": {"api": {"request_llm": True}},
+        "llm": {"configured": {"ast_planner": {"provider": "openai", "model": "m", "temperature": 0,
+                                               "base_url": "http://internal:9", "headers": {"X-Key": "v"}}},
+                "by_node": {}},
+        "nodes": [{"node": "aggregator", "outputs": {"aggregator_response": {"terminal_results": {"g": rows}}},
+                   "llm_calls": [{"model": "m", "messages": [{"role": "user", "content": "secret-n1"}],
+                                  "response": "secret-n1", "parsed": {"rows": rows}}]}],
+    })
+    doc["result"]["sub_queries"][0]["rows"] = {"rows": [["secret-n1"]], "total_rows": 1}
+    return doc
+
+
+def test_a_callers_trace_drops_rows_of_a_run_whose_results_were_withheld():
+    ctx = fake_runtime()
+    ctx.traces.write("run-1", _rich_trace(withheld=True))
+
+    text = str(TracesAPI(ctx).get("run-1", user_context=ANN))
+
+    assert "secret-n1" not in text
+    assert "SELECT 1" in text
+
+
+def test_a_callers_trace_keeps_rows_of_a_released_run():
+    ctx = fake_runtime()
+    ctx.traces.write("run-1", _rich_trace(withheld=False))
+
+    assert "secret-n1" in str(TracesAPI(ctx).get("run-1", user_context=ANN))
+
+
+def test_a_callers_trace_has_no_operator_config_but_the_operators_keeps_it():
+    ctx = fake_runtime()
+    ctx.traces.write("run-1", _rich_trace(withheld=False))
+
+    theirs = TracesAPI(ctx).get("run-1", user_context=ANN)
+    assert "settings" not in theirs
+    assert theirs["llm"]["configured"]["ast_planner"] == {"provider": "openai", "model": "m", "temperature": 0}
+    assert "internal:9" not in str(theirs)
+
+    ours = TracesAPI(ctx).get("run-1")
+    assert ours["settings"] and "internal:9" in str(ours) and "secret-n1" in str(ours)

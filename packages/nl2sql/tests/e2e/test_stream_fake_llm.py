@@ -102,7 +102,7 @@ def test_the_rest_api_streams_server_sent_events(demo_project, fake_llm, monkeyp
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
     with TestClient(app) as client:
-        reply = client.post("/api/v1/query/stream", json={"natural_language": QUESTION})
+        reply = client.post("/api/v1/query/stream", json={"question": QUESTION})
 
     assert reply.status_code == 200
     assert reply.headers["content-type"].startswith("text/event-stream")

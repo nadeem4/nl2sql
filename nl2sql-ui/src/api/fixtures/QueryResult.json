@@ -1,0 +1,69 @@
+{
+  "approvals_needed": [],
+  "artifact_refs": {},
+  "clarification": null,
+  "decomposition": null,
+  "errors": [],
+  "explanation": null,
+  "final_answer": null,
+  "reasoning": [],
+  "result_manifest": [],
+  "source": {
+    "datasource_id": null,
+    "id": null,
+    "params": null,
+    "type": "generated"
+  },
+  "status": "success",
+  "stop": null,
+  "sub_queries": [
+    {
+      "datasource_id": "chinook",
+      "estimate": null,
+      "id": "sq1",
+      "intent": "How many customers?",
+      "knowledge_used": null,
+      "plan": null,
+      "plan_source": "llm",
+      "retry_count": 0,
+      "row_cap": null,
+      "rows": {
+        "columns": [
+          "n"
+        ],
+        "rows": [
+          [
+            59
+          ]
+        ],
+        "total_rows": 1
+      },
+      "schema_version": "",
+      "sql": "SELECT COUNT(*) AS n FROM Customer",
+      "status": "success",
+      "truncated": false,
+      "validation": []
+    }
+  ],
+  "timings": {},
+  "trace_id": "trace-fixture",
+  "trace_path": null,
+  "truncated": false,
+  "usage": {
+    "calls": [],
+    "nodes": {},
+    "plan_cache_hits": 0,
+    "total": {
+      "cache_write_input_tokens": null,
+      "cached_input_tokens": null,
+      "calls": 0,
+      "cost": null,
+      "input_tokens": null,
+      "latency_s": 0.0,
+      "output_tokens": null,
+      "reasoning_tokens": null,
+      "total_tokens": null
+    }
+  },
+  "warnings": []
+}

@@ -7,7 +7,6 @@ import ast
 import pathlib
 
 import nl2sql
-from nl2sql_api.models.query import QueryResponse, SubQueryResponse
 
 API_SRC = pathlib.Path(__file__).resolve().parents[1] / "src"
 
@@ -35,6 +34,7 @@ def test_the_api_imports_only_the_top_level_nl2sql_namespace():
 
 
 def test_the_query_response_is_the_engine_result_so_the_two_cannot_drift():
-    assert issubclass(QueryResponse, nl2sql.QueryResult)
-    assert issubclass(SubQueryResponse, nl2sql.SubQueryResult)
-    assert set(QueryResponse.model_fields) == set(nl2sql.QueryResult.model_fields)
+    from nl2sql_api.routes import query
+
+    route = next(r for r in query.router.routes if r.path == "/query" and "POST" in r.methods)
+    assert route.response_model is nl2sql.QueryResult

@@ -1,4 +1,5 @@
-"""The golden files the web app's node tests read: ``ApiError``, ``Job`` and ``Turn`` (docs/architecture/wave_d.md, "Testing").
+"""The golden files the web app's node tests read: ``ApiError``, ``Job``, ``QueryResult``, ``Turn``, the ``Dashboard`` and
+``DashboardView`` (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
@@ -11,10 +12,10 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from itertools import count
 
+from dashboard_stubs import Recorder, dashboard, view
 from fastapi.testclient import TestClient
 
-from nl2sql import UserContext
-from nl2sql import ToolCall, ToolStep, Turn
+from nl2sql import QueryResult, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
 from nl2sql.testing.config import make_config
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
@@ -41,6 +42,15 @@ def build() -> dict:
         class Engine:
             config = make_config(pathlib.Path(folder))
             conversations = Conversations()
+            dashboards = Recorder()
+
+            @staticmethod
+            def run_query(question, **_):
+                return QueryResult(trace_id="trace-fixture", status="success", sub_queries=[SubQueryResult(
+                    id="sq1", intent=question, sql="SELECT COUNT(*) AS n FROM Customer", datasource_id="chinook",
+                    rows=RowSample(columns=["n"], rows=[[59]], total_rows=1), status="success")])
+
+        Engine.dashboards.returns.update({"rename": dashboard(), "open": view()})
 
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine
@@ -50,6 +60,8 @@ def build() -> dict:
                                      poll_s=0.01)
         try:
             client = TestClient(app, raise_server_exceptions=False)
+            answer = client.post("/api/v1/query", json={"question": "How many customers?"})
+            assert answer.status_code == 200, answer.text
             error = client.get("/api/v1/jobs/missing")
             assert error.status_code == 404
             job = jobs.submit("index", IndexJob(datasource_ids=["chinook"]), UserContext(user_id="ann"),
@@ -62,7 +74,9 @@ def build() -> dict:
             turn = client.post("/api/v1/conversations/conv-0001/turns", json={"text": "How many customers are there?"})
             assert turn.status_code == 200, turn.text
             return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
-                    "Turn.json": turn.json()}
+                    "QueryResult.json": answer.json(), "Turn.json": turn.json(),
+                    "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
+                    "DashboardView.json": client.get("/api/v1/dashboards/d1").json()}
         finally:
             jobs.close()
 

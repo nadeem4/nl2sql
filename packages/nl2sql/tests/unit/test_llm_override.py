@@ -264,3 +264,15 @@ def test_same_provider_model_choice_drops_operator_endpoint_and_headers():
 
     assert (chosen.model, key) == ("gpt-5.4", KEY)
     assert chosen.headers == {} and chosen.base_url is None
+
+
+def test_the_stored_trace_of_an_override_run_holds_no_key(monkeypatch):
+    seen = []
+    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _graph(seen))
+    ctx = fake_runtime(artifact_store=None, settings={"traces": {"mode": "always"}})
+
+    result = QueryAPI(ctx).run_query(f"Why does {KEY} fail, or {ANTHROPIC_KEY}?", llm_override=OVERRIDE)
+
+    stored = json.dumps(ctx.traces.get(result.trace_id))
+    assert result.trace_id in stored
+    assert KEY not in stored and ANTHROPIC_KEY not in stored
