@@ -2804,7 +2804,9 @@ denies it; the asker then re-asks the same question with <code>approval_ids</cod
 <p>The requests the caller asked, plus those their roles may decide. <code>status</code> (<code>pending</code> by default, <code>granted</code> or
 <code>denied</code>; anything else is a <code>422</code>) filters them. Each is an <code>ApprovalRecord</code>: the request (its <code>question</code>, <code>sql</code>,
 <code>reason</code>, <code>hook</code> and the <code>approver_roles</code> who may decide), its <code>status</code>, and when and by whom it was decided. Who
-granted it, with the roles they held, is the engine's record and is not returned.</p>
+granted it, with the roles they held, is the engine's record and is not returned. Each record also has <code>own</code>: <code>true</code>
+when the caller asked it (same tenant, same <code>user_id</code>), set by the server so a page never compares ids; <code>grant</code> and
+<code>deny</code> return it the same way. <code>own</code> says nothing about who may decide: the engine answers that on the call.</p>
 <h3 id="post-apiv1approvalsrequest_idgrant"><code>POST /api/v1/approvals/{request_id}/grant</code></h3>
 <p>Grant the request, as the caller. A caller holding none of the approver roles gets <code>403</code> <code>FORBIDDEN</code>; an unknown id, or
 another tenant's request, is a <code>404</code>. Returns the updated <code>ApprovalRecord</code>.</p>

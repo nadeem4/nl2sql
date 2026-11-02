@@ -6313,8 +6313,8 @@ caller may reach as <code>{id, description, sample_questions, recorded}</code> (
 provider can answer with no key), and <code>recorded_with</code>, the provider and model those recordings came from, or <code>null</code>.
 It also names the caller as <code>caller: {"user_id": "...", "admin": true | false}</code>. <code>admin</code> is whether the caller holds a role
 in <code>policies.admin_roles</code>, which is the check every admin route makes. <code>user_id</code> is the key's owner under <code>api_keys</code>, the
-proxy's user header under <code>proxy</code>, <code>static</code> under <code>static</code> and <code>local</code> under <code>none</code>; it is left out on the hosted demo,
-where a visitor's id is its session cookie, a secret. Nothing else about the caller (roles, tenant) or any other user
+proxy's user header under <code>proxy</code>, <code>static</code> under <code>static</code> and <code>local</code> under <code>none</code>; on the hosted demo it is <code>visitor-</code> and a
+one-way hash of the session cookie, never the cookie itself. Nothing else about the caller (roles, tenant) or any other user
 is returned, and whether the caller may approve a request is not here: each hook names its own approvers, so the
 approvals routes decide.</p>
 <h3 id="get-apiv1about"><code>GET /api/v1/about</code></h3>

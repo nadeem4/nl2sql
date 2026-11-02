@@ -6817,7 +6817,7 @@ grants it by id, and the asker's re-run names the id:</p>
 </code></pre></div>
 <p><code>list(*, user_context, status="pending")</code> shows the requests the caller's roles may approve and the
 caller's own, within the caller's tenant (another tenant's id is <code>ApprovalNotFound</code> in <code>list</code>, <code>grant</code> and <code>deny</code>, and <code>APPROVAL_NOT_GRANTED</code> as a run's id); <code>grant(request_id, *, by)</code> and <code>deny(request_id, *, by, reason=None)</code> return the
-<code>ApprovalRecord</code> (<code>id</code>, <code>status</code>, <code>request</code>, <code>created_at</code>, <code>updated_at</code>, <code>decided_by</code>, <code>reason</code>; the approver's roles stay inside the engine);
+<code>ApprovalRecord</code> (<code>id</code>, <code>status</code>, <code>request</code>, <code>created_at</code>, <code>updated_at</code>, <code>decided_by</code>, <code>reason</code>, <code>own</code>: whether the caller asked it, set by <code>list</code>, <code>grant</code> and <code>deny</code>; the approver's roles stay inside the engine);
 a request already decided is returned as it is, and an unknown or expired id is <code>ApprovalNotFound</code>.
 A grant is reusable for any re-run of that request (same question, asker, plan and SQL) until it
 expires (<code>settings.approvals.max_age_hours</code>, 24, counted from the last change). An id that is

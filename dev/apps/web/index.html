@@ -6361,9 +6361,9 @@ is not used by the page.</p>
 each with the question, who asked, the plan, the SQL it would run and why it
 stopped. <strong>Grant</strong> and <strong>Deny</strong> call the matching routes. The list also holds requests you
 asked yourself; those show no buttons, since only an approver may decide them,
-and the nav count leaves them out. The page learns your user id from <code>GET /meta</code>
-(<code>caller.user_id</code>). On the hosted demo there is none, so it cannot tell them apart
-and the server refuses a decision that is not yours, with its reason shown.</p>
+and the nav count leaves them out. The server marks them (<code>own</code> on each
+record), so the page compares no ids; it never decides who may approve, and the
+server refuses a decision that is not yours, with its reason shown.</p>
 <h2 id="charts-diagrams-reports">Charts, diagrams, reports</h2>
 <p>A chat answer can carry outputs. Each is drawn from data the API already holds, by the renderer for its kind
 (<code>src/outputs/Output.jsx</code> picks it from the <code>ToolOutput</code>). A body the page cannot read is shown as text, never dropped.</p>
