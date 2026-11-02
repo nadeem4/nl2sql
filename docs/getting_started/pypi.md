@@ -28,7 +28,7 @@ Running a query needs an LLM key; only indexing is key-free. See
 ## Configure
 
 The engine reads one config, `nl2sql.yaml`, and the files it includes.
-`nl2sql init` writes it (in Python, `nl2sql.config.init_project("my-project")`
+`nl2sql init` writes it (in Python, `nl2sql.init_project("my-project")`
 writes the same files); see
 [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init).
 Each section has its own page:
