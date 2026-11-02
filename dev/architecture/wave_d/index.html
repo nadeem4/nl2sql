@@ -4691,7 +4691,7 @@ so the web app reads a typed eval report.</p>
 </tr>
 <tr>
 <td><code>GET /meta</code></td>
-<td>Without a caller: <code>mode</code> (<code>demo</code>, <code>hosted</code>, <code>your_data</code>), the identity source and <code>request_llm</code>, which is what the page needs to show a sign-in. With a caller: also the datasources it may reach with their <code>sample_questions</code> (D222), which of those the replay provider has recordings for, <code>recorded_with</code>, and the hosted limits.</td>
+<td>Without a caller: <code>mode</code> (<code>demo</code>, <code>hosted</code>, <code>your_data</code>), the identity source and <code>request_llm</code>, which is what the page needs to show a sign-in. With a caller: also <code>caller</code> (<code>{user_id, admin}</code>, A4c; no <code>user_id</code> on the hosted demo), the datasources it may reach with their <code>sample_questions</code> (D222), which of those the replay provider has recordings for, <code>recorded_with</code>, and the hosted limits.</td>
 </tr>
 <tr>
 <td><code>GET /about</code></td>
@@ -6668,6 +6668,13 @@ in exactly one part.</p>
 <td><code>apps/web.md</code> (evals, settings)</td>
 </tr>
 <tr>
+<td>A4c</td>
+<td><strong><code>/meta</code> names the caller.</strong> <code>caller: {user_id, admin}</code> in <code>GET /meta</code> for a request that has one, so Approvals and Connect/Knowledge stop guessing; <code>src/api/meta.js</code>, <code>src/lib/caller.js</code>.</td>
+<td>A4b, W1, W3</td>
+<td><code>test_meta_names_*</code>, <code>test_meta_admin_is_the_answer_the_admin_routes_give</code>, <code>test_meta_names_a_hosted_visitor_without_its_session_token</code>, <code>caller.test.js</code>, <code>meta.test.js</code></td>
+<td><code>api/rest/health.md</code>, <code>apps/web.md</code></td>
+</tr>
+<tr>
 <td>W4b</td>
 <td><strong>Home (with the start screen of section 4 and <code>/meta</code>'s <code>start</code>), Pipeline, Retrieval, hosted first run.</strong> Files: <code>src/pages/Home.jsx</code>, <code>Pipeline.jsx</code>, <code>Retrieval.jsx</code> and the modules beside them (section 5's table, except W4a's), <code>src/api/meta.js</code>, <code>styles/home.css</code>.</td>
 <td>A4b, W4a, D0b</td>
@@ -7113,6 +7120,7 @@ schema diagram (<code>GET /datasources/{id}/diagram</code> is <code>text/plain</
 <code>download()</code> helper and <code>Mermaid.jsx</code> of W2a, so Knowledge lists the tables and columns instead; one
 <code>schemaForm.js</code> test file covers the form, so <code>SchemaForm.jsx</code> and <code>Steps.jsx</code> have no test of their own;
 <code>SchemaPanel.jsx</code> and <code>datasources.js</code> were already in <code>src/connect/</code> from D0b. The schema diagram is a follow-up now that W2a (#422: <code>download()</code>, <code>Mermaid.jsx</code>) is on <code>main</code>. A drifted report points to <code>nl2sql index</code>; a button for it on a datasource that already exists is a follow-up too. Review fixes: the per-datasource state of the next steps resets on a new Add, origins are looked up per field (<code>tables.X.description</code>, <code>columns.X.Y.role</code>), a proposal shows every <code>change</code> entry, only a 403 from <code>GET /proposals</code> hides review and drift, and a typed secret is cleared after Add.</p>
+<p><strong>A4c (<code>/meta</code> names the caller).</strong> <code>GET /meta</code> with a caller adds <code>caller: {user_id, admin}</code>; <code>admin</code> is <code>identity.is_admin</code>, the check the admin routes make, so the page and the server cannot disagree. <strong><code>user_id</code> is left out on the hosted demo:</strong> a visitor's id is its session cookie, the secret that session is kept by, so the body carries <code>{admin: false}</code> only; under <code>api_keys</code> it is the key's owner (never the token or its hash), under <code>proxy</code> the proxy's user header, under <code>static</code> <code>static</code> and under <code>none</code> <code>local</code>. <strong>No <code>can_approve</code>:</strong> who may approve is the hook's own list (<code>approver_roles</code>, falling back to <code>policies.admin_roles</code>), so it is a fact about a request, not the caller; the engine still decides on Grant and Deny, and the page only hides its own requests (it compares <code>user_id</code> with the request's asker). Never another user's data, roles or tenant. The web app reads it with <code>getMeta()</code> (<code>src/api/meta.js</code>; <code>App.jsx</code> still reads the old <code>/api/meta</code> for Home, Pipeline and the status pill until W4b) and <code>callerOf</code> (<code>src/lib/caller.js</code>): Approvals no longer learns the id from a conversation's owner (<code>Chat</code>'s <code>onCaller</code> is gone), and Connect and Knowledge offer admin work unless <code>/meta</code> says the caller is not an admin, still treating a route's 403 as final. <strong>Known gap:</strong> a hosted visitor has no id, so Approvals cannot tell its own requests apart there and shows Grant and Deny; the server refuses them.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at

@@ -6310,7 +6310,13 @@ API starts even when a required datasource cannot connect; this route says so.</
 <p>Without a caller: <code>{"mode": "demo" | "your_data" | "hosted", "auth": "api_keys" | "proxy" | "static" | "none",
 "request_llm": false}</code>, what a page needs before it has an identity. With a caller, also <code>datasources</code>, each one the
 caller may reach as <code>{id, description, sample_questions, recorded}</code> (<code>recorded</code> is the sample questions the <code>replay</code>
-provider can answer with no key), and <code>recorded_with</code>, the provider and model those recordings came from, or <code>null</code>.</p>
+provider can answer with no key), and <code>recorded_with</code>, the provider and model those recordings came from, or <code>null</code>.
+It also names the caller as <code>caller: {"user_id": "...", "admin": true | false}</code>. <code>admin</code> is whether the caller holds a role
+in <code>policies.admin_roles</code>, which is the check every admin route makes. <code>user_id</code> is the key's owner under <code>api_keys</code>, the
+proxy's user header under <code>proxy</code>, <code>static</code> under <code>static</code> and <code>local</code> under <code>none</code>; it is left out on the hosted demo,
+where a visitor's id is its session cookie, a secret. Nothing else about the caller (roles, tenant) or any other user
+is returned, and whether the caller may approve a request is not here: each hook names its own approvers, so the
+approvals routes decide.</p>
 <h3 id="get-apiv1about"><code>GET /api/v1/about</code></h3>
 <p><code>engine.about()</code>: the engine version and its pipeline steps. Needs a caller.</p>
 
