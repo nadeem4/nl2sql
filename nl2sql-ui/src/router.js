@@ -67,7 +67,7 @@ export const PAGES = [
   // Wave D's pages. Each is a stub (pages/<Name>.jsx) until the row that owns
   // it fills it, and stays out of the nav until then. `param` is the one id a
   // route may carry: "optional" (#/chat and #/chat/{id}) or "required".
-  stub("dashboards", "/dashboards", "Dashboards", "Whole dashboards in workspaces, each tile with its takeaway.", "optional"),
+  page("dashboards", "/dashboards", "Dashboards", "Whole dashboards in workspaces: open one with its stored results, then rename, arrange, filter, schedule or move it.", "optional"),
   {
     id: "connect",
     path: "/connect",

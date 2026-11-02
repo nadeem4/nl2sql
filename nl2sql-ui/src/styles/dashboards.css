@@ -1,0 +1,70 @@
+/* ---- Dashboards ----
+   A column of workspaces beside the dashboard. The charts sit on the engine's four-column grid; each tile gets its cell
+   from --col and --row (dashboards/layout.js), and on a narrow screen they stack in reading order. */
+
+.dash { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+.dash-side { display: grid; gap: var(--sp-2); align-content: start; }
+.dash-main { display: grid; gap: var(--sp-4); min-width: 0; }
+.dash-h { font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-top: var(--sp-4); }
+.dash-h:first-child { margin-top: 0; }
+.dash-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.dash-item {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); width: 100%;
+  padding: var(--sp-2) var(--sp-3); border: 0; border-radius: var(--r-control); background: transparent;
+  font-size: var(--fs-2); color: var(--ink); text-align: left; text-decoration: none; min-height: 36px; align-items: center;
+}
+.dash-item[aria-current] { background: var(--well); font-weight: var(--fw-bold); }
+.dash-meta { font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); white-space: nowrap; }
+.dash-row { display: flex; gap: var(--sp-2); }
+.dash-new { margin-top: var(--sp-2); }
+
+.dash-input {
+  min-width: 0; flex: 1; padding: 5px 10px; font-size: var(--fs-2); background: var(--raised);
+  border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+}
+.dash-short { flex: 0 0 90px; font-family: var(--mono); }
+.dash-danger { color: var(--fault); }
+
+.dash-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+.dash-title { font-size: var(--fs-5); letter-spacing: -0.02em; line-height: 1.2; }
+.dash-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.dash-actions [aria-pressed="true"] { background: var(--well); }
+
+.dash-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--hair); border-radius: var(--r-well); background: var(--surface); }
+.dash-filter-wrap { display: flex; align-items: center; gap: var(--sp-2); }
+.dash-filter { position: relative; font-size: var(--fs-2); }
+.dash-filter summary { cursor: pointer; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--rule-strong); border-radius: var(--r-control); background: var(--raised); list-style: none; }
+.dash-filter summary::-webkit-details-marker { display: none; }
+.dash-between { display: flex; align-items: center; gap: var(--sp-2); }
+.dash-count { margin-left: var(--sp-2); font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-2); }
+.dash-options { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; display: grid; gap: var(--sp-1); min-width: 200px; max-height: 260px; overflow: auto; padding: var(--sp-3); background: var(--raised); border: 1px solid var(--rule); border-radius: var(--r-well); box-shadow: var(--shadow); }
+
+.dash-schedule { padding: var(--sp-3) var(--sp-4); border: 1px solid var(--hair); border-radius: var(--r-well); background: var(--surface); }
+.dash-manage { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--hair); }
+
+.dash-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 150px; gap: var(--sp-4); }
+.dash-tile {
+  grid-column: var(--col); grid-row: var(--row); display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  overflow: auto; background: var(--raised); border: 1px solid var(--hair); border-radius: var(--r-raised);
+}
+.dash-tile .art { border: 0; flex: 1; }
+.dash-tile-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) 0; }
+.dash-tile-head h3 { font-size: var(--fs-3); }
+.dash-age { font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); white-space: nowrap; }
+.dash-tile[aria-busy] .art { opacity: .55; }
+.dash-note { display: grid; gap: var(--sp-2); justify-items: start; padding: var(--sp-3) var(--sp-4) var(--sp-4); font-size: var(--fs-2); color: var(--ink-2); }
+.dash-note p { margin: 0; }
+.dash-note[data-kind="fix"], .dash-note[data-kind="error"] { color: var(--fault); }
+.dash-note[data-kind="approval"] { color: var(--warn); }
+.dash-note-sub { color: var(--ink-3); }
+.dash-edit { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--hair); background: var(--surface); }
+.dash-edit-row { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.dash-edit-row .inspect-close { margin-left: 0; }
+
+@media (max-width: 900px) {
+  .dash { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .dash-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }
+  .dash-tile { grid-column: 1; grid-row: auto; min-height: 220px; }
+}
