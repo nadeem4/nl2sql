@@ -5402,6 +5402,34 @@
   
   
     <li class="md-nav__item">
+      <a href="conversations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="errors/" class="md-nav__link">
         
   
@@ -6284,6 +6312,11 @@ server on a config:</p>
 <td>List, grant and deny the approvals a hook asked for.</td>
 </tr>
 <tr>
+<td><a href="conversations/">Conversations</a></td>
+<td><code>routes/conversations.py</code></td>
+<td>Conversations: start, list, read, delete, send a turn (whole or streamed), retry, run a chat tool, report.</td>
+</tr>
+<tr>
 <td><a href="datasource/">Datasource</a></td>
 <td><code>routes/datasource.py</code></td>
 <td>Manage datasource configs.</td>
@@ -6310,7 +6343,7 @@ server on a config:</p>
 </tr>
 </tbody>
 </table>
-<p>The routers <code>approvals</code>, <code>conversations</code>, <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code> and <code>web</code> are empty
+<p>The routers <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code> and <code>web</code> are empty
 for now: later rows fill them. The committed contract is <code>packages/api/openapi.json</code>; <code>test_openapi_snapshot_is_current</code>
 fails when a route changes without it (rewrite it with <code>python packages/api/tests/test_openapi_snapshot.py</code>).</p>
 <h2 id="error-handling">Error Handling</h2>

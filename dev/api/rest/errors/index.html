@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../jobs/">
+        <link rel="prev" href="../conversations/">
       
       
         <link rel="next" href="../../../releases/">
@@ -5230,6 +5230,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../conversations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -6023,7 +6051,8 @@
 </ul>
 <p>In an OpenAPI route, declare the envelope with <code>responses={404: ERROR_RESPONSE}</code> (from <code>nl2sql_api.errors</code>), or use
 <code>identity.AUTH_RESPONSES</code> and <code>identity.ADMIN_RESPONSES</code>.</p>
-<p><code>POST /api/v1/query</code> is the exception for a pipeline failure: it is <code>200</code> with the errors in <code>QueryResult.errors</code>.</p>
+<p>A conversation that is running a turn is a <code>409</code> (<code>ConversationBusy</code>); a refused conversation argument is a <code>422</code>.
+<code>POST /api/v1/query</code> is the exception for a pipeline failure: it is <code>200</code> with the errors in <code>QueryResult.errors</code>.</p>
 
 
 

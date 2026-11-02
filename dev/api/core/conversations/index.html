@@ -5313,6 +5313,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../rest/conversations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../rest/errors/" class="md-nav__link">
         
   
@@ -6032,7 +6060,7 @@ and <code>engine.chat_tools</code> (<a href="../../../conversations/tools/">Chat
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <p>Every method takes <code>user_context</code> keyword-only and required. A conversation that is not the caller's is
-<code>ConversationNotFound</code>; one already running a turn is <code>ConversationBusy</code>. <code>ValueError</code> is raised, before
+<code>ConversationNotFound</code>; one already running a turn is <code>ConversationBusy</code>. <code>InvalidArgument</code> (a <code>ValueError</code>, 422) is raised, before
 anything runs, for: neither or both of <code>text</code> and <code>choice</code>, a <code>choice</code> with nothing pending or not one of the
 pending options, an empty message, a conversation at <code>max_turns</code> (<code>CONVERSATION_TOO_LONG</code>), <code>retry</code> with no
 earlier question.</p>
@@ -6104,11 +6132,11 @@ earlier question.</p>
 <li><code>stream</code> ends with <code>conversation.turn</code>; see <a href="../../../conversations/#streaming">Streaming</a>.</li>
 <li><code>ask_only</code> returns the run's <code>QueryResult</code> with its rows; the stored turn has none.</li>
 <li><code>tool</code> runs one enabled <a href="../../../conversations/tools/">chat tool</a> as a turn of kind <code>tool</code> and makes no model
-  call. Arguments the tool's <code>args_model</code> rejects are a <code>ValueError</code> and store nothing; a tool that is not
+  call. Arguments the tool's <code>args_model</code> rejects are an <code>InvalidArgument</code> and store nothing; a tool that is not
   enabled, raises or cannot apply is a stored step with <code>error.code</code> <code>UNKNOWN_CHAT_TOOL</code>, <code>TOOL_FAILED</code> or
   <code>TOOL_NOT_APPLICABLE</code>.</li>
 <li><code>report</code> returns Markdown for the stored answered turns (or <code>turns</code>, a list of turn numbers). A turn number
-  that does not exist, or a conversation with nothing answered, is a <code>ValueError</code>. <code>include_rows=False</code> leaves
+  that does not exist, or a conversation with nothing answered, is an <code>InvalidArgument</code>. <code>include_rows=False</code> leaves
   the row tables and chart takeaways out, which is how the <code>report</code> tool stores its output.</li>
 <li>Every method needs a caller: <code>user_context=None</code>, or a context with no <code>user_id</code>, is a <code>TypeError</code>, not a
   shared anonymous owner.</li>

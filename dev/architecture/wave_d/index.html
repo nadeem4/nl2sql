@@ -2826,6 +2826,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/conversations/">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/rest/errors/">
 <span class="md-ellipsis">
     
@@ -6866,7 +6878,23 @@ in <code>models</code> are ignored, as the registry always has. A provider with 
 dict[provider, key]</code> are top-level exports. The old playground (<code>cli/demo/playground/</code>) still imports <code>nl2sql.llm.*</code>
 directly; it is deleted by X1b, so it was not rewritten. Code on main wins over the row's file list: <code>api/llm_api.py</code>
 and <code>registry.py</code> needed no change beyond the docstring, and <code>api/types.py</code> was not touched.</p>
-<p><strong>A1 (query, results, traces, feedback, approvals routes).</strong> <code>POST /query</code> and <code>/query/stream</code> take <code>question</code> (was
+<p><strong>A2a (conversations and chat tools routes).</strong> <code>routes/conversations.py</code> and <code>models/conversations.py</code>; see
+<a href="../../api/rest/conversations/">Conversations API</a>. <code>main.py</code> already registered the namespace. Engine change: the
+conversation methods' argument errors (no question to retry, text xor choice, blank text, a <code>choice</code> that is not an
+option, nothing pending, bad tool arguments, a report with no turn or nothing answered) were plain <code>ValueError</code>, a 500
+at the API; they are now <code>InvalidArgument</code> (422, still a <code>ValueError</code>), and "too long" keeps <code>CONVERSATION_TOO_LONG</code>.
+<code>ConversationBusy</code> is already an <code>NL2SQLError</code>, so the handler found by MRO maps it to 409 with no change to
+<code>errors.py</code>; <code>test_errors.py</code> now pins it and <code>ConversationNotFound</code> (404). Shapes W1 must know: <code>POST /conversations</code>
+is <code>201</code> and <code>DELETE</code> is <code>204</code>; <code>TurnRequest</code> is <code>{text | choice, execute}</code>; the stream ends with <code>conversation.turn</code>
+whose <code>data.stored</code> is the <code>Turn</code>; <code>RetryRequest</code> is <code>{approval_ids}</code> (request ids); <code>ToolRequest</code> is <code>{args}</code>; a tool
+that is not enabled is a stored error step (200), not a status; refusals (404, 409, 422) arrive before the stream
+begins, because the route waits 0.5 s for the first event (<code>SETTLE_S</code>); a failure that arrives later, once the 200 is
+sent, ends the stream with one <code>run.failed</code> frame (<code>sse.event_stream</code> catches it: a named error's code and message,
+else <code>UNKNOWN_ERROR</code> and a fixed message, D202); the helper is used by the conversation routes only (<code>/query/stream</code>
+and the job stream build their own frames); <code>retry</code> is also a 404 for an unknown approval id (<code>ApprovalNotFound</code>); a closed stream cancels the turn only once the step in flight
+returns; <code>GET /chat-tools</code> is a <code>ChatToolInfo</code> list. The report is <code>text/markdown</code>. Golden fixture <code>Turn.json</code> is
+written by <code>test_web_fixtures.py</code> from a <code>POST .../turns</code> response.
+<strong>A1 (query, results, traces, feedback, approvals routes).</strong> <code>POST /query</code> and <code>/query/stream</code> take <code>question</code> (was
 <code>natural_language</code>; the old name is a 422, every body is <code>extra="forbid"</code>), <code>choice</code> and <code>approval_ids</code>; both together are
 a 422 <code>CLARIFICATION_INVALID</code> raised in the route before the engine is called. Both routes depend on
 <code>overrides.llm_override</code> and pass <code>llm_override=</code> to the facade. <code>QueryResponse</code> and <code>SubQueryResponse</code> are gone: the
