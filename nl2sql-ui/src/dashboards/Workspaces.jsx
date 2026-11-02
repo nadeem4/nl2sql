@@ -12,8 +12,8 @@ export default function Workspaces({ workspaces, selected, dashboards, drafts, c
 
   const act = async (fn) => {
     try {
-      await fn();
-      await onChanged();
+      const id = await fn();
+      await onChanged(id);
     } catch (e) {
       onError(e);
     }
@@ -21,7 +21,7 @@ export default function Workspaces({ workspaces, selected, dashboards, drafts, c
   const create = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    act(async () => { const w = await createWorkspace(name.trim()); setName(""); onSelect(w.id); });
+    act(async () => { const w = await createWorkspace(name.trim()); setName(""); return w.id; });
   };
   const rename = (e) => {
     e.preventDefault();

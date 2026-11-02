@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ageLabel, refreshedLabel, runsById, tileState } from "./tile.js";
+import { ageLabel, oldestAt, refreshedLabel, runsById, tileState } from "./tile.js";
 
 const view = JSON.parse(readFileSync(new URL("../api/fixtures/DashboardView.json", import.meta.url), "utf8"));
 const runs = runsById(view.runs);
@@ -55,4 +55,23 @@ test("a tile with no run yet, an empty result, a stop and an error each have a s
   assert.equal(tileState({ status: "stopped", chart: null }).kind, "stopped");
   const error = tileState({ status: "error", chart: null, error: { code: "X", message: "It broke." } });
   assert.deepEqual([error.kind, error.message], ["error", "It broke."]);
+});
+
+test("the dashboard is as old as its oldest usable result", () => {
+  const rows = [
+    { tile_id: "a", status: "ok", at: "2026-01-02T00:00:00Z" },
+    { tile_id: "b", status: "ok", at: "2026-01-01T00:00:00Z" },
+    { tile_id: "c", status: "denied", at: "2025-12-01T00:00:00Z" },
+    { tile_id: "d", status: "needs_approval", at: "2025-12-01T00:00:00Z" },
+  ];
+  assert.equal(oldestAt(rows), "2026-01-01T00:00:00Z");
+  assert.equal(oldestAt([]), null);
+  assert.equal(oldestAt([rows[2]]), null);
+});
+
+test("a filtered view says which chart the filters did not reach", () => {
+  const run = { status: "ok", chart: { kind: "bar" }, filtered: false };
+  assert.equal(tileState(run, { filtered: true }).note, "Not filtered");
+  assert.equal(tileState(run, { filtered: false }).note, undefined);
+  assert.equal(tileState({ ...run, filtered: true }, { filtered: true }).note, undefined);
 });

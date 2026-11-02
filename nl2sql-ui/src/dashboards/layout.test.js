@@ -33,11 +33,13 @@ test("shift moves a tile one place earlier or later and stops at the ends", () =
   assert.deepEqual(shift(items, "c", 1).map((i) => i.id), ["a", "b", "c"]);
 });
 
-test("resize keeps a tile between one and four columns and one and six rows", () => {
+test("resize keeps a tile between one and four columns and at least one row, with no ceiling on rows", () => {
   const items = [{ id: "a", w: 2, h: 2 }];
   assert.deepEqual(resize(items, "a", 1, 1), [{ id: "a", w: 3, h: 3 }]);
-  assert.deepEqual(resize(items, "a", 9, 9), [{ id: "a", w: 4, h: 6 }]);
+  assert.deepEqual(resize(items, "a", 9, 9), [{ id: "a", w: 4, h: 11 }]);
   assert.deepEqual(resize(items, "a", -9, -9), [{ id: "a", w: 1, h: 1 }]);
+  // Widening a tall stored tile leaves its height alone.
+  assert.deepEqual(resize([{ id: "a", w: 1, h: 8 }], "a", 1, 0), [{ id: "a", w: 2, h: 8 }]);
 });
 
 test("arrangeBody is the TileArrangements the layout route takes", () => {

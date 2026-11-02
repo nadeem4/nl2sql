@@ -8,7 +8,7 @@ import TileEdit from "./Edit.jsx";
 // cannot be shown says why in a sentence, never a blank card. `edit` is Edit.jsx's set of actions, present only
 // while the dashboard is being edited.
 function Body({ state, tile, busy, onRefresh, onRemove }) {
-  if (state.kind === "chart") return <Chart spec={state.spec} />;
+  if (state.kind === "chart") return <Chart spec={{ ...state.spec, title: "" }} />;
   return (
     <div className="dash-note" data-kind={state.kind} role={state.kind === "error" ? "alert" : undefined}>
       <p>{state.message}</p>
@@ -28,14 +28,14 @@ function Body({ state, tile, busy, onRefresh, onRemove }) {
   );
 }
 
-export default function Tile({ tile, run, place, busy, now, edit, onRefresh, onRemove }) {
-  const state = tileState(run);
+export default function Tile({ tile, run, place, busy, now, filtered, edit, onRefresh, onRemove }) {
+  const state = tileState(run, { filtered });
   const age = run ? ageLabel(run.at, now) : "";
   return (
     <section className="dash-tile" style={cellStyle(place)} aria-label={tile.title} aria-busy={busy || undefined}>
       <header className="dash-tile-head">
         <h3>{tile.title}</h3>
-        {age && <span className="dash-age" title={run.at}>{busy ? "Refreshing" : age}</span>}
+        {age && <span className="dash-age" title={run.at}>{busy ? "Refreshing" : [age, state.note].filter(Boolean).join(". ")}</span>}
       </header>
       {edit && <TileEdit tile={tile} busy={busy} {...edit} />}
       <Body state={state} tile={tile} busy={busy} onRefresh={onRefresh} onRemove={onRemove} />

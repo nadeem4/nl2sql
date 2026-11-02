@@ -1557,7 +1557,7 @@ and `init_project` were exported already; `RegistryError`, `load_trace`, `check_
 
 **W2b (dashboards page).** `src/pages/Dashboards.jsx` is the page (route `#/dashboards[/{id}]`, now in the nav) and
 `src/dashboards/` holds `Workspaces.jsx`, `Grid.jsx`, `Tile.jsx`, `Edit.jsx`, `Filters.jsx`, `Schedule.jsx` and the pure
-modules `layout.js`, `filters.js`, `tile.js`, `schedule.js` (each with a test); `src/api/dashboards.js` has one function
+modules `layout.js`, `filters.js`, `tile.js`, `schedule.js` and `flow.js` (each with a test; `flow.js` holds the open-then-refresh-due flow and "Run again"); `src/api/dashboards.js` has one function
 per route of `routes/dashboards.py` and `routes/workspaces.py` (`routes.test.js` reads it). A tile draws W2a's `Chart`;
 opening calls `GET /dashboards/{id}` and then `POST .../refresh` with `tile_id` for each id in `due`. Arranging is by order
 and size, not dragging: `order` -> `shift`/`resize` -> `pack` rows on the 4-column grid -> `PUT /layout`, so a body is
@@ -1566,7 +1566,7 @@ for display. Filters apply values through a refresh body and store nothing; **Ed
 (`PUT /filters`), but adding or changing a filter's column stays in chat. **Code won over the doc:** the row's file list
 gained `filters.js`, `tile.js`, `schedule.js` and `fakeApi.js` (a test helper) beside `layout.js`; drafts are listed with
 `GET /dashboards?status=draft`; `router.js` lists Dashboards in the nav (no longer a stub) and `router.test.js` follows.
-Not built: the approval grant itself (Approvals is W1/W3's); the tile's **Run again** only repeats the refresh.
+**Run again** on a gated tile refreshes once to learn the request ids (a stored run has none), then refreshes with `approval_ids`; an `ApprovalNotFound` shows "still waiting". Replies that arrive after the page has moved to another dashboard are dropped. Not built: the approval grant itself (Approvals is W1/W3's), and **Generate for a datasource** (a job with progress), which the Pages table lists for this page but no W2 row owns yet; it needs a row.
 
 ### Session batches
 

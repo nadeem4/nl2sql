@@ -2,7 +2,6 @@
 // The page arranges by order and size, never by dragging: a list of {id, w, h} is packed left to right into rows, so
 // every arrangement it sends is on the grid and no two tiles share a cell.
 export const GRID_COLUMNS = 4;
-export const MAX_ROWS = 6;
 
 export const order = (tiles) =>
   [...tiles]
@@ -40,7 +39,7 @@ export function shift(items, id, by) {
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
 export const resize = (items, id, dw, dh) =>
-  items.map((i) => (i.id === id ? { ...i, w: clamp(i.w + dw, 1, GRID_COLUMNS), h: clamp(i.h + dh, 1, MAX_ROWS) } : i));
+  items.map((i) => (i.id === id ? { ...i, w: clamp(i.w + dw, 1, GRID_COLUMNS), h: Math.max(1, i.h + dh) } : i));
 
 // The body of PUT /dashboards/{id}/layout.
 export const arrangeBody = (items) => ({ arrangements: pack(items) });

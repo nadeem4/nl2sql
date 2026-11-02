@@ -15,7 +15,21 @@ export function ageLabel(at, now = new Date()) {
 
 export const refreshedLabel = (at, now) => (at ? `Refreshed ${ageLabel(at, now)}` : "Not refreshed yet");
 
-export function tileState(run) {
+// The `at` of the oldest result worth counting; a chart that is denied, waiting or broken has no result to age.
+const BLOCKED = new Set(["denied", "needs_approval", "needs_fixing"]);
+export function oldestAt(runs) {
+  const times = runs.filter((r) => !BLOCKED.has(r.status) && r.at).map((r) => r.at);
+  return times.length ? times.reduce((a, b) => (Date.parse(b) < Date.parse(a) ? b : a)) : null;
+}
+
+// `filtered` is whether the page shows filtered results: a chart the filters did not reach says so.
+export function tileState(run, { filtered = false } = {}) {
+  const state = stateOf(run);
+  if (filtered && run && run.filtered === false) state.note = "Not filtered";
+  return state;
+}
+
+function stateOf(run) {
   if (!run) return { kind: "pending", message: "Not run yet." };
   const said = (run.error && run.error.message) || "";
   switch (run.status) {

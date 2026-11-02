@@ -32,13 +32,15 @@ routes](../api/rest/dashboards.md) and never a model.
   ago"). The charts the server reports as due are then refreshed one at a time. **Refresh** re-runs every chart.
 - **Charts** are drawn with the same chart card as the chat. A chart that cannot show says why: *needs fixing* (what
   broke, with **Remove this chart**), *denied* (you may not read its data), *needs approval* (the reason, a link to
-  Approvals, and **Run again** once granted), or no rows.
+  Approvals, and **Run again**: it names the request, then runs the chart with it once it is granted, or says it is still
+  waiting), or no rows.
 - **Filters** apply values to every chart: a list of a column's values for an `in` filter, two ends for a `between`
-  filter. **Apply** shows the filtered result and stores nothing; **Clear** brings back the stored results.
+  filter. **Apply** shows the filtered result and stores nothing; **Clear** brings back the stored results
+  (it opens the dashboard again). A chart a filter does not reach is marked "Not filtered". The header's age is that of
+  the oldest result shown.
 - **Schedule** sets how often the dashboard refreshes itself, or stops it. An interval under the server's minimum is
   refused with its own sentence.
-- **Edit** turns on, per chart: rename, chart type (automatic, line, bar, big number, table), move earlier or later,
+- **Edit** turns on, per chart: rename, chart type (automatic, line, bar, big number, table; the chart runs once so the new type shows), move earlier or later,
   wider or narrower, taller or shorter, and remove. It also renames the dashboard, **moves** it to another workspace
-  (or **pins** a draft into one), removes a filter, and deletes the dashboard. The grid has four columns; charts are
-  packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here.
-
+  (or **pins** a draft into one; with no workspace yet, **Pin** makes "General"), removes a filter, and deletes the dashboard. The grid has four columns; charts are
+  packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here, and so is generating a dashboard for a datasource.

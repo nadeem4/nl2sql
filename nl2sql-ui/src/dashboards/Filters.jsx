@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { filterValues } from "../api/dashboards.js";
 import { activeCount, inputType, setValues } from "./filters.js";
 
@@ -7,17 +7,18 @@ import { activeCount, inputType, setValues } from "./filters.js";
 // a `between` filter takes two ends.
 function InFilter({ dashboardId, filter, values, onChange, onError }) {
   const [options, setOptions] = useState(null);
+  const asked = useRef(false);
   const open = (e) => {
-    if (!e.currentTarget.open || options) return;
-    setOptions([]);
-    filterValues(dashboardId, filter.id).then(setOptions).catch((err) => { setOptions(null); onError(err); });
+    if (!e.currentTarget.open || asked.current) return;
+    asked.current = true;
+    filterValues(dashboardId, filter.id).then(setOptions).catch((err) => { asked.current = false; onError(err); });
   };
   const toggle = (v) => onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
   return (
     <details className="dash-filter" onToggle={open}>
       <summary>{filter.label}{values.length > 0 && <span className="dash-count">{values.length}</span>}</summary>
       <div className="dash-options">
-        {options === null || options.length === 0 ? <span className="page-note">Loading values</span> : options.map((v) => (
+        {options === null ? <span className="page-note">Loading values</span> : options.length === 0 ? <span className="page-note">No values</span> : options.map((v) => (
           <label key={String(v)} className="check">
             <input type="checkbox" checked={values.includes(v)} onChange={() => toggle(v)} />
             {String(v)}

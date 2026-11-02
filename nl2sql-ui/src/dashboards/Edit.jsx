@@ -31,7 +31,7 @@ export default function TileEdit({ tile, busy, first, last, onTitle, onChart, on
         <button type="button" className="inspect-close" disabled={busy || tile.layout.w <= 1} onClick={() => onSize(-1, 0)}>Narrower</button>
         <button type="button" className="inspect-close" disabled={busy || tile.layout.w >= 4} onClick={() => onSize(1, 0)}>Wider</button>
         <button type="button" className="inspect-close" disabled={busy || tile.layout.h <= 1} onClick={() => onSize(0, -1)}>Shorter</button>
-        <button type="button" className="inspect-close" disabled={busy || tile.layout.h >= 6} onClick={() => onSize(0, 1)}>Taller</button>
+        <button type="button" className="inspect-close" disabled={busy} onClick={() => onSize(0, 1)}>Taller</button>
         <button type="button" className="inspect-close dash-danger" disabled={busy} onClick={onRemove}>Remove</button>
       </div>
     </div>
