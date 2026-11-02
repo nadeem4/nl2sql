@@ -13,3 +13,18 @@ test("a kind this page does not know, or no output, is shown as plain text", () 
   assert.equal(rendererFor(null), "text");
   assert.equal(rendererFor(undefined), "text");
 });
+
+import { chartSpecOf } from "./output.js";
+
+const spec = { kind: "bar", title: "t", data: { trace_id: "a", result_id: "b", columns: [], rows: [], truncated: false } };
+
+test("a chart body is a ChartSpec object or its JSON text", () => {
+  assert.deepEqual(chartSpecOf({ kind: "chart", body: spec }), spec);
+  assert.deepEqual(chartSpecOf({ kind: "chart", body: JSON.stringify(spec) }), spec);
+});
+
+test("a chart body that is not a ChartSpec is not drawn", () => {
+  assert.equal(chartSpecOf({ kind: "chart", body: "not json" }), null);
+  assert.equal(chartSpecOf({ kind: "chart", body: { kind: "bar" } }), null);
+  assert.equal(chartSpecOf({ kind: "chart", body: null }), null);
+});

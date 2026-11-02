@@ -1,0 +1,47 @@
+{
+  "data": {
+    "columns": [
+      "genre",
+      "tracks"
+    ],
+    "result_id": "sq1",
+    "rows": [
+      [
+        "Rock",
+        1297
+      ],
+      [
+        "Latin",
+        579
+      ],
+      [
+        "Metal",
+        374
+      ],
+      [
+        "Jazz",
+        130
+      ]
+    ],
+    "trace_id": "trace-0001-fixture",
+    "truncated": true
+  },
+  "kind": "bar",
+  "reason": "one category and one number",
+  "series": null,
+  "takeaway": "Rock has more tracks than the next two genres together.",
+  "title": "Top genres by tracks",
+  "value": null,
+  "x": {
+    "field": "genre",
+    "kind": "text",
+    "title": "Genre"
+  },
+  "y": [
+    {
+      "field": "tracks",
+      "kind": "number",
+      "title": "Tracks"
+    }
+  ]
+}

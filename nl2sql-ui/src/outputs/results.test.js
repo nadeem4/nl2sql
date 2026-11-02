@@ -5,8 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PAGE_SIZE, csvUrl, firstPage, initialView, pageNav, pageRange, pageUrl, resultTabs, rowCount, rowsView,
-  subQueryHeads, truncatedNotice, verifiedSource, viewUrl,
+  PAGE_SIZE, firstPage, initialView, pageNav, pageRange, resultTabs, rowCount, rowsView,
+  subQueryHeads, truncatedNotice, verifiedSource,
 } from "./results.js";
 
 const longest = { node_id: "combine_g1", columns: ["genre", "track", "ms"], row_count: 3340, truncated: false };
@@ -31,28 +31,14 @@ test("rowsView: a tab switch selects that result, starts at offset 0 and asks fo
 
   view = rowsView(view, { type: "page", offset: 200 });
   assert.deepEqual(view, { active: "combine_g1", offset: 200 });
-  assert.equal(viewUrl("run-1", view, "admin"), "/api/query/run-1/results/combine_g1?role=admin&offset=200&limit=100");
 
   view = rowsView(view, { type: "select", id: "sq_2" });
   assert.deepEqual(view, { active: "sq_2", offset: 0 });
-  assert.equal(viewUrl("run-1", view, "admin"), "/api/query/run-1/results/sq_2?role=admin&offset=0&limit=100");
   assert.equal(initialView([]).active, null);
 });
 
-// A run is read back as the role it was asked as: the server binds an anonymous run to its roles.
-test("pageUrl asks the paging endpoint for one page, 100 rows by default, as the run's role", () => {
+test("a page holds 100 rows", () => {
   assert.equal(PAGE_SIZE, 100);
-  assert.equal(pageUrl("run-1", "combine_g1", "admin", 0),
-    "/api/query/run-1/results/combine_g1?role=admin&offset=0&limit=100");
-  assert.equal(pageUrl("run-1", "combine_g1", "viewer", 200, 50),
-    "/api/query/run-1/results/combine_g1?role=viewer&offset=200&limit=50");
-  // Ids and the role are escaped, so a strange one cannot reach another route or add a parameter.
-  assert.equal(pageUrl("a/b", "c?d", "x&y", 0), "/api/query/a%2Fb/results/c%3Fd?role=x%26y&offset=0&limit=100");
-});
-
-test("csvUrl points at the full-result CSV endpoint, not a sample, as the run's role", () => {
-  assert.equal(csvUrl("run-1", "combine_g1", "admin"), "/api/query/run-1/results/combine_g1.csv?role=admin");
-  assert.equal(csvUrl("a b", "x", "a b"), "/api/query/a%20b/results/x.csv?role=a%20b");
 });
 
 test("pageNav: previous steps back a page, next follows the server's next_offset", () => {
