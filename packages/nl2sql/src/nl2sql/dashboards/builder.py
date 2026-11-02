@@ -269,6 +269,8 @@ class Builder:
         if len(ticked) > cap:
             raise InvalidArgument(f"A dashboard holds at most {cap} charts (dashboards.max_tiles); {len(ticked)} were "
                                   "ticked. Untick some.")
+        if sum(1 for t in ticked if t.source == "asked") > MAX_ASKED:
+            raise InvalidArgument(f"At most {MAX_ASKED} new questions go to the model in one build; untick some.")
         if time_column is not None and time_column not in {t.column for t in self._column_options(source)[1]}:
             raise InvalidArgument(f"'{time_column}' is not a time column you can read here.")
         if any(t.source == "asked" for t in ticked):

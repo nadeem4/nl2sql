@@ -76,7 +76,7 @@ def start_dashboard_build_job(body: DashboardBuildJob, user: Caller, jobs: Queue
             time_column=body.time_column, cancellation_token=ctx.token, llm_override=override,
             on_tile=lambda tile: ctx.progress(f"tile {tile.done} of {tile.total}", tile.done, tile.total))
 
-    return jobs.submit("dashboard-build", body, user, run)
+    return jobs.submit("dashboard-build", body, user, run, secrets=[k for k in override.keys.values()] if override else [])
 
 
 _ADMIN_STARTED = {**_STARTED, **identity.ADMIN_RESPONSES}
