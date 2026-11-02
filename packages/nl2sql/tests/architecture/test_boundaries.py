@@ -646,11 +646,14 @@ def _outside_the_cli(path):
 def test_the_cli_imports_only_the_public_nl2sql():
     """The CLI is a client of the facade, like the API: ``from nl2sql import ...``, never the engine's internals.
 
-    No exception is left (CL0b). The playground is held to the older rule above until it is deleted (X1b).
+    The playground, ``cli/demo/`` and ``commands/demo.py`` are held to the older rule above until X1a/X1b
+    delete them (they are in ``STILL_IMPORTED_FROM_INSIDE``); nothing else is excepted.
     """
     offenders = []
     for path in python_files(CLI):
-        if path.relative_to(CLI).as_posix().startswith("demo/playground/"):
+        relative = path.relative_to(CLI).as_posix()
+        # X1a turns demo.py into a launcher and X1b deletes demo/: both go before the CLI moves (CL1).
+        if relative.startswith("demo/") or relative == "commands/demo.py":
             continue
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name in _outside_the_cli(path)]
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)

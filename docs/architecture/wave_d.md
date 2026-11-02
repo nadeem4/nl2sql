@@ -1534,12 +1534,14 @@ list is unchanged (the playground and `demo.py`, X1b).
 
 **CL0b (CLI on the facade: the rest).** The whole CLI imports only the top-level `nl2sql` (and `nl2sql.cli`):
 `CLI_FILES_STILL_IMPORTING_INSIDE` is deleted from `test_boundaries.py` and `test_the_cli_imports_only_the_public_nl2sql`
-has no exception but the playground (`demo/playground/`, X1b; `STILL_IMPORTED_FROM_INSIDE` is unchanged). **Where the code
+has no exception but the playground (`demo/playground/`, `demo/` and `commands/demo.py`, which X1a/X1b remove; `STILL_IMPORTED_FROM_INSIDE` is unchanged). **Where the code
 won over the doc:** the design names facade methods for the provider catalogue, evals, traces and so on, but those
 commands read stateless tables and files before or without an engine, so plain top-level exports were added instead of
-namespace methods (the full list is in `docs/api/core/llm.md`); only the MCP start is a method, `NL2SQL.serve_mcp(identity,
-*, http=False, host=None, port=None)` (D232), which `nl2sql mcp` calls; the "needs the mcp extra" hint now comes from
-catching its `ImportError`, after the engine is built. `evaluation.records.publish` is renamed `publish_records` so
+namespace methods (the full list is in `docs/api/core/llm.md`); the replay, recording and provider-table names that only
+`nl2sql demo` uses are not exported (X1a/X1b delete that code); only the MCP start is a method, `NL2SQL.serve_mcp(identity,
+*, http=False, host=None, port=None)` (D232), which `nl2sql mcp` calls and which raises `ValueError` for stdio without an
+identity; the "needs the mcp extra" hint comes from `importlib.util.find_spec("mcp")`, checked before the engine is built.
+The eval path defaults (`BENCHMARKS_DIR`, `HISTORY_PATH`, `README_PATH`) live in `cli/commands/eval.py`. `evaluation.records.publish` is renamed `publish_records` so
 the export has a clear name (no alias). `NL2SQLError`, `ProfileReport`, `DatasourceKnowledgeView`, `Policies`, `Registry`
 and `init_project` were exported already; `RegistryError`, `load_trace`, `check_file_name` and the others above are new.
 **For CL1:** nothing in `nl2sql/cli/` (outside the playground) imports an engine module, so the move to

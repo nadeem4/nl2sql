@@ -322,7 +322,10 @@ class NL2SQL:
 
         Raises:
             ImportError: the ``mcp`` extra is not installed.
+            ValueError: stdio was asked for with no ``identity``.
         """
+        if not http and identity is None:
+            raise ValueError("serve_mcp over stdio needs the caller's UserContext")
         from nl2sql.mcp import server
 
         if http:

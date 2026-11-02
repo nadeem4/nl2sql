@@ -35,3 +35,10 @@ def test_serve_mcp_over_http_passes_the_identity_host_and_port(monkeypatch):
     nl2sql.NL2SQL.serve_mcp(engine, None, http=True, host="0.0.0.0", port=9123)
 
     assert seen == [(engine, None, "0.0.0.0", 9123)]
+
+
+def test_serve_mcp_over_stdio_needs_an_identity(monkeypatch):
+    monkeypatch.setattr(server, "build_server", lambda *a, **k: pytest.fail("refused before the server is built"))
+
+    with pytest.raises(ValueError, match="UserContext"):
+        nl2sql.NL2SQL.serve_mcp(object(), None)

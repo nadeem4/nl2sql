@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, List, Mapping, Optional
 
 import yaml
 
-from nl2sql import (
+from nl2sql.llm.providers import (
     LLM_AGENTS,
     PROVIDER_KEYS,
     default_model_for,

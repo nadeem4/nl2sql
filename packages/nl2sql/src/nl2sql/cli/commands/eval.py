@@ -34,8 +34,13 @@ from typing_extensions import Annotated
 
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
-from nl2sql import (BENCHMARKS_DIR, HISTORY_PATH, README_PATH, LLMFileConfig, import_records, load_llm_file,
-                    publish_records, resolve_llm_spec, run_stamp, write_records)
+from nl2sql import (LLMFileConfig, import_records, load_llm_file, publish_records, resolve_llm_spec, run_stamp,
+                    write_records)
+
+# The relative defaults of ``eval publish``'s options (the records functions keep their own).
+BENCHMARKS_DIR = pathlib.Path("benchmarks")
+HISTORY_PATH = pathlib.Path("docs") / "benchmarks.md"
+README_PATH = pathlib.Path("README.md")
 
 app = typer.Typer(help="Evals: run suites and gate them against a baseline, regenerate expected rows, "
                        "publish recorded runs.", no_args_is_help=True)

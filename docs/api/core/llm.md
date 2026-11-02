@@ -117,7 +117,7 @@ form). Both are top-level exports, so an app never imports `nl2sql.llm.providers
 So are the stateless facts a command-line tool prints before any engine exists:
 `nl2sql.KEYED_PROVIDERS` (the providers that read a key), `nl2sql.env_var_for_provider(provider)`,
 `nl2sql.api_key_from_env(provider)` (the key, or None; print it masked) and
-`nl2sql.ANTHROPIC_EXTRA_HINT` (what to install when `langchain-anthropic` is missing). The rest of the CLI reads the provider tables the same way: `PROVIDER_KEYS`, `UPSTREAMS`, `ANTHROPIC_UPSTREAM`, `OLLAMA_BASE_URL`, `LLM_AGENTS`, `default_model_for`, `default_temperature_for`, `env_var_for_key`, `mask_key`, `looks_like_api_key` and `KEY_SHAPE_MESSAGE`. Config writers (`default_llm`, `starter_config`, `write_env_values`, `write_project`, `check_file_name`), the replay tools `nl2sql demo` uses (`ReplayStore`, `RecordingProxy`, `FakeLLMServer`, `DEMO_QUESTIONS`, `DEMO_QUESTIONS_BY_DATASOURCE`), the eval tools (`LLMFileConfig`, `load_llm_file`, `resolve_llm_spec`, `write_records`, `import_records`, `publish_records`, `run_stamp` and the three path constants), `load_trace` and `RegistryError` are top-level exports too.
+`nl2sql.ANTHROPIC_EXTRA_HINT` (what to install when `langchain-anthropic` is missing). So are `looks_like_api_key` and `KEY_SHAPE_MESSAGE`, the config writers (`default_llm`, `starter_config`, `write_env_values`, `write_project`, `check_file_name`), the eval tools (`LLMFileConfig`, `load_llm_file`, `resolve_llm_spec`, `write_records`, `import_records`, `publish_records`, `run_stamp`), `load_trace` and `RegistryError`. The provider tables and the replay and recording tools `nl2sql demo` uses are not exported: that command keeps its internal imports until X1a and X1b remove them.
 
 ### llm.prices
 

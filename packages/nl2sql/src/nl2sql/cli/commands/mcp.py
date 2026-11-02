@@ -7,6 +7,7 @@ stdout is the protocol, so everything this command says goes to stderr.
 """
 from __future__ import annotations
 
+import importlib.util
 import logging
 from typing import TYPE_CHECKING, List, Optional
 
@@ -68,6 +69,8 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str], http:
             identity = caller(config.policies, list(roles), user)
     except (ConfigError, ValueError) as error:
         _fail(str(error))
+    if importlib.util.find_spec("mcp") is None:
+        _fail('nl2sql mcp needs the mcp extra: pip install "nl2sql-engine[mcp]"')
     try:
         engine = NL2SQL(config)
     except ConfigError as error:
@@ -87,8 +90,6 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str], http:
             logger.info("Serving %d datasource(s) over stdio as role(s) %s", len(config.datasources),
                         ", ".join(identity.roles) or "(allow_all)")
             engine.serve_mcp(identity)
-    except ImportError:
-        _fail('nl2sql mcp needs the mcp extra: pip install "nl2sql-engine[mcp]"')
     except (EngineNotReady, ValueError) as error:
         _fail(str(error))
     finally:
