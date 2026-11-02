@@ -13,7 +13,7 @@ from pydantic import BaseModel, SecretStr
 
 from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
-from nl2sql.common.errors import DatasourceNotFound
+from nl2sql.common.errors import DatasourceNotFound, NotAuthorized
 from nl2sql.common.planned import arrives_with
 from nl2sql.config import Datasource
 from nl2sql.config.models import is_secret_key
@@ -36,20 +36,31 @@ class DatasourcesAPI:
         """Every configured datasource, in config order, failed ones included (``status == "failed"``).
 
         With ``user_context``, only the datasources its roles reach (``policies.scope``), so the sample
-        questions and examples of one it may not use are not shown. Without it, all of them.
+        questions and examples of one it may not use are not shown, and a failed one's ``reason`` (the driver's
+        text) is left to callers holding ``policies.admin_roles``. Without it, all of them, in full.
         """
-        return [self._info(d) for d in self._ctx.config.datasources if self._reaches(user_context, d.id)]
+        return [self._shown(self._info(d), user_context)
+                for d in self._ctx.config.datasources if self._reaches(user_context, d.id)]
 
     def get(self, datasource_id: str, *, user_context: Optional[UserContext] = None) -> DatasourceInfo:
-        """One configured datasource, its connection masked.
+        """One configured datasource, its connection masked (``reason`` as in :meth:`list`).
 
         Raises:
             DatasourceNotFound: it is not configured, or ``user_context`` does not reach it (a ``ValueError``).
         """
         for datasource in self._ctx.config.datasources:
             if datasource.id == datasource_id and self._reaches(user_context, datasource_id):
-                return self._info(datasource)
+                return self._shown(self._info(datasource), user_context)
         raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
+
+    def _shown(self, info: DatasourceInfo, user_context: Optional[UserContext]) -> DatasourceInfo:
+        """``info`` for ``user_context``: a failure's raw reason is for admins (and for no caller at all)."""
+        if user_context is None or info.reason is None:
+            return info
+        policies = self._ctx.policy_engine.policies
+        if policies.allow_all or set(user_context.roles) & set(policies.admin_roles):
+            return info
+        return replace(info, reason="The last connection check failed. An admin can see why.")
 
     def _reaches(self, user_context: Optional[UserContext], datasource_id: str) -> bool:
         if user_context is None:
@@ -250,7 +261,7 @@ class DatasourcesAPI:
         hint as the fix), or the adapter's own stage.
 
         Raises:
-            ValueError: an id that is not configured.
+            DatasourceNotFound: an id that is not configured.
         """
         if isinstance(datasource, str):
             return self._ctx.check_datasource(datasource)
@@ -288,7 +299,7 @@ class DatasourcesAPI:
         model call. ``user_context`` is required, as for ``schema``.
 
         Raises:
-            ValueError: ``tables`` names no table the caller may see.
+            InvalidArgument: ``tables`` names no table the caller may see.
         """
         from nl2sql.charts.diagram import schema_diagram
         from nl2sql.knowledge.scope import deny_names, visible
@@ -316,13 +327,13 @@ class DatasourcesAPI:
 
         Raises:
             TypeError: ``by`` is not a ``UserContext``.
-            PermissionError: ``by`` holds none of ``policies.admin_roles``.
-            ValueError: the datasource is not configured; the engine was built in code or its ``datasources``
-                section is not a ``datasources/`` folder; the id cannot be a file name; or two secrets map to
-                one environment variable.
+            NotAuthorized: ``by`` holds none of ``policies.admin_roles`` (a ``PermissionError``).
+            DatasourceNotFound: the datasource is not configured (a ``ValueError``).
+            ValueError: the id cannot be a file name, or two secrets map to one environment variable.
             SecretValueInConfig: a secret is a literal and ``env_file`` is false.
             ReviewError: ``FILE_CHANGED``, the file changed on disk since the config was loaded (reload the
-                engine). Nothing is written.
+                engine), or ``NOT_WRITABLE``, the engine was built in code, its ``datasources`` section is not a
+                ``datasources/`` folder, or the folder cannot be written. Nothing is written.
         """
         by = self._admin(by)
         return self._write(datasource_id, _who(by), env_file)
@@ -337,12 +348,14 @@ class DatasourcesAPI:
         config = self._ctx.config
         datasource = next((d for d in config.datasources if d.id == datasource_id), None)
         if datasource is None:
-            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+            raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
         folder, project = config.datasources_folder, config.folder
         if folder is None or project is None:
-            raise ValueError("Saving a datasource needs the engine to be loaded from a nl2sql.yaml whose datasources "
-                             "section is a folder (`datasources: { file: datasources/ }`, one <id>.yaml each); this "
-                             "engine was built in code or its datasources are inline.")
+            raise ReviewError(ReviewErrorCode.NOT_WRITABLE,
+                              "Saving a datasource needs the engine to be loaded from a nl2sql.yaml whose datasources "
+                              "section is a folder (`datasources: { file: datasources/ }`, one <id>.yaml each); this "
+                              "engine was built in code or its datasources are inline.",
+                              fix="Run the server from a project folder whose nl2sql.yaml has a datasources folder.")
         name = check_file_name(datasource_id)
         secrets = EnvSecrets(env_file=env_file, reserved={
             **reserved_names(d for d in config.datasources if d.id != datasource_id), **config_reserved_names(config)})
@@ -355,9 +368,15 @@ class DatasourcesAPI:
                 raise ReviewError(ReviewErrorCode.FILE_CHANGED,
                                   f"{target.name} changed on disk since the engine loaded it.",
                                   fix="Reload the engine (build it again from nl2sql.yaml) and save again.")
-            if secrets.values:
-                write_env_values(project, secrets.values)
-            write_atomic(target, data)
+            try:
+                if secrets.values:
+                    write_env_values(project, secrets.values)
+                write_atomic(target, data)
+            except OSError:  # the cause (a path, a permission) stays out of the message
+                raise ReviewError(ReviewErrorCode.NOT_WRITABLE, "The datasource could not be written: the config "
+                                  "folder is read-only.",
+                                  fix="Mount the config folder writable, or add the datasource to its files by hand."
+                                  ) from None
             config.record_datasource_file(name, hashlib.sha256(data).hexdigest())
         self._ctx.bus.publish("datasource.saved", {
             "datasource_id": datasource_id, "file": f"{folder.name}/{name}", "by": who},
@@ -390,8 +409,8 @@ class DatasourcesAPI:
                             "(policies.admin_roles).")
         policies = self._ctx.config.policies
         if not (policies.allow_all or set(by.roles) & set(policies.admin_roles)):
-            raise PermissionError(f"Saving a datasource needs one of the admin roles "
-                                  f"({', '.join(policies.admin_roles) or 'none defined'}).")
+            raise NotAuthorized(f"Saving a datasource needs one of the admin roles "
+                                f"({', '.join(policies.admin_roles) or 'none defined'}).")
         return by
 
     def _info(self, datasource: Datasource) -> DatasourceInfo:

@@ -1,16 +1,20 @@
 """The `jobs` namespace of `/api/v1`: a background job's state, progress and cancellation. The routes that start a job
 (`POST /jobs/<kind>`) are added to this file by the rows that own each kind (docs/architecture/wave_d.md, "Jobs")."""
+import logging
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from nl2sql import NL2SQL, UserContext
+from nl2sql import NL2SQL, ProfileReport, UserContext
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine, get_jobs
 from nl2sql_api.errors import ERROR_RESPONSE
-from nl2sql_api.jobs import DashboardJob, DashboardJobResult, Job, JobContext, Jobs
+from nl2sql_api.jobs import (DashboardJob, DashboardJobResult, IndexJob, IndexResult, Job, JobContext, Jobs,
+                             ProfileJob)
 from nl2sql_api.sse import SSE_HEADERS
+
+logger = logging.getLogger("nl2sql_api")
 
 router = APIRouter(tags=["jobs"])
 
@@ -18,6 +22,12 @@ Caller = Annotated[UserContext, Depends(identity.caller)]
 Queue = Annotated[Jobs, Depends(get_jobs)]
 Engine = Annotated[NL2SQL, Depends(get_engine)]
 _NOT_FOUND = {404: {**ERROR_RESPONSE, "description": "No such job for this caller."}, **identity.AUTH_RESPONSES}
+
+
+def _count(datasource_ids, engine: NL2SQL) -> int:
+    """How many datasources a job goes through: the named ones (a repeated id is one) or every configured one."""
+    return len(dict.fromkeys(datasource_ids if datasource_ids is not None else
+                             [d.id for d in engine.config.datasources]))
 
 
 def _admin(user: UserContext, engine: NL2SQL) -> bool:
@@ -47,6 +57,63 @@ def start_dashboard_job(body: DashboardJob, user: Caller, jobs: Queue, engine: E
         return DashboardJobResult(dashboard=dashboard, run=first)
 
     return jobs.submit("dashboard", body, user, run)
+
+
+_ADMIN_STARTED = {**_STARTED, **identity.ADMIN_RESPONSES}
+
+
+@router.post("/jobs/index", response_model=Job, status_code=202, summary="Build the index",
+             responses=_ADMIN_STARTED)
+def start_index_job(body: IndexJob, user: Annotated[UserContext, Depends(identity.admin)], jobs: Queue,
+                    engine: Engine):
+    """Indexes `datasource_ids` (every configured datasource when left out), one at a time, beside the live entries
+    and switching each over when it is written. `progress` is one step per datasource (`"<id>"`, or `"<id>
+    (failed)"`); the `result` is an `IndexResult`, where `failed` names the datasources that kept their previous
+    index (the reason is in the server log). Admin only."""
+
+    def run(ctx: JobContext) -> IndexResult:
+        total = _count(body.datasource_ids, engine)
+        finished = []
+
+        def on_datasource(event) -> None:
+            if event.state == "started":
+                return
+            finished.append(event.datasource_id)
+            failed = event.state == "failed"
+            step = f"{event.datasource_id} (failed)" if failed else event.datasource_id
+            ctx.progress(step, len(finished), total)
+
+        built = engine.index.build(body.datasource_ids, on_datasource=on_datasource, cancellation_token=ctx.token)
+        for error in built.errors:
+            logger.error("Indexing %s failed: %s", error["datasource_id"], error["error"])
+        return IndexResult(ok=built.ok, stats=built.stats, empty=built.empty,
+                           failed=[error["datasource_id"] for error in built.errors])
+
+    return jobs.submit("index", body, user, run)
+
+
+@router.post("/jobs/profile", response_model=Job, status_code=202, summary="Profile the datasources",
+             responses=_ADMIN_STARTED)
+def start_profile_job(body: ProfileJob, user: Annotated[UserContext, Depends(identity.admin)], jobs: Queue,
+                      engine: Engine):
+    """Profiles `datasource_ids` (every one when left out) and files what it finds as proposals: joins, roles and,
+    with `draft`, model-written descriptions, always on the server's key (a key typed in a browser never pays for
+    drafts) and capped by `max_cost_usd`. `progress` is one step per datasource; the `result` is a `ProfileReport`
+    each. Admin only."""
+
+    def run(ctx: JobContext) -> List[ProfileReport]:
+        total = _count(body.datasource_ids, engine)
+        done = []
+
+        def on_datasource(report: ProfileReport) -> None:
+            done.append(report.datasource_id)
+            ctx.progress(report.datasource_id, len(done), total)
+
+        return engine.knowledge.profile(body.datasource_ids, user_context=user, draft=body.draft,
+                                        max_cost_usd=body.max_cost_usd, on_datasource=on_datasource,
+                                        cancellation_token=ctx.token)
+
+    return jobs.submit("profile", body, user, run)
 
 
 @router.get("/jobs", response_model=List[Job], summary="List jobs", responses=identity.AUTH_RESPONSES)

@@ -49,17 +49,20 @@ mount a config folder there, and a volume for `storage.path`.
 - `GET /api/v1/meta` - The mode, the identity source and `request_llm` (no caller needed)
 - `GET /api/v1/about` - What the engine is
 - `GET /api/v1/datasource-types` - The adapters the engine can name, each with its connection schema (admin only)
-- `POST /api/v1/datasource/test` - Test a connection without registering it; returns the failed stage and the fix (admin only)
-- `POST /api/v1/datasource` - Register a datasource in the running process (`config` is one `datasources` entry: `id`, `type`, `connection`, ...); `save: true` also writes `datasources/<id>.yaml` with secrets as references; a body that does not validate is a 422 listing each problem by path
-- `GET /api/v1/datasource` - List the datasources, with their status and masked connections
-- `GET /api/v1/datasource/{datasource_id}` - One datasource
-- `DELETE /api/v1/datasource/{datasource_id}` - Take a datasource out of the running process
+- `POST /api/v1/datasources/test` - Test a connection without registering it; returns the failed stage and the fix (admin only)
+- `POST /api/v1/datasources` - Register a datasource in the running process (`config` is one `datasources` entry); `save: true` also writes `datasources/<id>.yaml` (admin only)
+- `GET /api/v1/datasources`, `GET /api/v1/datasources/{datasource_id}` - The datasources the caller reaches, with status, masked connection and sample questions
+- `DELETE /api/v1/datasources/{datasource_id}` - Take a datasource out of the running process (admin only)
+- `GET /api/v1/datasources/{datasource_id}/schema`, `GET /api/v1/datasources/{datasource_id}/diagram` - The caller's view of the schema, as JSON or a Mermaid `erDiagram`
+- `GET /api/v1/index` - Index health (status, entries by type, embedding model, problems)
+- `DELETE /api/v1/index` - Clear the vector store (admin only)
+- `GET /api/v1/index/check` - Drift check against the live schemas (admin only)
+- `GET /api/v1/index/inspect`, `POST /api/v1/index/inspect` - The retrieval inspector
+- `POST /api/v1/jobs/index`, `POST /api/v1/jobs/profile` - Start the index or profile job (admin only, `202`)
+- `GET /api/v1/knowledge`, `GET /api/v1/knowledge/sources`, `POST /api/v1/knowledge/reload`, `POST /api/v1/knowledge/choices` - What the engine knows; reload (admin) and file a clarification choice
+- `GET /api/v1/proposals`, `GET /api/v1/proposals/{proposal_id}`, `POST /api/v1/proposals/accept|reject|examples` - Review proposed knowledge changes (admin only)
 - `PUT /api/v1/settings/llm` - Replace the whole `llm` section in the running process (admin only; 422 with the config error)
 - `GET /api/v1/llm` - Each agent and the model it runs on
 - `GET /api/v1/llm/{agent}` - One agent's model
-- `POST /api/v1/index/{datasource_id}` - Index one datasource's schema
-- `POST /api/v1/index-all` - Index every configured datasource
-- `DELETE /api/v1/index` - Clear the vector store
-- `GET /api/v1/index/status` - Index health (status, entries by type, embedding model, problems)
 
 Reference: <https://github.com/nadeem4/nl2sql/blob/main/docs/api/rest/index.md>.

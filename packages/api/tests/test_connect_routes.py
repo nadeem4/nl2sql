@@ -1,6 +1,6 @@
 """The Connect routes over a real engine built in a temp folder (docs/architecture/wave_c.md, section 7).
 
-``GET /datasource-types``, ``POST /datasource/test`` and ``POST /datasource`` (with ``save``) are admin-only.
+``GET /datasource-types``, ``POST /datasources/test`` and ``POST /datasources`` (with ``save``) are admin-only.
 Nothing here reads or writes a real ``.env``: every project is a ``tmp_path`` folder.
 """
 import sqlite3
@@ -68,7 +68,7 @@ def _postgres(**connection):
 
 # ---------------------------------------------------------------- types
 
-def test_types_route(connect):
+def test_types_route_carries_connection_schemas(connect):
     client, _, _ = connect()
 
     response = client.get("/api/v1/datasource-types")
@@ -86,12 +86,12 @@ def test_types_route(connect):
 def test_test_route_registers_nothing(connect):
     client, engine, folder = connect()
 
-    response = client.post("/api/v1/datasource/test", json={"config": _sqlite(folder)})
+    response = client.post("/api/v1/datasources/test", json={"config": _sqlite(folder)})
 
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "ready"
     assert engine.datasources.list() == []
-    assert client.get("/api/v1/datasource").json() == {"datasources": []}
+    assert client.get("/api/v1/datasources").json() == []
     assert not (folder / "datasources" / "shop.yaml").exists()
 
 
@@ -99,7 +99,7 @@ def test_test_route_reports_the_failed_stage_and_fix(connect):
     client, engine, folder = connect()
     config = _sqlite(folder, connection={"database": str(folder / "missing.db")})
 
-    response = client.post("/api/v1/datasource/test", json={"config": config})
+    response = client.post("/api/v1/datasources/test", json={"config": config})
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -110,7 +110,7 @@ def test_test_route_reports_the_failed_stage_and_fix(connect):
 def test_test_route_never_echoes_a_secret(connect):
     client, _, _ = connect()
 
-    response = client.post("/api/v1/datasource/test", json={"config": _postgres(password=PASSWORD)})
+    response = client.post("/api/v1/datasources/test", json={"config": _postgres(password=PASSWORD)})
 
     assert response.status_code == 200, response.text
     assert PASSWORD not in response.text
@@ -119,7 +119,7 @@ def test_test_route_never_echoes_a_secret(connect):
 def test_test_route_with_a_typo_is_a_422_naming_the_path(connect):
     client, _, folder = connect()
 
-    response = client.post("/api/v1/datasource/test", json={"config": _sqlite(folder, sampel_questions=["x"])})
+    response = client.post("/api/v1/datasources/test", json={"config": _sqlite(folder, sampel_questions=["x"])})
 
     assert response.status_code == 422
     assert "config.sampel_questions" in _problems(response)
@@ -131,7 +131,7 @@ def test_add_with_a_typo_is_a_422_naming_the_path(connect):
     client, engine, folder = connect()
     config = _sqlite(folder, sampel_questions=["x"], limits={"row_limit": "SECRET-TYPO-VALUE"})
 
-    response = client.post("/api/v1/datasource", json={"config": config})
+    response = client.post("/api/v1/datasources", json={"config": config})
 
     assert response.status_code == 422, response.text
     problems = _problems(response)
@@ -143,7 +143,7 @@ def test_add_with_a_typo_is_a_422_naming_the_path(connect):
 def test_add_without_a_config_is_a_422(connect):
     client, _, _ = connect()
 
-    response = client.post("/api/v1/datasource", json={"save": True})
+    response = client.post("/api/v1/datasources", json={"save": True})
 
     assert response.status_code == 422
     assert "config" in _problems(response)
@@ -152,7 +152,7 @@ def test_add_without_a_config_is_a_422(connect):
 def test_add_with_an_unknown_body_key_is_a_422(connect):
     client, _, folder = connect()
 
-    response = client.post("/api/v1/datasource", json={"config": _sqlite(folder), "sav": True})
+    response = client.post("/api/v1/datasources", json={"config": _sqlite(folder), "sav": True})
 
     assert response.status_code == 422
     assert "sav" in _problems(response)
@@ -160,9 +160,9 @@ def test_add_with_an_unknown_body_key_is_a_422(connect):
 
 def test_add_with_a_taken_id_is_a_409(connect):
     client, _, folder = connect()
-    assert client.post("/api/v1/datasource", json={"config": _sqlite(folder)}).status_code == 200
+    assert client.post("/api/v1/datasources", json={"config": _sqlite(folder)}).status_code == 200
 
-    response = client.post("/api/v1/datasource", json={"config": _sqlite(folder)})
+    response = client.post("/api/v1/datasources", json={"config": _sqlite(folder)})
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CONFLICT"
@@ -171,7 +171,7 @@ def test_add_with_a_taken_id_is_a_409(connect):
 def test_get_and_remove_of_an_unknown_id_are_404(connect):
     client, _, _ = connect()
 
-    for response in (client.get("/api/v1/datasource/nope"), client.delete("/api/v1/datasource/nope")):
+    for response in (client.get("/api/v1/datasources/nope"), client.delete("/api/v1/datasources/nope")):
         assert response.status_code == 404, response.text
         assert response.json()["error"]["code"] == "NOT_FOUND"
 
@@ -179,7 +179,7 @@ def test_get_and_remove_of_an_unknown_id_are_404(connect):
 def test_add_without_save_writes_no_file(connect):
     client, engine, folder = connect()
 
-    response = client.post("/api/v1/datasource", json={"config": _sqlite(folder)})
+    response = client.post("/api/v1/datasources", json={"config": _sqlite(folder)})
 
     assert response.status_code == 200, response.text
     assert [d.id for d in engine.datasources.list()] == ["shop"]
@@ -188,10 +188,10 @@ def test_add_without_save_writes_no_file(connect):
 
 # ---------------------------------------------------------------- save
 
-def test_save_on_a_fresh_local_install_writes_env(connect):
+def test_save_uses_wave_cs_writer_with_env_file_only_on_fresh_local_install(connect):
     client, engine, folder = connect()
 
-    response = client.post("/api/v1/datasource", json={"config": _postgres(password=PASSWORD), "save": True})
+    response = client.post("/api/v1/datasources", json={"config": _postgres(password=PASSWORD), "save": True})
 
     assert response.status_code == 200, response.text
     assert response.json()["file"] == "datasources/sales.yaml"
@@ -209,7 +209,7 @@ def test_save_refuses_a_literal_secret_off_loopback(connect):
 
     for host in ("127.0.0.1", "203.0.113.7"):
         client = TestClient(app, base_url="http://localhost", client=(host, 50000))
-        response = client.post("/api/v1/datasource", json={"config": _postgres(password=PASSWORD), "save": True},
+        response = client.post("/api/v1/datasources", json={"config": _postgres(password=PASSWORD), "save": True},
                                headers=ROLE)
 
         assert response.status_code == 422, response.text
@@ -225,7 +225,7 @@ def test_save_with_a_reference_works_off_loopback(connect, monkeypatch):
     monkeypatch.setenv("SALES_DB_PW", "from-the-environment")
     client, engine, folder = connect(host="203.0.113.7", api=PROXY)
 
-    response = client.post("/api/v1/datasource",
+    response = client.post("/api/v1/datasources",
                            json={"config": _postgres(password="${env:SALES_DB_PW}"), "save": True}, headers=ROLE)
 
     assert response.status_code == 200, response.text
@@ -238,7 +238,7 @@ def test_save_over_a_file_changed_since_load_is_a_409(connect):
     client, engine, folder = connect()
     (folder / "datasources" / "shop.yaml").write_text("type: sqlite\n", encoding="utf-8")
 
-    response = client.post("/api/v1/datasource", json={"config": _sqlite(folder), "save": True})
+    response = client.post("/api/v1/datasources", json={"config": _sqlite(folder), "save": True})
 
     assert response.status_code == 409, response.text
     assert "changed on disk" in response.json()["error"]["message"]
@@ -246,7 +246,29 @@ def test_save_over_a_file_changed_since_load_is_a_409(connect):
     assert (folder / "datasources" / "shop.yaml").read_text(encoding="utf-8") == "type: sqlite\n"
 
 
-@pytest.mark.parametrize("path", ["/api/v1/datasource", "/api/v1/datasource/test"])
+def test_save_on_a_read_only_config_is_its_own_error(connect, monkeypatch):
+    # Docker mounts the config read-only (D212): the save fails with its own message and the datasource stays
+    # registered in memory until the server restarts.
+    import nl2sql.config.writer as writer
+
+    client, engine, folder = connect()
+
+    def refuse(path, data):
+        raise PermissionError(13, "Read-only file system", str(path))
+
+    monkeypatch.setattr(writer, "write_atomic", refuse)
+
+    response = client.post("/api/v1/datasources", json={"config": _sqlite(folder), "save": True})
+
+    assert response.status_code == 403, response.text
+    error = response.json()["error"]
+    assert error["code"] == "NOT_WRITABLE" and "read-only" in error["message"] and error["fix"]
+    assert str(folder) not in response.text and "Errno" not in response.text  # no OSError text
+    assert [d.id for d in engine.datasources.list()] == ["shop"]
+    assert list((folder / "datasources").iterdir()) == []
+
+
+@pytest.mark.parametrize("path", ["/api/v1/datasources", "/api/v1/datasources/test"])
 def test_a_body_that_is_not_an_object_is_our_422_and_echoes_nothing(connect, path):
     client, _, _ = connect()
 
@@ -260,7 +282,7 @@ def test_a_body_that_is_not_an_object_is_our_422_and_echoes_nothing(connect, pat
         assert "PWLEAK-77" not in response.text and "input" not in response.text
 
 
-@pytest.mark.parametrize("path", ["/api/v1/datasource", "/api/v1/datasource/test"])
+@pytest.mark.parametrize("path", ["/api/v1/datasources", "/api/v1/datasources/test"])
 def test_a_body_that_is_not_json_is_our_422_and_echoes_nothing(connect, path):
     client, _, _ = connect()
 
@@ -276,7 +298,7 @@ def test_a_body_that_is_not_json_is_our_422_and_echoes_nothing(connect, path):
 def test_a_connection_that_does_not_validate_is_the_same_path_message_list(connect):
     client, engine, _ = connect()
 
-    response = client.post("/api/v1/datasource", json={"config": _postgres(passwrd="PWLEAK-77", port="not-a-port")})
+    response = client.post("/api/v1/datasources", json={"config": _postgres(passwrd="PWLEAK-77", port="not-a-port")})
 
     assert response.status_code == 422, response.text
     problems = _problems(response)
@@ -290,7 +312,7 @@ def test_a_forwarded_request_is_not_the_local_operator(connect):
     client, engine, folder = connect()
 
     for header in ({"X-Forwarded-For": "203.0.113.7"}, {"Forwarded": "for=203.0.113.7"}, {"X-Real-IP": "203.0.113.7"}):
-        response = client.post("/api/v1/datasource", json={"config": _postgres(password=PASSWORD), "save": True},
+        response = client.post("/api/v1/datasources", json={"config": _postgres(password=PASSWORD), "save": True},
                                headers=header)
 
         assert response.status_code == 403, (header, response.text)
@@ -302,7 +324,7 @@ def test_a_forwarded_request_is_not_the_local_operator(connect):
 def test_the_test_route_keeps_a_validation_message_readable(connect):
     client, _, _ = connect()
 
-    response = client.post("/api/v1/datasource/test", json={"config": _postgres(passwrd=PASSWORD)})
+    response = client.post("/api/v1/datasources/test", json={"config": _postgres(passwrd=PASSWORD)})
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -315,10 +337,10 @@ def test_save_of_a_taken_env_name_is_a_422(connect, monkeypatch):
     monkeypatch.setenv("NL2SQL_MY_DB_PASSWORD", "already-set")
     client, engine, folder = connect()
     first = {**_postgres(password="${env:NL2SQL_MY_DB_PASSWORD}"), "id": "my-db"}
-    assert client.post("/api/v1/datasource", json={"config": first}).status_code == 200
+    assert client.post("/api/v1/datasources", json={"config": first}).status_code == 200
 
     second = {**_postgres(password=PASSWORD), "id": "my_db"}
-    response = client.post("/api/v1/datasource", json={"config": second, "save": True})
+    response = client.post("/api/v1/datasources", json={"config": second, "save": True})
 
     assert response.status_code == 422, response.text
     assert PASSWORD not in response.text

@@ -17,7 +17,7 @@ import pytest
 import yaml
 from langchain_core.embeddings import DeterministicFakeEmbedding
 
-from nl2sql import NL2SQL, ConfigError, Embeddings, Registry, UserContext
+from nl2sql import DatasourceNotFound, NL2SQL, NotAuthorized, ConfigError, Embeddings, Registry, UserContext
 from nl2sql.knowledge.apply import apply_change
 from nl2sql.knowledge.merge import LoadedSource, merge
 from nl2sql.knowledge.resolve import derived_roles, problems
@@ -404,7 +404,7 @@ def test_an_unindexed_datasource_shows_nothing_but_the_reason(tmp_path):
 
 
 def test_an_unknown_datasource_is_an_error(engine):
-    with pytest.raises(ValueError, match="nope"):
+    with pytest.raises(DatasourceNotFound, match="nope"):
         engine.knowledge.show("nope", user_context=ADMIN)
 
 
@@ -464,7 +464,7 @@ def test_export_refuses_to_overwrite_a_config_or_source_file(engine, tmp_path):
 
 
 def test_reload_needs_an_admin_role(engine):
-    with pytest.raises(PermissionError):
+    with pytest.raises(NotAuthorized):
         engine.knowledge.reload(user_context=ANALYST)
 
 

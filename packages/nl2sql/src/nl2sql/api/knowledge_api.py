@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 
+from nl2sql.common.errors import DatasourceNotFound, NotAuthorized
+
 if TYPE_CHECKING:
     from nl2sql.common.cancellation import CancellationToken
     from nl2sql.clarify.models import ClarificationChoice
@@ -89,7 +91,7 @@ class KnowledgeAPI:
 
         Raises:
             TypeError: ``user_context`` is not a ``UserContext``: there is no default caller.
-            ValueError: ``datasource_id`` is not configured.
+            DatasourceNotFound: ``datasource_id`` is not configured (a ``ValueError``).
         """
         caller = _caller(user_context)
         views = []
@@ -146,13 +148,13 @@ class KnowledgeAPI:
 
         Raises:
             TypeError: ``user_context`` is not a ``UserContext``.
-            PermissionError: the caller holds no admin role.
+            NotAuthorized: the caller holds no admin role (a ``PermissionError``).
         """
         caller = _caller(user_context)
         policies = self._ctx.config.policies
         if not self._may_reload(caller):
-            raise PermissionError(f"Reloading the knowledge needs one of the admin roles "
-                                  f"({', '.join(policies.admin_roles) or 'none defined'}).")
+            raise NotAuthorized(f"Reloading the knowledge needs one of the admin roles "
+                                f"({', '.join(policies.admin_roles) or 'none defined'}).")
         self._ctx.reload_knowledge()
         return self.sources(user_context=caller)
 
@@ -182,7 +184,8 @@ class KnowledgeAPI:
 
         Raises:
             TypeError: ``user_context`` is not a ``UserContext``.
-            ValueError: a datasource is not configured, or ``max_cost_usd`` is not positive.
+            DatasourceNotFound: a datasource is not configured (a ``ValueError``).
+            InvalidArgument: ``max_cost_usd`` is not positive (a ``ValueError``).
             UnknownPriceError: ``draft`` is set and the ``profiler`` model has no price in ``llm.prices``.
         """
         from nl2sql.profiler.run import profile
@@ -228,7 +231,7 @@ class KnowledgeAPI:
             return configured
         unknown = [i for i in datasource_ids if i not in configured]
         if unknown:
-            raise ValueError(f"Unknown datasource ID: {', '.join(unknown)}")
+            raise DatasourceNotFound(f"Unknown datasource ID: {', '.join(unknown)}")
         return list(datasource_ids)
 
     def _reach(self, datasource_id: str, caller: "UserContext") -> Optional[Tuple[Any, Any]]:

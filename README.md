@@ -392,9 +392,10 @@ is off unless listed in `api.cors_origins`.
 With no identity the routes answer HTTP 401 (HTTP 403 under `none` for a request that is not the local operator). Every
 error is one envelope, `{"error": {"code", "message", "fix", "details", "request_id"}}`.
 
-The routes that change the process (`POST /api/v1/datasource`, `DELETE /api/v1/datasource/{id}`, and the
-Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasource/test`,
-`PUT /api/v1/settings/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
+The routes that change the process (`POST /api/v1/datasources`, `DELETE /api/v1/datasources/{id}`, and the
+Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasources/test`,
+`PUT /api/v1/settings/llm`, `POST /api/v1/jobs/index`, `POST /api/v1/jobs/profile`, `DELETE /api/v1/index`,
+`GET /api/v1/index/check`, `POST /api/v1/knowledge/reload` and every `/proposals` route)
 also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403.
 
 | Method | Path | Purpose |
@@ -451,18 +452,32 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `PUT` | `/api/v1/workspaces/{workspace_id}/name` | Rename a workspace |
 | `DELETE` | `/api/v1/workspaces/{workspace_id}` | Delete an empty workspace (`204`) |
 | `GET` | `/api/v1/datasource-types` | The adapters the engine can name, installed or not, each with its connection schema (the Connect a database form) |
-| `POST` | `/api/v1/datasource/test` | Connect to a datasource that is not added and report the stage that failed and the fix; registers nothing |
-| `POST` | `/api/v1/datasource` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...). `save: true` also writes `datasources/<id>.yaml`, with every secret as a reference. A body that does not validate is a 422 listing each problem by path |
-| `GET` | `/api/v1/datasource` | List the datasources: type, description, status (`ready`, `failed`, `unchecked`), capabilities, masked connection |
-| `GET` | `/api/v1/datasource/{datasource_id}` | One datasource, as the list shows it |
-| `DELETE` | `/api/v1/datasource/{datasource_id}` | Take a datasource out of the running process |
+| `POST` | `/api/v1/datasources/test` | Connect to a datasource that is not added and report the stage that failed and the fix; registers nothing |
+| `POST` | `/api/v1/datasources` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...). `save: true` also writes `datasources/<id>.yaml`, with every secret as a reference; a read-only config answers `403 NOT_WRITABLE` and keeps it registered until restart. A body that does not validate is a 422 listing each problem by path |
+| `GET` | `/api/v1/datasources` | List the datasources the caller reaches: type, description, status (`ready`, `failed`, `unchecked`), capabilities, masked connection, sample questions |
+| `GET` | `/api/v1/datasources/{datasource_id}` | One datasource, as the list shows it |
+| `DELETE` | `/api/v1/datasources/{datasource_id}` | Take a datasource out of the running process |
+| `GET` | `/api/v1/datasources/{datasource_id}/schema` | The tables and columns the caller may see |
+| `GET` | `/api/v1/datasources/{datasource_id}/diagram` | The schema as a Mermaid `erDiagram` (plain text); repeat `tables` to draw some and their neighbours |
+| `GET` | `/api/v1/index` | Index health: status, entries by type, embedding model and problems per datasource |
+| `DELETE` | `/api/v1/index` | Clear the vector store |
+| `GET` | `/api/v1/index/check` | Drift check: compare each datasource's live schema with what was indexed (admin) |
+| `GET` | `/api/v1/index/inspect` | The retrieval inspector's defaults |
+| `POST` | `/api/v1/index/inspect` | Run a retrieval and show the pool, the picks and what was dropped |
+| `POST` | `/api/v1/jobs/index` | Start the index job (admin, `202`): index every datasource or `datasource_ids`; progress per datasource |
+| `POST` | `/api/v1/jobs/profile` | Start the profile job (admin, `202`): profile datasources into proposals, on the server's key; `draft`, `max_cost_usd` |
+| `GET` | `/api/v1/knowledge` | The merged knowledge per datasource, with where each item came from and its problems |
+| `GET` | `/api/v1/knowledge/sources` | Each knowledge source, its counts, checksum, load time and last error |
+| `POST` | `/api/v1/knowledge/reload` | Reload every knowledge source and swap atomically (admin) |
+| `POST` | `/api/v1/knowledge/choices` | File a clarification pick as a `term` proposal |
+| `GET` | `/api/v1/proposals` | List proposals by `kind`, `status`, `datasource_id` and `limit` (admin) |
+| `GET` | `/api/v1/proposals/{proposal_id}` | One proposal (admin) |
+| `POST` | `/api/v1/proposals/accept` | Accept proposals by id, with optional edits; writes each file once (admin) |
+| `POST` | `/api/v1/proposals/reject` | Reject proposals by id, with a reason (admin) |
+| `POST` | `/api/v1/proposals/examples` | File starter questions as `example` proposals (admin) |
 | `PUT` | `/api/v1/settings/llm` | Replace the whole `llm` section in the running process (the body is the section as JSON; a bad one is a 422) |
 | `GET` | `/api/v1/llm` | Each agent and the model it runs on |
 | `GET` | `/api/v1/llm/{agent}` | One agent's model |
-| `POST` | `/api/v1/index/{datasource_id}` | Index one datasource's schema |
-| `POST` | `/api/v1/index-all` | Index every configured datasource |
-| `DELETE` | `/api/v1/index` | Clear the vector store |
-| `GET` | `/api/v1/index/status` | Index health: status, entries by type, embedding model and problems per datasource |
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \

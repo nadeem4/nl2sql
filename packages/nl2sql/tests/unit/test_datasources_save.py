@@ -15,7 +15,7 @@ import yaml
 from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, SecretStr
 
-from nl2sql import NL2SQL, Registry, SecretValueInConfig, UserContext
+from nl2sql import DatasourceNotFound, NL2SQL, NotAuthorized, Registry, SecretValueInConfig, UserContext
 from nl2sql.config import (Datasource, Policies, Role, default_llm, load_config, starter_config, write_project)
 from nl2sql.review.models import ReviewError, ReviewErrorCode
 from nl2sql.testing.config import make_config
@@ -83,7 +83,7 @@ def test_save_needs_an_admin(project):
     folder, engine = project
     engine.datasources.add(_shop())
 
-    with pytest.raises(PermissionError, match="admin"):
+    with pytest.raises(NotAuthorized, match="admin"):  # still a PermissionError
         engine.datasources.save("shop", by=ANALYST)
     with pytest.raises(TypeError):
         engine.datasources.save("shop", by="root")  # type: ignore[arg-type]
@@ -94,7 +94,7 @@ def test_save_needs_an_admin(project):
 def test_save_refuses_an_unknown_datasource(project):
     _, engine = project
 
-    with pytest.raises(ValueError, match="Unknown datasource ID: nope"):
+    with pytest.raises(DatasourceNotFound, match="Unknown datasource ID: nope"):  # still a ValueError
         engine.datasources.save("nope", by=ADMIN)
 
 
@@ -145,8 +145,9 @@ def test_save_needs_a_folder_include(tmp_path):
     for name, config in {"inline": inline, "code": inline.model_copy()}.items():
         engine = NL2SQL(config) if name == "code" else NL2SQL.from_config(tmp_path / "inline" / "nl2sql.yaml")
         try:
-            with pytest.raises(ValueError, match="datasources/"):
+            with pytest.raises(ReviewError, match="datasources/") as raised:
                 engine.datasources.save("shop", by=ADMIN)
+            assert raised.value.code == "NOT_WRITABLE"
         finally:
             engine.close()
 
@@ -400,3 +401,18 @@ def test_the_saved_datasource_wins_after_a_reload(tmp_path, monkeypatch):
         assert again.config.datasources[0].connection["password"] == "${env:NL2SQL_SALES_PASSWORD}"
     finally:
         again.close()
+
+
+def test_a_write_failure_is_not_writable_without_the_cause(project, monkeypatch):
+    _, engine = project
+    engine.datasources.add(_shop())
+
+    def refuse(*args, **kwargs):
+        raise OSError(30, "Read-only file system: /secret/path")
+
+    monkeypatch.setattr("nl2sql.config.writer.write_atomic", refuse)
+
+    with pytest.raises(ReviewError) as raised:
+        engine.datasources.save("shop", by=ADMIN)
+
+    assert raised.value.code == "NOT_WRITABLE" and "/secret/path" not in str(raised.value)

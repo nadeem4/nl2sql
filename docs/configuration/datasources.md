@@ -181,7 +181,7 @@ RBAC is unchanged: a preferred table the role may not read loses its data like
 any other table, and the validator refuses a plan that reads it.
 
 A name that is not in the indexed schema is a warning, not an error: `nl2sql
-doctor` and the index status (`engine.index.health()`, `GET /api/v1/index/status`)
+doctor` and the index status (`engine.index.health()`, `GET /api/v1/index`)
 print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
 usual cause is a view created after the last index; re-index the datasource.
 
@@ -199,9 +199,9 @@ broken one is marked unavailable:
 
 - the log has an error: `Datasource 'sales' is unavailable: <reason>`;
 - `check()` reports it `failed` at stage `connect`, with a fix;
-- `engine.datasources.list()` (and `GET /api/v1/datasource`) shows it with
+- `engine.datasources.list()` (and `GET /api/v1/datasources`) shows it with
   `status: "failed"` and the `reason`, and nothing is routed to it;
-- the index status (`engine.index.health()`, `GET /api/v1/index/status`) carries
+- the index status (`engine.index.health()`, `GET /api/v1/index`) carries
   the same sentence as a warning;
 - a query with `datasource_id` set to it, and `nl2sql index` or
   `engine.index.build([...])` naming it, fail with that reason.
@@ -232,7 +232,8 @@ from, and nothing else. It needs:
 - an admin `by` (`policies.admin_roles`; under `allow_all` any caller) - a caller without one gets `PermissionError`;
 - an engine loaded from a `nl2sql.yaml` whose `datasources` section is a folder (`datasources: { file: datasources/ }`,
   one `<id>.yaml` each, as `nl2sql init` writes it). An engine built in code, or with the datasources inline in
-  `nl2sql.yaml`, raises `ValueError`.
+  `nl2sql.yaml`, or one whose folder cannot be written, raises `ReviewError` with code `NOT_WRITABLE`
+  (not a `ValueError`; the REST API answers 403).
 
 **The file is checked before it is replaced.** The engine records each datasource file's SHA-256 when it loads the
 config, as an accept does for the glossary. If the file changed on disk since (somebody edited it), `save` raises
@@ -274,8 +275,8 @@ an object instead of data (an adapter, store, hook or chat model object) and loa
 `nl2sql.config.starter_config(llm=..., path=...)` is a config with no datasources, `allow_all` policies, local
 embeddings and a `yaml` knowledge source; `nl2sql.config.write_env_values(folder, values)` writes the `.env`.
 
-Over REST, `POST /api/v1/datasource` with `"save": true` calls the same method; see
-[Datasource API](../api/rest/datasource.md).
+Over REST, `POST /api/v1/datasources` with `"save": true` calls the same method; see
+[Datasource API](../api/rest/datasources.md).
 
 ## Notes
 
@@ -285,6 +286,6 @@ Over REST, `POST /api/v1/datasource` with `"save": true` calls the same method; 
 - From Python, `engine.datasources.add(Datasource(...))` adds one to a running
   engine (built, not connected), `engine.datasources.save(id, by=admin)` writes it to `datasources/<id>.yaml`
   ([Saving a datasource](#saving-a-datasource)), and `engine.datasources.remove(id)` takes one
-  out; `nl2sql-api`'s `POST /api/v1/datasource` takes
-  the same shape as JSON, and `POST /api/v1/datasource/test` and `GET /api/v1/datasource-types` are the Connect a
+  out; `nl2sql-api`'s `POST /api/v1/datasources` takes
+  the same shape as JSON, and `POST /api/v1/datasources/test` and `GET /api/v1/datasource-types` are the Connect a
   database form's other two calls.

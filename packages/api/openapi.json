@@ -1,6 +1,82 @@
 {
   "components": {
     "schemas": {
+      "AcceptReport": {
+        "description": "What ``engine.proposals.accept`` and ``apply`` did.\n\n``accepted``: the proposals now accepted; ``files_written``: each file\nwritten, once; ``warnings``: such as an earlier knowledge source shadowing\nwhat was written; ``refused``: proposal id to why it was not accepted (or,\nfrom ``apply``, rejected); ``rejected``: the proposals ``apply`` rejected.",
+        "properties": {
+          "accepted": {
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "title": "Accepted",
+            "type": "array"
+          },
+          "files_written": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files Written",
+            "type": "array"
+          },
+          "refused": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Refused",
+            "type": "object"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "title": "Rejected",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "AcceptReport",
+        "type": "object"
+      },
+      "AcceptRequest": {
+        "additionalProperties": false,
+        "description": "``POST /proposals/accept``: ids, and per id the fields to merge over its change before it is written.",
+        "properties": {
+          "edits": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edits"
+          },
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "AcceptRequest",
+        "type": "object"
+      },
       "AnswerSource": {
         "description": "Where an answer came from.\n\n``{\"type\": \"verified\", \"id\", \"datasource_id\", \"params\"}`` when a verified\nquery from ``curated.yaml`` answered, with the values it ran with;\n``{\"type\": \"generated\"}`` (the other fields None) when the pipeline\nplanned and generated the SQL.",
         "properties": {
@@ -588,6 +664,31 @@
         "title": "ChatToolInfo",
         "type": "object"
       },
+      "ChoiceRequest": {
+        "additionalProperties": false,
+        "description": "``POST /knowledge/choices``: a clarification pick, filed as a `term` proposal.",
+        "properties": {
+          "choice": {
+            "$ref": "#/components/schemas/ClarificationChoice"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          }
+        },
+        "required": [
+          "choice"
+        ],
+        "title": "ChoiceRequest",
+        "type": "object"
+      },
       "ClarificationChoice": {
         "description": "The caller's pick, passed to ``run_query(choice=...)`` (from L2) to run that option's plan.",
         "properties": {
@@ -710,6 +811,179 @@
           "options"
         ],
         "title": "ClarificationRequest",
+        "type": "object"
+      },
+      "ColumnChange": {
+        "description": "A column on both sides whose type, nullability or primary key changed: ``{\"type\": (old, new)}``.",
+        "properties": {
+          "changes": {
+            "additionalProperties": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            },
+            "propertyNames": {
+              "enum": [
+                "type",
+                "nullable",
+                "pk"
+              ]
+            },
+            "title": "Changes",
+            "type": "object"
+          },
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "table": {
+            "$ref": "#/components/schemas/nl2sql_sdk__schema__TableRef"
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "changes"
+        ],
+        "title": "ColumnChange",
+        "type": "object"
+      },
+      "ColumnKnowledge": {
+        "additionalProperties": false,
+        "description": "What people say about one column. ``values`` maps a code (a string) to its meaning, on ``role: enum`` only.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "grain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "second",
+                  "day",
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grain"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "identifier",
+                  "enum",
+                  "money",
+                  "quantity",
+                  "date",
+                  "text"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "synonyms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Synonyms",
+            "type": "array"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "title": "ColumnKnowledge",
+        "type": "object"
+      },
+      "ColumnRef": {
+        "properties": {
+          "column_name": {
+            "title": "Column Name",
+            "type": "string"
+          },
+          "table": {
+            "$ref": "#/components/schemas/nl2sql_sdk__schema__TableRef"
+          }
+        },
+        "required": [
+          "table",
+          "column_name"
+        ],
+        "title": "ColumnRef",
         "type": "object"
       },
       "CombineGroup": {
@@ -1325,6 +1599,181 @@
         "title": "DashboardView",
         "type": "object"
       },
+      "DatasourceInfo": {
+        "description": "One configured datasource, as ``engine.datasources.list()`` and ``get()`` report it.\n\n``status`` is ``ready`` once ``check()`` (or ``datasources.test``)\nconnected to it, ``failed`` when it did not (``reason`` says why), and\n``unchecked`` before either ran. ``connection`` is the configured\nconnection with every secret masked. A failed datasource has no\n``capabilities``: nothing is routed to it. ``sample_questions`` are the\ndatasource's own, then the glossary ``examples`` a person accepted (not\nscoped to a caller: a caller-facing route filters by the datasource).",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "connection": {
+            "additionalProperties": true,
+            "title": "Connection",
+            "type": "object"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "sample_questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sample Questions",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "failed",
+              "unchecked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "description",
+          "status"
+        ],
+        "title": "DatasourceInfo",
+        "type": "object"
+      },
+      "DatasourceKnowledge": {
+        "additionalProperties": false,
+        "description": "One datasource's knowledge. Table and column names are resolved against the live snapshot when used.",
+        "properties": {
+          "columns": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ColumnKnowledge"
+            },
+            "title": "Columns",
+            "type": "object"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "joins": {
+            "items": {
+              "$ref": "#/components/schemas/JoinKnowledge"
+            },
+            "title": "Joins",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "tables": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TableKnowledge"
+            },
+            "title": "Tables",
+            "type": "object"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/Term"
+            },
+            "title": "Terms",
+            "type": "array"
+          }
+        },
+        "title": "DatasourceKnowledge",
+        "type": "object"
+      },
+      "DatasourceKnowledgeView": {
+        "description": "One datasource's merged knowledge as the engine uses it, what the caller may see of it.\n\n``origins`` maps an item (``tables.Invoice.description``,\n``columns.Invoice.Total.role``) to where it came from, and ``sources`` to\nthe knowledge source that set it; derived roles are in ``knowledge`` with\norigin ``derived``. ``problems`` are the names that do not resolve\nagainst the live snapshot, and joins whose types cannot be compared.",
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digest"
+          },
+          "knowledge": {
+            "$ref": "#/components/schemas/DatasourceKnowledge"
+          },
+          "origins": {
+            "additionalProperties": {
+              "enum": [
+                "knowledge",
+                "database",
+                "derived"
+              ],
+              "type": "string"
+            },
+            "title": "Origins",
+            "type": "object"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "datasource_id"
+        ],
+        "title": "DatasourceKnowledgeView",
+        "type": "object"
+      },
       "DatasourceResponse": {
         "properties": {
           "datasource_id": {
@@ -1424,6 +1873,113 @@
           }
         },
         "title": "DenyRequest",
+        "type": "object"
+      },
+      "DriftImpact": {
+        "properties": {
+          "glossary_items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Glossary Items",
+            "type": "array"
+          },
+          "policy_rules": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactedRule"
+            },
+            "title": "Policy Rules",
+            "type": "array"
+          },
+          "preferred_tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preferred Tables",
+            "type": "array"
+          },
+          "verified_queries": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactedQuery"
+            },
+            "title": "Verified Queries",
+            "type": "array"
+          }
+        },
+        "title": "DriftImpact",
+        "type": "object"
+      },
+      "DriftReport": {
+        "description": "One datasource's check: its live database against the snapshot its live build was made from.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchemaDiff"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriftImpact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "live_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Version"
+          },
+          "status": {
+            "enum": [
+              "unchanged",
+              "drifted",
+              "not_indexed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "status",
+          "checked_at"
+        ],
+        "title": "DriftReport",
         "type": "object"
       },
       "Encoding": {
@@ -1696,6 +2252,30 @@
           "mode"
         ],
         "title": "EvalReport",
+        "type": "object"
+      },
+      "ExamplesRequest": {
+        "additionalProperties": false,
+        "description": "``POST /proposals/examples``: starter questions to file as `example` proposals.",
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Questions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "questions"
+        ],
+        "title": "ExamplesRequest",
         "type": "object"
       },
       "ExpectedColumn": {
@@ -2170,6 +2750,39 @@
         "title": "FiltersBody",
         "type": "object"
       },
+      "ForeignKeyRef": {
+        "description": "A foreign key of ``table``: its ``columns`` refer to ``referred_columns`` of ``referred_table``.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "referred_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Referred Columns",
+            "type": "array"
+          },
+          "referred_table": {
+            "$ref": "#/components/schemas/nl2sql_sdk__schema__TableRef"
+          },
+          "table": {
+            "$ref": "#/components/schemas/nl2sql_sdk__schema__TableRef"
+          }
+        },
+        "required": [
+          "table",
+          "columns",
+          "referred_table",
+          "referred_columns"
+        ],
+        "title": "ForeignKeyRef",
+        "type": "object"
+      },
       "GroupByItem": {
         "additionalProperties": false,
         "description": "Represents an item in the GROUP BY clause.\n\nAttributes:\n    expr (Expr): The expression to group by.",
@@ -2210,7 +2823,63 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImpactedQuery": {
+        "description": "A verified query whose SQL reads something the diff dropped or retyped; ``reasons`` say what.",
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "query_id": {
+            "title": "Query Id",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "query_id",
+          "reasons"
+        ],
+        "title": "ImpactedQuery",
+        "type": "object"
+      },
+      "ImpactedRule": {
+        "description": "A role's ``allow`` or ``deny`` pattern that matched a dropped table and now matches nothing.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "kind",
+          "pattern"
+        ],
+        "title": "ImpactedRule",
+        "type": "object"
+      },
       "IndexJob": {
+        "additionalProperties": false,
         "properties": {
           "datasource_ids": {
             "anyOf": [
@@ -2267,6 +2936,64 @@
           "ok"
         ],
         "title": "IndexResult",
+        "type": "object"
+      },
+      "InspectRequest": {
+        "additionalProperties": false,
+        "description": "``POST /index/inspect``: one retrieval run. Anything left out takes the engine's default.",
+        "properties": {
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "k": {
+            "default": 8,
+            "minimum": 1.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "lambda_mult": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lambda Mult"
+          },
+          "query": {
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Types"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "InspectRequest",
         "type": "object"
       },
       "Job": {
@@ -2459,6 +3186,69 @@
         "title": "JoinKeyPair",
         "type": "object"
       },
+      "JoinKnowledge": {
+        "additionalProperties": false,
+        "description": "A join the database does not declare. ``from_`` is ``from`` in YAML.",
+        "properties": {
+          "cardinality": {
+            "default": "unknown",
+            "enum": [
+              "one-to-one",
+              "one-to-many",
+              "many-to-one",
+              "many-to-many",
+              "unknown"
+            ],
+            "title": "Cardinality",
+            "type": "string"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "From"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "To"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "JoinKnowledge",
+        "type": "object"
+      },
       "JoinSpec": {
         "additionalProperties": false,
         "description": "Specification for a table join.\n\nAttributes:\n    left_alias (str): Alias of the left table.\n    right_alias (str): Alias of the right table.\n    join_type (Literal): Type of join (inner, left, right, full).\n    condition (Expr): The join condition expression.",
@@ -2492,6 +3282,64 @@
           "condition"
         ],
         "title": "JoinSpec",
+        "type": "object"
+      },
+      "KnowledgeSourceInfo": {
+        "description": "One knowledge source as ``engine.knowledge.sources`` reports it.",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "loaded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loaded At"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "KnowledgeSourceInfo",
         "type": "object"
       },
       "KnowledgeUsed": {
@@ -2887,7 +3735,7 @@
           },
           "tables": {
             "items": {
-              "$ref": "#/components/schemas/TableRef"
+              "$ref": "#/components/schemas/nl2sql__pipeline__nodes__ast_planner__schemas__TableRef"
             },
             "title": "Tables",
             "type": "array"
@@ -2988,6 +3836,7 @@
         "type": "object"
       },
       "ProfileJob": {
+        "additionalProperties": false,
         "properties": {
           "datasource_ids": {
             "anyOf": [
@@ -3011,6 +3860,7 @@
           "max_cost_usd": {
             "anyOf": [
               {
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -3533,6 +4383,35 @@
         "title": "RefreshBody",
         "type": "object"
       },
+      "RejectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "RejectRequest",
+        "type": "object"
+      },
       "ResultManifest": {
         "description": "Which results a run produced, and who asked it, written as ``manifest.json`` in the run's folder.",
         "properties": {
@@ -3746,6 +4625,34 @@
           }
         },
         "title": "RowSample",
+        "type": "object"
+      },
+      "Rule": {
+        "additionalProperties": false,
+        "description": "A business rule in prose (D40), sent when a sub-query reads one of ``tables`` (empty: every sub-query).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "Rule",
         "type": "object"
       },
       "RuleUse": {
@@ -3963,6 +4870,106 @@
           }
         },
         "title": "ScheduleIdentity",
+        "type": "object"
+      },
+      "SchemaDiff": {
+        "description": "What changed in a datasource's structure between ``from_version`` and ``to_version``.\n\nIt compares exactly what the schema fingerprint covers: tables, columns,\ntheir types, nullability and primary keys, foreign keys, and the\n``engine_type``, which is ``(old, new)`` when it changed. A rename is a\ndrop and an add. ``to_version`` is None for the live database, which has\nno version. A table that was added or dropped is listed once, without its\ncolumns or foreign keys.",
+        "properties": {
+          "columns_added": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnRef"
+            },
+            "title": "Columns Added",
+            "type": "array"
+          },
+          "columns_changed": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnChange"
+            },
+            "title": "Columns Changed",
+            "type": "array"
+          },
+          "columns_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnRef"
+            },
+            "title": "Columns Dropped",
+            "type": "array"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "engine_type": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Type"
+          },
+          "foreign_keys_added": {
+            "items": {
+              "$ref": "#/components/schemas/ForeignKeyRef"
+            },
+            "title": "Foreign Keys Added",
+            "type": "array"
+          },
+          "foreign_keys_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/ForeignKeyRef"
+            },
+            "title": "Foreign Keys Dropped",
+            "type": "array"
+          },
+          "from_version": {
+            "title": "From Version",
+            "type": "string"
+          },
+          "tables_added": {
+            "items": {
+              "$ref": "#/components/schemas/nl2sql_sdk__schema__TableRef"
+            },
+            "title": "Tables Added",
+            "type": "array"
+          },
+          "tables_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/nl2sql_sdk__schema__TableRef"
+            },
+            "title": "Tables Dropped",
+            "type": "array"
+          },
+          "to_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Version"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "from_version"
+        ],
+        "title": "SchemaDiff",
         "type": "object"
       },
       "SelectItem": {
@@ -4287,15 +5294,11 @@
         "title": "SuccessResponse",
         "type": "object"
       },
-      "TableRef": {
+      "TableKnowledge": {
         "additionalProperties": false,
-        "description": "Represents a reference to a database table.\n\nAttributes:\n    name (str): The name of the table.\n    schema_name (Optional[str]): The schema of the table.\n    database (Optional[str]): The database name.\n    alias (str): The alias used for the table in the query.",
+        "description": "What people say about one table.",
         "properties": {
-          "alias": {
-            "title": "Alias",
-            "type": "string"
-          },
-          "database": {
+          "description": {
             "anyOf": [
               {
                 "type": "string"
@@ -4304,13 +5307,9 @@
                 "type": "null"
               }
             ],
-            "title": "Database"
+            "title": "Description"
           },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "schema_name": {
+          "notes": {
             "anyOf": [
               {
                 "type": "string"
@@ -4319,14 +5318,58 @@
                 "type": "null"
               }
             ],
-            "title": "Schema Name"
+            "title": "Notes"
+          }
+        },
+        "title": "TableKnowledge",
+        "type": "object"
+      },
+      "Term": {
+        "additionalProperties": false,
+        "description": "A business term: what a word means in this datasource, and the columns it is computed from.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "synonyms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Synonyms",
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "term": {
+            "minLength": 1,
+            "title": "Term",
+            "type": "string"
           }
         },
         "required": [
-          "name",
-          "alias"
+          "term"
         ],
-        "title": "TableRef",
+        "title": "Term",
         "type": "object"
       },
       "TermMatch": {
@@ -5257,6 +6300,66 @@
           "name"
         ],
         "title": "WorkspaceBody",
+        "type": "object"
+      },
+      "nl2sql__pipeline__nodes__ast_planner__schemas__TableRef": {
+        "additionalProperties": false,
+        "description": "Represents a reference to a database table.\n\nAttributes:\n    name (str): The name of the table.\n    schema_name (Optional[str]): The schema of the table.\n    database (Optional[str]): The database name.\n    alias (str): The alias used for the table in the query.",
+        "properties": {
+          "alias": {
+            "title": "Alias",
+            "type": "string"
+          },
+          "database": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name"
+          }
+        },
+        "required": [
+          "name",
+          "alias"
+        ],
+        "title": "TableRef",
+        "type": "object"
+      },
+      "nl2sql_sdk__schema__TableRef": {
+        "properties": {
+          "schema_name": {
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_name",
+          "table_name"
+        ],
+        "title": "TableRef",
         "type": "object"
       }
     }
@@ -7398,22 +8501,78 @@
         ]
       }
     },
-    "/api/v1/datasource": {
+    "/api/v1/datasource-types": {
       "get": {
-        "description": "Every configured datasource as `{\"datasources\": [...]}`: its `id`, `type`, `description`,\n`status` (`ready`, `failed` with a `reason`, or `unchecked`), `capabilities` and `connection`,\nwith every secret masked.",
-        "operationId": "list_datasources_api_v1_datasource_get",
+        "description": "Every adapter the engine can name, installed or not, as `{\"types\": [...]}`: its `name`, `title`,\n`installed`, an `install_hint` when a driver is missing and the JSON Schema of its connection\n(`connection_schema`), which is the Connect a database form: a secret field is `format: password`.\nAdmin only.",
+        "operationId": "datasource_types_api_v1_datasource_types_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response List Datasources Api V1 Datasource Get",
+                  "title": "Response Datasource Types Api V1 Datasource Types Get",
                   "type": "object"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "List the datasource types",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasources": {
+      "get": {
+        "description": "The datasources the caller's scope reaches: `id`, `type`, `description`, `status` (`ready`, `failed` with a\n`reason` (a generic sentence unless the caller is an admin: the driver's text stays with admins), or `unchecked`), `capabilities`, `connection` (every secret masked) and `sample_questions`.",
+        "operationId": "list_datasources_api_v1_datasources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DatasourceInfo"
+                  },
+                  "title": "Response List Datasources Api V1 Datasources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
           }
         },
         "summary": "List datasources",
@@ -7422,8 +8581,8 @@
         ]
       },
       "post": {
-        "description": "Register a datasource in this process from `config`, shaped like one entry of\n`datasources` in `nl2sql.yaml` (`id`, `type`, `connection`, ...). It is not indexed: call\n`POST /api/v1/index/{datasource_id}` next. Admin only.\n\nWith `\"save\": true` it is also written to `datasources/<id>.yaml` beside `nl2sql.yaml`, and `file` says\nwhere. A secret is never written into the YAML: a `${env:VAR}` or other reference is kept as it is, and a\nliteral is written to the `.env` as `${env:NL2SQL_...}` only when `api.auth` is `none` (the local operator);\nanywhere else it is a 422. A save that fails leaves nothing registered.\n\nA body that does not validate, a typo included, is a 422 listing each problem by its path, never a value.",
-        "operationId": "add_datasource_api_v1_datasource_post",
+        "description": "Register a datasource in this process from `config`, shaped like one entry of `datasources` in\n`nl2sql.yaml` (`id`, `type`, `connection`, ...). It is not indexed: start the `index` job\n(`POST /jobs/index`) next. Admin only.\n\nWith `\"save\": true` it is also written to `datasources/<id>.yaml` beside `nl2sql.yaml`, and `file` says\nwhere. A secret is never written into the YAML: a `${env:VAR}` or other reference is kept as it is, and a\nliteral is written to the `.env` as `${env:NL2SQL_...}` only when `api.auth` is `none` (the local operator);\nanywhere else it is a 422. A save that fails leaves nothing registered, except when the config is\nread-only (`403 NOT_WRITABLE`, Docker's mounted config): the datasource then stays registered until the\nserver restarts.\n\nA body that does not validate, a typo included, is a 422 listing each problem by its path, never a value.",
+        "operationId": "add_datasource_api_v1_datasources_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7447,7 +8606,7 @@
               },
               "schema": {
                 "additionalProperties": false,
-                "description": "``POST /datasource``: the datasource, and whether to also write it to `datasources/<id>.yaml`.",
+                "description": "``POST /datasources``: the datasource, and whether to also write it to `datasources/<id>.yaml`.",
                 "properties": {
                   "config": {
                     "additionalProperties": true,
@@ -7499,7 +8658,7 @@
                 }
               }
             },
-            "description": "The caller holds no role in `policies.admin_roles`."
+            "description": "Not an admin, or `save` found the config read-only (`NOT_WRITABLE`)."
           },
           "409": {
             "content": {
@@ -7528,54 +8687,10 @@
         ]
       }
     },
-    "/api/v1/datasource-types": {
-      "get": {
-        "description": "Every adapter the engine can name, installed or not, as `{\"types\": [...]}`: its `name`, `title`,\n`installed`, an `install_hint` when a driver is missing and the JSON Schema of its connection\n(`connection_schema`), which is the Connect a database form: a secret field is `format: password`.\nAdmin only.",
-        "operationId": "datasource_types_api_v1_datasource_types_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Datasource Types Api V1 Datasource Types Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "No identity: see `api.auth`."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "The caller holds no role in `policies.admin_roles`."
-          }
-        },
-        "summary": "List the datasource types",
-        "tags": [
-          "datasources"
-        ]
-      }
-    },
-    "/api/v1/datasource/test": {
+    "/api/v1/datasources/test": {
       "post": {
         "description": "Connect to the datasource in `config` and say whether it works: `{\"id\", \"status\": \"ready\"|\"failed\",\n\"stage\", \"reason\", \"fix\", \"warnings\"}`. A failure is a 200 with `status: failed`, its `stage` (`config`,\n`driver`, `network`, `auth`, `database`, `permission`) and what to do. Nothing is registered or written,\nand no value is echoed. Admin only.",
-        "operationId": "test_datasource_api_v1_datasource_test_post",
+        "operationId": "test_datasource_api_v1_datasources_test_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7598,7 +8713,7 @@
               },
               "schema": {
                 "additionalProperties": false,
-                "description": "``POST /datasource/test``: one datasource, shaped like one entry of `datasources` in `nl2sql.yaml`.",
+                "description": "``POST /datasources/test``: one datasource, shaped like one entry of `datasources` in `nl2sql.yaml`.",
                 "properties": {
                   "config": {
                     "additionalProperties": true,
@@ -7622,7 +8737,7 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Test Datasource Api V1 Datasource Test Post",
+                  "title": "Response Test Datasource Api V1 Datasources Test Post",
                   "type": "object"
                 }
               }
@@ -7666,10 +8781,10 @@
         ]
       }
     },
-    "/api/v1/datasource/{datasource_id}": {
+    "/api/v1/datasources/{datasource_id}": {
       "delete": {
         "description": "Take a datasource out of the engine and close its connections (404 for an unknown id). It is not\nremoved from the config file, and its index entries stay until the next full index. Admin only.",
-        "operationId": "remove_datasource_api_v1_datasource__datasource_id__delete",
+        "operationId": "remove_datasource_api_v1_datasources__datasource_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -7687,7 +8802,7 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Remove Datasource Api V1 Datasource  Datasource Id  Delete",
+                  "title": "Response Remove Datasource Api V1 Datasources  Datasource Id  Delete",
                   "type": "object"
                 }
               }
@@ -7722,7 +8837,7 @@
                 }
               }
             },
-            "description": "No datasource has that id."
+            "description": "No datasource has that id (or the caller cannot reach it)."
           },
           "422": {
             "content": {
@@ -7741,8 +8856,153 @@
         ]
       },
       "get": {
-        "description": "One configured datasource, as the list shows it, or 404 when it is not configured or the caller cannot reach it.",
-        "operationId": "get_datasource_api_v1_datasource__datasource_id__get",
+        "description": "One datasource, as the list shows it, or 404 when it is not configured or the caller cannot reach it.",
+        "operationId": "get_datasource_api_v1_datasources__datasource_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasourceInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No datasource has that id (or the caller cannot reach it)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a datasource",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasources/{datasource_id}/diagram": {
+      "get": {
+        "description": "The schema as a Mermaid entity-relationship diagram, for the caller's view of it. Repeat `tables` to draw\nthose tables and the ones one relationship away; leave it out for the whole datasource (cut to the 30 with the\nmost relationships).",
+        "operationId": "get_diagram_api_v1_datasources__datasource_id__diagram_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tables",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tables"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A Mermaid `erDiagram`."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No datasource has that id (or the caller cannot reach it)."
+          },
+          "422": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "`tables` names no table the caller may see."
+          }
+        },
+        "summary": "Draw a schema",
+        "tags": [
+          "datasources"
+        ]
+      }
+    },
+    "/api/v1/datasources/{datasource_id}/schema": {
+      "get": {
+        "description": "The datasource's tables and columns as the caller may see them: a table or column the caller's scope\ndenies is left out.",
+        "operationId": "get_schema_api_v1_datasources__datasource_id__schema_get",
         "parameters": [
           {
             "in": "path",
@@ -7760,12 +9020,22 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Get Datasource Api V1 Datasource  Datasource Id  Get",
+                  "title": "Response Get Schema Api V1 Datasources  Datasource Id  Schema Get",
                   "type": "object"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
           },
           "404": {
             "content": {
@@ -7775,7 +9045,7 @@
                 }
               }
             },
-            "description": "No datasource has that id."
+            "description": "No datasource has that id (or the caller cannot reach it)."
           },
           "422": {
             "content": {
@@ -7788,7 +9058,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Get a datasource",
+        "summary": "Read a schema",
         "tags": [
           "datasources"
         ]
@@ -8090,7 +9360,7 @@
     },
     "/api/v1/index": {
       "delete": {
-        "description": "Remove every entry from the vector store. Questions need a re-index before they can be answered.\nAdmin only.",
+        "description": "Remove every entry from the vector store. Questions need a re-index (`POST /jobs/index`) before they can be\nanswered. Admin only.",
         "operationId": "clear_index_api_v1_index_delete",
         "responses": {
           "200": {
@@ -8128,21 +9398,19 @@
         },
         "summary": "Clear the index",
         "tags": [
-          "indexing"
+          "index"
         ]
-      }
-    },
-    "/api/v1/index-all": {
-      "post": {
-        "description": "Index every configured datasource, one at a time. `success` is false when any failed: `errors`\nnames each one, and each keeps its previous entries. Admin only.",
-        "operationId": "index_all_datasources_api_v1_index_all_post",
+      },
+      "get": {
+        "description": "The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by type, when it\nwas built, the embedding model, one entry per registered datasource and any problems found. Read from the live\nindex. A caller who is not an admin sees only the datasources their scope reaches, a failed one by its name\nwithout the driver's text, and no warning that names a table.",
+        "operationId": "get_index_api_v1_index_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Index All Datasources Api V1 Index All Post",
+                  "title": "Response Get Index Api V1 Index Get",
                   "type": "object"
                 }
               }
@@ -8158,60 +9426,36 @@
               }
             },
             "description": "No identity: see `api.auth`."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "The caller holds no role in `policies.admin_roles`."
           }
         },
-        "summary": "Index every datasource",
+        "summary": "Index health",
         "tags": [
-          "indexing"
+          "index"
         ]
       }
     },
-    "/api/v1/index/status": {
+    "/api/v1/index/check": {
       "get": {
-        "description": "The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by\ntype, when it was built, the embedding model, one entry per registered datasource and any\nproblems found. Read from the live index; the same report the playground shows.",
-        "operationId": "get_index_status_api_v1_index_status_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Index Status Api V1 Index Status Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Index status",
-        "tags": [
-          "indexing"
-        ]
-      }
-    },
-    "/api/v1/index/{datasource_id}": {
-      "post": {
-        "description": "Index one datasource's schema into the vector store, beside its live entries, and switch to the new\nones when all are written; returns the indexing stats. A failure keeps its previous entries and is a\n500 `INDEX_FAILED` (the reason is in the server log). Admin only.",
-        "operationId": "index_datasource_api_v1_index__datasource_id__post",
+        "description": "Compare each datasource's live schema with the one its index was built from: a `DriftReport` per datasource\n(`unchanged`, `drifted`, `not_indexed` or `failed`, with the tables and columns that moved and what each touches).\nRepeat `datasource_id` to name some; leave it out for every one. Admin only: it reads every live database.",
+        "operationId": "check_index_api_v1_index_check_get",
         "parameters": [
           {
-            "in": "path",
+            "in": "query",
             "name": "datasource_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Datasource Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Datasource Id"
             }
           }
         ],
@@ -8220,9 +9464,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Index Datasource Api V1 Index  Datasource Id  Post",
-                  "type": "object"
+                  "items": {
+                    "$ref": "#/components/schemas/DriftReport"
+                  },
+                  "title": "Response Check Index Api V1 Index Check Get",
+                  "type": "array"
                 }
               }
             },
@@ -8247,6 +9493,16 @@
               }
             },
             "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A named datasource is not configured, or the caller cannot reach it."
           },
           "422": {
             "content": {
@@ -8259,9 +9515,105 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Index one datasource",
+        "summary": "Check for schema drift",
         "tags": [
-          "indexing"
+          "index"
+        ]
+      }
+    },
+    "/api/v1/index/inspect": {
+      "get": {
+        "description": "The defaults a retrieval run takes: `k`, `lambda_mult`, `fetch_multiplier` and the entry `types`.",
+        "operationId": "inspect_defaults_api_v1_index_inspect_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inspect Defaults Api V1 Index Inspect Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          }
+        },
+        "summary": "Retrieval defaults",
+        "tags": [
+          "index"
+        ]
+      },
+      "post": {
+        "description": "Run retrieval for `query` as the caller and show the candidate `pool`, the `picks` and what was `dropped`.\nThe pool holds only what the caller's scope reaches.",
+        "operationId": "inspect_index_api_v1_index_inspect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inspect Index Api V1 Index Inspect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A named datasource is not configured, or the caller cannot reach it."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect retrieval",
+        "tags": [
+          "index"
         ]
       }
     },
@@ -8358,6 +9710,150 @@
           }
         },
         "summary": "Generate a starter dashboard",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/index": {
+      "post": {
+        "description": "Indexes `datasource_ids` (every configured datasource when left out), one at a time, beside the live entries\nand switching each over when it is written. `progress` is one step per datasource (`\"<id>\"`, or `\"<id>\n(failed)\"`); the `result` is an `IndexResult`, where `failed` names the datasources that kept their previous\nindex (the reason is in the server log). Admin only.",
+        "operationId": "start_index_job_api_v1_jobs_index_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller already has a job queued or running."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Build the index",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/profile": {
+      "post": {
+        "description": "Profiles `datasource_ids` (every one when left out) and files what it finds as proposals: joins, roles and,\nwith `draft`, model-written descriptions, always on the server's key (a key typed in a browser never pays for\ndrafts) and capped by `max_cost_usd`. `progress` is one step per datasource; the `result` is a `ProfileReport`\neach. Admin only.",
+        "operationId": "start_profile_job_api_v1_jobs_profile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller already has a job queued or running."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Profile the datasources",
         "tags": [
           "jobs"
         ]
@@ -8546,6 +10042,214 @@
         ]
       }
     },
+    "/api/v1/knowledge": {
+      "get": {
+        "description": "The merged knowledge the engine uses for each datasource the caller may see, or for `datasource_id`: each\nitem with where it came from, and the `problems` (names that do not resolve against the live schema, joins whose\ntypes cannot be compared).",
+        "operationId": "show_knowledge_api_v1_knowledge_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "datasource_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Datasource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DatasourceKnowledgeView"
+                  },
+                  "title": "Response Show Knowledge Api V1 Knowledge Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A named datasource is not configured, or the caller cannot reach it."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Show the knowledge",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/choices": {
+      "post": {
+        "description": "File the caller's clarification pick as a `term` proposal, so the next person is not asked. `term` names\nthe phrase when it differs from the one the engine asked about. It changes nothing until an admin accepts it.",
+        "operationId": "save_choice_api_v1_knowledge_choices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChoiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save a clarification choice",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/reload": {
+      "post": {
+        "description": "Load every source again and swap atomically; a failing source keeps its previous knowledge and says why in\n`error`. Runs in flight keep what they started with. Admin only.",
+        "operationId": "reload_knowledge_api_v1_knowledge_reload_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KnowledgeSourceInfo"
+                  },
+                  "title": "Response Reload Knowledge Api V1 Knowledge Reload Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "Reload the knowledge",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/knowledge/sources": {
+      "get": {
+        "description": "Each knowledge source (`yaml`, ...): what it holds per datasource the caller reaches, its checksum, when it\nloaded and the last reload's error.",
+        "operationId": "knowledge_sources_api_v1_knowledge_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KnowledgeSourceInfo"
+                  },
+                  "title": "Response Knowledge Sources Api V1 Knowledge Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          }
+        },
+        "summary": "List knowledge sources",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/api/v1/llm": {
       "get": {
         "description": "Each agent (`default` first) with the provider, model and temperature it runs on, and\n`inherited` when it sets nothing of its own, as `{\"llms\": ...}`. Never a key.",
@@ -8636,6 +10340,468 @@
         "summary": "What this server is",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/proposals": {
+      "get": {
+        "description": "Proposed knowledge changes, newest first: `kind` (`term`, `join`, `description`, `example`, ...), `status`\n(`proposed` by default), `datasource_id`. Admin only.",
+        "operationId": "list_proposals_api_v1_proposals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "proposed",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "datasource_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Datasource Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 500,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  },
+                  "title": "Response List Proposals Api V1 Proposals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List proposals",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/proposals/accept": {
+      "post": {
+        "description": "Accept the proposals in `ids`, writing each file once. `edits` maps an id to the fields merged over its\nchange first (a fixed description, a renamed query). The report lists what was `accepted`, the `files_written`,\n`warnings` and, per id, why one was `refused`. Admin only.",
+        "operationId": "accept_proposals_api_v1_proposals_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not an admin (`NOT_AUTHORIZED`), or the config has no writable knowledge file (`NOT_WRITABLE`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such proposal, or one the caller's scope cannot see (`NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The file changed on disk since the engine loaded it (`FILE_CHANGED`): reload and try again."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept proposals",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/proposals/examples": {
+      "post": {
+        "description": "File each question as an `example` proposal for `datasource_id`: a question the datasource can answer,\nwhich an accept appends to the glossary's `examples`. Nothing reaches routing until an admin accepts. Admin\nonly.",
+        "operationId": "propose_examples_api_v1_proposals_examples_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamplesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  },
+                  "title": "Response Propose Examples Api V1 Proposals Examples Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not an admin (`NOT_AUTHORIZED`), or the config has no writable knowledge file (`NOT_WRITABLE`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such proposal, or one the caller's scope cannot see (`NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The file changed on disk since the engine loaded it (`FILE_CHANGED`): reload and try again."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "File starter questions",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/proposals/reject": {
+      "post": {
+        "description": "Reject the proposals in `ids`; a rejected change is never proposed again. Admin only.",
+        "operationId": "reject_proposals_api_v1_proposals_reject_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  },
+                  "title": "Response Reject Proposals Api V1 Proposals Reject Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not an admin (`NOT_AUTHORIZED`), or the config has no writable knowledge file (`NOT_WRITABLE`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such proposal, or one the caller's scope cannot see (`NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The file changed on disk since the engine loaded it (`FILE_CHANGED`): reload and try again."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject proposals",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal_id}": {
+      "get": {
+        "description": "One proposal. Admin only.",
+        "operationId": "get_proposal_api_v1_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not an admin (`NOT_AUTHORIZED`), or the config has no writable knowledge file (`NOT_WRITABLE`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such proposal, or one the caller's scope cannot see (`NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The file changed on disk since the engine loaded it (`FILE_CHANGED`): reload and try again."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a proposal",
+        "tags": [
+          "knowledge"
         ]
       }
     },

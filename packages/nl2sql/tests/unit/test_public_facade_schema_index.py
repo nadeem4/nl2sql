@@ -29,14 +29,15 @@ from nl2sql_sdk.schema import (
 
 
 class _Registry:
-    def __init__(self, ids=("chinook",)):
+    def __init__(self, ids=("chinook",), down=None):
         self._ids = list(ids)
+        self._down = dict(down or {})
 
     def list_ids(self):
         return list(self._ids)
 
     def unavailable(self):
-        return {}
+        return dict(self._down)
 
     def get_preferred_tables(self, _ds):
         return []
@@ -193,3 +194,33 @@ def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
 def test_index_inspect_runs_the_stores_mmr_search(tmp_path):
     record = _engine(_Context(tmp_path, snapshot=_snapshot())).index.inspect("albums", k=3, user_context=ADMIN)
     assert [e["datasource_id"] for e in record["pool"]] == ["chinook"]
+
+
+def test_index_health_for_a_non_admin_is_theirs_and_has_no_raw_reasons(tmp_path):
+    ctx = _Context(tmp_path, snapshot=_snapshot())
+    ctx.ds_registry = _Registry(ids=("chinook",), down={"chinook": "password=hunter2 refused", "hr": "boom at db.hr"})
+    engine = _engine(ctx)
+    viewer = UserContext(roles=["viewer"])
+
+    mine = engine.index.health(user_context=viewer)
+    full = engine.index.health(user_context=ADMIN)
+
+    assert "hunter2" not in str(mine) and "boom" not in str(mine) and "'hr'" not in str(mine)
+    assert any("'chinook'" in w and "unavailable" in w for w in mine["warnings"])  # the stage stays
+    assert "hunter2" in str(full) and "boom" in str(full)  # an admin keeps the text
+    assert engine.index.health() == full  # no caller: the whole report
+
+
+def test_index_health_for_a_non_admin_lists_only_reachable_datasources_and_no_table_warnings(tmp_path):
+    ctx = _Context(tmp_path, snapshot=_snapshot())
+    ctx.ds_registry = _Registry(ids=("chinook", "hr"))
+    ctx.ds_registry.get_preferred_tables = lambda ds: ["Secret"] if ds == "chinook" else []
+    engine = _engine(ctx)
+
+    mine = engine.index.health(user_context=UserContext(roles=["viewer"]))
+    full = engine.index.health(user_context=ADMIN)
+
+    assert [d["datasource_id"] for d in mine["datasources"]] == ["chinook"]
+    assert {d["datasource_id"] for d in full["datasources"]} == {"chinook", "hr"}
+    assert "Secret" in str(full["warnings"]) and "Secret" not in str(mine)
+    assert "hr" not in str(mine["problems"])

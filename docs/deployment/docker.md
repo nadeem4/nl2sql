@@ -60,7 +60,7 @@ published port is a `403`, so set `api.auth` for a container. See
 
 - Schema indexing is not automatic; you must run indexing in your operational
   flow: `nl2sql --config /etc/nl2sql/nl2sql.yaml index` against the same
-  storage, or `POST /api/v1/index-all` (admin role).
+  storage, or `POST /api/v1/jobs/index` (admin role).
 - Observability exporters require network access. They are observers in the
   config's `observers` section: an `otel` observer with its `endpoint` (the
   API image installs the `otel` extra; see

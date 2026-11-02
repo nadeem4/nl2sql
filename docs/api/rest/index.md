@@ -43,8 +43,8 @@ Source: `packages/api/src/nl2sql_api/main.py`
 Source: `packages/api/src/nl2sql_api/dependencies.py`
 
 - `get_engine(request)` returns the singleton `NL2SQL` instance.
-- Service providers (`DatasourceService`, `QueryService`, `LLMService`,
-  `IndexingService`, `HealthService`) are created per-request with the engine.
+- Routes are thin over the engine's namespaces (`engine.datasources`, `engine.index`, ...); there are no service
+  classes between them.
 - `identity.caller` (in `nl2sql_api/identity.py`) returns the caller's
   `UserContext`; see [Identity](#identity).
 - `identity.admin` guards the routes that change datasources, LLMs or the
@@ -70,13 +70,14 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Traces and feedback](feedback.md) | `routes/query.py` | A run's trace, ratings, and corrections as proposals. |
 | [Approvals](approvals.md) | `routes/approvals.py` | List, grant and deny the approvals a hook asked for. |
 | [Conversations](conversations.md) | `routes/conversations.py` | Conversations: start, list, read, delete, send a turn (whole or streamed), retry, run a chat tool, report. |
-| [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
+| [Datasources](datasources.md) | `routes/datasources.py` | Connect a database, list datasources, read a schema or its diagram. |
 | [LLM](llm.md) | `routes/llm.py` | Replace the LLM (`PUT /settings/llm`) and inspect each agent's model. |
-| [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
+| [Indexing](indexing.md) | `routes/index.py`, `routes/jobs.py` | Index status, drift check, retrieval inspector, the index job. |
+| [Knowledge](knowledge.md) | `routes/knowledge.py`, `routes/jobs.py` | The merged knowledge, proposals, the profile job. |
 | [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 
-The routers `datasources`, `index`, `knowledge`, `evals`, `settings` and `web` are empty
+The routers `evals`, `settings` and `web` are empty
 for now: later rows fill them. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
 fails when a route changes without it (rewrite it with `python packages/api/tests/test_openapi_snapshot.py`).
 
@@ -155,10 +156,11 @@ A test or an embedding app overrides `identity.caller` and `identity.admin` with
 The routes that change the running process need an admin role, checked by the
 `identity.admin` dependency:
 
-- `POST /api/v1/datasource` and `DELETE /api/v1/datasource/{datasource_id}`
-- The Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasource/test`
+- `POST /api/v1/datasources` and `DELETE /api/v1/datasources/{datasource_id}`
+- The Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasources/test`
 - `PUT /api/v1/settings/llm`
-- `POST /api/v1/index/{datasource_id}`, `POST /api/v1/index-all` and `DELETE /api/v1/index`
+- `POST /api/v1/jobs/index`, `POST /api/v1/jobs/profile`, `DELETE /api/v1/index` and `GET /api/v1/index/check`
+- `POST /api/v1/knowledge/reload` and every `/api/v1/proposals` route
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -168,8 +170,8 @@ A caller whose roles include one in `policies.admin_roles` is let through; one w
 roles but none of them admin is `HTTP 403`; one with no identity is `HTTP 401`. The check
 uses `admin_roles` alone, so `policies.allow_all` does not make a caller an admin.
 
-The read-only routes (`/health`, `/ready`, `/meta`, `GET /datasource`, `GET /llm`, which
-never returns API keys, and `GET /index/status`) need no role.
+The read-only routes (`/health`, `/ready`, `/meta`, `GET /datasources`, `GET /llm`, which
+never returns API keys, and `GET /index`) need no role.
 
 ```yaml
 # The proxy sets X-NL2SQL-Roles; only "ops" may change datasources and the index.

@@ -18,10 +18,10 @@ from nl2sql_api.jobs import Jobs
 logger = logging.getLogger("nl2sql_api")
 
 # One router per namespace, each in routes/<name>.py, all registered under /api/v1. A route is added to its
-# namespace's file, never here; web serves the page at / and the rest are under /api/v1. datasource, indexing and
-# llm hold the routes of datasources, index and settings until their rows move them.
+# namespace's file, never here; web serves the page at / and the rest are under /api/v1. llm holds the routes of
+# settings until its row moves them.
 NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "workspaces", "datasources",
-              "datasource", "index", "indexing", "knowledge", "evals", "settings", "llm", "jobs", "web")
+              "index", "knowledge", "evals", "settings", "llm", "jobs", "web")
 
 
 def _lifespan(config_path: Optional[str]):

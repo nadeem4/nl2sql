@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 import pytest
 
 import nl2sql
-from nl2sql import QueryResult, UserContext
+from nl2sql import InvalidArgument, QueryResult, UserContext
 from nl2sql.api.query_api import RowSample, SubQueryResult
 from nl2sql.charts.diagram import schema_diagram
 from nl2sql.chat_tools import ToolContext, ToolNotApplicable
@@ -210,7 +210,7 @@ def test_a_glossary_join_to_a_denied_table_is_not_drawn(tmp_path):
 def test_tables_that_match_nothing_the_caller_may_see_is_an_error(tmp_path):
     engine = _engine(_Context(tmp_path, snapshot=_snapshot()))
 
-    with pytest.raises(ValueError, match="No table"):
+    with pytest.raises(InvalidArgument, match="No table"):  # still a ValueError
         engine.datasources.diagram("chinook", user_context=VIEWER, tables=["Artist"])
 
 
