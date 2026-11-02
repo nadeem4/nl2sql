@@ -11,17 +11,16 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from nl2sql import NL2SQL, configure_logging, load_env_file
+from nl2sql import EngineNotReady, NL2SQL, configure_logging, load_env_file
 from nl2sql_api import errors
 from nl2sql_api.jobs import Jobs
 
 logger = logging.getLogger("nl2sql_api")
 
 # One router per namespace, each in routes/<name>.py, all registered under /api/v1. A route is added to its
-# namespace's file, never here; web serves the page at / and the rest are under /api/v1. llm holds the routes of
-# settings until its row moves them.
+# namespace's file, never here; web serves the page at / and the rest are under /api/v1.
 NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "workspaces", "datasources",
-              "index", "knowledge", "evals", "settings", "llm", "jobs", "web")
+              "index", "knowledge", "evals", "settings", "jobs", "web")
 
 
 def _lifespan(config_path: Optional[str]):
@@ -35,12 +34,14 @@ def _lifespan(config_path: Optional[str]):
         # NL2SQL_LOG_LEVEL (else INFO), as text or, with NL2SQL_LOG_FORMAT=json, JSON lines.
         configure_logging()
         engine = NL2SQL.from_config(config_path)
-        # Refuse to start when a required datasource cannot connect (EngineNotReady);
-        # an optional one that fails leaves the API serving the others.
+        # check() marks a datasource that cannot connect and leaves the others serving. The API starts either way:
+        # /ready says not ready (D208), where a refusal to start would only show as an orchestrator's restart loop.
         try:
             engine.check()
+        except EngineNotReady as exc:
+            logger.warning("The engine is not ready; /ready says so.\n%s", exc.report)
         except Exception:
-            engine.close()
+            engine.close()  # any other failure stops the start, with no engine left open
             raise
         app.state.engine = engine
         # One worker thread for the app's lifetime: the queue lives in this process (D206).

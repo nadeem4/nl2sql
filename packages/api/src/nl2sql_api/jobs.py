@@ -49,10 +49,16 @@ class ProfileJob(BaseModel):
 
 
 class EvalJob(BaseModel):
-    suites: Optional[List[str]] = None
+    model_config = ConfigDict(extra="forbid")
+
+    suites: Optional[List[str]] = None  # the suites in `evals.suites`, by file or by name; every one when left out
     mode: Literal["full", "plans", "retrieval"] = "full"
     cases: Optional[List[str]] = None
-    max_cost_usd: Optional[float] = None
+    max_cost_usd: Optional[float] = Field(None, gt=0)
+
+
+class DemoJob(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 class DashboardJob(BaseModel):
@@ -92,7 +98,7 @@ class Job(BaseModel):
     id: str  # 22 url-safe characters
     kind: JobKind
     status: JobStatus
-    params: Union[IndexJob, ProfileJob, EvalJob, DashboardJob]  # the request body, typed per kind
+    params: Union[IndexJob, ProfileJob, EvalJob, DashboardJob, DemoJob]  # the request body, typed per kind
     created_by: Optional[str] = None  # the caller's user_id
     created_at: datetime
     started_at: Optional[datetime] = None

@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from nl2sql_api import dependencies, main
 from nl2sql_api.main import app
-from nl2sql_api.routes import datasources, index, knowledge, llm, query
+from nl2sql_api.routes import datasources, evals, health, index, knowledge, query, settings
 
 
 def test_app_is_constructed():
@@ -25,7 +25,7 @@ def test_health_endpoint_is_registered():
 
 def test_routes_doing_blocking_work_are_synchronous():
     """`async def` handlers around blocking calls would serialise the whole API."""
-    for module in (query, datasources, llm, index, knowledge):
+    for module in (query, datasources, settings, evals, health, index, knowledge):
         for name, func in vars(module).items():
             if name.startswith("_") or not inspect.isfunction(func):
                 continue

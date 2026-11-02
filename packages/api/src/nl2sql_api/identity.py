@@ -14,7 +14,7 @@
 roles is in ``policies.admin_roles``. Neither ever reads the request body.
 """
 import ipaddress
-from typing import List
+from typing import List, Optional
 
 from fastapi import Depends, Request
 
@@ -131,6 +131,15 @@ def caller(request: Request, engine: NL2SQL = Depends(get_engine)) -> UserContex
     if auth == "static":
         return _static(engine)
     return _operator(request, engine)
+
+
+def optional_caller(request: Request, engine: NL2SQL = Depends(get_engine)) -> Optional[UserContext]:
+    """As ``caller``, and None instead of a refusal when the request has no identity: for the routes that answer a
+    visitor and a caller differently (``/ready``, ``/meta``)."""
+    try:
+        return caller(request, engine)
+    except RequestRefused:
+        return None
 
 
 def is_admin(user: UserContext, engine: NL2SQL) -> bool:

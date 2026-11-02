@@ -612,7 +612,7 @@ print(change.changes)  # {"default": {"old": "openai/gpt-5.4", "new": "anthropic
 checked by the same rules as the file. A `${...}` reference is kept in a secret
 field (`api_key`, a `headers` value) and is an error anywhere else, so data that did not come
 from your files never reads the environment. `nl2sql-api` serves it as the
-admin-only [`PUT /api/v1/settings/llm`](../api/rest/llm.md): the body is the
+admin-only [`PUT /api/v1/settings/llm`](../api/rest/settings.md): the body is the
 section as JSON, and a bad one is HTTP 422 with the `ConfigError` text. The
 playground's model switch calls `replace` too. `engine.llm.list()` shows the
 model each agent runs on.

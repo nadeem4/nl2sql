@@ -1,6 +1,6 @@
-# LLM API
+# Settings and API keys
 
-Source: `packages/api/src/nl2sql_api/routes/llm.py`
+Source: `packages/api/src/nl2sql_api/routes/settings.py`
 
 ## Endpoints
 
@@ -63,14 +63,34 @@ HTTP 422
 
 ### `GET /api/v1/llm`
 
-Response: `{"llms": {...}}`, `engine.llm.list()`: each agent by its name in
-the `llm` section (`default` first) with its `provider`, `model`,
-`temperature` and `inherited` (True when it sets nothing of its own). Never a
-key. No role needed.
+Any caller. Response: `{"llms": {...}}`, `engine.llm.list()`: each agent by its name in the `llm` section (`default`
+first) with its `provider`, `model`, `temperature` and `inherited` (True when it sets nothing of its own). Never a key.
+There is no `GET /llm/{agent}`: the list holds every agent.
 
-### `GET /api/v1/llm/{agent}`
+### `GET /api/v1/llm/providers`
 
-Response: one agent's entry, `engine.llm.get(agent)`.
+Any caller. `engine.llm.providers()`: each provider the engine can name, with its `name`, `key_variable`,
+`key_present`, the verified `models` and the `key_shape` (`prefix`, `min_length`) a key must match, so a form can
+check one before sending it. Never a key.
 
-Errors:
-- An unknown agent -> `HTTP 404`, naming the agents.
+### `GET /api/v1/api-keys`
+
+Admin only. Every key, newest first, revoked ones included: `id`, `label`, `user_id`, `tenant_id`, `roles`,
+`created_by`, `created_at`, and `revoked_at`/`revoked_by` once revoked. Never a token or its hash.
+
+### `POST /api/v1/api-keys`
+
+Admin only. Body `{"user_id": "ann", "roles": ["analyst"], "tenant_id": null, "label": "ci"}`. Answers `201`
+`{"key": {...}, "token": "nl2sql_<id>_<secret>"}`. The `token` is in this response only: the server stores a hash.
+Send it as `Authorization: Bearer <token>`. An empty user, or a role that is not one of `policies.roles`, is a `422`
+`INVALID_REQUEST`.
+
+### `DELETE /api/v1/api-keys/{key_id}`
+
+Admin only. Revokes the key; it stops verifying at once. Answers `204`. An unknown id is a `404`.
+
+### `GET /api/v1/events/catalog`
+
+Any caller. Every event the engine publishes (`engine.events.catalog()`): `name`, `description`, whether a run has it
+(`run`), whether a caller's stream carries it, whether the audit observer writes it, and its data's JSON Schema
+(`data_schema`).

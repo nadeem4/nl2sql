@@ -41,8 +41,11 @@ under the owner's data scope, so it is the owner's alone (in `GET /jobs`, `GET /
 | `POST /api/v1/jobs/index` | Build the index for `datasource_ids` (every datasource when left out); admin. Progress is one step per datasource, `<id> (failed)` for one that failed; the result is `{ok, stats, empty, failed}`. See [Indexing](indexing.md#start-an-index-build). |
 | `POST /api/v1/jobs/profile` | Profile `datasource_ids` into proposals (`draft`, `max_cost_usd`), on the server's key only; admin. The result is a list of profile reports. See [Knowledge](knowledge.md#start-a-profile). |
 
+| `POST /api/v1/jobs/eval` | Run the configured eval suites (`suites`, `mode`, `cases`, `max_cost_usd`), on the server's model; admin. `mode: full` needs a cost cap. Progress is one step per case (`case <id>`); the result is an `EvalReport`. See [Evals](evals.md). |
+| `POST /api/v1/jobs/demo` | Add the sample databases, their verified queries and the demo glossary, then index them (`engine.add_demo()`), as the caller; admin. Progress is one step per datasource; the result is an `IndexResult`. No body. |
+
 Each `POST /api/v1/jobs/<kind>` answers `202` with the queued `Job` and a `409` when the caller already has a job
-queued or running. The other kinds arrive with the rows that own them.
+queued or running.
 
 ## Events
 

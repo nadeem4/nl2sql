@@ -13,9 +13,12 @@ Source: `packages/api/src/nl2sql_api/main.py`
   overriding a variable already set), builds one engine with
   `NL2SQL.from_config()` (the file `NL2SQL_CONFIG` names, else `./nl2sql.yaml`)
   and calls `engine.check()` before it serves. A `required` datasource that
-  fails, or no datasource ready at all, raises `EngineNotReady` and the server
-  does not start; an optional one that fails leaves it serving the others. The
-  engine is stored in `app.state.engine` and closed at shutdown. Logs are
+  fails, or no datasource ready at all, raises `EngineNotReady`: the API logs
+  the report and starts anyway (D208), so a restart loop never hides the reason.
+  `GET /ready` then answers `503 not_ready` and an admin reads each failing
+  datasource and its stage under `problems`; an optional one that fails leaves
+  the others serving. Any other failure of `check()` closes the engine and stops
+  the start. The engine is stored in `app.state.engine` and closed at shutdown. Logs are
   text, or JSON lines with `NL2SQL_LOG_FORMAT=json`.
 - Retention: the lifespan calls `engine.storage.purge()` once before it
   serves and then once a day (`purge_daily`, every `PURGE_INTERVAL_S`
@@ -64,21 +67,22 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 
 | API | Router Path | Purpose |
 | --- | --- | --- |
-| [Health](health.md) | `routes/health.py` | Liveness (`/health`), readiness (`/ready`), `/meta` (mode, auth source, `request_llm`; no caller) and `/about`. |
+| [Health](health.md) | `routes/health.py` | Liveness (`/health`), readiness (`/ready`, from the engine's own check), `/meta` (mode, auth source, `request_llm`; with a caller also the datasources and what is recorded) and `/about`. |
 | [Query](query.md) | `routes/query.py` | Execute natural language queries, whole or streamed as Server-Sent Events, with a clarification `choice` or granted `approval_ids`, and a request's own keys and models. |
 | [Results](results.md) | `routes/query.py` | A run's manifest, pages, CSV and chart (`/results/{trace_id}/...`). |
 | [Traces and feedback](feedback.md) | `routes/query.py` | A run's trace, ratings, and corrections as proposals. |
 | [Approvals](approvals.md) | `routes/approvals.py` | List, grant and deny the approvals a hook asked for. |
 | [Conversations](conversations.md) | `routes/conversations.py` | Conversations: start, list, read, delete, send a turn (whole or streamed), retry, run a chat tool, report. |
 | [Datasources](datasources.md) | `routes/datasources.py` | Connect a database, list datasources, read a schema or its diagram. |
-| [LLM](llm.md) | `routes/llm.py` | Replace the LLM (`PUT /settings/llm`) and inspect each agent's model. |
+| [Settings and API keys](settings.md) | `routes/settings.py` | The agents' models (`/llm`, `/llm/providers`), replace the LLM (`PUT /settings/llm`), API keys (`/api-keys`) and the event catalog. |
+| [Evals](evals.md) | `routes/evals.py`, `routes/jobs.py` | The configured suites and the scorers; the eval job. |
 | [Indexing](indexing.md) | `routes/index.py`, `routes/jobs.py` | Index status, drift check, retrieval inspector, the index job. |
 | [Knowledge](knowledge.md) | `routes/knowledge.py`, `routes/jobs.py` | The merged knowledge, proposals, the profile job. |
 | [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 
-The routers `evals`, `settings` and `web` are empty
-for now: later rows fill them. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
+The router `web` is empty
+for now: a later row fills it. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
 fails when a route changes without it (rewrite it with `python packages/api/tests/test_openapi_snapshot.py`).
 
 ## Error Handling
@@ -158,7 +162,8 @@ The routes that change the running process need an admin role, checked by the
 
 - `POST /api/v1/datasources` and `DELETE /api/v1/datasources/{datasource_id}`
 - The Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasources/test`
-- `PUT /api/v1/settings/llm`
+- `PUT /api/v1/settings/llm` and the `/api/v1/api-keys` routes
+- Every `/api/v1/evals` route, `POST /api/v1/jobs/eval` and `POST /api/v1/jobs/demo`
 - `POST /api/v1/jobs/index`, `POST /api/v1/jobs/profile`, `DELETE /api/v1/index` and `GET /api/v1/index/check`
 - `POST /api/v1/knowledge/reload` and every `/api/v1/proposals` route
 

@@ -420,15 +420,17 @@ The CLI, `nl2sql-api` (in its lifespan, before it accepts requests) and
 `nl2sql demo` call `check()` at startup:
 
 - A datasource with `required: true` that fails, or datasources configured and
-  none ready, raises `EngineNotReady`: the entry point prints the report and
-  refuses to start (the CLI exits 1).
+  none ready, raises `EngineNotReady`: the CLI and `nl2sql demo` print the report
+  and refuse to start (the CLI exits 1). `nl2sql-api` logs the report and starts
+  anyway: `GET /api/v1/ready` answers 503 `not_ready`, and an admin reads each
+  failing datasource and its stage under `problems`.
 - An optional datasource that fails is printed, left out of routing, and the
   entry point runs degraded.
 
 ```yaml
 # datasources/sales.yaml
 type: postgres
-required: true           # without it, nothing works: refuse to start
+required: true           # without it, nothing works: the CLI refuses to start, /ready says not_ready
 connection: { host: db.internal, database: sales, user: nl2sql, password: "${env:SALES_DB_PASSWORD}" }
 ```
 

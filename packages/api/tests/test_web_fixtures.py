@@ -1,5 +1,6 @@
 """The golden files the web app's node tests read: ``ApiError``, ``Job``, ``QueryResult``, ``Turn``, the ``Dashboard`` and
-``DashboardView``, the ``Proposal`` and the ``DriftReport`` (a ``drifted`` one with its diff and impact, and an ``unchanged`` one) (docs/architecture/wave_d.md, "Testing").
+``DashboardView``, the ``Proposal``, the ``DriftReport`` (a ``drifted`` one with its diff and impact, and an ``unchanged`` one),
+an eval ``Job`` (its result an ``EvalReport``) and ``/meta`` for a signed-in caller (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
@@ -17,12 +18,12 @@ from fastapi.testclient import TestClient
 
 from nl2sql import QueryResult, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
 from nl2sql.testing.config import make_config
-from nl2sql import DriftReport, Proposal
+from nl2sql import DatasourceInfo, DriftReport, EvalReport, Proposal
 from nl2sql.schema.impact import DriftImpact, ImpactedQuery
 from nl2sql_sdk.schema import ColumnChange, ColumnRef, SchemaDiff, TableRef
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
-from nl2sql_api.jobs import IndexJob, IndexResult, Jobs
+from nl2sql_api.jobs import EvalJob, IndexJob, IndexResult, Jobs
 from nl2sql_api.main import create_app
 
 FIXTURES = pathlib.Path(__file__).resolve().parents[3] / "nl2sql-ui" / "src" / "api" / "fixtures"
@@ -31,7 +32,7 @@ START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 def build() -> dict:
     """``{file name: its JSON}``, from responses of an app with no real engine behind it."""
-    ticks = count()
+    ticks, ids = count(), count(1)
     with tempfile.TemporaryDirectory() as folder:
         class Conversations:
             """One stored turn that asked a question and was answered, as ``POST /conversations/{id}/turns`` serves it."""
@@ -43,11 +44,13 @@ def build() -> dict:
                             status="answered", trace_id="trace-0001-turn")
 
         class Engine:
-            config = make_config(pathlib.Path(folder))
+            config = make_config(pathlib.Path(folder), api={"auth": "static", "static_role": "analyst"})
             conversations = Conversations()
             dashboards = Recorder()
             proposals = Recorder()
             index = Recorder()
+            datasources = Recorder()
+            llm = Recorder()
 
             @staticmethod
             def run_query(question, **_):
@@ -73,12 +76,17 @@ def build() -> dict:
                         impact=impact),
             DriftReport(datasource_id="support", status="unchanged", live_version="v1", checked_at=AT)]
 
+        Engine.datasources.returns["list"] = [DatasourceInfo(
+            id="chinook", type="sqlite", status="ready", description="A music store", sample_questions=["How many customers?"])]
+        Engine.llm.returns.update({"recorded": ["How many customers?"],
+                                   "recorded_with": "anthropic/claude-sonnet-5-5"})
+
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine
         app.dependency_overrides[identity.caller] = lambda: UserContext(user_id="ann", roles=["analyst"])
         app.dependency_overrides[identity.admin] = lambda: UserContext(user_id="ann", roles=["admin"])
         app.state.engine = Engine
-        app.state.jobs = jobs = Jobs(clock=lambda: START + timedelta(seconds=next(ticks)), new_id=lambda: "job-0001-fixture-id",
+        app.state.jobs = jobs = Jobs(clock=lambda: START + timedelta(seconds=next(ticks)), new_id=lambda: f"job-{next(ids):04d}-fixture-id",
                                      poll_s=0.01)
         try:
             client = TestClient(app, raise_server_exceptions=False)
@@ -93,9 +101,18 @@ def build() -> dict:
             while jobs.get(job.id, UserContext(user_id="ann")).status != "succeeded":
                 assert time.monotonic() < deadline, "the fixture job did not finish"
                 time.sleep(0.005)
+            report = EvalReport(mode="plans", suites=[{"name": "chinook", "path": "evals/chinook.yaml", "digest": "d1"}])
+            evaluated = jobs.submit("eval", EvalJob(mode="plans"), UserContext(user_id="ann"),
+                                    lambda ctx: (ctx.progress("case q1", 1, 1), report)[1])
+            while jobs.get(evaluated.id, UserContext(user_id="ann")).status != "succeeded":
+                assert time.monotonic() < deadline, "the fixture eval job did not finish"
+                time.sleep(0.005)
+            meta = client.get("/api/v1/meta")
+            assert meta.status_code == 200 and "datasources" in meta.json(), meta.text
             turn = client.post("/api/v1/conversations/conv-0001/turns", json={"text": "How many customers are there?"})
             assert turn.status_code == 200, turn.text
             return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
+                    "JobEval.json": client.get(f"/api/v1/jobs/{evaluated.id}").json(), "Meta.json": meta.json(),
                     "QueryResult.json": answer.json(), "Turn.json": turn.json(),
                     "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
                     "DashboardView.json": client.get("/api/v1/dashboards/d1").json(),

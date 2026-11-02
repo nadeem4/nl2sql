@@ -89,3 +89,12 @@ def test_post_llm_is_gone(make_client):
     client, _ = make_client()
 
     assert client.post("/api/v1/llm", json={"config": {"name": "default"}}).status_code == 405
+
+
+def test_replacing_the_llm_drops_the_kept_ready_check(make_client):
+    client, engine = make_client(api={"auth": "static", "static_role": "admin"})
+    client.get("/api/v1/ready")
+    assert app.state.ready_cache is not None
+
+    assert client.put(ROUTE, json=NEW_LLM).status_code == 200
+    assert app.state.ready_cache is None

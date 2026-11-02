@@ -798,6 +798,9 @@ class Config(_Model):
     # them; every copy of this config shares the one dict.
     _datasources_folder: Optional[Path] = PrivateAttr(default=None)
     _file_hashes: Dict[str, str] = PrivateAttr(default_factory=dict)
+    # The SHA-256 of nl2sql.yaml and of each section file it includes when they were loaded, by the label
+    # ``locate`` gives (``nl2sql.yaml``, ``knowledge.yaml``). A writer that edits one of them checks and updates it.
+    _section_hashes: Dict[str, str] = PrivateAttr(default_factory=dict)
 
     @property
     def datasources_folder(self) -> Optional[Path]:
@@ -812,6 +815,15 @@ class Config(_Model):
     def record_datasource_file(self, name: str, sha256: str) -> None:
         """Remember the hash of ``datasources/<name>`` as the engine last saw it."""
         self._file_hashes[name] = sha256
+
+    def section_file_hash(self, label: str) -> Optional[str]:
+        """The SHA-256 of ``nl2sql.yaml`` or a section file (as ``locate`` labels it) when it was loaded or last
+        written by the engine; None when it was not there."""
+        return self._section_hashes.get(label)
+
+    def record_section_file(self, label: str, sha256: str) -> None:
+        """Remember the hash of ``label`` as the engine last saw it."""
+        self._section_hashes[label] = sha256
 
     @property
     def folder(self) -> Optional[Path]:

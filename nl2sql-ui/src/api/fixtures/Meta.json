@@ -1,0 +1,18 @@
+{
+  "auth": "static",
+  "datasources": [
+    {
+      "description": "A music store",
+      "id": "chinook",
+      "recorded": [
+        "How many customers?"
+      ],
+      "sample_questions": [
+        "How many customers?"
+      ]
+    }
+  ],
+  "mode": "your_data",
+  "recorded_with": "anthropic/claude-sonnet-5-5",
+  "request_llm": false
+}
