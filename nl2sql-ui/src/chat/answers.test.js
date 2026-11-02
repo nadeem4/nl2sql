@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  HINT_KEY, answerDate, describeSaveError, hintSeen, markHintSeen, needsFixing, runView, saveBody, savedLine, stepRef,
+  HINT_KEY, answerDate, createHintStore, describeSaveError, hintSeen, markHintSeen, needsFixing, rerunApprovalIds, runView,
+  saveBody, savedLine, stepRef,
 } from "./answers.js";
 
 const ASK = (result) => ({ call: { name: "ask" }, result });
@@ -62,7 +63,7 @@ test("storage that is missing or throws never breaks the bar", () => {
 test("a run is shown as rows, as needing fixing, as waiting for an approval, or as the error it is", () => {
   assert.deepEqual(runView({ status: "success", result_manifest: [{}] }), { kind: "rows" });
   assert.deepEqual(runView({ status: "error", errors: [{ error_code: "TILE_NEEDS_FIXING", message: "m" }] }),
-    { kind: "needs_fixing", message: "This answer needs fixing: the schema has changed since it was saved." });
+    { kind: "needs_fixing", message: "This answer needs fixing: the schema has changed since it was saved. m" });
   assert.deepEqual(runView({ status: "needs_approval", approvals_needed: [{ id: "r1" }, { id: "r2" }] }),
     { kind: "approval", approvalIds: ["r1", "r2"] });
   assert.deepEqual(runView({ status: "error", errors: [{ error_code: "X", message: "boom" }] }), { kind: "error", message: "boom" });
@@ -72,4 +73,38 @@ test("a run is shown as rows, as needing fixing, as waiting for an approval, or 
 test("the date of a saved answer is its day, and nothing when it has none", () => {
   assert.equal(answerDate({ created_at: "2026-11-02T10:30:00Z" }), "2026-11-02");
   assert.equal(answerDate({}), "");
+});
+
+test("needs-fixing keeps the server's message; a stopped or clarifying run shows its sentence, not an empty table", () => {
+  const fixing = runView({ status: "error", errors: [{ error_code: "TILE_NEEDS_FIXING", message: "Column x was renamed." }] });
+  assert.equal(fixing.kind, "needs_fixing");
+  assert.match(fixing.message, /needs fixing/);
+  assert.match(fixing.message, /Column x was renamed\./);
+  assert.deepEqual(runView({ status: "stopped", final_answer: "Stopped at the cost limit." }), { kind: "error", message: "Stopped at the cost limit." });
+  assert.deepEqual(runView({ status: "needs_clarification", final_answer: "Which one?" }), { kind: "error", message: "Which one?" });
+  assert.deepEqual(runView({ status: "stopped" }), { kind: "error", message: "The answer could not be run." });
+});
+
+test("a run again carries the approval ids only when the last run is waiting for them", () => {
+  assert.deepEqual(rerunApprovalIds({ status: "needs_approval", approvals_needed: [{ id: "r1" }] }), ["r1"]);
+  assert.equal(rerunApprovalIds({ status: "success" }), undefined);
+  assert.equal(rerunApprovalIds(undefined), undefined);
+});
+
+test("the hint store dismisses the hint for every subscriber at once and keeps the flag", () => {
+  const data = {};
+  const storage = { getItem: (k) => data[k] ?? null, setItem: (k, v) => { data[k] = v; } };
+  const store = createHintStore(storage);
+  let calls = 0;
+  const off = store.subscribe(() => { calls += 1; });
+  assert.equal(store.visible(), true);
+  store.dismiss();
+  assert.equal(store.visible(), false);
+  assert.equal(calls, 1);
+  assert.equal(data[HINT_KEY], "1");
+  store.dismiss();
+  assert.equal(calls, 1);
+  off();
+  assert.equal(createHintStore(storage).visible(), false);
+  assert.equal(createHintStore(undefined).visible(), true);
 });

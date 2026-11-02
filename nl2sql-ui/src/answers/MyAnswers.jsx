@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { deleteAnswer, listAnswers, runAnswer } from "../api/answers.js";
-import { answerDate, runView } from "../chat/answers.js";
+import { answerDate, rerunApprovalIds, runView } from "../chat/answers.js";
 import RowsTable from "../outputs/RowsTable.jsx";
 
 // The answers a person kept with "Yes" in chat. Run answers the saved plan again as the viewer, so what they may read
 // and any approval apply; no model is called. Delete forgets one. A list of one's own: nobody else sees it.
-function Shown({ id, shown, busy, onRun }) {
+function Shown({ shown }) {
   if (!shown) return null;
   const view = runView(shown);
   if (view.kind === "rows") return <RowsTable result={shown} />;
@@ -13,10 +13,7 @@ function Shown({ id, shown, busy, onRun }) {
     <div className="dash-note" data-kind={view.kind} role={view.kind === "error" ? "alert" : undefined}>
       <p>{view.kind === "approval" ? "This answer is waiting for an approval." : view.message}</p>
       {view.kind === "approval" && (
-        <>
-          <p className="dash-note-sub">Someone with the right role grants it in <a href="#/approvals">Approvals</a>, then run it again.</p>
-          <button type="button" className="index-rebuild" disabled={busy} onClick={() => onRun(id, view.approvalIds)}>Run again</button>
-        </>
+        <p className="dash-note-sub">Someone with the right role grants it in <a href="#/approvals">Approvals</a>, then use Run again.</p>
       )}
     </div>
   );
@@ -25,7 +22,7 @@ function Shown({ id, shown, busy, onRun }) {
 export default function MyAnswers() {
   const [answers, setAnswers] = useState(null);
   const [shown, setShown] = useState({});
-  const [busy, setBusy] = useState(null);
+  const [busy, setBusy] = useState(() => new Set());
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -33,14 +30,14 @@ export default function MyAnswers() {
   }, []);
 
   const guard = async (id, work) => {
-    setBusy(id);
+    setBusy((prev) => new Set(prev).add(id));
     setError(null);
     try {
       await work();
     } catch (e) {
       setError(e);
     } finally {
-      setBusy(null);
+      setBusy((prev) => { const next = new Set(prev); next.delete(id); return next; });
     }
   };
   const run = (id, approvalIds) => guard(id, async () => {
@@ -73,12 +70,12 @@ export default function MyAnswers() {
                 <span className="dash-meta">{[a.datasource_id, answerDate(a)].filter(Boolean).join(" · ")}</span>
               </div>
               <div className="dash-row">
-                <button type="button" className="index-rebuild" disabled={busy === a.id} onClick={() => run(a.id)}>
+                <button type="button" className="index-rebuild" disabled={busy.has(a.id)} onClick={() => run(a.id, rerunApprovalIds(shown[a.id]))}>
                   {shown[a.id] ? "Run again" : "Run"}
                 </button>
-                <button type="button" className="index-rebuild dash-danger" disabled={busy === a.id} onClick={() => remove(a)}>Delete</button>
+                <button type="button" className="index-rebuild dash-danger" disabled={busy.has(a.id)} onClick={() => remove(a)}>Delete</button>
               </div>
-              <Shown id={a.id} shown={shown[a.id]} busy={busy === a.id} onRun={run} />
+              <Shown shown={shown[a.id]} />
             </li>
           ))}
         </ul>
