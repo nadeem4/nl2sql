@@ -16,7 +16,7 @@ from nl2sql.charts.choose import choose
 from nl2sql.charts.spec import ChartSpec, ColumnKind
 from nl2sql.common.errors import InvalidArgument, ScheduleTooFrequent, UnknownTile, WorkspaceNotFound
 from nl2sql.config.models import ChartSettings
-from nl2sql.conversations.models import Conversation
+from nl2sql.conversations.models import Conversation, ToolStep
 from nl2sql.dashboards.models import (
     GRID_COLUMNS, AddTile, Arrange, ChartPlan, Dashboard, DashboardEdit, MoveDashboard, RemoveTile, RenameDashboard,
     RenameTile, ReplacePlan, Schedule, ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, StepRef, Tile,
@@ -163,10 +163,9 @@ def _move(d: Dashboard, e: MoveDashboard, env: EditEnv, out: Applied) -> Dashboa
     return d.model_copy(update={"workspace_id": e.workspace_id})
 
 
-def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, ChartPlan]:
-    """The question and the whole plan of an ``ask`` step the conversation holds: its decomposition with the plan of
-    each sub-query, or the verified query that answered. ``ref.step`` counts the turn's ``ask`` steps from 1, as the
-    ``chart`` tool does. Nothing but what the engine stored is read: no model text becomes a plan (D4)."""
+def ask_step(conversation: Conversation, ref: StepRef) -> ToolStep:
+    """The ``ask`` step ``ref`` names, which answered. ``ref.step`` counts the turn's ``ask`` steps from 1, as the
+    ``chart`` tool does. Raises ``InvalidArgument`` when there is no such step or it did not answer."""
     if ref.turn is None:
         turn = conversation.turns[-1] if conversation.turns else None
     else:
@@ -177,9 +176,17 @@ def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, Chart
     if ref.step > len(asks):
         raise InvalidArgument(f"Turn {ref.turn} has {len(asks)} answer(s) to build a chart from; there is no step {ref.step}.")
     step = asks[ref.step - 1]
-    result = step.result
-    if step.status != "ok" or result is None:
+    if step.status != "ok" or step.result is None:
         raise InvalidArgument(f"Step {ref.step} of turn {ref.turn} did not answer ({step.status}); a chart needs an answer.")
+    return step
+
+
+def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, ChartPlan]:
+    """The question and the whole plan of an ``ask`` step the conversation holds: its decomposition with the plan of
+    each sub-query, or the verified query that answered. Nothing but what the engine stored is read: no model text
+    becomes a plan (D4)."""
+    step = ask_step(conversation, ref)
+    result = step.result
     if result.source.type == "verified":
         plan = ChartPlan(verified=VerifiedRef(id=result.source.id or "", params=dict(result.source.params or {})),
                          verified_datasource_id=result.source.datasource_id)

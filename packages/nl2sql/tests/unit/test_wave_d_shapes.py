@@ -205,7 +205,7 @@ def test_decide_approval_decides_once(store):
 
 
 def test_approvals_migration_is_registered():
-    assert MIGRATIONS[-1][0] == "0007_approvals"
+    assert "0007_approvals" in [name for name, _ in MIGRATIONS]
 
 
 def test_settings_approvals_expire_after_24_hours_by_default():

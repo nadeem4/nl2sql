@@ -393,3 +393,21 @@ class ConnectionInvalid(NL2SQLError, ValueError):
     def __init__(self, problems: "list[dict[str, str]]"):
         self.problems = problems
         super().__init__(" ".join(f"{p['path']}: {p['message']}" for p in problems))
+
+
+class AnswerNotFound(NL2SQLError, LookupError):
+    """No such saved answer, or it is not the caller's: the two are the same, an admin's included (D247)."""
+
+    code, status = "ANSWER_NOT_FOUND", 404
+
+
+class AnswerLimitReached(NL2SQLError):
+    """The caller already holds ``answers.max_per_user`` saved answers (D242); delete one to save another."""
+
+    code, status = "ANSWER_LIMIT_REACHED", 409
+
+
+class NotSavable(InvalidArgument):
+    """A step that cannot be saved as an answer: it did not answer, kept no plan, or is not the run asked for."""
+
+    code = "NOT_SAVABLE"

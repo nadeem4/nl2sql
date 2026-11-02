@@ -36,7 +36,7 @@ file at `<storage.path>/state.db`; any store implementing
 `nl2sql_sdk.stores.StateStore` can take its place. The same store holds the
 plan cache, the playground's answer ratings, the review queue, conversations,
 workspaces, dashboards with their last chart results, API keys and the index
-build lock. The interface is version 5.
+build lock. The interface is version 6.
 
 ### Snapshots are immutable
 
@@ -103,7 +103,7 @@ table, and the engine applies the pending ones when it starts
 came later; migration 3 adds the immutability trigger and the `locks` table;
 migration 4 adds the `schema_diffs` table; migration 5 adds the `proposals`
 table, the review queue (release 0.8, [Wave B](../architecture/wave_b.md#5-the-review-queue));
-migration 6 adds Wave C's five tables, below; migration 7 adds the `approvals` table (Wave D), below. A 0.8 `state.db` is migrated in
+migration 6 adds Wave C's five tables, below; migration 7 adds the `approvals` table and migration 8 the `saved_answers` table (Wave D), below. A 0.8 `state.db` is migrated in
 place and keeps its rows.
 
 ### Conversations, dashboards and API keys
@@ -136,6 +136,15 @@ run again).
 | Table (migration 7) | Methods | Filtered on | Notes |
 | --- | --- | --- | --- |
 | `approvals` | `put_approval(doc)`, `get_approval(request_id)`, `list_approvals(status=None)`, `decide_approval(request_id, status, *, by, at=None)`, `purge_approvals(older_than)` | `id` (the request id), `status` (`pending`, `granted`, `denied`), `created_at`, `updated_at` | `list_approvals` is newest (`created_at`) first. `decide_approval` changes only a `pending` request, under the store lock, so a late deny never overwrites a grant; it returns the stored document, or `None` for an unknown id. `purge_approvals` deletes by `updated_at` whatever the status. |
+
+### Saved answers
+
+Wave D ([D238](../architecture/wave_d.md)). `StateStore` version 6 adds the saved-answer methods, one JSON document
+per answer, in the `saved_answers` table that migration 8 creates (`CREATE TABLE IF NOT EXISTS`).
+
+| Table (migration 8) | Methods | Filtered on | Notes |
+| --- | --- | --- | --- |
+| `saved_answers` | `put_saved_answer(doc)`, `get_saved_answer(answer_id)`, `list_saved_answers(tenant_id, user_id)`, `delete_saved_answer(answer_id)` | owner (`tenant_id`, `user_id`), `created_at` | `list_saved_answers` is newest first. The engine checks the owner on every read; a document holds a typed plan, never rows. |
 
 ### The lock
 

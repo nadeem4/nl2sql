@@ -185,6 +185,7 @@ nav:
       - Results: api/core/results.md
       - Conversations: api/core/conversations.md
       - Dashboards: api/core/dashboards.md
+      - Saved answers: api/core/answers.md
     - REST API (FastAPI):
       - Overview: api/rest/index.md
       - Health: api/rest/health.md

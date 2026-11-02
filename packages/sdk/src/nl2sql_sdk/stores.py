@@ -4,7 +4,7 @@ A store is named by ``type`` in one of the four ``storage`` sub-blocks, for
 example ``index: {type: qdrant, url: ...}``. Every store class has:
 
 * ``interface_version``: the version of these interfaces it was written for
-  (``5``). The engine accepts exactly the version it was built for. Version 2
+  (``6``). The engine accepts exactly the version it was built for. Version 2
   added ``StateStore.put_schema_diff`` and ``get_schema_diff``; version 3 the
   review queue's methods (``put_proposal``, ``get_proposal``,
   ``list_proposals``, ``decide_proposal``, ``purge_proposals``, typed with
@@ -13,7 +13,8 @@ example ``index: {type: qdrant, url: ...}``. Every store class has:
   methods, which take and return plain JSON documents (``dict``), since this
   module holds no engine model; version 5 the approval methods
   (``put_approval``, ``get_approval``, ``list_approvals``, ``decide_approval``,
-  ``purge_approvals``). The version is one per kind, so every store
+  ``purge_approvals``); version 6 the saved-answer methods (``put_saved_answer``,
+  ``get_saved_answer``, ``list_saved_answers``, ``delete_saved_answer``). The version is one per kind, so every store
   class declares it, whatever its slot.
 * ``slot``: the sub-block it fills, ``"index"``, ``"state"``, ``"traces"`` or
   ``"results"``. Store names share one entry point group, ``nl2sql.stores``,
@@ -216,9 +217,9 @@ class IndexStore(Store, Protocol):
 
 class StateStore(Store, Protocol):
     """Schema snapshots and their diffs, the plan cache, feedback, the review queue's proposals, conversations,
-    workspaces, dashboards with their stored chart results, API keys, migrations and a lock.
+    workspaces, dashboards with their stored chart results, saved answers, API keys, migrations and a lock.
 
-    The conversation, workspace, dashboard and key methods take and return JSON documents: the engine owns
+    The conversation, workspace, dashboard, saved-answer and key methods take and return JSON documents: the engine owns
     their models. A document carries the fields the store filters on, which the methods below name.
     """
 
@@ -401,6 +402,23 @@ class StateStore(Store, Protocol):
 
     def purge_approvals(self, older_than: datetime) -> int:
         """Delete the approvals last updated before ``older_than``; return how many."""
+        ...
+
+    # -- saved answers (Wave D, D238). A document has ``id``, ``tenant_id``, ``user_id`` and ``created_at``
+    # (ISO 8601; a stamp with no zone is UTC).
+
+    def put_saved_answer(self, doc: dict) -> None:
+        """Store ``doc``, replacing the saved answer with its ``id``."""
+        ...
+
+    def get_saved_answer(self, answer_id: str) -> Optional[dict]: ...
+
+    def list_saved_answers(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[dict]:
+        """The owner's saved answers, newest ``created_at`` first."""
+        ...
+
+    def delete_saved_answer(self, answer_id: str) -> bool:
+        """Delete the saved answer; False when there is no such id."""
         ...
 
     def lock(self, name: str, ttl_s: int) -> ContextManager[None]:

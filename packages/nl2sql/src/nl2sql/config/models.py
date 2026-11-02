@@ -703,6 +703,12 @@ class Dashboards(_Model):
     schedule_identity_max_age_days: PositiveInt = 30
 
 
+class Answers(_Model):
+    """The ``answers`` section: saved answers (DB1a, D242)."""
+
+    max_per_user: PositiveInt = 100  # saved answers one person may keep; the next save is refused by name
+
+
 class McpHttp(_Model):
     host: str = "127.0.0.1"
     port: int = Field(8765, ge=1, le=65535)
@@ -782,6 +788,7 @@ class Config(_Model):
     # The chat tools by registered name; None (no section) means the five built-ins, [] means none (ask stays).
     chat_tools: Optional[List[str]] = None
     dashboards: Dashboards = Field(default_factory=Dashboards)
+    answers: Answers = Field(default_factory=Answers)
     mcp: Mcp = Field(default_factory=Mcp)
     # What this project is for (D229): demo, your_data or hosted. NL2SQL_MODE and the launcher flags override it
     # at the entry point (resolve_mode); the engine reads no environment.

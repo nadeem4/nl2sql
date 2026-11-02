@@ -96,6 +96,7 @@ storage:    { path: .nl2sql }
 | `conversations` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | How a model-led turn is bounded and kept. Every field has a default. |
 | `chat_tools` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | A list of chat tool names. Absent means `chart`, `diagram` and `report`, if registered; `[]` means none (`ask` stays). |
 | `dashboards` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | The starter dashboard's size and the refresh limits. Every field has a default. |
+| `answers` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | Saved answers: how many one person may keep. Every field has a default. |
 | `mcp` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | `nl2sql mcp --http`: where it listens and how it authenticates. Every field has a default. |
 
 From Python:
@@ -240,6 +241,9 @@ max_tiles: 10                        # the starter dashboard's size
 min_refresh_minutes: 15              # a schedule below this is refused
 schedule_identity_max_age_days: 30   # a schedule stops when its saved identity is older
 
+# answers (every value shown is the default)
+max_per_user: 100                    # saved answers one person may keep; the next save is refused
+
 # mcp.yaml (every value shown is the default)
 http:
   host: 127.0.0.1
@@ -255,6 +259,7 @@ auth: api_keys            # api_keys | none (none: loopback only)
 | `conversations` | `Conversations`: strict keys; every count is at least 1, and `max_age_days: null` keeps conversations. Read by `engine.conversations` (C1). The `conversation` agent that leads a turn is one of the [LLM agents](llm.md#per-node-models). |
 | `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built (`chat_tools[i]` in the report), with the closest registered name; `ask` and a plugin whose `args_model` does not forbid extra keys are errors too. Absent means the default tools (`chart`, `diagram` and `report`) that the registry has, so an engine on `Registry.empty()` starts with none and needs no `chat_tools: []`; a name you list must be registered. `[]` means none; `ask` is the conversation's own tool and is always on. Read by `engine.conversations` and `engine.chat_tools` (C2); see [Chat tools](../conversations/tools.md). |
 | `dashboards` | `Dashboards`: strict keys; every value is at least 1. Read by `engine.dashboards` (D1 to D3). |
+| `answers` | `Answers`: strict keys; `max_per_user` is at least 1. Read by `engine.answers` (DB1a): the save past the cap is refused with `AnswerLimitReached`, never by dropping an older answer. |
 | `mcp` | `Mcp`: strict keys. `http.port` is 1 to 65535 and `http.path` starts with `/`. `auth: none` is for loopback only: the server refuses to start on any other host, or when `allowed_hosts` lists a name that is not loopback. `allowed_hosts` and `allowed_origins` feed the MCP SDK's DNS-rebinding protection: a request whose `Host` or `Origin` is not listed is refused, so a deployment behind a proxy lists its public host name. Read by `nl2sql mcp --http`; see [MCP over HTTP](../getting_started/mcp.md#over-http). |
 
 ```python

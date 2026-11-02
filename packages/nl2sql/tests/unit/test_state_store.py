@@ -136,8 +136,8 @@ def test_diff_is_pruned_with_its_snapshot(store):
     assert store.get_schema_diff("ds1", v2) is not None
 
 
-def test_the_state_store_implements_store_interface_version_5():
-    assert SqliteState.interface_version == 5
+def test_the_state_store_implements_store_interface_version_6():
+    assert SqliteState.interface_version == 6
 
 
 # -- the plan cache --------------------------------------------------------------
@@ -191,7 +191,7 @@ def test_migrate_applies_each_migration_once(tmp_path):
     state.close()
 
     assert applied and applied == sorted(applied)
-    assert applied[-3:] == ["0005_proposals", "0006_conversations_dashboards_and_keys", "0007_approvals"]
+    assert applied[-3:] == ["0006_conversations_dashboards_and_keys", "0007_approvals", "0008_saved_answers"]
     assert again == []
 
 

@@ -23,7 +23,7 @@ class FilesConfig(BaseModel):
 
 
 class FilesTraces:
-    interface_version: ClassVar[int] = 5
+    interface_version: ClassVar[int] = 6
     slot: ClassVar[str] = "traces"
     config_model: ClassVar[type] = FilesConfig
 

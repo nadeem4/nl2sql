@@ -9,7 +9,7 @@ method, so answering a question never loads it.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
@@ -56,6 +56,11 @@ class FeedbackAPI:
             TypeError: ``user_context`` is not a ``UserContext``.
             ValueError: ``rating`` is not ``"up"`` or ``"down"``, or ``trace_id`` is not a plain token.
         """
+        return self._record(trace_id, rating, user_context=user_context, note=note)[0]
+
+    def _record(self, trace_id: str, rating: str, *, user_context: "UserContext",
+                note: Optional[str] = None) -> Tuple[Dict[str, Any], Optional["Proposal"], str]:
+        """``record``, with the proposal it filed and, when it filed none, why (``skip_reason``'s word)."""
         from nl2sql.api.traces_api import TracesAPI
         from nl2sql.common.errors import TraceNotFound
         from nl2sql.feedback import RATINGS
@@ -69,13 +74,19 @@ class FeedbackAPI:
         if trace is None:
             raise TraceNotFound(f"No run '{trace_id}' for this caller, or its trace was not kept.")
         request = trace.get("request") or {}
-        return self._rate({**(trace.get("result") or {}), "trace_id": trace_id},
-                          question=request.get("question") or "", role=",".join(user_context.roles),
-                          rating=rating, note=note)
+        return self._rate_proposing({**(trace.get("result") or {}), "trace_id": trace_id},
+                                    question=request.get("question") or "", role=",".join(user_context.roles),
+                                    rating=rating, note=note)
 
     def _rate(self, result: Union[Mapping[str, Any], Any], *, question: str, role: str, rating: str,
               note: Optional[str] = None) -> Dict[str, Any]:
         """Store the rating of a run whose result the caller already holds (a correction, which has checked its caller)."""
+        return self._rate_proposing(result, question=question, role=role, rating=rating, note=note)[0]
+
+    def _rate_proposing(self, result: Union[Mapping[str, Any], Any], *, question: str, role: str, rating: str,
+                        note: Optional[str] = None) -> Tuple[Dict[str, Any], Optional["Proposal"], str]:
+        """``_rate``, with the proposal a thumbs-up filed and, when none was, why: ``skip_reason``'s word, or
+        ``"truncated"``, ``"unknown_datasource"``, ``"not_one_query"`` or ``"queue_error"``."""
         from nl2sql.feedback import rated_row, run_record, run_signals
         from nl2sql.tracing.document import TRUNCATED
         from nl2sql.tracing.trace import engine_info
@@ -93,14 +104,19 @@ class FeedbackAPI:
             if "SECURITY_VIOLATION" in row["error_codes"]:
                 row["sql"] = []
         stored = self._ctx.state.add_feedback(rated_row(row, rating, note))
+        proposal: Optional["Proposal"] = None
+        reason = ""
         try:
             # A trace caps long fields, so a capped SQL is not the run's SQL: rate it, never propose it.
-            if not any(TRUNCATED in statement for statement in stored.get("sql") or []):
-                self._propose(stored)
+            if any(TRUNCATED in statement for statement in stored.get("sql") or []):
+                reason = "truncated"
+            else:
+                proposal, reason = self._propose(stored)
         except Exception as e:  # the rating is stored; a queue that cannot take the proposal never fails it
             logger.warning("The thumbs-up of run %s was stored, but its verified-query proposal was not filed: %s",
                            stored.get("trace_id"), e)
-        return stored
+            reason = "queue_error"
+        return stored, proposal, reason
 
     def correct(self, trace_id: str, *, sql: Optional[str] = None, plan: Any = None, question: Optional[str] = None,
                 note: Optional[str] = None, user_context: "UserContext",
@@ -185,27 +201,29 @@ class FeedbackAPI:
         """Delete every rating; returns how many. Schema snapshots and the plan cache stay."""
         return self._ctx.state.clear_feedback()
 
-    def _propose(self, row: Dict[str, Any]) -> None:
-        """File a thumbs-up generated answer as a ``verified_query`` proposal (D43); other rows file nothing."""
+    def _propose(self, row: Dict[str, Any]) -> Tuple[Optional["Proposal"], str]:
+        """File a thumbs-up generated answer as a ``verified_query`` proposal (D43); other rows file nothing.
+        Returns the proposal as stored, or None and why none was filed."""
         from nl2sql.config.curated import CuratedSqlError, inspect_verified_sql
         from nl2sql.feedback import skip_reason, verified_query
         from nl2sql.review.queue import propose, table_names
         from nl2sql_sdk.stores import Proposal
 
-        if skip_reason(row):
-            return
+        reason = skip_reason(row)
+        if reason:
+            return None, reason
         datasource_id = row["datasource_ids"][0]
         if datasource_id not in self._ctx.ds_registry.list_ids():
-            return
+            return None, "unknown_datasource"
         change = verified_query(row)
         try:
             parsed = inspect_verified_sql(change["sql"], self._ctx.ds_registry.get_dialect(datasource_id))
         except CuratedSqlError:
-            return  # not one read-only query: nothing a person could verify
-        propose(self._ctx, Proposal.build(
+            return None, "not_one_query"  # not one read-only query: nothing a person could verify
+        return propose(self._ctx, Proposal.build(
             kind="verified_query", datasource_id=datasource_id, target=change["questions"][0], change=change,
             origin="thumbs_up", tables=table_names(self._ctx, datasource_id, parsed.tables),
-            evidence={"trace_id": row["trace_id"], "role": row.get("role") or None}))
+            evidence={"trace_id": row["trace_id"], "role": row.get("role") or None})), ""
 
     def _llm_configs(self) -> Dict[str, Any]:
         """Provider and model per agent, by the name each model step asks for."""

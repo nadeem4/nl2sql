@@ -25,7 +25,7 @@ class LocalConfig(BaseModel):
 
 
 class LocalResults:
-    interface_version: ClassVar[int] = 5
+    interface_version: ClassVar[int] = 6
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type] = LocalConfig
 

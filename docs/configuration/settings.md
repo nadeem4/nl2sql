@@ -254,3 +254,4 @@ These two are sections of `nl2sql.yaml` of their own, not groups of
 | `dashboards.max_tiles` | `10` | Charts in the starter dashboard. |
 | `dashboards.min_refresh_minutes` | `15` | The shortest refresh schedule; a shorter one is refused. |
 | `dashboards.schedule_identity_max_age_days` | `30` | A schedule stops when the owner identity saved with it is older than this, until the owner sets it again. |
+| `answers.max_per_user` | `100` | Saved answers one person may keep (`engine.answers`); the next save is refused with `AnswerLimitReached`. |

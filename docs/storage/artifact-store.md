@@ -127,7 +127,7 @@ class S3ResultsConfig(BaseModel):
 
 
 class S3Results:
-    interface_version: ClassVar[int] = 5
+    interface_version: ClassVar[int] = 6
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type] = S3ResultsConfig
 

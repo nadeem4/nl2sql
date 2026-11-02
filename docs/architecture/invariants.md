@@ -610,7 +610,7 @@ A dashboard follows the same rule. A chart keeps the typed plan that produced it
 - `test_other_users_conversation_is_not_found`, `test_turn_runs_with_the_callers_roles_not_the_starters`, `test_stored_turn_has_no_rows`, `test_model_never_sees_rows` in `packages/nl2sql/tests/unit/test_conversations.py`; `test_stored_dashboard_results_are_denied_after_access_is_lost`, `test_refresh_runs_as_the_caller`, `test_open_never_approves`, `test_scheduled_refresh_never_approves`, `test_schedule_stops_with_a_visible_error_when_a_check_fails` and `test_schedule_stops_when_the_identity_snapshot_expires` in `packages/nl2sql/tests/unit/test_dashboards_d2.py`; `test_owned_and_privileged_methods_require_a_caller`, `test_every_entry_point_reaches_data_through_run_query` and `test_dashboards_make_no_model_call` in the boundary test
 
 ### Failure Behavior
-`ConversationNotFound` for an id that is missing or another owner's, with the same message for both; `DashboardNotFound` likewise. A chart the caller can no longer read is `denied`, with no rows; a schedule that fails a check is `stopped`, with its code and message on the schedule.
+`ConversationNotFound` for an id that is missing or another owner's, with the same message for both; `DashboardNotFound` likewise. `engine.answers` is owner-only too: another caller's saved answer, an admin's included, is `AnswerNotFound`, with no admin read (D247). A chart the caller can no longer read is `denied`, with no rows; a schedule that fails a check is `stopped`, with its code and message on the schedule.
 
 ### Why It Exists
 A conversation outlives the request that began it. If it carried the starter's roles, a person who lost access, or anyone who learned its id, would keep reading what the roles allowed.
