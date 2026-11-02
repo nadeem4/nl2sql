@@ -45,7 +45,7 @@ PUBLIC_SURFACE = {
     "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
     "ConnectionInvalid",
     "NL2SQLError", "NotAuthorized", "InvalidArgument", "ReplayMiss", "NotPinnable", "ChartNotSupported", "CorrectionRefused", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
-    "SavedAnswer", "SaveReport", "AnswerNotFound", "AnswerLimitReached", "NotSavable",
+    "SavedAnswer", "SaveReport", "AnswerNotFound", "AnswerLimitReached", "NotSavable", "LockHeld",
     "LLMOverride", "resolve_mode", "provider_for_key", "provider_keys_in_environment",
     # The CLI is a client of the facade (CL0a): the config check and the provider key facts it prints
     "check_config", "KEYED_PROVIDERS", "api_key_from_env", "env_var_for_provider", "ANTHROPIC_EXTRA_HINT",
