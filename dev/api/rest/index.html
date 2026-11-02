@@ -5567,6 +5567,34 @@
   
   
     <li class="md-nav__item">
+      <a href="answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saved answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="dashboards/" class="md-nav__link">
         
   
@@ -6475,7 +6503,7 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
   (<code>from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...</code>),
   never an engine submodule. <code>packages/api/tests/test_architecture.py</code> enforces it.</li>
 <li><code>create_app(config_path=None)</code> builds the app: one router module per namespace (<code>health</code>, <code>query</code>, <code>approvals</code>,
-  <code>conversations</code>, <code>dashboards</code>, <code>workspaces</code>, <code>datasources</code>, <code>datasource</code>, <code>index</code>, <code>indexing</code>, <code>knowledge</code>, <code>evals</code>,
+  <code>conversations</code>, <code>dashboards</code>, <code>workspaces</code>, <code>answers</code>, <code>datasources</code>, <code>datasource</code>, <code>index</code>, <code>indexing</code>, <code>knowledge</code>, <code>evals</code>,
   <code>settings</code>, <code>llm</code>, <code>web</code>) under <code>/api/v1</code> (<code>web</code> at the root), and <code>errors.install</code> for the
   <a href="errors/">error envelope</a>. <code>nl2sql_api.main:app</code> is <code>create_app()</code> for <code>uvicorn nl2sql_api.main:app</code>.</li>
 <li>CORS is restricted to the origins in <code>api.cors_origins</code>
@@ -6563,6 +6591,11 @@ server on a config:</p>
 <td><a href="knowledge/">Knowledge</a></td>
 <td><code>routes/knowledge.py</code>, <code>routes/jobs.py</code></td>
 <td>The merged knowledge, proposals, the profile job.</td>
+</tr>
+<tr>
+<td><a href="answers/">Saved answers</a></td>
+<td><code>routes/answers.py</code></td>
+<td>Save, list, read, delete and run a person's own answers.</td>
 </tr>
 <tr>
 <td><a href="dashboards/">Dashboards</a></td>

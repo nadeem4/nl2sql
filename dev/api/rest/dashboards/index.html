@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../knowledge/">
+        <link rel="prev" href="../answers/">
       
       
         <link rel="next" href="../jobs/">
@@ -5395,6 +5395,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saved answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -5473,6 +5501,17 @@
     <span class="md-ellipsis">
       
         Generate a starter dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-a-dashboard-from-chosen-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build a dashboard from chosen tiles
       
     </span>
   </a>
@@ -6261,6 +6300,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#build-a-dashboard-from-chosen-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build a dashboard from chosen tiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#starter-questions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6399,6 +6449,33 @@ only the tables and columns the caller can read are charted. <code>progress</cod
 can be cancelled between charts, and <code>result</code> is <code>{dashboard, run}</code>: the saved <code>Dashboard</code> and its first
 <code>DashboardRun</code>. Any caller may start one, and the dashboard is theirs. No index is a <code>422</code> <code>NOT_INDEXED</code> and a
 datasource with nothing to chart a <code>422</code> <code>NO_TILES</code>, both as the job's <code>error</code>.</p>
+<h2 id="build-a-dashboard-from-chosen-tiles">Build a dashboard from chosen tiles</h2>
+<p>The guided builder is three calls. None runs a tile; the job does.</p>
+<p><code>GET /api/v1/dashboard-builder/options?datasource_id=chinook</code> returns what the caller may tick, with no model call:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span><span class="nt">"curated"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"v_revenue"</span><span class="p">,</span><span class="w"> </span><span class="nt">"question"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Revenue by month?"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">}],</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w"> </span><span class="nt">"saved"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"question"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Top countries?"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">}],</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w"> </span><span class="nt">"metrics"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"term"</span><span class="p">:</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"chinook.main.invoices.total"</span><span class="p">],</span><span class="w"> </span><span class="nt">"definition"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}],</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w"> </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"label"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Country"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook.main.customers.country"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">}],</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w"> </span><span class="nt">"time_columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"label"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Invoice date"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook.main.invoices.date"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invoices"</span><span class="p">}],</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w"> </span><span class="nt">"ranges"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"last_30_days"</span><span class="p">,</span><span class="w"> </span><span class="nt">"label"</span><span class="p">:</span><span class="w"> </span><span class="s2">"last 30 days"</span><span class="p">}]}</span>
+</code></pre></div>
+<p><code>POST /api/v1/dashboard-builder/proposals</code> takes the chips and returns the tiles to tick (a <code>200</code> list of
+<code>TileProposal</code>: <code>source</code>, <code>ref</code>, <code>question</code>, <code>title</code>, <code>chart</code>, <code>ticked</code>). Only <code>datasource_id</code> and <code>sources</code> (one or
+more of <code>curated</code>, <code>saved</code>, <code>asked</code>) are required; the rest default to empty:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"curated"</span><span class="p">,</span><span class="w"> </span><span class="s2">"saved"</span><span class="p">,</span><span class="w"> </span><span class="s2">"asked"</span><span class="p">],</span><span class="w"> </span><span class="nt">"curated_ids"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"v_revenue"</span><span class="p">],</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w"> </span><span class="nt">"saved_ids"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"a1"</span><span class="p">],</span><span class="w"> </span><span class="nt">"metrics"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"revenue"</span><span class="p">],</span><span class="w"> </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"chinook.main.customers.country"</span><span class="p">],</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w"> </span><span class="nt">"time_range"</span><span class="p">:</span><span class="w"> </span><span class="s2">"last_30_days"</span><span class="p">,</span><span class="w"> </span><span class="nt">"text"</span><span class="p">:</span><span class="w"> </span><span class="s2">"by country"</span><span class="p">}</span>
+</code></pre></div>
+<p>Curated and saved ids become tiles with no model call. <code>asked</code> makes one model call and needs a key: the server's, or
+one sent in headers as for <code>POST /query</code>; without one it is a <code>422</code> <code>MISSING_PROVIDER_KEY</code>, and the hosted keyless demo
+refuses it the same way. Nothing is saved.</p>
+<p><code>POST /api/v1/jobs/dashboard-build</code> is a <a href="../jobs/">job</a> (<code>202</code>, the queued <code>Job</code>). Body: <code>datasource_id</code> and <code>tiles</code>
+(the reviewed <code>TileProposal</code> list, unticked ones may be left out) are required; <code>title</code>, <code>workspace_id</code> and
+<code>time_column</code> (from the options; adds a date filter) are optional. <code>progress</code> has one step per tile (<code>tile 2 of 5</code>),
+the job can be cancelled between tiles (nothing is saved), and <code>result</code> is a <code>BuildReport</code>: <code>{dashboard, built,
+skipped}</code>, where <code>skipped</code> lists <code>{question, code, message}</code> for tiles that could not be built. A tile limit
+overflow is a <code>422</code> <code>INVALID_ARGUMENT</code>, and nothing buildable a <code>NO_TILES</code> error, both as the job's <code>error</code>. Only
+the owner reads the job's result. Request keys are passed to the build as to a question.</p>
 <h2 id="starter-questions">Starter questions</h2>
 <p><code>GET /api/v1/datasources/{id}/starter-questions?n=5</code> returns the questions of the first <code>n</code> charts the starter
 dashboard would build, as the caller may read the datasource, without running or saving anything. The list is empty
@@ -6450,7 +6527,7 @@ when the caller reaches no table; a datasource with no index (or one the caller 
 </tr>
 <tr>
 <td><code>422</code></td>
-<td><code>NOT_PINNABLE</code>, <code>CHART_NOT_SUPPORTED</code>, <code>UNKNOWN_TILE</code>, <code>UNKNOWN_FILTER</code>, <code>SCHEDULE_TOO_FREQUENT</code>, <code>WORKSPACE_NOT_EMPTY</code>, <code>NOT_INDEXED</code>, <code>NO_TILES</code>, <code>INVALID_ARGUMENT</code>, or <code>INVALID_REQUEST</code> for a body that does not validate.</td>
+<td><code>NOT_PINNABLE</code>, <code>CHART_NOT_SUPPORTED</code>, <code>UNKNOWN_TILE</code>, <code>UNKNOWN_FILTER</code>, <code>SCHEDULE_TOO_FREQUENT</code>, <code>WORKSPACE_NOT_EMPTY</code>, <code>NOT_INDEXED</code>, <code>NO_TILES</code>, <code>MISSING_PROVIDER_KEY</code>, <code>INVALID_ARGUMENT</code>, or <code>INVALID_REQUEST</code> for a body that does not validate.</td>
 </tr>
 </tbody>
 </table>

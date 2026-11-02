@@ -5594,6 +5594,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../rest/answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saved answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../rest/dashboards/" class="md-nav__link">
         
   
@@ -6882,7 +6910,7 @@ interface (<code>Scorer</code>, <code>Score</code>, <code>CaseRun</code>), and r
 <code>DatasourceKnowledgeView</code>, <code>Proposal</code>, <code>AcceptReport</code>, <code>ReviewError</code>,
 <code>ProfileReport</code>, <code>ClarificationRequest</code>, <code>ClarificationOption</code>,
 <code>ClarificationChoice</code>, <code>Explanation</code>, <code>ExplainedStep</code>, <code>TermUse</code>), and the saved answers (<code>SavedAnswer</code>,
-<code>SaveReport</code>, <code>AnswerNotFound</code>, <code>AnswerLimitReached</code>, <code>NotSavable</code>). The list is fixed by
+<code>SaveReport</code>, <code>AnswerNotFound</code>, <code>AnswerLimitReached</code>, <code>NotSavable</code>), and <code>LockHeld</code> (a retryable "busy, try again"). The list is fixed by
 <code>tests/unit/test_public_surface.py</code>: adding or removing a name is a semver
 decision. The REST API (<code>nl2sql-api</code>) is held to importing only from <code>nl2sql</code>
 by an architecture test.</p>

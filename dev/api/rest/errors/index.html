@@ -5398,6 +5398,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saved answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../dashboards/" class="md-nav__link">
         
   
@@ -6262,6 +6290,7 @@
 <ul>
 <li>An <code>NL2SQLError</code> (the base of every named facade exception) is answered with its own <code>status</code> and <code>code</code>:
   for example <code>NotAuthorized</code> 403, <code>ApprovalNotFound</code> 404, <code>DashboardBusy</code> 409, <code>InvalidArgument</code> 422.</li>
+<li><code>LockHeld</code> (another save or run holds the same lease; it is not an <code>NL2SQLError</code>) is <code>409</code> <code>CONFLICT</code>, and the caller may retry.</li>
 <li>A route or dependency that refuses on its own raises <code>RequestRefused(status, code, message, fix=..., details=...)</code>,
   with a message it wrote.</li>
 <li>A body or parameter that does not validate is <code>422</code> <code>INVALID_REQUEST</code> with <code>details</code>.</li>
