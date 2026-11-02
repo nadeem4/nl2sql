@@ -15,8 +15,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from nl2sql.cli.common.engine import config_option
-from nl2sql.llm.providers import KEYED_PROVIDERS, api_key_from_env, env_var_for_provider
-from nl2sql.llm.wires.anthropic import EXTRA_HINT as ANTHROPIC_EXTRA_HINT
+from nl2sql import ANTHROPIC_EXTRA_HINT, KEYED_PROVIDERS, api_key_from_env, env_var_for_provider
 from nl2sql.cli.console import console, print_success, print_error
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
 from nl2sql.cli.checks import check_package

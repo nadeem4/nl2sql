@@ -1,9 +1,9 @@
 """The CLI's one config: the global ``--config``, and the engine every command builds from it.
 
 ``nl2sql --config prod/nl2sql.yaml <command>``. Without the flag,
-``NL2SQL_CONFIG``, then ``./nl2sql.yaml`` (``nl2sql.config.load_config``). The
+``NL2SQL_CONFIG``, then ``./nl2sql.yaml`` (``nl2sql.load_config``). The
 app callback keeps the flag in ``ctx.obj`` and loads the ``.env`` next to the
-file (``nl2sql.config.load_env_file``), never overriding a variable already
+file (``nl2sql.load_env_file``), never overriding a variable already
 set. See docs/architecture/configuration_v2.md, section 10.
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from nl2sql.cli.console import console
 
 if TYPE_CHECKING:
     from nl2sql import NL2SQL
-    from nl2sql.config import Config
+    from nl2sql import Config
 
 
 def config_option(ctx: typer.Context) -> Optional[Path]:
@@ -34,7 +34,7 @@ def _fail(error: Exception) -> None:
 
 def load_project_config(ctx: typer.Context) -> "Config":
     """The ``Config`` the command line names. A problem is printed and exits 1."""
-    from nl2sql.config import ConfigError, load_config
+    from nl2sql import ConfigError, load_config
 
     try:
         return load_config(config_option(ctx))

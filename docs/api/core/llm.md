@@ -122,6 +122,10 @@ engine.llm.providers()[0]
 (from its prefix), and `nl2sql.provider_keys_in_environment() -> dict[str, str]`
 maps each keyed provider whose variable is set to its key (print only a masked
 form). Both are top-level exports, so an app never imports `nl2sql.llm.providers`.
+So are the stateless facts a command-line tool prints before any engine exists:
+`nl2sql.KEYED_PROVIDERS` (the providers that read a key), `nl2sql.env_var_for_provider(provider)`,
+`nl2sql.api_key_from_env(provider)` (the key, or None; print it masked) and
+`nl2sql.ANTHROPIC_EXTRA_HINT` (what to install when `langchain-anthropic` is missing).
 
 ### llm.prices
 

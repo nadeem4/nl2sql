@@ -1,6 +1,6 @@
 """``nl2sql config check [--connect]``: the whole config, checked without starting the engine.
 
-The checking is ``nl2sql.config.check.check_config``; this prints its result:
+The checking is ``nl2sql.check_config``; this prints its result:
 the problems grouped by file, every secret as present or missing (never its
 value), and with ``--connect`` each datasource's status. Exit code 0 means no
 problems and 1 means problems; a usage error is 2. See
@@ -27,7 +27,7 @@ def check(
     """
     Check the whole config without starting the engine: files, includes, ${env:...}, and every component it names.
     """
-    from nl2sql.config.check import check_config
+    from nl2sql import check_config
 
     report = check_config(config_option(ctx), connect=connect)
 

@@ -1518,6 +1518,22 @@ stay in chat). A job's `result` is the owner's alone: `Jobs.get`, `list`, `cance
 
 **A4a (evals, settings, API keys, `/ready`, `/meta`).** `routes/evals.py` (`GET /evals/suites`, `/evals/scorers`; admin), `routes/settings.py` (`GET /llm`, `/llm/providers`, `PUT /settings/llm`, `/api-keys` list, create `201` and revoke `204`, `GET /events/catalog`) and the `health` router's `/ready` and `/meta`; `POST /jobs/eval` and `POST /jobs/demo` in `routes/jobs.py` (both admin; `DemoJob` has no fields). 86 routes. **Code wins over the doc:** `routes/llm.py`, `services/` and `GET /llm/{agent}` are gone (the list holds every agent); `POST /jobs/eval` takes only suites named in `evals.suites` (by file or name, else `422`), and `mode: full` needs `max_cost_usd` or `evals.max_cost_usd` (else `422`); `/ready` answers `{"status"}` (not the old `{success, data, message}`), `200` or `503`, cached 10 s, with `problems` for an admin; the API now starts when a required datasource fails (the lifespan logs `EngineNotReady` instead of closing the engine), and `/ready` says so; the api-key routes never echo a built-in exception's text (B200), so a bad role is a fixed `422` message. New: `identity.optional_caller` (None for a visitor; it calls `caller` itself, so a test override of `identity.caller` does not reach it: tests use a real `api.auth` config), `engine.llm.recorded_with()`, `EventInfo` exported from `nl2sql`, and `Config.section_file_hash(label)` / `record_section_file(label, sha256)`. **Engine fix (G2b review):** `add_demo` checks every file's hash first (`FILE_CHANGED`), appends text so comments stay, never writes a second `curated:` key and adds nothing on a stale engine; `POST /jobs/demo` passes the caller's `user_context`. **Left to later rows:** `start` in `/meta` (W4b), the hosted limits (A4b) and a `cancellation_token` on `add_demo` (a demo job stops only between jobs). **For A4b / W4a:** `GET /meta` with a caller is `{mode, auth, request_llm, datasources: [{id, description, sample_questions, recorded}], recorded_with}`; golden files `JobEval.json` and `Meta.json` are in `nl2sql-ui/src/api/fixtures/`.
 
+**CL0a (CLI on the facade: config and init).** The whole CLI is now held to the top-level `nl2sql` by
+`test_the_cli_imports_only_the_public_nl2sql` (`nl2sql.cli.*` and nothing of the engine; `nl2sql_sdk` is forbidden),
+with the named list `CLI_FILES_STILL_IMPORTING_INSIDE` in `test_boundaries.py` for CL0b: `commands/demo.py`, `eval.py`,
+`info.py`, `knowledge.py`, `launch.py`, `mcp.py`, `profile.py`, `trace.py`, `common/decorators.py` and
+`demo/llm_config.py`. The test also fails on a listed file that no longer needs its entry, so CL0b deletes entries as it
+goes and then the list and the playground carve-out. `config_check.py`, `init.py`, `doctor.py`, `common/engine.py` and
+`main.py` now import only `nl2sql`; `cli/config.py` and `install.py` imported nothing from the engine already. New
+top-level exports (the code on main wins over the plan: `engine.llm.providers()` and `engine.check` need an engine, and
+`config check`, `init` and `doctor` run before one exists, so the stateless helpers are exported instead):
+`check_config` (from `nl2sql.config.check`), `KEYED_PROVIDERS`, `api_key_from_env`, `env_var_for_provider` and
+`ANTHROPIC_EXTRA_HINT` (an alias of the anthropic wire's `EXTRA_HINT`, in `llm/providers.py`). `init_project`,
+`load_config`, `load_env_file`, `configure_logging`, `Config` and `ConfigError` were exported already. For CL0b: launch.py's
+`default_llm`, `starter_config`, `write_env_values`, `write_project`, `check_file_name`, `Policies`-loading in `mcp.py`,
+`looks_like_api_key`/`KEY_SHAPE_MESSAGE` and the `nl2sql.mcp` start are the names still to expose. The `STILL_IMPORTED_FROM_INSIDE`
+list is unchanged (the playground and `demo.py`, X1b).
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below
