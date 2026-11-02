@@ -1,6 +1,7 @@
 """The hosted demo: anonymous sessions, limits, one job and two streams per session (D221, "The hosted demo")."""
 import asyncio
 import json
+import os
 import re
 import threading
 from types import SimpleNamespace
@@ -14,7 +15,7 @@ from nl2sql import UserContext
 from nl2sql.testing.config import make_config
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
-from nl2sql_api.hosted import MAX_VISITORS, SESSION_COOKIE, Hosted, HostedMiddleware, Limits
+from nl2sql_api.hosted import SESSION_COOKIE, Hosted, HostedMiddleware, Limits, load_session_key
 from nl2sql_api.jobs import IndexJob, Jobs
 from nl2sql_api.main import create_app
 from nl2sql_api.routes import web
@@ -55,7 +56,7 @@ def test_hosted_session_cookie_is_nl2sql_demo_session(make):
     cookie = client.get("/api/v1/health").headers["set-cookie"]
     assert cookie.startswith(f"{SESSION_COOKIE}=") and "HttpOnly" in cookie and "samesite=lax" in cookie.lower()
     token = client.cookies[SESSION_COOKIE]
-    assert re.fullmatch(r"[0-9a-f]{32}", token)  # 128 random bits
+    assert re.fullmatch(r"[0-9a-f]{64}", token)  # a 128-bit nonce and its 128-bit signature
     assert "set-cookie" not in client.get("/api/v1/health").headers  # kept, not minted again
 
 
@@ -334,30 +335,60 @@ def test_a_refused_job_start_gives_its_slot_back():
 def test_a_self_chosen_cookie_of_the_right_form_is_replaced(make):
     """Session fixation: a visitor (or a page that plants a cookie) cannot pick the token it will be known by."""
     _, client = make()
-    chosen = "a" * 32
+    chosen = "a" * 64
     response = client.get("/api/v1/meta", headers={"Cookie": f"{SESSION_COOKIE}={chosen}"})
     minted = re.search(rf"{SESSION_COOKIE}=([^;]+)", response.headers["set-cookie"]).group(1)
 
-    assert minted != chosen and re.fullmatch(r"[0-9a-f]{32}", minted)
+    assert minted != chosen and re.fullmatch(r"[0-9a-f]{64}", minted)
     assert response.json()["caller"]["user_id"] == Hosted.visitor_id(minted) != Hosted.visitor_id(chosen)
 
 
-def test_a_token_this_server_minted_is_recognised_until_it_is_forgotten():
-    hosted = Hosted(role="viewer")
+def test_a_token_this_server_signed_is_recognised_and_a_forged_or_tampered_one_is_not():
+    hosted = Hosted(role="viewer", key=b"k" * 32)
     token = hosted.mint()
+    flipped = token[:-1] + ("0" if token[-1] != "0" else "1")
 
-    assert re.fullmatch(r"[0-9a-f]{32}", token) and hosted.knows(token) and not hosted.knows("a" * 32)
-    for _ in range(MAX_VISITORS):
-        hosted.mint()
-    assert not hosted.knows(token)  # the oldest is dropped, like any idle visitor: the store stays bounded
+    assert re.fullmatch(r"[0-9a-f]{64}", token) and hosted.knows(token) and hosted.mint() != token
+    assert not hosted.knows("a" * 64) and not hosted.knows(flipped) and not hosted.knows(token[:32] + "0" * 32)
+    assert not hosted.knows("") and not Hosted(role="viewer", key=b"o" * 32).knows(token)  # another key signs differently
 
 
-@pytest.mark.parametrize("value", ["A" * 32, "a" * 31, "a" * 33, "g" * 32])
+def test_a_flood_of_cookieless_requests_cannot_invalidate_a_visitor(make):
+    app, client = make()
+    client.get("/api/v1/health")
+    token = client.cookies[SESSION_COOKIE]
+    before = client.get("/api/v1/meta").json()["caller"]["user_id"]
+    for _ in range(5100):
+        app.state.hosted.mint()  # what that many visitors with no cookie cost: nothing is stored
+
+    assert "set-cookie" not in client.get("/api/v1/meta").headers
+    assert client.get("/api/v1/meta").json()["caller"]["user_id"] == before == Hosted.visitor_id(token)
+
+
+def test_the_session_key_is_made_once_and_kept_so_a_restart_keeps_every_visitor(tmp_path):
+    key = load_session_key(tmp_path)
+    first = Hosted(role="viewer", key=key)
+    token = first.mint()
+
+    assert len(key) == 32 and load_session_key(tmp_path) == key
+    assert Hosted(role="viewer", key=load_session_key(tmp_path)).knows(token)  # the server restarted
+    assert [p.name for p in tmp_path.iterdir()] == ["hosted_session.key"]
+    if os.name == "posix":
+        assert (tmp_path / "hosted_session.key").stat().st_mode & 0o777 == 0o600
+
+
+def test_without_a_key_a_server_makes_its_own_and_forgets_it_on_restart():
+    token = Hosted(role="viewer").mint()
+
+    assert not Hosted(role="viewer").knows(token)
+
+
+@pytest.mark.parametrize("value", ["A" * 64, "a" * 63, "a" * 65, "g" * 64])
 def test_only_the_cookie_this_server_mints_is_accepted(make, value):
     _, client = make()
     response = client.get("/api/v1/health", headers={"Cookie": f"{SESSION_COOKIE}={value}"})
     minted = re.search(rf"{SESSION_COOKIE}=([^;]+)", response.headers["set-cookie"]).group(1)
-    assert re.fullmatch(r"[0-9a-f]{32}", minted) and minted != value
+    assert re.fullmatch(r"[0-9a-f]{64}", minted) and minted != value
 
 
 def test_the_session_cookie_is_secure_over_https_only(make):

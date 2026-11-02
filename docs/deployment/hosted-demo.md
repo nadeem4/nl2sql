@@ -252,9 +252,9 @@ In hosted mode every browser is an anonymous session: a random `nl2sql_demo_sess
 (`visitor-` and 32 hex characters of its SHA-256), and that id is the `user_id` of everything the visitor owns
 (conversations, dashboards, jobs, approvals), the key of the limits below, and what `GET /meta` shows as `caller.user_id`.
 The visitor holds the one visitor role and is never an admin, so the admin routes answer
-`403`. Only a token this process minted is accepted as the cookie (it remembers the ids of the last 5,000; a token of the
-right form that it did not mint, such as one a visitor chose, gets a new session, so no one can fix the token another
-browser will use), and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
+`403`. Only a token this server signed is accepted as the cookie (64 hex characters: a random nonce and its HMAC-SHA256;
+nothing is stored per visitor, so no number of requests can push a visitor out). A cookie it did not sign, such as one
+a visitor chose or changed, gets a new session, so no one can fix the token another browser will use, and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
 at a time, besides the limits below; going over any of them
 is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
@@ -300,10 +300,18 @@ stops still counts toward both limits. Stopping does end the work: the page
 aborts its request, the server sees the connection close and cancels the run
 before its next step or model call (the call already in flight finishes).
 
-The session cookie is a random token this process made up. It carries no key and names no one; it is the visitor's
+The session cookie is a random token this server signed. It carries no key and names no one; it is the visitor's
 only credential, so it appears in no response body, stored record or log line (only the id derived from it does). A
 visitor who clears their cookies starts a new session; the rate limit, keyed by the
 address the client reports, is what holds an honest browser's pace down in the meantime.
+
+**Restarts and workers.** The signing key is made once, as `hosted_session.key` (32 random bytes, mode 0600 where the
+OS supports it), in the storage directory (`storage.path`), beside the state store whose conversations, dashboards and
+approvals also survive a restart. So a restart or a redeploy on the same volume keeps every visitor's cookie, and with it
+their work. Jobs and the limits' counters are in memory and start again. Several workers sharing that directory share the
+key, so a cookie one signed is valid at all of them (the limits and job slots are still counted per worker). On a
+volume that is wiped, the key is made again and every visitor starts a new session. The key is never read from the
+environment and is not part of any response or log.
 
 ## What is off, and what is on
 

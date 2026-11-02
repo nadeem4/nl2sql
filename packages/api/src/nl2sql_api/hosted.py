@@ -2,8 +2,10 @@
 
 ``nl2sql-api serve --demo --hosted`` is a public server where nobody is trusted and nothing is kept for long:
 
-* **Identity.** Every browser is an anonymous session: a random 128-bit token in the ``HttpOnly`` cookie
-  :data:`SESSION_COOKIE`. The token is a secret, so it only finds the session: the middleware turns it into a one-way
+* **Identity.** Every browser is an anonymous session: a random token in the ``HttpOnly`` cookie
+  :data:`SESSION_COOKIE` (a 128-bit nonce and its HMAC under a key kept in the storage directory, so nothing is stored
+  per visitor, a token the server did not sign is replaced, and a restart keeps every cookie valid). The token is a
+  secret, so it only finds the session: the middleware turns it into a one-way
   visitor id (:meth:`Hosted.visitor_id`) and everything after that (the ``user_id`` with one non-admin role, the
   limits, the job and stream caps, every owner the engine stores) uses the id, never the token. It is not a value of
   ``api.auth``:
@@ -18,13 +20,15 @@
 State is in this process's memory only; a visitor who has been idle for an hour is forgotten.
 """
 import hashlib
+import hmac
 import math
+import os
 import re
 import secrets
 import threading
 import time
-from collections import OrderedDict
 from http.cookies import SimpleCookie
+from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional
 
 from starlette.responses import JSONResponse
@@ -111,11 +115,11 @@ class Limits:
 class Hosted:
     """Hosted mode's state: the role every visitor holds, the limits, and the streams each visitor has open."""
 
-    def __init__(self, role: Optional[str], limits: Optional[Limits] = None) -> None:
+    def __init__(self, role: Optional[str], limits: Optional[Limits] = None, key: Optional[bytes] = None) -> None:
         self.role = role
+        self._key = key or secrets.token_bytes(32)  # without one, tokens last only as long as this process
         self.limits = limits or Limits()
         self._streams: Dict[str, int] = {}
-        self._minted: "OrderedDict[str, None]" = OrderedDict()  # ids of the tokens this process made, oldest first
         self._starting: set = set()  # visitors whose job start is being handled: the slot a parallel start cannot take
         self._lock = threading.Lock()
 
@@ -128,20 +132,21 @@ class Hosted:
         return "visitor-" + hashlib.sha256(b"nl2sql-hosted-visitor:" + token.encode()).hexdigest()[:32]
 
     def mint(self) -> str:
-        """A new session token, remembered (as its visitor id, never the token) so :meth:`knows` can recognise it. The
-        store holds :data:`MAX_VISITORS`; the oldest is forgotten first, and its holder gets a new session."""
-        token = secrets.token_hex(16)
-        with self._lock:
-            self._minted[self.visitor_id(token)] = None
-            while len(self._minted) > MAX_VISITORS:
-                self._minted.popitem(last=False)
-        return token
+        """A new session token: a random 128-bit nonce and its HMAC-SHA256 under the server's key (cut to 128 bits),
+        64 hex characters. Nothing is stored, so no number of visitors can push another out."""
+        nonce = secrets.token_bytes(16)
+        return nonce.hex() + self._sign(nonce).hex()
 
     def knows(self, token: str) -> bool:
-        """Whether this process minted ``token``. A cookie of the right form that it did not mint is no session: a
-        visitor cannot choose the token it will be known by (session fixation)."""
-        with self._lock:
-            return _MINTED.fullmatch(token) is not None and self.visitor_id(token) in self._minted
+        """Whether this server signed ``token``. A cookie of the right form that it did not sign (one a visitor chose,
+        or tampered with) is no session: a visitor cannot choose the token it will be known by (session fixation)."""
+        if not _MINTED.fullmatch(token):
+            return False
+        nonce, signature = bytes.fromhex(token[:32]), bytes.fromhex(token[32:])
+        return hmac.compare_digest(signature, self._sign(nonce))
+
+    def _sign(self, nonce: bytes) -> bytes:
+        return hmac.new(self._key, nonce, hashlib.sha256).digest()[:16]
 
     def user(self, visitor: str, tenant_id: Optional[str] = None) -> UserContext:
         """The visitor with id ``visitor`` (from :meth:`visitor_id`): anonymous, with the one role, never an admin."""
@@ -190,7 +195,7 @@ _SPENDS = re.compile(r"^/api/v1/(query(/stream)?|conversations/[^/]+/(turns(/str
 _STREAMS_POST = re.compile(r"^/api/v1/(query/stream|conversations/[^/]+/turns/stream)$")
 _STREAMS_GET = re.compile(r"^/api/v1/jobs/[^/]+/events$")
 _JOB_START = re.compile(r"^/api/v1/jobs/[^/]+$")
-_MINTED = re.compile(r"[0-9a-f]{32}", re.ASCII)  # what secrets.token_hex(16) makes
+_MINTED = re.compile(r"[0-9a-f]{64}", re.ASCII)  # what Hosted.mint makes: nonce and signature
 
 
 def _address(scope: Scope) -> str:
@@ -213,6 +218,30 @@ def _https(scope: Scope) -> bool:
         if name == b"x-forwarded-proto":
             return value.decode("latin-1").split(",")[0].strip().lower() == "https"
     return False
+
+
+KEY_FILE = "hosted_session.key"
+
+
+def load_session_key(directory: Path) -> bytes:
+    """The key that signs session tokens, read from ``directory`` or made there on first use (32 random bytes,
+    readable by the owner only where the OS supports it). It lives beside the engine's own state, which survives a
+    restart, so a restart keeps every visitor's cookie valid; a key made per process would orphan their work. Never
+    read from the environment."""
+    path = Path(directory) / KEY_FILE
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp = path.with_name(f"{KEY_FILE}.{secrets.token_hex(4)}")
+        descriptor = os.open(temp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(descriptor, "wb") as made:
+            made.write(secrets.token_bytes(32))
+        try:
+            os.link(temp, path)  # whole or not at all, and the first of several workers to start wins
+        except FileExistsError:
+            pass
+        finally:
+            os.unlink(temp)
+    return path.read_bytes()
 
 
 def _cookie(scope: Scope) -> str:
