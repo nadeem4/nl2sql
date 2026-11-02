@@ -135,9 +135,10 @@ Two things can still give a table away, and are the operator's to manage:
 
 ## In Python
 
-`nl2sql.mcp.server.build_server(engine, identity)` returns the server (a
-`FastMCP`); `nl2sql mcp` builds the engine and calls
-`build_server(engine, identity).run("stdio")`. `identity` is a `UserContext`,
+`engine.serve_mcp(identity)` serves the engine over stdio until the client closes the
+stream; `nl2sql mcp` builds the engine and calls it. Over stdio `identity` is required (a
+`ValueError` otherwise). `nl2sql.mcp.server.build_server(engine, identity)` returns the server (a
+`FastMCP`) if you need to run it yourself. `identity` is a `UserContext`,
 or a function returning one that is called on every tool call, inside the
 tool's guard: a function that raises gives `INTERNAL_ERROR`, never its
 exception's text. The engine stays yours to close.
@@ -148,16 +149,16 @@ is built, so neither can change it.
 
 ```python
 from nl2sql import NL2SQL, UserContext
-from nl2sql.mcp.server import build_server
 
 with NL2SQL.from_config("nl2sql.yaml") as engine:
-    build_server(engine, UserContext(roles=["analyst"])).run("stdio")
+    engine.serve_mcp(UserContext(roles=["analyst"]))
 ```
 
-For HTTP, `build_server(engine, identity, over_http=True)` sets the server up for
+For HTTP, `engine.serve_mcp(None, http=True)` runs it with Uvicorn (`host` and `port` override
+`mcp.http`). `identity` is only used with `mcp.auth: none`. To build the app yourself,
+`build_server(engine, identity, over_http=True)` sets the server up for
 `streamable_http_app()`, and `nl2sql.mcp.http.build_app(engine, identity)` wraps it in the key
-check; `nl2sql.mcp.http.serve(engine, identity)` runs it with Uvicorn. `identity` is only used
-with `mcp.auth: none`.
+check.
 
 ## Over HTTP
 

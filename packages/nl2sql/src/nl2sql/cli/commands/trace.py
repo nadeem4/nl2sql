@@ -12,7 +12,7 @@ from typing_extensions import Annotated
 
 from nl2sql.cli.console import console
 from nl2sql.cli.common.engine import build_engine
-from nl2sql.tracing.document import load_trace
+from nl2sql import load_trace
 
 app = typer.Typer(help="Inspect and replay run traces.", no_args_is_help=True)
 

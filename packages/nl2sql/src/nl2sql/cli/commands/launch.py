@@ -31,7 +31,8 @@ from nl2sql.cli.commands.knowledge import caller
 from nl2sql.cli.commands.profile import profile_datasources
 from nl2sql.cli.commands.review import _print_report
 from nl2sql.cli.console import console
-from nl2sql.llm.providers import KEYED_PROVIDERS, KEY_SHAPE_MESSAGE, api_key_from_env, env_var_for_provider, looks_like_api_key
+from nl2sql import (KEYED_PROVIDERS, KEY_SHAPE_MESSAGE, api_key_from_env, env_var_for_provider,
+                    looks_like_api_key)
 
 if TYPE_CHECKING:
     from nl2sql import NL2SQL, DatasourceType, UserContext
@@ -146,7 +147,7 @@ def _ask(key: str, spec: Dict[str, Any], current: Any, required: bool = True) ->
 
 
 def _datasource_id(engine: "NL2SQL", type_name: str, connection: Dict[str, Any]) -> str:
-    from nl2sql.config.writer import check_file_name
+    from nl2sql import check_file_name
 
     database = str(connection.get("database") or "")
     stem = pathlib.Path(database).stem if database and ("." in pathlib.Path(database).name) else database
@@ -220,8 +221,7 @@ def _model_key(provider: Optional[str]) -> Optional[str]:
 
 def _write(engine: "NL2SQL", folder: pathlib.Path, config_path: pathlib.Path, datasource, provider: str,
            key: Optional[str], admin: "UserContext", exists: bool) -> None:
-    from nl2sql import ConfigError, ReviewError
-    from nl2sql.config import default_llm, starter_config, write_env_values, write_project
+    from nl2sql import ConfigError, ReviewError, default_llm, starter_config, write_env_values, write_project
 
     try:
         if exists:
@@ -351,8 +351,7 @@ def launch_command(
     no_ports: Annotated[bool, typer.Option("--no-ports", help="Do not look for databases on local ports")] = False,
 ) -> None:
     """Find a database, connect it, index it, and look at what was found."""
-    from nl2sql import NL2SQL, ConfigError, load_env_file
-    from nl2sql.config import default_llm, starter_config
+    from nl2sql import NL2SQL, ConfigError, default_llm, load_env_file, starter_config
 
     folder = directory
     config_path = folder / "nl2sql.yaml"

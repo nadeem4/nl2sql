@@ -464,7 +464,7 @@ def test_publish_replaces_only_the_readme_block_and_never_touches_a_record(tmp_p
     readme = tmp_path / "README.md"
     readme.write_text(f"# Title\n\nbefore\n{records.START}\nold\n{records.END}\nafter\n", encoding="utf-8")
     history = tmp_path / "docs" / "benchmarks.md"
-    assert records.publish(tmp_path / "benchmarks", history, readme) == 2
+    assert records.publish_records(tmp_path / "benchmarks", history, readme) == 2
     text = readme.read_text(encoding="utf-8")
     assert text.startswith("# Title\n\nbefore\n") and text.endswith("after\n") and "\nold\n" not in text
     assert "mini" in text and history.read_text(encoding="utf-8").startswith("# Benchmark Results")

@@ -203,7 +203,7 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
     A folder written by an older engine is used as it is, with a warning:
     demo folders are never upgraded in place.
     """
-    from nl2sql.config import init_project
+    from nl2sql import init_project
 
     directory.mkdir(parents=True, exist_ok=True)
     config_path = directory / "nl2sql.yaml"

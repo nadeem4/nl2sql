@@ -232,3 +232,17 @@ def test_public_bind_without_keys_refuses_to_start(tmp_path, monkeypatch, served
     assert result.exit_code == 1
     assert "auth: api_keys" in result.stderr and "0.0.0.0" in result.stderr
     assert served_http[1:] == [], "nothing was served"
+
+
+def test_mcp_without_the_extra_says_so_before_building_the_engine(project, served, monkeypatch):
+    import importlib.util
+
+    project(default_role="analyst")
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None if name == "mcp" else real(name, *a))
+    monkeypatch.setattr("nl2sql.NL2SQL", lambda *a, **k: pytest.fail("the engine is built after the extra is found"))
+
+    result = runner.invoke(app, ["mcp"])
+
+    assert result.exit_code == 1
+    assert "nl2sql-engine[mcp]" in result.stderr and served == []

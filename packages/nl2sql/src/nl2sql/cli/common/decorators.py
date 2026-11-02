@@ -5,7 +5,7 @@ import traceback
 import click
 from rich.console import Console
 from rich.markup import escape
-from nl2sql.common.exceptions import NL2SQLError
+from nl2sql import NL2SQLError
 
 console = Console()
 

@@ -18,8 +18,7 @@ from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
 
 if TYPE_CHECKING:
-    from nl2sql import NL2SQL, UserContext
-    from nl2sql.profiler.models import ProfileReport
+    from nl2sql import NL2SQL, UserContext, ProfileReport
 
 def print_reports(engine: "NL2SQL", who: "UserContext", reports: List["ProfileReport"]) -> None:
     """Each report, then the open proposals of the profiled datasources that the profiler filed."""
