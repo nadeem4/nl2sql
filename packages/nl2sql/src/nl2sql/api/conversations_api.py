@@ -67,9 +67,11 @@ class ConversationsAPI:
         return self._service.tool(conversation_id, name, args, user_context=user_context)
 
     def ask_only(self, conversation_id: str, question: str, *, user_context: UserContext,
-                 choice: Optional[str] = None) -> "QueryResult":
-        """Runs only the ``ask`` tool, stored as a turn of kind ``tool``, with no model call of its own."""
-        return self._service.ask_only(conversation_id, question, user_context=user_context, choice=choice)
+                 choice: Optional[str] = None, cancellation_token: Optional["CancellationToken"] = None) -> "QueryResult":
+        """Runs only the ``ask`` tool, stored as a turn of kind ``tool``, with no model call of its own. A cancelled
+        ``cancellation_token`` stops the run at its next step."""
+        return self._service.ask_only(conversation_id, question, user_context=user_context, choice=choice,
+                                      cancellation_token=cancellation_token)
 
     def report(self, conversation_id: str, *, user_context: UserContext, turns: Optional[List[int]] = None,
                title: Optional[str] = None, include_rows: bool = True) -> str:

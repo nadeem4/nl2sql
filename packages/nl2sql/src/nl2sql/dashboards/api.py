@@ -20,7 +20,6 @@ from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import InvalidArgument, NoTiles, NotPinnable, UnknownTile, WorkspaceNotEmpty
 from nl2sql.conversations.models import Conversation
 from nl2sql.conversations.store import ConversationStore, Owner
-from nl2sql.dashboards.builder import Builder
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits, plan_from_step
 from nl2sql.dashboards import filters as filtering
 from nl2sql.dashboards.layout import arrange
@@ -55,7 +54,16 @@ class Dashboards:
         self._store = DashboardStore(ctx.state)
         self._workspaces = Workspaces(ctx, self._store)
         self._refresher = Refresher(ctx, self._store)
-        self.builder = Builder(ctx, self)  # the guided builder (DB1b)
+        self._builder: Any = None
+
+    @property
+    def builder(self) -> Any:
+        """The guided builder (DB1b), made on first use: a refresh or an edit never loads the model layer."""
+        if self._builder is None:
+            from nl2sql.dashboards.builder import Builder
+
+            self._builder = Builder(self._ctx, self)
+        return self._builder
 
     def _owner(self, user: UserContext) -> Owner:
         return owner_for(user, self._ctx.tenant_id)
@@ -152,7 +160,8 @@ class Dashboards:
                 last_run=lambda tile_id: self._store.last_run(dashboard_id, tile_id),
                 step=None if conversation is None else (lambda ref: plan_from_step(conversation, ref)),
                 check=lambda tile: self._check(tile, user_context),
-                verified=self._verified, saved=lambda answer_id: self._saved(answer_id, user_context))
+                verified=lambda ds, vid, params: self._verified(ds, vid, params, user_context),
+                saved=lambda answer_id: self._saved(answer_id, user_context))
             applied = apply_edits(dashboard, edits, env)  # raises before anything is stored: all or none
             saved = applied.dashboard.model_copy(update={"updated_at": now})
             # Results first: if the drop fails nothing was saved, and a lost result only costs a refresh, whereas a
@@ -162,11 +171,18 @@ class Dashboards:
         self._published(applied, saved, user_context)
         return saved
 
-    def _verified(self, datasource_id: str, verified_id: str, params: Dict[str, Any]) -> Tuple[str, ChartPlan]:
-        """The question and plan of a verified query, by id: the reviewed query itself, never SQL from anywhere else."""
+    def _verified(self, datasource_id: str, verified_id: str, params: Dict[str, Any],
+                  user: UserContext) -> Tuple[str, ChartPlan]:
+        """The question and plan of a verified query, by id: the reviewed query itself, never SQL from anywhere else.
+        Only a query ``curated.list`` shows this caller is found; any other id is 'no verified query', so the edit
+        cannot be used to learn what exists or what it reads."""
+        from nl2sql.api.curated_api import CuratedAPI
+
+        listed = {q.id for q in CuratedAPI(self._ctx).list(user_context=user, datasource_id=datasource_id)}
         curated = self._ctx.config.curated
         datasource = curated.datasources.get(datasource_id) if curated is not None else None
-        query = next((q for q in datasource.verified_queries if q.id == verified_id), None) if datasource else None
+        query = next((q for q in datasource.verified_queries if q.id == verified_id and q.id in listed),
+                     None) if datasource else None
         if query is None:
             raise InvalidArgument(f"There is no verified query '{verified_id}' for datasource '{datasource_id}'.")
         unknown = sorted(set(params) - set(query.params))
@@ -190,7 +206,8 @@ class Dashboards:
         run = self._refresher.check([tile], user)[tile.id]
         if run.status not in SERVES:
             why = (run.error or {}).get("message") or f"the check ended {run.status}"
-            raise InvalidArgument(f"The plan of the chart '{tile.title}' was refused ({why}). Nothing was saved.")
+            raise InvalidArgument(f"The plan of the chart '{tile.title}' was refused ({why}). Nothing was saved.",
+                                  code=(run.error or {}).get("code") or None)
 
     def rename(self, dashboard_id: str, title: str, *, user_context: UserContext) -> Dashboard:
         return self.edit(dashboard_id, [RenameDashboard(title=title)], user_context=user_context)

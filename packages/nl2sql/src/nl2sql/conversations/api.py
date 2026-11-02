@@ -178,7 +178,7 @@ class Conversations:
                             user_context=user_context, turns=turns, title=title, include_rows=include_rows)
 
     def ask_only(self, conversation_id: str, question: str, *, user_context: UserContext,
-                 choice: Optional[str] = None) -> QueryResult:
+                 choice: Optional[str] = None, cancellation_token: Optional[CancellationToken] = None) -> QueryResult:
         conversation = self.get(conversation_id, user_context=user_context)
         if choice is not None:
             self._pending_option(conversation, choice)
@@ -189,7 +189,7 @@ class Conversations:
             holder.append(run.results[-1])
             return self._finish(run)
 
-        self._turn(conversation_id, user_context, "tool", question, True, CancellationToken(), body)
+        self._turn(conversation_id, user_context, "tool", question, True, cancellation_token or CancellationToken(), body)
         return holder[0]
 
     def stream(self, conversation_id: str, text: Optional[str] = None, *, user_context: UserContext,
