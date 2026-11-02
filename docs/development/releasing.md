@@ -40,7 +40,7 @@ flowchart TD
 The same chain runs on every pull request up to the point of publishing: the
 `build` and `fresh-install` jobs in `test.yml` build the wheels, install them
 the way a user does and boot the demo, and the `api-image` job builds the GHCR
-image from `packages/api/Dockerfile` (without pushing it), so a release does
+image from the root `Dockerfile` (without pushing it), so a release does
 not meet these checks for the first time.
 
 ### 1. Commit messages decide the version
@@ -218,9 +218,9 @@ the release decision.
    what makes each PyPI trusted-publisher registration unique — see
    [PyPI pending publishers](#pypi-pending-publishers).
 3. **`ghcr`** — `needs: pypi`, which waits for every leg of the matrix. Builds
-   `packages/api/Dockerfile` and pushes `ghcr.io/nadeem4/nl2sql-api` at both the
+   the root `Dockerfile` and pushes `ghcr.io/nadeem4/nl2sql-api` at both the
    tag and `latest`. The build context is the **repository root** (`context: .`)
-   with the Dockerfile named explicitly (`file: packages/api/Dockerfile`),
+   with the Dockerfile named explicitly (`file: Dockerfile`),
    because the Dockerfile installs the three packages from their local sources
    and its `COPY ./packages/...` paths resolve against the build context. A
    context of `packages/api` makes them resolve to

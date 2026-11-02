@@ -68,11 +68,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: nl2sql-ui/package-lock.json
+
+      # The nl2sql-api wheel carries the built web app (D226), so it is built first.
+      - name: Build the web app
+        run: npm ci && npm run build
+        working-directory: nl2sql-ui
+
       - name: Build all distributions
         run: |
           for pkg in packages/sdk packages/nl2sql packages/api; do
             python -m build "$pkg" --outdir dist
           done
+
+      - name: The API wheel carries the web app
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          wheel = glob.glob("dist/nl2sql_api-*.whl")[0]
+          assert "nl2sql_api/web/static/index.html" in zipfile.ZipFile(wheel).namelist(), "wheel has no static/index.html"
+          PY
 
       - name: Smoke test the built wheels
         run: |
@@ -170,7 +190,7 @@ jobs:
           packages-dir: upload/
           attestations: false
 
-  # packages/api/Dockerfile installs nl2sql-sdk, nl2sql-engine and
+  # The root Dockerfile installs nl2sql-sdk, nl2sql-engine and
   # nl2sql-api from the local sources, not from PyPI, and its COPY paths are
   # written relative to the repository root (`./packages/...`). COPY resolves
   # against the build context, so the context must be the repo root and the
@@ -202,7 +222,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: packages/api/Dockerfile
+          file: Dockerfile
           push: true
           tags: |
             ghcr.io/nadeem4/nl2sql-api:${{ inputs.tag || github.ref_name }}

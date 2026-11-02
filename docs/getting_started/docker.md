@@ -7,15 +7,15 @@ Use this path when you want the HTTP API only.
 From the repo root:
 
 ```bash
-docker build -f packages/api/Dockerfile -t nl2sql-api .
+docker build -t nl2sql-api .
 ```
 
-The image installs the local packages from the build context -
-`packages/sdk`, `packages/nl2sql[postgres,mysql]` and `packages/api` - so
-the build context has to be the repo root. The `COPY ./packages/...` lines
-resolve against the context, so `-f packages/api/Dockerfile .` is the only
-correct invocation; building with `packages/api` as the context fails with
-`"/packages/sdk": not found`.
+The `Dockerfile` is at the repo root. Its first stage builds the web app
+(`nl2sql-ui`); the second installs the local packages from the build context -
+`packages/sdk`, `packages/nl2sql[postgres,mysql,mssql,duckdb,anthropic,otel]` and
+`packages/api` - and serves the built app, so the build context has to be the
+repo root. For a running stack with a volume and API keys, see
+[Docker Compose](../deployment/compose.md).
 
 The root `.dockerignore` keeps that context to the sources the build actually
 needs - it drops `.git`, virtualenvs, `docs/`, `site/`, `chroma_db/`, `data/`,
@@ -23,10 +23,9 @@ needs - it drops `.git`, virtualenvs, `docs/`, `site/`, `chroma_db/`, `data/`,
 
 ## Adapters
 
-The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
-the `nl2sql-engine` distribution; an extra only adds the driver it needs, so add another
-extra to the `pip install` line in `packages/api/Dockerfile` to include one -
-for example `"./packages/nl2sql[postgres,mysql,mssql]"`.
+The image ships all five adapters' drivers (PostgreSQL, MySQL, SQL Server with
+Microsoft's ODBC driver 18, DuckDB, SQLite) and the Anthropic provider. One image,
+no slim variant.
 
 ## Configuration
 
@@ -50,9 +49,9 @@ auth: static
 static_role: admin      # one role for every request
 ```
 
-`api.auth: static` pins the RBAC role for every request; the default, `none`,
-answers only requests made straight to `localhost`, so a request through a
-published Docker port is HTTP 403. See [Identity](../api/rest/index.md#identity)
+`api.auth: static` pins the RBAC role for every request. The image runs
+`nl2sql-api serve --host 0.0.0.0`, which refuses to start while `api.auth` is
+the default, `none`, so the container needs `api_keys`, `proxy` or `static`. See [Identity](../api/rest/index.md#identity)
 and [API settings](../configuration/api.md).
 
 The routes that register datasources or LLMs and build or clear the index need a

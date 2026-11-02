@@ -1461,7 +1461,7 @@ What has to change:
 | `release-please-config.json` | `extra-files` path `packages/sdk/pyproject.toml`. The version stays in lockstep with the other two packages, so the first `nl2sql-sdk` release is 0.5.0. |
 | `.github/workflows/publish_pypi.yaml` | the build loop path; the smoke install `dist/nl2sql_sdk-*.whl`; the matrix entry `package: nl2sql-sdk`, `stem: nl2sql_sdk`; `environment: pypi-nl2sql-sdk` |
 | `.github/workflows/test.yml` | `pip install -e packages/sdk` (twice) and the wheel smoke test |
-| `packages/api/Dockerfile` | `COPY ./packages/sdk` and install it |
+| `packages/api/Dockerfile` (now the root `Dockerfile`, K1) | `COPY ./packages/sdk` and install it |
 | `tests/architecture/test_boundaries.py` | `SDK` path, the allowed set, `ADAPTER_LIBRARIES` |
 | Docs | `adapters/sdk.md`, `adapters/development.md`, `adapters/architecture.md`, `adapters/index.md`, `adapters/sqlalchemy.md`, `extensions/add-adapter.md`, `architecture/invariants.md`, `development/releasing.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `README.md`, `packages/sdk/README.md` |
 
@@ -1648,7 +1648,7 @@ data/                  # --demo only: the three bundled SQLite files, copied
 | `deploy/huggingface/Dockerfile` | `nl2sql init --demo /app/demo` replaces `setup --demo`. `ENV NL2SQL_CONFIG=/app/demo/nl2sql.yaml`. The index is built with `nl2sql index`. The `NL2SQL_DEMO_*` variables go, and `CMD` passes `--hosted --questions-per-minute 6 --questions-per-session 30`. |
 | `deploy/huggingface/docker-compose.yml`, `README.md` | the same variables and flags |
 | `.github/workflows/publish_space.yml` | any `setup --demo` or old-variable reference in the smoke steps |
-| `packages/api/Dockerfile` | `packages/sdk`; `ENV NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml`. The docs show mounting a config folder there and a data volume for `storage.path`. |
+| `packages/api/Dockerfile` (now the root `Dockerfile`, K1) | `packages/sdk`; `ENV NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml`. The docs show mounting a config folder there and a data volume for `storage.path`. |
 
 ### Docs to rewrite
 

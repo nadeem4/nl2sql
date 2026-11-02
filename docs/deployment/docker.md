@@ -2,6 +2,9 @@
 
 NL2SQL can be deployed as a standalone HTTP service using the `nl2sql-api` package and Docker. You can also embed the core library in your own service.
 
+For a ready-made stack (one service, one volume, API keys on), see
+[Docker Compose](compose.md).
+
 For the playground served as a public demo of the sample databases, where each
 visitor brings their own API key, see [Hosted demo](hosted-demo.md).
 
@@ -9,11 +12,12 @@ visitor brings their own API key, see [Hosted demo](hosted-demo.md).
 
 - Install `nl2sql-engine` and add adapters via extras (e.g. `nl2sql-engine[postgres]`).
 - Provide the config: `nl2sql.yaml` and the files it includes, at the path
-  `NL2SQL_CONFIG` names. `packages/api/Dockerfile` sets
+  `NL2SQL_CONFIG` names. The `Dockerfile` at the repository root sets
   `NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml`, so mount a config folder there.
 - Provide the provider keys and any variable the config reads as `${env:VAR}`,
-  in the environment or in a `.env` next to `nl2sql.yaml` (loaded at startup,
-  never overriding a variable already set).
+  in the environment or in a `.env` next to `nl2sql.yaml` (loaded by `nl2sql-api serve`, the image's
+  command, never overriding a variable already set, and never when hosted; plain
+  uvicorn does not load it).
 
 ## Persistence mounts
 
@@ -49,9 +53,16 @@ and left out of routing. Mark the datasources the service cannot run without
 
 `nl2sql-api` identifies callers from `api.auth` (`api_keys`, `proxy`, `static`
 or `none`), and `policies.admin_roles` (default `[admin]`) says which roles may
-change datasources, LLMs and the index. Under the default `none`, only a
-request made straight to `localhost` is answered, and a request through a
-published port is a `403`, so set `api.auth` for a container. See
+change datasources, LLMs and the index. The image binds `0.0.0.0`, and
+`serve` refuses to start under the default `none`, so set `api.auth` for a
+container, for example `api_keys`:
+
+```yaml
+api:
+  auth: api_keys
+```
+
+Create keys with `nl2sql keys create`. See
 [API settings](../configuration/api.md),
 [Identity](../api/rest/index.md#identity) and
 [Admin routes](../api/rest/index.md#admin-routes).

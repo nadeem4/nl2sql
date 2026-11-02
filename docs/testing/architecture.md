@@ -65,13 +65,16 @@ release. Its `realdb-gate` job always runs and is the required check.
 
 Three more jobs test the package rather than the source tree:
 
-- **`api-image`** builds `packages/api/Dockerfile` from the repository root,
-  the image the release pushes to GHCR, without pushing it, and imports
-  `nl2sql_api.main` inside it. `tests/unit/test_docker_images.py` separately
+- **`api-image`** builds the root `Dockerfile` (the web app's Node stage, then
+  the API), the image the release pushes to GHCR, without pushing it. It
+  imports `nl2sql_api.main` inside it, checks that `pyodbc.drivers()` lists the
+  SQL Server driver, records the image size in the job summary and checks that
+  `GET /` answers the built page. `tests/unit/test_docker_images.py` separately
   checks that every Dockerfile's `FROM python:X.Y` satisfies every package's
   `requires-python`.
 
-- **`build`** builds the three wheels and sdists, installs them into a clean
+- **`build`** builds the web app first, then the three wheels and sdists (the
+  `nl2sql-api` wheel must carry `static/index.html`), installs them into a clean
   virtualenv and runs `import nl2sql` and `nl2sql --help`.
 - **`fresh-install`** takes those wheels and installs them the way a user
   does, `pip install "nl2sql-engine[demo]"`, into an empty virtualenv outside

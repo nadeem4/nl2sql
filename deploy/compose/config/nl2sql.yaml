@@ -1,0 +1,21 @@
+# The example config for the Compose stack: the Chinook sample database that the image carries, API keys on.
+# Replace the datasource with your own (docs/deployment/compose.md), keeping `api.auth: api_keys`:
+# the server refuses to listen beyond loopback without one.
+version: 2
+mode: your_data   # NL2SQL_MODE in .env overrides this
+datasources:
+  - id: chinook
+    type: sqlite
+    connection: { database: /opt/nl2sql/samples/data/chinook.sqlite }
+    description: The Chinook music store sample database.
+llm: { provider: openai, model: gpt-5.4, temperature: 0.0 }
+embeddings: { provider: local }
+storage: { path: "${env:NL2SQL_DATA_DIR}" }
+policies:
+  default_role: analyst
+  admin_roles: [admin]
+  roles:
+    admin: { description: "Manages datasources, models and the index", allow: [chinook] }
+    analyst: { description: Asks questions, allow: [chinook] }
+api:
+  auth: api_keys

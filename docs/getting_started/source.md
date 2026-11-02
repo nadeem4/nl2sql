@@ -59,9 +59,13 @@ NL2SQL_CONFIG=my-demo/nl2sql.yaml nl2sql-api --port 8000
 or in Docker:
 
 ```bash
-docker build -f packages/api/Dockerfile -t nl2sql-api .
+docker build -t nl2sql-api .
 docker run --rm -p 8000:8000 -v "$PWD/my-demo:/etc/nl2sql" nl2sql-api
 ```
+
+The image listens beyond localhost, so it needs `api.auth` set (`api_keys`, `proxy` or `static`) in the config;
+with the default `none` it exits at start-up. For a demo, add `api: { auth: static, static_role: admin }` to
+`my-demo/nl2sql.yaml`, or use the [Compose stack](../deployment/compose.md), which ships `api_keys`.
 
 See [Docker (REST API)](docker.md) for adapter extras, the role settings and
 the data volume.
