@@ -15,7 +15,6 @@ def test_app_is_constructed():
 
 def test_dependency_providers_are_callable():
     assert callable(dependencies.get_engine)
-    assert callable(dependencies.get_query_service)
 
 
 def test_health_endpoint_is_registered():

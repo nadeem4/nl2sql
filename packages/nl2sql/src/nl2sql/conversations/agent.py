@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, ValidationError, create_model, model_vali
 
 from nl2sql.api.query_api import tables_read
 from nl2sql.clarify.models import ClarificationRequest
+from nl2sql.common.errors import InvalidArgument
 from nl2sql.common.strict import StrictModel
 from nl2sql.conversations.models import ModelStep, ToolCall, ToolOutput, ToolStep, Turn
 from nl2sql.dashboards.models import Dashboard, TileRun
@@ -132,16 +133,16 @@ def check_call(call: ToolCall, tools: Mapping[str, type], option_ids: Sequence[s
             args = AskArgs.model_validate(call.args)
             if args.choice is not None and args.choice not in option_ids:
                 shown = ", ".join(option_ids) or "none: nothing is pending"
-                raise ValueError(f"'{args.choice}' is not an option of the pending question ({shown}).")
+                raise InvalidArgument(f"'{args.choice}' is not an option of the pending question ({shown}).")
         elif call.name in tools:
             tools[call.name].model_validate(call.args)
         else:
             names = ", ".join(["ask", *tools]) if not offered else ", ".join(tools) or "none"
-            raise ValueError(f"'{call.name}' is not {'a tool you may offer' if offered else 'an enabled tool'}; "
+            raise InvalidArgument(f"'{call.name}' is not {'a tool you may offer' if offered else 'an enabled tool'}; "
                              f"the {'offerable' if offered else 'enabled'} tools are: {names}.")
     except ValidationError as exc:
         problems = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'args'}: {e['msg']}" for e in exc.errors())
-        raise ValueError(f"The arguments of '{call.name}' are not valid: {problems}.") from None
+        raise InvalidArgument(f"The arguments of '{call.name}' are not valid: {problems}.") from None
 
 
 def checked_step(tools: Mapping[str, type], option_ids: Sequence[str], calls_left: int) -> type:

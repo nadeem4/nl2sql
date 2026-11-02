@@ -15,7 +15,7 @@ and `engine.chat_tools` ([Chat tools](../../conversations/tools.md)).
 ## Public Surface
 
 Every method takes `user_context` keyword-only and required. A conversation that is not the caller's is
-`ConversationNotFound`; one already running a turn is `ConversationBusy`. `ValueError` is raised, before
+`ConversationNotFound`; one already running a turn is `ConversationBusy`. `InvalidArgument` (a `ValueError`, 422) is raised, before
 anything runs, for: neither or both of `text` and `choice`, a `choice` with nothing pending or not one of the
 pending options, an empty message, a conversation at `max_turns` (`CONVERSATION_TOO_LONG`), `retry` with no
 earlier question.
@@ -47,11 +47,11 @@ earlier question.
 - `stream` ends with `conversation.turn`; see [Streaming](../../conversations/index.md#streaming).
 - `ask_only` returns the run's `QueryResult` with its rows; the stored turn has none.
 - `tool` runs one enabled [chat tool](../../conversations/tools.md) as a turn of kind `tool` and makes no model
-  call. Arguments the tool's `args_model` rejects are a `ValueError` and store nothing; a tool that is not
+  call. Arguments the tool's `args_model` rejects are an `InvalidArgument` and store nothing; a tool that is not
   enabled, raises or cannot apply is a stored step with `error.code` `UNKNOWN_CHAT_TOOL`, `TOOL_FAILED` or
   `TOOL_NOT_APPLICABLE`.
 - `report` returns Markdown for the stored answered turns (or `turns`, a list of turn numbers). A turn number
-  that does not exist, or a conversation with nothing answered, is a `ValueError`. `include_rows=False` leaves
+  that does not exist, or a conversation with nothing answered, is an `InvalidArgument`. `include_rows=False` leaves
   the row tables and chart takeaways out, which is how the `report` tool stores its output.
 - Every method needs a caller: `user_context=None`, or a context with no `user_id`, is a `TypeError`, not a
   shared anonymous owner.

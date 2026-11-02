@@ -1,4 +1,4 @@
-"""The golden files the web app's node tests read: ``ApiError`` and ``Job``, the ``Dashboard`` and
+"""The golden files the web app's node tests read: ``ApiError``, ``Job``, ``QueryResult``, ``Turn``, the ``Dashboard`` and
 ``DashboardView``, the ``Proposal`` and the ``DriftReport`` (a ``drifted`` one with its diff and impact, and an ``unchanged`` one) (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
@@ -15,7 +15,7 @@ from itertools import count
 from dashboard_stubs import AT, Recorder, dashboard, view
 from fastapi.testclient import TestClient
 
-from nl2sql import UserContext
+from nl2sql import QueryResult, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
 from nl2sql.testing.config import make_config
 from nl2sql import DriftReport, Proposal
 from nl2sql.schema.impact import DriftImpact, ImpactedQuery
@@ -33,11 +33,27 @@ def build() -> dict:
     """``{file name: its JSON}``, from responses of an app with no real engine behind it."""
     ticks = count()
     with tempfile.TemporaryDirectory() as folder:
+        class Conversations:
+            """One stored turn that asked a question and was answered, as ``POST /conversations/{id}/turns`` serves it."""
+
+            def ask(self, conversation_id, text=None, **kwargs):
+                return Turn(index=1, at=START, kind="message", text=text, reply="There are 59 customers.",
+                            steps=[ToolStep(call=ToolCall(name="ask", args={"question": text}), status="ok",
+                                            question=text, trace_id="trace-0001-fixture")],
+                            status="answered", trace_id="trace-0001-turn")
+
         class Engine:
             config = make_config(pathlib.Path(folder))
+            conversations = Conversations()
             dashboards = Recorder()
             proposals = Recorder()
             index = Recorder()
+
+            @staticmethod
+            def run_query(question, **_):
+                return QueryResult(trace_id="trace-fixture", status="success", sub_queries=[SubQueryResult(
+                    id="sq1", intent=question, sql="SELECT COUNT(*) AS n FROM Customer", datasource_id="chinook",
+                    rows=RowSample(columns=["n"], rows=[[59]], total_rows=1), status="success")])
 
         Engine.dashboards.returns.update({"rename": dashboard(), "open": view()})
         Engine.proposals.returns["get"] = Proposal(
@@ -66,6 +82,8 @@ def build() -> dict:
                                      poll_s=0.01)
         try:
             client = TestClient(app, raise_server_exceptions=False)
+            answer = client.post("/api/v1/query", json={"question": "How many customers?"})
+            assert answer.status_code == 200, answer.text
             error = client.get("/api/v1/jobs/missing")
             assert error.status_code == 404
             job = jobs.submit("index", IndexJob(datasource_ids=["chinook"]), UserContext(user_id="ann"),
@@ -75,7 +93,10 @@ def build() -> dict:
             while jobs.get(job.id, UserContext(user_id="ann")).status != "succeeded":
                 assert time.monotonic() < deadline, "the fixture job did not finish"
                 time.sleep(0.005)
+            turn = client.post("/api/v1/conversations/conv-0001/turns", json={"text": "How many customers are there?"})
+            assert turn.status_code == 200, turn.text
             return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
+                    "QueryResult.json": answer.json(), "Turn.json": turn.json(),
                     "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
                     "DashboardView.json": client.get("/api/v1/dashboards/d1").json(),
                     "Proposal.json": client.get("/api/v1/proposals/p-1").json(),

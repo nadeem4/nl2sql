@@ -1,0 +1,43 @@
+{
+  "at": "2026-01-01T00:00:00Z",
+  "error": null,
+  "index": 1,
+  "kind": "message",
+  "offers": [],
+  "reply": "There are 59 customers.",
+  "status": "answered",
+  "steps": [
+    {
+      "call": {
+        "args": {
+          "question": "How many customers are there?"
+        },
+        "name": "ask"
+      },
+      "error": null,
+      "output": null,
+      "question": "How many customers are there?",
+      "result": null,
+      "status": "ok",
+      "trace_id": "trace-0001-fixture"
+    }
+  ],
+  "text": "How many customers are there?",
+  "trace_id": "trace-0001-turn",
+  "usage": {
+    "calls": [],
+    "nodes": {},
+    "plan_cache_hits": 0,
+    "total": {
+      "cache_write_input_tokens": null,
+      "cached_input_tokens": null,
+      "calls": 0,
+      "cost": null,
+      "input_tokens": null,
+      "latency_s": 0.0,
+      "output_tokens": null,
+      "reasoning_tokens": null,
+      "total_tokens": null
+    }
+  }
+}

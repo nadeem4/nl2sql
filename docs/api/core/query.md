@@ -546,7 +546,7 @@ with open("genres.csv", "wb") as out:
 ```
 
 `nl2sql-api` serves these as
-[`GET /api/v1/query/{request_id}/results/{result_id}`](../rest/query.md#get-apiv1queryrequest_idresultsresult_id)
+[`GET /api/v1/results/{trace_id}/{result_id}`](../rest/results.md#get-apiv1resultstrace_idresult_id)
 and `.../{result_id}.csv`; the playground serves the same two under `/api/query/...`.
 
 ### SubQueryResult

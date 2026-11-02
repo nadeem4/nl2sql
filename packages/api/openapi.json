@@ -176,6 +176,63 @@
         "title": "ApiError",
         "type": "object"
       },
+      "ApprovalRecord": {
+        "description": "One stored request: ``status`` is ``pending``, ``granted`` or ``denied``; ``id`` is the request's id.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ApprovalRequest"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "request",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ApprovalRecord",
+        "type": "object"
+      },
       "ApprovalRequest": {
         "description": "What a person is asked to approve: one sub-query's SQL, bound to the asker.\n\nThe generated path pins the run's ``decomposition``, the ``sub_query`` the\nSQL answers and its validated ``plan``; the verified path pins the\n``verified`` query and its values. ``id`` is a SHA-256, in hex, over every\nfield but ``reason`` and ``approver_roles``, so the engine can tell an\nedited request. ``approver_roles`` is for display: the engine checks the\nhook's configured roles.",
         "properties": {
@@ -581,6 +638,32 @@
         "title": "ChartSpec",
         "type": "object"
       },
+      "ChatToolInfo": {
+        "additionalProperties": false,
+        "description": "One enabled tool, as ``engine.chat_tools.list()`` reports it.",
+        "properties": {
+          "args_schema": {
+            "additionalProperties": true,
+            "title": "Args Schema",
+            "type": "object"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "args_schema"
+        ],
+        "title": "ChatToolInfo",
+        "type": "object"
+      },
       "ChoiceRequest": {
         "additionalProperties": false,
         "description": "``POST /knowledge/choices``: a clarification pick, filed as a `term` proposal.",
@@ -972,6 +1055,188 @@
           "subquery_id"
         ],
         "title": "CombineInput",
+        "type": "object"
+      },
+      "Conversation": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dashboard_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboard Id"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClarificationRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/Turn"
+            },
+            "title": "Turns",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Conversation",
+        "type": "object"
+      },
+      "ConversationInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "updated_at",
+          "turns"
+        ],
+        "title": "ConversationInfo",
+        "type": "object"
+      },
+      "CorrectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
+          },
+          "trace_id": {
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id"
+        ],
+        "title": "CorrectionRequest",
         "type": "object"
       },
       "Dashboard": {
@@ -1590,6 +1855,24 @@
           "combine_groups"
         ],
         "title": "DecomposerResponse",
+        "type": "object"
+      },
+      "DenyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "DenyRequest",
         "type": "object"
       },
       "DriftImpact": {
@@ -2348,6 +2631,41 @@
           "kind"
         ],
         "title": "Expr",
+        "type": "object"
+      },
+      "FeedbackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          },
+          "trace_id": {
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "rating"
+        ],
+        "title": "FeedbackRequest",
         "type": "object"
       },
       "FilterSpec": {
@@ -3784,7 +4102,27 @@
         "type": "object"
       },
       "QueryRequest": {
+        "additionalProperties": false,
         "properties": {
+          "approval_ids": {
+            "description": "Ids of approvals an approver granted, from an earlier `needs_approval` run.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Ids",
+            "type": "array"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClarificationChoice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The option picked from an earlier `clarification_request`; asks the same question again."
+          },
           "datasource_id": {
             "anyOf": [
               {
@@ -3801,19 +4139,19 @@
             "title": "Execute",
             "type": "boolean"
           },
-          "natural_language": {
-            "title": "Natural Language",
+          "question": {
+            "title": "Question",
             "type": "string"
           }
         },
         "required": [
-          "natural_language"
+          "question"
         ],
         "title": "QueryRequest",
         "type": "object"
       },
-      "QueryResponse": {
-        "description": "The engine's ``QueryResult``, served as is.\n\nIt derives from ``nl2sql.QueryResult``, so the HTTP response cannot drift\nfrom what the engine returns. ``sub_queries[].rows`` carries a capped\nsample only; the full result set lives in artifact storage, addressable\nthrough ``artifact_refs``. ``trace_path`` is where the run's trace was\nwritten on the server, or None.",
+      "QueryResult": {
+        "description": "Represents the result of a query execution.\n\nCarries everything a UI renders: the plan, the validation checks, a capped\nrow sample, the SQL, per-node timings and the question's LLM token usage.\nThe full result set still lives in artifact storage, addressable through\n``artifact_refs``. ``result_manifest`` lists the run's saved results (its\nmanifest: node id, columns, row count, truncated), never their rows; read\nthose by ``trace_id`` with ``engine.results.page`` or ``engine.results.csv``,\nas the caller who asked (``user_context``): nobody else can read them.\n``trace_path`` is where this run's trace file was written, or None when\n``settings.traces.mode`` did not keep one or the trace store is not the\n``files`` store (read it with ``engine.traces.get(trace_id)``).",
         "properties": {
           "approvals_needed": {
             "items": {
@@ -3928,7 +4266,7 @@
           },
           "sub_queries": {
             "items": {
-              "$ref": "#/components/schemas/SubQueryResponse"
+              "$ref": "#/components/schemas/SubQueryResult"
             },
             "title": "Sub Queries",
             "type": "array"
@@ -3972,7 +4310,7 @@
             "type": "array"
           }
         },
-        "title": "QueryResponse",
+        "title": "QueryResult",
         "type": "object"
       },
       "QuestionUsage": {
@@ -4072,6 +4410,74 @@
           "ids"
         ],
         "title": "RejectRequest",
+        "type": "object"
+      },
+      "ResultManifest": {
+        "description": "Which results a run produced, and who asked it, written as ``manifest.json`` in the run's folder.",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/ResultOwner"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ResultSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "owner"
+        ],
+        "title": "ResultManifest",
+        "type": "object"
+      },
+      "ResultOwner": {
+        "description": "Who asked a run: the only caller its results are readable by.",
+        "properties": {
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roles"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "title": "ResultOwner",
         "type": "object"
       },
       "ResultPage": {
@@ -4177,6 +4583,21 @@
           "node_id"
         ],
         "title": "ResultSummary",
+        "type": "object"
+      },
+      "RetryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_ids": {
+            "description": "Request ids of granted approvals (`POST /approvals/{id}/grant`).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Ids",
+            "type": "array"
+          }
+        },
+        "title": "RetryRequest",
         "type": "object"
       },
       "RowSample": {
@@ -4600,6 +5021,37 @@
         "title": "SkippedTile",
         "type": "object"
       },
+      "StartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "dashboard_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opens the chat on this dashboard (the caller's, draft or saved), so the model can edit it.",
+            "title": "Dashboard Id"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every question of the conversation skips routing and asks this datasource.",
+            "title": "Datasource Id"
+          }
+        },
+        "title": "StartRequest",
+        "type": "object"
+      },
       "SubQuery": {
         "properties": {
           "datasource_id": {
@@ -4686,8 +5138,8 @@
         "title": "SubQuery",
         "type": "object"
       },
-      "SubQueryResponse": {
-        "description": "One decomposed sub-query: its plan, validation checks, SQL and row sample.",
+      "SubQueryResult": {
+        "description": "Represents the result of a sub-query execution.",
         "properties": {
           "datasource_id": {
             "default": "",
@@ -4803,7 +5255,7 @@
             "type": "array"
           }
         },
-        "title": "SubQueryResponse",
+        "title": "SubQueryResult",
         "type": "object"
       },
       "SuccessResponse": {
@@ -5233,6 +5685,301 @@
         "title": "TitleBody",
         "type": "object"
       },
+      "ToolCall": {
+        "additionalProperties": false,
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
+      "ToolOutput": {
+        "additionalProperties": false,
+        "description": "What a chat tool returns. Defined here so a stored step can hold one without this module importing\n``nl2sql.chat_tools`` (which imports ``Conversation``); tool authors import it from ``nl2sql.chat_tools``.",
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ],
+            "title": "Body"
+          },
+          "kind": {
+            "enum": [
+              "chart",
+              "mermaid",
+              "markdown",
+              "json"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "refs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Refs",
+            "type": "object"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "body"
+        ],
+        "title": "ToolOutput",
+        "type": "object"
+      },
+      "ToolRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "description": "The tool's arguments, as `GET /chat-tools` describes them.",
+            "title": "Args",
+            "type": "object"
+          }
+        },
+        "title": "ToolRequest",
+        "type": "object"
+      },
+      "ToolStep": {
+        "additionalProperties": false,
+        "description": "One tool call inside a turn.",
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/ToolCall"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueryResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "needs_clarification",
+              "needs_approval",
+              "stopped",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "call",
+          "status"
+        ],
+        "title": "ToolStep",
+        "type": "object"
+      },
+      "Turn": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "message",
+              "choice",
+              "retry",
+              "tool"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "offers": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "title": "Offers",
+            "type": "array"
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "needs_clarification",
+              "needs_approval",
+              "stopped",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ToolStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/QuestionUsage"
+          }
+        },
+        "required": [
+          "index",
+          "at",
+          "kind",
+          "text",
+          "steps",
+          "status"
+        ],
+        "title": "Turn",
+        "type": "object"
+      },
+      "TurnRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An option id of the pending clarification, sent instead of `text`; the question is asked again with no model call.",
+            "title": "Choice"
+          },
+          "execute": {
+            "default": true,
+            "description": "`false` plans and validates without running SQL.",
+            "title": "Execute",
+            "type": "boolean"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the user typed.",
+            "title": "Text"
+          }
+        },
+        "title": "TurnRequest",
+        "type": "object"
+      },
       "UnmappedSubQuery": {
         "properties": {
           "datasource_id": {
@@ -5370,6 +6117,45 @@
           }
         },
         "title": "UsageTotals",
+        "type": "object"
+      },
+      "UserContext": {
+        "description": "Who is asking: the caller's id, tenant and roles.",
+        "properties": {
+          "roles": {
+            "description": "List of assigned roles.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Organization/Tenant identifier.",
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unique identifier for the user.",
+            "title": "User Id"
+          }
+        },
+        "title": "UserContext",
         "type": "object"
       },
       "ValidationCheck": {
@@ -5604,6 +6390,964 @@
         "summary": "The pipeline and its models",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/approvals": {
+      "get": {
+        "description": "The requests the caller asked, plus those their roles may decide, in `status` (default `pending`). Who granted\none is the engine's record and is not returned.",
+        "operationId": "list_approvals_api_v1_approvals_get",
+        "parameters": [
+          {
+            "description": "Only requests in this state.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "pending",
+              "description": "Only requests in this state.",
+              "enum": [
+                "pending",
+                "granted",
+                "denied"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalRecord"
+                  },
+                  "title": "Response List Approvals Api V1 Approvals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List approval requests",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/approvals/{request_id}/deny": {
+      "post": {
+        "description": "Deny the request, with an optional `reason`. A run that names it ends with `APPROVAL_NOT_GRANTED`.",
+        "operationId": "deny_approval_api_v1_approvals__request_id__deny_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DenyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds none of the roles that may approve this."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such approval request for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deny an approval",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/approvals/{request_id}/grant": {
+      "post": {
+        "description": "Grant the request. The asker then re-asks the question with `approval_ids: [request_id]`.",
+        "operationId": "grant_approval_api_v1_approvals__request_id__grant_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds none of the roles that may approve this."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such approval request for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant an approval",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/chat-tools": {
+      "get": {
+        "description": "The enabled chat tools: name, description and the JSON Schema of their arguments. `ask` is the\nconversation's own and is not listed.",
+        "operationId": "list_chat_tools_api_v1_chat_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatToolInfo"
+                  },
+                  "title": "Response List Chat Tools Api V1 Chat Tools Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          }
+        },
+        "summary": "List chat tools",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations": {
+      "get": {
+        "description": "The caller's conversations, newest first: id, title, last update and the number of turns.",
+        "operationId": "list_conversations_api_v1_conversations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationInfo"
+                  },
+                  "title": "Response List Conversations Api V1 Conversations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List conversations",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "post": {
+        "description": "A new, empty conversation owned by the caller. Nothing runs. With `dashboard_id` the chat edits that dashboard.",
+        "operationId": "start_conversation_api_v1_conversations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "`dashboard_id` is not the caller's dashboard."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request does not validate, or the facade refused an argument."
+          }
+        },
+        "summary": "Start a conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "delete": {
+        "description": "Deletes the conversation and its turns; its results stay until their own retention.",
+        "operationId": "delete_conversation_api_v1_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The conversation is already running a turn."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete a conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "get": {
+        "description": "The conversation with its stored turns and, when the last turn asked one, the pending clarification. Another\nuser's conversation is a 404.",
+        "operationId": "get_conversation_api_v1_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/report": {
+      "get": {
+        "description": "The answered questions of the conversation written up as Markdown, with no model call. A turn that does not\nexist, or a conversation with no answered question, is a 422.",
+        "operationId": "get_report_api_v1_conversations__conversation_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Turn numbers to include; all by default.",
+            "in": "query",
+            "name": "turns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Turn numbers to include; all by default.",
+              "title": "Turns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "title",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Title"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/markdown": {}
+            },
+            "description": "The report, as Markdown."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request does not validate, or the facade refused an argument."
+          }
+        },
+        "summary": "The conversation as a report",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/retry": {
+      "post": {
+        "description": "Runs the conversation's last question again as a turn of kind `retry`, with no model call of its own. After a\n`needs_approval` turn, send the granted request ids as `approval_ids`.",
+        "operationId": "retry_turn_api_v1_conversations__conversation_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RetryRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller, or an id in `approval_ids` is unknown, waiting, denied or expired."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The conversation is already running a turn."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request does not validate, or the facade refused an argument."
+          }
+        },
+        "summary": "Run the last question again",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/tools/{name}": {
+      "post": {
+        "description": "One chat tool by name, as a turn of kind `tool` with no model call: how a client runs a tool the model offered.\nArguments that do not validate are a 422 and store nothing; a tool that is not enabled is a stored error step.",
+        "operationId": "run_tool_api_v1_conversations__conversation_id__tools__name__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ToolRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The conversation is already running a turn."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request does not validate, or the facade refused an argument."
+          }
+        },
+        "summary": "Run a chat tool",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/turns": {
+      "post": {
+        "description": "One turn: the model's bounded loop of tool calls and a reply, stored. A pipeline outcome is not an error: the\nturn's `status` is `answered`, `needs_clarification` (answer it with `choice` in the next turn), `needs_approval`,\n`stopped` or `error`. Keys and models in the `X-NL2SQL-*` headers apply to the whole turn when `api.request_llm`\nis on.",
+        "operationId": "post_turn_api_v1_conversations__conversation_id__turns_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The conversation is already running a turn."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request does not validate, or the facade refused an argument."
+          }
+        },
+        "summary": "Send a message",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/turns/stream": {
+      "post": {
+        "description": "As `POST /turns`, as events. A refusal (not the caller's, a bad body, a busy conversation) answers with the\nerror envelope before the stream begins; once it has, a failure is a last `run.failed` event (its `error_code`, or\n`UNKNOWN_ERROR` with a fixed message).",
+        "operationId": "post_turn_stream_api_v1_conversations__conversation_id__turns_stream_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-Sent Events: the run events of each question the model asks, a `conversation.step` after each step, and `conversation.turn` last, whose `data.stored` is the stored `Turn`. A `: keep-alive` comment every 15 seconds. Closing the connection cancels the turn and stores nothing. A failure after the stream has begun is a last `run.failed` event."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The conversation is already running a turn."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request does not validate, or the facade refused an argument."
+          }
+        },
+        "summary": "Send a message and follow it",
+        "tags": [
+          "conversations"
         ]
       }
     },
@@ -7388,6 +9132,208 @@
         ]
       }
     },
+    "/api/v1/feedback": {
+      "get": {
+        "description": "Every rating, newest first. Admin only: it spans all callers.",
+        "operationId": "list_feedback_api_v1_feedback_get",
+        "parameters": [
+          {
+            "description": "At most this many, newest first.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "At most this many, newest first.",
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Feedback Api V1 Feedback Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List the ratings",
+        "tags": [
+          "query"
+        ]
+      },
+      "post": {
+        "description": "Record a thumbs up or down for a run the caller asked. The question, SQL and answer come from the run's\ntrace, never from the body. Another caller's run is a 404.",
+        "operationId": "rate_api_v1_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rate Api V1 Feedback Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rate an answer",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/feedback/correct": {
+      "post": {
+        "description": "Turn the caller's fix (`sql` or `plan`, exactly one) for a run they asked into a proposal for a verified\nquery. Nothing is saved: a reviewer accepts the proposal elsewhere. The correction is checked as the caller, so it\nis refused (422 `CORRECTION_REFUSED`) when it is not read-only, reads what the caller may not, or a hook denies it.",
+        "operationId": "correct_api_v1_feedback_correct_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The correction was refused; `details` say why."
+          }
+        },
+        "summary": "Correct an answer",
+        "tags": [
+          "query"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Liveness, from process state only: `{\"status\": \"ok\", \"version\": {\"engine\", \"api\"}}`. Checks nothing else.",
@@ -8861,7 +10807,7 @@
     },
     "/api/v1/query": {
       "post": {
-        "description": "Run a natural-language question through the pipeline.\n\nReturns, per sub-query, the plan, the validation checks, the SQL and a capped row\nsample, plus the written answer, errors, timings and token usage. A pipeline\nfailure (a refusal included) comes back with status 200 and `status: \"error\"`.\n`execute: false` plans and validates without running SQL. The caller (user,\ntenant and roles) comes from the source `api.auth` names, never from the\nbody; no identity is a 401.",
+        "description": "Run a natural-language question through the pipeline.\n\nReturns, per sub-query, the plan, the validation checks, the SQL and a capped row sample, plus the written\nanswer, errors, timings and token usage. A pipeline failure (a refusal included) comes back with status 200 and\n`status: \"error\"`. `execute: false` plans and validates without running SQL. `choice` answers an earlier\n`clarification_request`; `approval_ids` names approvals an approver granted. The caller (user, tenant and roles)\ncomes from the source `api.auth` names, never from the body; no identity is a 401. Where `api.request_llm` is on,\na request may carry its own provider keys and models in headers.",
         "operationId": "execute_query_api_v1_query_post",
         "requestBody": {
           "content": {
@@ -8878,7 +10824,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueryResponse"
+                  "$ref": "#/components/schemas/QueryResult"
                 }
               }
             },
@@ -8893,6 +10839,16 @@
               }
             },
             "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request carries keys or models and `api.request_llm` is off."
           },
           "422": {
             "content": {
@@ -8913,7 +10869,7 @@
     },
     "/api/v1/query/stream": {
       "post": {
-        "description": "The same run as `POST /query`, reported as it happens, as Server-Sent Events.\n\nEach SSE `event` is the event's name and its `data` line the whole event as\nJSON (`name`, `at`, `trace_id`, `tenant_id`, `data`): `run.started`;\n`node.started` (`node`, `sub_query_id`) and `node.finished` (plus `seconds`,\n`ok`) per pipeline step; `result.manifest` (`results`) as soon as the results\nare saved, so a client can start paging them with the event's `trace_id`;\n`answer.delta` (`field`: `summary` or `content`, `text`) as the answer model\nwrites; `sanity.flagged` and `run.limit_reached`; then exactly one of\n`run.finished`, the run's summary whose `data.result` is the `/query`\nresponse, or `run.failed` (`message`, `error_code`, and the engine's `user_id` and `roles`) when the run could not\nfinish. A refusal or a provider error is a `run.finished` with\n`status: \"error\"`, as `/query` returns it. Same body and auth as `/query`;\nclosing the connection cancels the run before its next step.",
+        "description": "The same run as `POST /query`, reported as it happens, as Server-Sent Events.\n\nEach SSE `event` is the event's name and its `data` line the whole event as\nJSON (`name`, `at`, `trace_id`, `tenant_id`, `data`): `run.started`;\n`node.started` (`node`, `sub_query_id`) and `node.finished` (plus `seconds`,\n`ok`) per pipeline step; `result.manifest` (`results`) as soon as the results\nare saved, so a client can start paging them with the event's `trace_id`;\n`answer.delta` (`field`: `summary` or `content`, `text`) as the answer model\nwrites; `sanity.flagged` and `run.limit_reached`; then exactly one of\n`run.finished`, the run's summary whose `data.result` is the `/query`\nresponse, or `run.failed` (`message`, `error_code`) when the run could not\nfinish. A refusal or a provider error is a `run.finished` with\n`status: \"error\"`, as `/query` returns it. Same body, headers and auth as `/query`; a request the engine refuses\noutright (a bad choice, a key it may not take) is the error envelope, before any event. A comment line keeps the\nconnection open while nothing happens; closing the connection cancels the run before its next step.",
         "operationId": "stream_query_api_v1_query_stream_post",
         "requestBody": {
           "content": {
@@ -8942,6 +10898,16 @@
             },
             "description": "No identity: see `api.auth`."
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The request carries keys or models and `api.request_llm` is off."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -8959,17 +10925,102 @@
         ]
       }
     },
-    "/api/v1/query/{request_id}/results/{result_id}": {
+    "/api/v1/ready": {
       "get": {
-        "description": "Rows `offset` to `offset + limit` of one saved result, read lazily from its\nparquet file. `request_id` is the run's `trace_id`; `result_id` is a `node_id`\nfrom the query response's `result_manifest`. `next_offset` is where the next page\nstarts, null at the end; a page past the end is empty. A run is readable only\nby the caller who asked it (the same user id and tenant): an unknown run,\nanother user's or another tenant's, or an id that is not a plain token is a 404.",
-        "operationId": "get_result_page_api_v1_query__request_id__results__result_id__get",
+        "description": "Returns `success: true`. It does not yet check datasources, the LLM or the index.",
+        "operationId": "readiness_check_api_v1_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/results/{trace_id}": {
+      "get": {
+        "description": "Which results the run saved: per result its id, columns, row count and whether it was capped, never the rows.\n`trace_id` is the run's `trace_id`. A run is readable only by the caller who asked it (the same user id and\ntenant): an unknown run, another user's or another tenant's, or an id that is not a plain token is a 404.",
+        "operationId": "get_result_manifest_api_v1_results__trace_id__get",
         "parameters": [
           {
             "in": "path",
-            "name": "request_id",
+            "name": "trace_id",
             "required": true,
             "schema": {
-              "title": "Request Id",
+              "title": "Trace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List a run's results",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/api/v1/results/{trace_id}/{result_id}": {
+      "get": {
+        "description": "Rows `offset` to `offset + limit` of one saved result, read lazily from its parquet file. `result_id` is a\n`node_id` from the run's manifest. `next_offset` is where the next page starts, null at the end; a page past the\nend is empty. Another caller's run, or an id that is not a plain token, is a 404.",
+        "operationId": "get_result_page_api_v1_results__trace_id___result_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
               "type": "string"
             }
           },
@@ -9057,17 +11108,17 @@
         ]
       }
     },
-    "/api/v1/query/{request_id}/results/{result_id}.csv": {
+    "/api/v1/results/{trace_id}/{result_id}.csv": {
       "get": {
-        "description": "The whole of one saved result as CSV, streamed a slice at a time from its\nparquet file, never built in memory. `request_id` is the run's `trace_id`;\n`result_id` is a `node_id` from the query response's `result_manifest`. A run is\nreadable only by the caller who asked it (the same user id and tenant): an\nunknown run, another user's or another tenant's, or an id that is not a plain\ntoken is a 404.",
-        "operationId": "export_result_csv_api_v1_query__request_id__results__result_id__csv_get",
+        "description": "The whole of one saved result as CSV, streamed a slice at a time from its parquet file, never built in memory.\n`result_id` is a `node_id` from the run's manifest. Another caller's run, or an id that is not a plain token, is\na 404.",
+        "operationId": "export_result_csv_api_v1_results__trace_id___result_id__csv_get",
         "parameters": [
           {
             "in": "path",
-            "name": "request_id",
+            "name": "trace_id",
             "required": true,
             "schema": {
-              "title": "Request Id",
+              "title": "Trace Id",
               "type": "string"
             }
           },
@@ -9125,25 +11176,113 @@
         ]
       }
     },
-    "/api/v1/ready": {
+    "/api/v1/results/{trace_id}/{result_id}/chart": {
       "get": {
-        "description": "Returns `success: true`. It does not yet check datasources, the LLM or the index.",
-        "operationId": "readiness_check_api_v1_ready_get",
+        "description": "The chart a saved result is drawn as, chosen from its column kinds with no model call. `format=vega-lite`\nreturns a Vega-Lite v5 spec ready to render; a table has none, so asking for it is a 422.",
+        "operationId": "get_result_chart_api_v1_results__trace_id___result_id__chart_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "result_id",
+            "required": true,
+            "schema": {
+              "title": "Result Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Force a kind the data can draw; by default five rules choose from its columns.",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "line",
+                    "bar",
+                    "big_number",
+                    "table"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Force a kind the data can draw; by default five rules choose from its columns.",
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "`spec` is the engine's chart spec; `vega-lite` is a Vega-Lite v5 document, rows inline.",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "spec",
+              "description": "`spec` is the engine's chart spec; `vega-lite` is a Vega-Lite v5 document, rows inline.",
+              "enum": [
+                "spec",
+                "vega-lite"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
+                "schema": {}
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A kind or format the data cannot be drawn as."
           }
         },
-        "summary": "Readiness check",
+        "summary": "Chart a result",
         "tags": [
-          "health"
+          "query"
         ]
       }
     },
@@ -9224,6 +11363,71 @@
         "summary": "Replace the LLM",
         "tags": [
           "llm"
+        ]
+      }
+    },
+    "/api/v1/traces/{trace_id}": {
+      "get": {
+        "description": "The trace document of a run the caller asked: its request, every node's input and output, and the result. An\nunknown trace, another caller's, or an id that is not a plain token is a 404.",
+        "operationId": "get_trace_api_v1_traces__trace_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Trace Api V1 Traces  Trace Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such run or result for this caller."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a run's trace",
+        "tags": [
+          "query"
         ]
       }
     },

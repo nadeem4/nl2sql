@@ -13,6 +13,7 @@ from importlib import metadata
 from typing import Any, List, Optional, Sequence
 
 from nl2sql import ResultNotFound
+from nl2sql.common.errors import InvalidArgument
 from nl2sql.conversations.models import Conversation, ToolStep, Turn
 
 ROW_LIMIT = 20
@@ -91,7 +92,7 @@ def _chosen(conversation: Conversation, turns: Optional[Sequence[int]]) -> List[
     by_index = {t.index: t for t in conversation.turns}
     missing = [i for i in turns if i not in by_index]
     if missing:
-        raise ValueError(f"There is no turn {', '.join(map(str, missing))} in this conversation.")
+        raise InvalidArgument(f"There is no turn {', '.join(map(str, missing))} in this conversation.")
     return [by_index[i] for i in dict.fromkeys(turns)]
 
 
@@ -103,12 +104,12 @@ def build_report(conversation: Conversation, results: Any, *, user_context: Any,
     The rows are read as ``user_context``, the conversation's owner, who asked every run in it.
 
     Raises:
-        ValueError: a turn that does not exist, or no answered question to report.
+        InvalidArgument: a turn that does not exist, or no answered question to report.
     """
     steps = [s for t in _chosen(conversation, turns) for s in t.steps
              if s.call.name == "ask" and s.status == "ok" and s.result is not None]
     if not steps:
-        raise ValueError("This conversation has no answered question to report.")
+        raise InvalidArgument("This conversation has no answered question to report.")
     today = datetime.now(timezone.utc).date().isoformat()
     head = f"# {title or conversation.title}\nGenerated {today} · {len(steps)} questions · nl2sql {_version()}"
     return "\n\n".join([head, *(_section(results, user_context, s, include_rows) for s in steps)]) + "\n"

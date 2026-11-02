@@ -119,7 +119,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
     so the list ends before it. ``owner`` is who asked (``ResultOwner``, as the
     result manifest records it); ``engine.traces.get`` answers only that caller.
     """
-    from nl2sql.api.query_api import result_from_state  # query_api imports the runtime
+    from nl2sql.api.query_api import result_from_state, results_withheld  # query_api imports the runtime
     from nl2sql.knowledge.scope import caller_knowledge
 
     traces = ctx.settings.traces
@@ -142,6 +142,10 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
         result = {"error": f"Could not build the QueryResult: {exc}"}
     result = cap(result, limits)
 
+    try:
+        withheld = results_withheld(state, [{"error_code": e.get("error_code")} for e in result.get("errors") or []])
+    except Exception:
+        withheld = True  # unknown, so a caller's copy hides the rows
     by_node: Dict[str, str] = {}
     for node in nodes:
         for call in node["llm_calls"]:
@@ -157,6 +161,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
         "failed": _failed(outcome, result, nodes),
         "error": error,
         "owner": owner,
+        "results_withheld": withheld,
         "request": request,
         "engine": engine_info(),
         "llm": {"configured": _llm_configs(ctx), "by_node": by_node},

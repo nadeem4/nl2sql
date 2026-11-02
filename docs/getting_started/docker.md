@@ -80,5 +80,5 @@ against the same storage.
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \
   -H "Content-Type: application/json" \
-  -d '{"natural_language":"Top 5 customers by revenue last quarter?"}'
+  -d '{"question":"Top 5 customers by revenue last quarter?"}'
 ```

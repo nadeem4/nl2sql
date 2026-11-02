@@ -21,21 +21,25 @@ class StubEngine:
         self.config = config
         self.calls = []
 
-    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+    def run_query(self, question, datasource_id=None, execute=True, user_context=None, choice=None, approvals=None,
+                  llm_override=None):
         self.calls.append(
             {
-                "natural_language": natural_language,
+                "question": question,
                 "datasource_id": datasource_id,
                 "execute": execute,
                 "user_context": user_context,
+                "choice": choice,
+                "approvals": approvals,
+                "llm_override": llm_override,
             }
         )
         if isinstance(self.run_query_result, Exception):
             raise self.run_query_result
         return self.run_query_result
 
-    def stream_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
-                     cancellation_token=None):
+    def stream_query(self, question, datasource_id=None, execute=True, user_context=None,
+                     cancellation_token=None, choice=None, approvals=None, llm_override=None):
         """The run as events: one per node, then ``run.finished`` with ``run_query``'s result."""
         from datetime import datetime, timezone
 
@@ -44,12 +48,13 @@ class StubEngine:
         def event(name, **data):
             return Event(name=name, at=datetime.now(timezone.utc), trace_id="trace-123", data=data)
 
-        self.calls.append({"natural_language": natural_language, "datasource_id": datasource_id,
+        self.calls.append({"question": question, "datasource_id": datasource_id,
                            "execute": execute, "user_context": user_context, "stream": True,
-                           "cancellation_token": cancellation_token})
+                           "cancellation_token": cancellation_token, "choice": choice, "approvals": approvals,
+                           "llm_override": llm_override})
         if isinstance(self.run_query_result, Exception):
             raise self.run_query_result
-        yield event("run.started", question=natural_language)
+        yield event("run.started", question=question)
         yield event("node.started", node="decomposer", sub_query_id=None)
         yield event("node.finished", node="decomposer", sub_query_id=None, seconds=0.1, ok=True)
         yield event("answer.delta", field="summary", text="Revenue ")

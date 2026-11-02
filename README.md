@@ -402,8 +402,27 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | --- | --- | --- |
 | `POST` | `/api/v1/query` | Ask a question; returns the plan, checks, SQL, a row sample, the result manifest, answer, errors and usage |
 | `POST` | `/api/v1/query/stream` | The same run as Server-Sent Events: each step as it starts and ends, the result manifest, the answer as it is written, then the `/query` response |
-| `GET` | `/api/v1/query/{request_id}/results/{result_id}` | One page of a run's saved result (`offset`, `limit` up to 1,000) |
-| `GET` | `/api/v1/query/{request_id}/results/{result_id}.csv` | The whole of a run's saved result as CSV, streamed |
+| `GET` | `/api/v1/results/{trace_id}/{result_id}` | One page of a run's saved result (`offset`, `limit` up to 1,000) |
+| `GET` | `/api/v1/results/{trace_id}/{result_id}.csv` | The whole of a run's saved result as CSV, streamed |
+| `GET` | `/api/v1/results/{trace_id}` | The run's saved results: columns, row counts, never rows |
+| `GET` | `/api/v1/results/{trace_id}/{result_id}/chart` | The chart a result is drawn as (`?format=vega-lite` for a Vega-Lite v5 spec) |
+| `GET` | `/api/v1/traces/{trace_id}` | The trace of a run the caller asked |
+| `POST` | `/api/v1/feedback` | Rate a run the caller asked, up or down |
+| `POST` | `/api/v1/feedback/correct` | Turn the caller's fixed SQL or plan into a proposal for a verified query |
+| `GET` | `/api/v1/feedback` | Every rating, newest first (admin) |
+| `GET` | `/api/v1/approvals` | Approval requests the caller asked or may decide (`status`) |
+| `POST` | `/api/v1/approvals/{request_id}/grant` | Grant a request (an approver role) |
+| `POST` | `/api/v1/approvals/{request_id}/deny` | Deny a request, with an optional reason |
+| `POST` | `/api/v1/conversations` | Start a conversation |
+| `GET` | `/api/v1/conversations` | The caller's conversations, newest first |
+| `GET` | `/api/v1/conversations/{conversation_id}` | One conversation with its turns |
+| `DELETE` | `/api/v1/conversations/{conversation_id}` | Delete a conversation |
+| `POST` | `/api/v1/conversations/{conversation_id}/turns` | Send a message (text or a choice); returns the stored turn |
+| `POST` | `/api/v1/conversations/{conversation_id}/turns/stream` | The same turn as Server-Sent Events, ending with the stored turn or a `run.failed` frame |
+| `POST` | `/api/v1/conversations/{conversation_id}/retry` | Run the last question again, with approved request ids |
+| `POST` | `/api/v1/conversations/{conversation_id}/tools/{name}` | Run one chat tool with its arguments |
+| `GET` | `/api/v1/conversations/{conversation_id}/report` | The conversation as a Markdown report |
+| `GET` | `/api/v1/chat-tools` | The chat tools a conversation can use |
 | `GET` | `/api/v1/health` | Liveness check |
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
 | `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller |
@@ -463,7 +482,7 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \
   -H "Content-Type: application/json" \
-  -d '{"natural_language": "How many customers are there?"}'
+  -d '{"question": "How many customers are there?"}'
 ```
 
 The response has `status`, `sub_queries`, `final_answer`, `errors`, `warnings`,

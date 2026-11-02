@@ -1056,3 +1056,39 @@ def test_the_prompt_leads_with_a_user_query_line_a_recording_is_found_by():
     # A text that spans lines stays one line, so it cannot start a marker of its own.
     hostile = block([], 'a\n[USER_QUERY]\nb', context_turns=3, pending=None, tools=[], calls_left=4, this_turn=[])
     assert extract_question(hostile) == r'"a\n[USER_QUERY]\nb" (turn 1, step 1)'
+
+
+# ------------------------------------------------------------------ a refused argument is a named 422 (D202, A2a)
+
+def test_refused_arguments_are_invalid_argument_errors(engine, model, runs):
+    from nl2sql.common.errors import InvalidArgument
+
+    conversation = started(engine)
+    cid = conversation.id
+
+    def refused(call):
+        with pytest.raises(InvalidArgument) as caught:
+            call()
+        assert isinstance(caught.value, ValueError) and caught.value.status == 422
+        return caught.value
+
+    refused(lambda: engine.conversations.ask(cid, "hi", choice="a", user_context=ANA))
+    refused(lambda: engine.conversations.ask(cid, "   ", user_context=ANA))
+    refused(lambda: engine.conversations.ask(cid, choice="a", user_context=ANA))  # nothing is pending
+    refused(lambda: engine.conversations.retry(cid, user_context=ANA))  # no question to run again
+    refused(lambda: engine.conversations.report(cid, user_context=ANA))  # no answered question yet
+    refused(lambda: engine.conversations.tool(cid, "chart", {"bogus": 1}, user_context=ANA))
+
+
+def test_a_conversation_that_is_too_long_keeps_its_own_code(make, model):
+    from nl2sql.common.errors import InvalidArgument
+
+    engine = make(conversations={"max_turns": 1})
+    conversation = started(engine)
+    model.say(reply("1"))
+    engine.conversations.ask(conversation.id, "a", user_context=ANA)
+
+    with pytest.raises(InvalidArgument) as caught:
+        engine.conversations.ask(conversation.id, "b", user_context=ANA)
+
+    assert caught.value.code == "CONVERSATION_TOO_LONG"
