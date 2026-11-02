@@ -1,10 +1,17 @@
 import React, { useState } from "react";
 import { NOTE_CHOICES, NOTE_MAX, canRate, correctionBody, feedbackBody, ratedLine } from "./feedback.js";
 import { correct, rate } from "../api/chat.js";
+import { saveAnswer } from "../api/answers.js";
+import { describeSaveError, hintSeen, markHintSeen, saveBody, savedLine } from "./answers.js";
 
-// Rate an answer, under the run it belongs to. A rating saves at once; the note saves over it. A wrong answer can
-// also carry the SQL that is right, which is filed as a proposal for review and changes nothing by itself.
-export default function Feedback({ result }) {
+// The browser's own storage, or nothing where it is blocked: the hint helpers cope with both.
+const storage = () => { try { return window.localStorage; } catch { return undefined; } };
+
+// "Did this answer it?" under the run it belongs to. Yes keeps the answer in My answers (and the server rates the run
+// up and may file it for review); Not quite rates it down and opens the note, where a wrong answer can also carry the
+// SQL that is right, filed as a proposal for review that changes nothing by itself. `conversationId` and `stepRef`
+// name the step for Yes; without them Yes is a plain rating.
+export default function Feedback({ result, conversationId = null, stepRef = null }) {
   const [rating, setRating] = useState(null);
   const [note, setNote] = useState("");
   const [sql, setSql] = useState("");
@@ -12,6 +19,7 @@ export default function Feedback({ result }) {
   const [proposal, setProposal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [hint, setHint] = useState(() => !hintSeen(storage()));
 
   if (!canRate(result, false)) return null;
 
@@ -26,6 +34,19 @@ export default function Feedback({ result }) {
       setSaving(false);
     }
   };
+  const choose = (go) => {
+    if (hint) { markHintSeen(storage()); setHint(false); }
+    go();
+  };
+  const yes = () => run(async () => {
+    if (!conversationId || !stepRef) return send("up", note);
+    try {
+      setSaved({ line: savedLine(await saveAnswer(saveBody(result, conversationId, stepRef, note))) });
+      setRating("up");
+    } catch (e) {
+      throw new Error(describeSaveError(e));
+    }
+  });
   const send = (next, text) => run(async () => {
     const reply = await rate(feedbackBody(result, next, text));
     setRating(next);
@@ -40,13 +61,14 @@ export default function Feedback({ result }) {
   return (
     <section className="rate chat-rate" aria-label="Rate this answer">
       <div className="rate-head">
-        <h4>Was this answer right?</h4>
+        <h4>Did this answer it?</h4>
         <div className="rate-buttons" role="group" aria-label="Rating">
-          <button type="button" className="rate-btn" aria-pressed={rating === "up"} disabled={saving} onClick={() => send("up", note)}>Right</button>
-          <button type="button" className="rate-btn" aria-pressed={rating === "down"} disabled={saving} onClick={() => send("down", note)}>Wrong</button>
+          <button type="button" className="rate-btn" aria-pressed={rating === "up"} disabled={saving} onClick={() => choose(yes)}>Yes</button>
+          <button type="button" className="rate-btn" aria-pressed={rating === "down"} disabled={saving} onClick={() => choose(() => send("down", note))}>Not quite</button>
         </div>
-        {saved && <p className="rate-saved" role="status">{ratedLine(saved.rating, saved.note)}</p>}
+        {saved && <p className="rate-saved" role="status">{saved.line || ratedLine(saved.rating, saved.note)}</p>}
       </div>
+      {hint && <p className="rate-hint">Yes keeps this answer in My answers. Not quite lets you say what was wrong.</p>}
       {rating === "down" && !proposal && (
         <form className="rate-note" onSubmit={sendCorrection}>
           <div className="rate-choices">
