@@ -1,0 +1,137 @@
+{
+  "at": "2026-01-01T00:00:00Z",
+  "error": null,
+  "index": 1,
+  "kind": "message",
+  "offers": [],
+  "reply": null,
+  "status": "needs_clarification",
+  "steps": [
+    {
+      "call": {
+        "args": {
+          "question": "Top sales?"
+        },
+        "name": "ask"
+      },
+      "error": null,
+      "output": null,
+      "question": "Top sales?",
+      "result": {
+        "approvals_needed": [],
+        "artifact_refs": {},
+        "clarification": {
+          "asker_tenant_id": null,
+          "asker_user_id": null,
+          "datasource_id": "chinook",
+          "id": "cbd7bc7264bae74c1dcae24d570ed463",
+          "knowledge_digest": "k",
+          "options": [
+            {
+              "explanation": {
+                "assumptions": [],
+                "datasource_id": "chinook",
+                "filters": [],
+                "groupings": [],
+                "joins": [],
+                "measures": [],
+                "order": null,
+                "planner_note": null,
+                "rules": [],
+                "source": "generated",
+                "sub_query_id": null,
+                "tables": [],
+                "terms": [],
+                "text": "Rank by revenue"
+              },
+              "id": "a",
+              "label": "By revenue",
+              "plan": {}
+            },
+            {
+              "explanation": {
+                "assumptions": [],
+                "datasource_id": "chinook",
+                "filters": [],
+                "groupings": [],
+                "joins": [],
+                "measures": [],
+                "order": null,
+                "planner_note": null,
+                "rules": [],
+                "source": "generated",
+                "sub_query_id": null,
+                "tables": [],
+                "terms": [],
+                "text": "Rank by revenue"
+              },
+              "id": "b",
+              "label": "By units sold",
+              "plan": {}
+            }
+          ],
+          "phrase": "top sales",
+          "question": "Top sales?",
+          "schema_version": "v1",
+          "sub_query": {}
+        },
+        "decomposition": null,
+        "errors": [],
+        "explanation": null,
+        "final_answer": null,
+        "reasoning": [],
+        "result_manifest": [],
+        "source": {
+          "datasource_id": null,
+          "id": null,
+          "params": null,
+          "type": "generated"
+        },
+        "status": "needs_clarification",
+        "stop": null,
+        "sub_queries": [],
+        "timings": {},
+        "trace_id": "trace-wait",
+        "trace_path": null,
+        "truncated": false,
+        "usage": {
+          "calls": [],
+          "nodes": {},
+          "plan_cache_hits": 0,
+          "total": {
+            "cache_write_input_tokens": null,
+            "cached_input_tokens": null,
+            "calls": 0,
+            "cost": null,
+            "input_tokens": null,
+            "latency_s": 0.0,
+            "output_tokens": null,
+            "reasoning_tokens": null,
+            "total_tokens": null
+          }
+        },
+        "warnings": []
+      },
+      "status": "needs_clarification",
+      "trace_id": "trace-wait"
+    }
+  ],
+  "text": "Top sales?",
+  "trace_id": null,
+  "usage": {
+    "calls": [],
+    "nodes": {},
+    "plan_cache_hits": 0,
+    "total": {
+      "cache_write_input_tokens": null,
+      "cached_input_tokens": null,
+      "calls": 0,
+      "cost": null,
+      "input_tokens": null,
+      "latency_s": 0.0,
+      "output_tokens": null,
+      "reasoning_tokens": null,
+      "total_tokens": null
+    }
+  }
+}
