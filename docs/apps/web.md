@@ -135,15 +135,6 @@ in the usual result table. An answer the schema has outgrown says it needs fixin
 and one waiting for an approval offers **Run again** once it is granted.
 **Delete** forgets it (`DELETE /answers/{id}`). The list is yours alone.
 
-
-**My answers.** A fold at the top of the Dashboards page lists the answers you kept
-with **Yes** in chat (`GET /answers`): the question, its datasource and the day it
-was kept. **Run** answers the saved plan again as you (`POST /answers/{id}/run`):
-your data scope, hooks and approvals apply, and no model is called; the rows show
-in the usual result table. An answer the schema has outgrown says it needs fixing,
-and one waiting for an approval offers **Run again** once it is granted.
-**Delete** forgets it (`DELETE /answers/{id}`). The list is yours alone.
-
 ## Connect and review
 
 **Connect** (`#/connect`) adds a datasource to the running server.
