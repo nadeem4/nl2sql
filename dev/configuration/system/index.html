@@ -5261,6 +5261,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saved answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -6797,6 +6825,12 @@ same <code>Config</code> as a split layout would:</p>
 <td>The starter dashboard's size and the refresh limits. Every field has a default.</td>
 </tr>
 <tr>
+<td><code>answers</code></td>
+<td>no</td>
+<td><a href="#conversations-chat-tools-dashboards-and-mcp">below</a></td>
+<td>Saved answers: how many one person may keep. Every field has a default.</td>
+</tr>
+<tr>
 <td><code>mcp</code></td>
 <td>no</td>
 <td><a href="#conversations-chat-tools-dashboards-and-mcp">below</a></td>
@@ -7008,14 +7042,17 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="nt">min_refresh_minutes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span><span class="w">              </span><span class="c1"># a schedule below this is refused</span>
 <a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="nt">schedule_identity_max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">   </span><span class="c1"># a schedule stops when its saved identity is older</span>
 <a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>
-<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="c1"># mcp.yaml (every value shown is the default)</span>
-<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="nt">http</span><span class="p">:</span>
-<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
-<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8765</span>
-<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mcp</span>
-<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"127.0.0.1"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
-<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">  </span><span class="nt">allowed_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                              </span><span class="c1"># browser Origins accepted</span>
-<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span><span class="w">            </span><span class="c1"># api_keys | none (none: loopback only)</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="c1"># answers (every value shown is the default)</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="nt">max_per_user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span><span class="w">                    </span><span class="c1"># saved answers one person may keep; the next save is refused</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="c1"># mcp.yaml (every value shown is the default)</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="nt">http</span><span class="p">:</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8765</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mcp</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"127.0.0.1"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a><span class="w">  </span><span class="nt">allowed_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                              </span><span class="c1"># browser Origins accepted</span>
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span><span class="w">            </span><span class="c1"># api_keys | none (none: loopback only)</span>
 </code></pre></div>
 <table>
 <thead>
@@ -7036,6 +7073,10 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <tr>
 <td><code>dashboards</code></td>
 <td><code>Dashboards</code>: strict keys; every value is at least 1. Read by <code>engine.dashboards</code> (D1 to D3).</td>
+</tr>
+<tr>
+<td><code>answers</code></td>
+<td><code>Answers</code>: strict keys; <code>max_per_user</code> is at least 1. Read by <code>engine.answers</code> (DB1a): the save past the cap is refused with <code>AnswerLimitReached</code>, never by dropping an older answer.</td>
 </tr>
 <tr>
 <td><code>mcp</code></td>

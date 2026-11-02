@@ -5194,6 +5194,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saved answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -7023,6 +7051,11 @@ accepted and validated now; the Wave B change named with each reads it.</p>
 <td><code>dashboards.schedule_identity_max_age_days</code></td>
 <td><code>30</code></td>
 <td>A schedule stops when the owner identity saved with it is older than this, until the owner sets it again.</td>
+</tr>
+<tr>
+<td><code>answers.max_per_user</code></td>
+<td><code>100</code></td>
+<td>Saved answers one person may keep (<code>engine.answers</code>); the next save is refused with <code>AnswerLimitReached</code>.</td>
 </tr>
 </tbody>
 </table>
