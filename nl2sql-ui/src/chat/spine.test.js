@@ -1,7 +1,7 @@
 // Run with `npm test`. What a turn's stream adds up to: Wave A's event names fill the spine.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EMPTY_SPINE, liveResult, liveStations, spineOf } from "./spine.js";
+import { EMPTY_SPINE, liveStations, spineOf } from "./spine.js";
 
 // A frame as http.stream hands it over: the event name and the whole Event as JSON.
 const frame = (event, data = {}, trace_id = "t-1") => ({ event, data: { name: event, trace_id, data } });
@@ -27,8 +27,8 @@ test("a step that runs twice keeps its longest time and is listed once", () => {
 
 test("result.manifest keeps the run's trace id and makes the rows readable before the answer", () => {
   const spine = run(frame("result.manifest", { results: [{ id: "r1" }] }, "t-9"));
-  assert.deepEqual(liveResult(spine), { trace_id: "t-9", result_manifest: [{ id: "r1" }], status: "running" });
-  assert.equal(liveResult(EMPTY_SPINE), null);
+  assert.equal(spine.traceId, "t-9");
+  assert.deepEqual(spine.manifest, [{ id: "r1" }]);
 });
 
 test("answer.delta grows the summary and ignores a field it does not show", () => {

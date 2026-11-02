@@ -12,11 +12,14 @@ export default function TracePanel({ result }) {
   const [picked, setPicked] = useState(null);
   const id = result && result.trace_id;
 
+  // The trace is a whole document, so it is read when a node is first picked, not when the page opens.
+  const wanted = picked !== null;
   useEffect(() => {
+    if (!wanted || !id || trace) return undefined;
     let current = true;
     getTrace(id).then((t) => current && setTrace(t)).catch((e) => current && setError(e.message));
     return () => { current = false; };
-  }, [id]);
+  }, [id, wanted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const usage = result.usage;
   const ledger = nodeLedger(usage, result.timings);

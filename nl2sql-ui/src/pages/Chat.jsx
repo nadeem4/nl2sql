@@ -6,6 +6,7 @@ import {
 import Composer from "../chat/Composer.jsx";
 import Spine from "../chat/Spine.jsx";
 import Turn from "../chat/Turn.jsx";
+import { addressChange, withConversation, withTurn } from "../chat/convstate.js";
 import { EMPTY_SPINE, spineOf } from "../chat/spine.js";
 import { hashFor } from "../router.js";
 
@@ -17,8 +18,9 @@ function describe(e) {
 
 // The conversation page: a list of the caller's conversations and one transcript. A turn streams its steps while it
 // runs and is then replaced by the stored turn the server sends last, so what stays is exactly what was saved.
-// `starter` is a question another page wants asked (Home's sample question); `onStarter` says it was taken.
-export default function Chat({ param, starter, onStarter }) {
+// `starter` is a question another page wants asked (Home's sample question); `onStarter` says it was taken;
+// `onCaller(user id)` tells the app who the signed-in user is, since a conversation's owner is its caller.
+export default function Chat({ param, starter, onStarter, onCaller }) {
   const [list, setList] = useState([]);
   const [conv, setConv] = useState(null);
   const [tools, setTools] = useState([]);
@@ -43,14 +45,16 @@ export default function Chat({ param, starter, onStarter }) {
   // must not read it again over the stream.
   useEffect(() => {
     if (!param) { setConv(null); return undefined; }
-    if (param === createdRef.current) return undefined;
+    const { load, created } = addressChange(param, createdRef.current);
+    createdRef.current = created;
+    if (!load) return undefined;
     let current = true;
     setError(null);
     getConversation(param).then((c) => current && setConv(c)).catch((e) => { if (current) { setConv(null); setError(describe(e)); } });
     return () => { current = false; };
   }, [param]);
 
-  const append = (turn) => setConv((c) => (c ? { ...c, turns: [...c.turns, turn] } : c));
+  useEffect(() => { if (conv && conv.user_id && onCaller) onCaller(conv.user_id); }, [conv && conv.user_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (body, label) => {
     if (busy) return;
@@ -72,13 +76,13 @@ export default function Chat({ param, starter, onStarter }) {
     let failed = null;
     const controller = new AbortController();
     abortRef.current = controller;
-    setLive({ label, spine });
+    setLive({ label, spine, stoppable: true });
     try {
       await streamTurn(c.id, body, ({ event, data }) => {
         spine = spineOf(spine, { event, data });
         if (spine.turn) stored = spine.turn;
         if (spine.failed) failed = spine.failed;
-        setLive({ label, spine });
+        setLive({ label, spine, stoppable: true });
       }, controller.signal);
     } catch (e) {
       if (!e || e.name !== "AbortError") setError(describe(e));
@@ -86,8 +90,9 @@ export default function Chat({ param, starter, onStarter }) {
       abortRef.current = null;
       setLive(null);
     }
-    if (stored) setConv((cur) => (cur ? { ...cur, turns: [...cur.turns, stored] } : cur));
-    else getConversation(c.id).then(setConv).catch(() => {});
+    // The asker may have opened another conversation while this one ran; the result belongs to the one it was sent for.
+    if (stored) setConv((cur) => withTurn(cur, c.id, stored));
+    else getConversation(c.id).then((next) => setConv((cur) => withConversation(cur, next))).catch(() => {});
     if (failed) setError(failed);
     refreshList();
   };
@@ -103,9 +108,11 @@ export default function Chat({ param, starter, onStarter }) {
   const act = async (work) => {
     if (busy || !conv) return;
     setError(null);
-    setLive({ label: "", spine: EMPTY_SPINE });
+    const id = conv.id;
+    setLive({ label: "", spine: EMPTY_SPINE, stoppable: false });
     try {
-      append(await work(conv.id));
+      const turn = await work(id);
+      setConv((cur) => withTurn(cur, id, turn));
     } catch (e) {
       setError(describe(e));
     } finally {
@@ -156,7 +163,7 @@ export default function Chat({ param, starter, onStarter }) {
           )}
           {!conv && !live && <p className="page-note chat-empty">Ask a question to start a conversation. The model picks the steps, and each answer shows how it was made.</p>}
         </div>
-        <Composer busy={busy} fresh={!conv || conv.turns.length === 0} datasources={sources}
+        <Composer busy={busy} canStop={Boolean(live && live.stoppable)} fresh={!conv || conv.turns.length === 0} datasources={sources}
           datasource={datasource} onDatasource={setDatasource}
           onSend={(text) => send({ text, execute: true }, text)}
           onStop={() => abortRef.current && abortRef.current.abort()} />

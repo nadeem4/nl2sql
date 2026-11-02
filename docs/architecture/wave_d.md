@@ -879,7 +879,7 @@ no W-PR deletes a file another imports:
 |---|---|
 | `node --test` over `src/**/*.test.js` (CI0 runs it in CI, fixing B202) | Every pure module: the router, the transport's envelope parsing and SSE reader, chart scales and paths, the schema form generator, filters, key handling, the hosted first run |
 | `src/api/routes.test.js` | Every path in `src/api/*.js` exists in `packages/api/openapi.json` with that method (D217) |
-| Golden fixtures | `nl2sql-ui/src/api/fixtures/*.json`: an `ApiError` and a `Job` (D0a-3), a `QueryResult` (A1), a `Turn` (A2a), a `Dashboard` and a `DashboardView` with its runs (A2b), a `Proposal` and a `DriftReport` (A3), a `Job` with an `EvalReport` and `/meta` (A4a). Each is written by that PR's route test from a real response, and `test_web_fixtures_are_current` fails when one is stale, as `openapi.json`'s test does. `turns.js`, `chart.js`, `status.js` and the other node tests read them. |
+| Golden fixtures | `nl2sql-ui/src/api/fixtures/*.json`: an `ApiError` and a `Job` (D0a-3), a `QueryResult` (A1), a `Turn` (A2a) and two waiting turns, `TurnClarification` and `TurnApproval` (W1), a `Dashboard` and a `DashboardView` with its runs (A2b), a `Proposal` and a `DriftReport` (A3), a `Job` with an `EvalReport` and `/meta` (A4a). Each is written by that PR's route test from a real response, and `test_web_fixtures_are_current` fails when one is stale, as `openapi.json`'s test does. `turns.js`, `chart.js`, `status.js` and the other node tests read them. |
 | `test_openapi_snapshot_is_current` | `openapi.json` is what the app serves |
 | `npm run build` in the CI job | The page builds; the job summary records the size of the built page and of the Mermaid chunk |
 | `scripts/fresh_install_check.py` (changed) | A fresh install of the three wheels serves the page and the v1 routes, demo and hosted |
@@ -1560,12 +1560,16 @@ and `init_project` were exported already; `RegistryError`, `load_trace`, `check_
 `src/api/chat.js`: `listConversations`, `startConversation`, `getConversation`, `deleteConversation`, `chatTools`,
 `sendTurn`, `streamTurn` (POST, SSE), `retryTurn(id, approvalIds)`, `runTool(id, name, args)`, `rate`, `correct`,
 `getTrace`, `listApprovals(status)`, `grantApproval`, `denyApproval(id, reason)`, `listDatasources`, `saveChoice`. The
-report tool is not called there, because `request()` parses JSON and `GET .../report` is markdown (W2a's). Pure
-modules, each with a test: `chat/spine.js` (`spineOf`, `liveStations`, `liveResult`; `run.started` resets all but the
+Report button calls `POST /tools/report` through `runTool` (JSON, with the markdown in `output.body`); only the `GET
+.../report` download is unwired. Pure
+modules, each with a test: `chat/spine.js` (`spineOf`, `liveStations`; `run.started` resets all but the
 steps), `chat/turns.js` (`answerOf`, `askSteps`, `pendingClarification`, `pendingApprovals`, `outputsOf`, `offersFor`,
-`toolButtons`, `toolArgs`, `statusLine`, `errorLine`), `chat/clarify.js`, `chat/approval.js`, `chat/warnings.js`,
+`toolButtons`, `toolArgs`, `statusLine`, `errorLine`, `waitsOf`: a clarification or approval wait is live on the last turn
+only), `chat/convstate.js` (`withTurn`, `withConversation`, `addressChange`: a late result goes to the conversation it was
+sent for), `chat/clarify.js`, `chat/approval.js` (`approvalState`, `ownRequest`, `toDecide`), `chat/warnings.js`,
 `chat/why.js`, `chat/feedback.js`. `Chat` takes `param` (the conversation id), `starter` (a question Home wants
-asked) and `onStarter`. `navItems(page, off, badges)` takes the Approvals count; `page()` in `router.js` builds a
+asked), `onStarter` and `onCaller` (the owner of a conversation is the caller; `App` uses it to leave their own requests
+out of the Approvals badge). The `TurnClarification.json` and `TurnApproval.json` fixtures are real waiting turns. `navItems(page, off, badges)` takes the Approvals count; `page()` in `router.js` builds a
 route entry. Tool arguments use 1-based `turn` and `step`. A 409 from a turn means the conversation is busy.
 **For W2a:** the rows table still fetches rows through `outputs/RowsTable.jsx` and `results.js` with the old URLs;
 repoint them to `GET /results/{id}`. **For W4:** Settings, Retrieval and Pipeline still call the old `/api/*` routes,

@@ -23,6 +23,17 @@ export function pendingApprovals(turn) {
   return askSteps(turn).flatMap((s) => (s.result && s.result.approvals_needed) || []);
 }
 
+// What the asker can act on now. A pick answers only the conversation's pending question, and a retry re-runs the last
+// question, so a clarification or an approval wait is live on the last turn alone.
+export function waitsOf(turn, conversation) {
+  const turns = (conversation && conversation.turns) || [];
+  const last = turns.length > 0 && turns[turns.length - 1].index === turn.index;
+  return {
+    clarification: last && conversation.pending ? pendingClarification(turn) : null,
+    approvals: last ? pendingApprovals(turn) : [],
+  };
+}
+
 export const outputsOf = (turn) =>
   (turn.steps || []).flatMap((s, index) => (s.output ? [{ index, output: s.output }] : []));
 
@@ -38,10 +49,11 @@ export function toolButtons(turn, conversation, tools) {
     .map((name) => ({ name, label: toolLabel(name) }));
 }
 
-export function statusLine(turn) {
+// `open` is false for an earlier turn whose question or approval has been superseded: it then says nothing about it.
+export function statusLine(turn, open = true) {
   switch (turn.status) {
-    case "needs_clarification": return "The model needs you to pick the meaning of the question.";
-    case "needs_approval": return "This answer is waiting for an approval.";
+    case "needs_clarification": return open ? "The model needs you to pick the meaning of the question." : null;
+    case "needs_approval": return open ? "This answer is waiting for an approval." : null;
     case "stopped": return "The turn stopped before it could answer.";
     default: return null;
   }

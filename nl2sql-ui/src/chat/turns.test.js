@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { answerOf, askSteps, errorLine, offersFor, outputsOf, pendingApprovals, pendingClarification, statusLine, toolArgs, toolButtons, toolLabel } from "./turns.js";
+import { answerOf, askSteps, errorLine, offersFor, outputsOf, pendingApprovals, pendingClarification, statusLine, toolArgs, toolButtons, toolLabel, waitsOf } from "./turns.js";
 
 const turn = (patch = {}) => ({ ...JSON.parse(readFileSync(new URL("../api/fixtures/Turn.json", import.meta.url), "utf8")), ...patch });
 const step = (name, patch = {}) => ({ call: { name, args: {} }, status: "ok", question: null, trace_id: null, result: null, output: null, error: null, ...patch });
@@ -68,4 +68,23 @@ test("a tool button runs on this turn's first answer; a report covers the conver
   assert.deepEqual(toolArgs("diagram", t), { view: "answer", turn: 3, step: 1 });
   assert.deepEqual(toolArgs("report", t), {});
   assert.deepEqual(toolArgs("dashboard_pin", t), {});
+});
+
+const fixture = (name) => JSON.parse(readFileSync(new URL(`../api/fixtures/${name}`, import.meta.url), "utf8"));
+
+test("a real clarification turn offers its readings, and only while it is the open question", () => {
+  const t = fixture("TurnClarification.json");
+  const conv = { turns: [t], pending: t.steps[0].result.clarification };
+  assert.deepEqual(waitsOf(t, conv).clarification.options.map((o) => o.id), ["a", "b"]);
+  assert.equal(waitsOf(t, { turns: [t], pending: null }).clarification, null);
+  const later = { ...t, index: 2 };
+  assert.equal(waitsOf(t, { turns: [t, later], pending: conv.pending }).clarification, null);
+});
+
+test("a real approval turn lists its requests, only on the last turn", () => {
+  const t = fixture("TurnApproval.json");
+  assert.deepEqual(waitsOf(t, { turns: [t] }).approvals.map((a) => a.id), ["ap-1"]);
+  assert.deepEqual(waitsOf(t, { turns: [t, { ...t, index: 2, status: "answered" }] }).approvals, []);
+  assert.equal(statusLine(t, false), null);
+  assert.match(statusLine(t, true), /approval/);
 });

@@ -11,8 +11,8 @@ import TracePanel from "./TracePanel.jsx";
 import Warnings from "./Warnings.jsx";
 import WhyPanel from "./WhyPanel.jsx";
 import {
-  answerOf, askSteps, errorLine, offersFor, outputsOf, pendingApprovals, pendingClarification, statusLine,
-  toolArgs, toolButtons, toolLabel,
+  answerOf, askSteps, errorLine, offersFor, outputsOf, statusLine,
+  toolArgs, toolButtons, toolLabel, waitsOf,
 } from "./turns.js";
 
 // What the asker said: their words, or the reading they picked, or the action that re-ran or ran something.
@@ -65,12 +65,12 @@ function Answer({ step, many }) {
 }
 
 export default function Turn({ turn, conversation, tools, busy, onPick, onRetry, onTool }) {
-  const clarification = pendingClarification(turn);
-  const approvals = pendingApprovals(turn);
+  const { clarification, approvals } = waitsOf(turn, conversation);
+  const open = Boolean(clarification) || approvals.length > 0;
   const steps = askSteps(turn);
   const outputs = outputsOf(turn);
   const buttons = toolButtons(turn, conversation, tools);
-  const status = statusLine(turn);
+  const status = statusLine(turn, open);
   const failed = errorLine(turn);
   return (
     <article className="chat-turn" aria-label={`Turn ${turn.index}`}>

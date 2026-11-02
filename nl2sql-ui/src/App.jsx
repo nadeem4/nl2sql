@@ -6,6 +6,7 @@ import RetrievalInspector from "./pages/Retrieval.jsx";
 import Home from "./pages/Home.jsx";
 import { sampleQuestion } from "./pages/home.js";
 import { listApprovals } from "./api/chat.js";
+import { toDecide } from "./chat/approval.js";
 import { needsKey } from "./pages/firstRun.js";
 import { modeStatus } from "./pages/status.js";
 import { readKeys, writeKeyFor } from "./lib/hostedKey.js";
@@ -137,7 +138,9 @@ export default function App() {
   const [pipelineError, setPipelineError] = useState(null);
   // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
   const [starter, setStarter] = useState(null);
-  const [pending, setPending] = useState(0);
+  const [waiting, setWaiting] = useState([]);
+  // The signed-in user's id, once a conversation has told us (its owner is the caller). Their own requests are not theirs to decide.
+  const [callerId, setCallerId] = useState(null);
   // The hosted demo keys and step choices: this tab, never the server.
   const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
   const [stepModels, setStepModels] = useState(() => readModels(window.sessionStorage));
@@ -159,7 +162,7 @@ export default function App() {
   // The Approvals tab shows how many requests wait; it is read again on each page change, which is when a decision
   // or a new request is most likely to have happened. A caller who may not see approvals simply sees no count.
   useEffect(() => {
-    listApprovals("pending").then((records) => setPending(records.length)).catch(() => setPending(0));
+    listApprovals("pending").then(setWaiting).catch(() => setWaiting([]));
   }, [page]);
 
   // A new page starts at its top, with the keyboard on it: the browser does
@@ -204,7 +207,7 @@ export default function App() {
     // Hosted, Settings is not off: it is where the visitor puts their own key.
     settings: settings && !settings.available && !settings.hosted,
     retrieval: retrieval && !retrieval.available,
-  }, { approvals: pending });
+  }, { approvals: toDecide(waiting, callerId).length });
 
   return (
     <div className="app">
@@ -261,13 +264,13 @@ export default function App() {
 
         {page === "chat" && (
           <Suspense fallback={null}>
-            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} />
+            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} onCaller={setCallerId} />
           </Suspense>
         )}
 
         {page === "approvals" && (
           <Suspense fallback={null}>
-            <Approvals />
+            <Approvals callerId={callerId} />
           </Suspense>
         )}
 

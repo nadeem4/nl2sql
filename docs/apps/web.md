@@ -22,10 +22,12 @@ to the same place. A new conversation also offers the datasource's starter
 questions and, with more than one datasource, a choice of which one to ask.
 
 **A turn streams.** A question is sent to `POST /conversations/{id}/turns/stream`.
-While it runs, the page shows the run spine (the pipeline stations as they start
-and finish, with their timings) and the answer text as it arrives. The last
+While it runs, the page shows the run spine (the pipeline stations lit as each
+one finishes) and the answer text as it arrives. The rows appear with the stored
+turn, not before. The last
 event carries the stored turn, which replaces the live view, so what stays on
-the page is exactly what the server saved. **Stop** cancels the stream. A second
+the page is exactly what the server saved. **Stop** cancels the stream; during a tool or retry call, which cannot be
+cancelled from the page, the button reads **Working** and is disabled. A second
 turn sent while one is running is refused by the server with 409, and the page
 says so.
 
@@ -41,6 +43,12 @@ them, in this order:
 - a rating (**Right** or **Wrong**, with a note), and a corrected SQL that
   **Send for review** files (`POST /feedback`, `POST /feedback/correct`).
 
+**Only the last turn is live.** A clarification pick answers the conversation's
+pending question, and **Run it now** re-runs the last question, so those buttons
+show on the last turn only. Earlier turns keep their text. If you open another
+conversation while a turn is running, its result is added to the conversation it
+was sent for, not to the one on screen.
+
 **Clarification.** When the model needs a decision, the turn shows its question
 and an option for each reading. **Use this reading** sends `{choice: option id}`
 as the next turn. **Remember this meaning** also files the pick, with an
@@ -54,14 +62,20 @@ with the approval ids. **Check again** reads the requests' state; a denied reque
 (`GET /chat-tools`, `POST /conversations/{id}/tools/{name}`): **Chart**,
 **Diagram**, **Report**, and **Pin to dashboard** when the conversation belongs
 to a dashboard. A tool the model offers in its reply gets a button too. Tool
-arguments use 1-based `turn` and `step` numbers.
+arguments use 1-based `turn` and `step` numbers. **Report** calls
+`POST /conversations/{id}/tools/report`, which stores the report as a turn output
+(the markdown is in `output.body`); the `GET /conversations/{id}/report` download
+is not used by the page.
 
 ## Approvals
 
 `#/approvals` lists the requests waiting for a decision (`GET /approvals?status=pending`),
 each with the question, who asked, the plan, the SQL it would run and why it
-stopped. **Grant** and **Deny** call the matching routes. The nav item shows how
-many are waiting; a caller who may not see approvals sees no count.
+stopped. **Grant** and **Deny** call the matching routes. The list also holds requests you
+asked yourself; those show no buttons, since only an approver may decide them,
+and the nav count leaves them out. The page learns your user id from the owner of
+a conversation, so until you have opened Chat it cannot tell them apart and the
+server refuses a decision that is not yours, with its reason shown.
 
 ## Source map
 

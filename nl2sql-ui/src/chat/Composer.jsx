@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 // The question box. In a new conversation it offers the datasources' starter questions and, with more than one
 // datasource, a choice of which to ask; once a conversation exists the datasource is fixed.
-export default function Composer({ busy, fresh, datasources, datasource, onDatasource, starter, onSend, onStop }) {
+export default function Composer({ busy, canStop, fresh, datasources, datasource, onDatasource, starter, onSend, onStop }) {
   const [text, setText] = useState("");
   useEffect(() => { if (starter) setText(starter); }, [starter]);
 
@@ -38,7 +38,9 @@ export default function Composer({ busy, fresh, datasources, datasource, onDatas
           </div>
         )}
         {busy
-          ? <button type="button" className="ask" onClick={onStop}>Stop</button>
+          ? (canStop
+            ? <button type="button" className="ask" onClick={onStop}>Stop</button>
+            : <button type="button" className="ask" disabled>Working</button>)
           : <button type="button" className="ask" disabled={!text.trim()} onClick={submit}>Ask</button>}
       </div>
     </section>

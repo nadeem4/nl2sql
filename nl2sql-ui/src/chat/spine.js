@@ -75,10 +75,3 @@ export function liveStations(spine) {
   states.cost = live ? "queued" : "busy";
   return states;
 }
-
-// Enough of a result for the rows table to page the saved results before the turn is over, or null until the
-// manifest has arrived.
-export function liveResult(spine) {
-  if (!spine || !spine.manifest || !spine.traceId) return null;
-  return { trace_id: spine.traceId, result_manifest: spine.manifest, status: "running" };
-}

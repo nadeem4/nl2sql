@@ -8,3 +8,8 @@ export function approvalState(needed, records) {
   if (needed.length && needed.every((n) => status(n) === "granted")) return { state: "ready", ids: needed.map((n) => n.id) };
   return { state: "waiting", ids: [] };
 }
+
+// The list also holds the caller's own requests, which only an approver may decide. Without a known caller nothing
+// is told apart, and the server's refusal says so.
+export const ownRequest = (record, callerId) => Boolean(callerId) && record.request.asker_user_id === callerId;
+export const toDecide = (records, callerId) => records.filter((r) => !ownRequest(r, callerId));

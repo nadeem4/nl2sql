@@ -16,10 +16,12 @@ from itertools import count
 from dashboard_stubs import AT, Recorder, dashboard, view
 from fastapi.testclient import TestClient
 
-from nl2sql import QueryResult, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
+from nl2sql import ApprovalRequest, QueryResult, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
 from nl2sql.testing.config import make_config
 from nl2sql import DatasourceInfo, DriftReport, EvalReport, Proposal
 from nl2sql.schema.impact import DriftImpact, ImpactedQuery
+from nl2sql.clarify.models import ClarificationOption, ClarificationRequest
+from nl2sql.explain.models import ExplainedStep
 from nl2sql_sdk.schema import ColumnChange, ColumnRef, SchemaDiff, TableRef
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
@@ -30,6 +32,28 @@ FIXTURES = pathlib.Path(__file__).resolve().parents[3] / "nl2sql-ui" / "src" / "
 START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
+def _waiting() -> dict:
+    """Two turns that stopped for a person: a question with two readings, and one held for an approval."""
+    reading = ExplainedStep(datasource_id="chinook", source="generated", text="Rank by revenue")
+    clarification = ClarificationRequest.build(
+        question="Top sales?", phrase="top sales", datasource_id="chinook", schema_version="v1", knowledge_digest="k",
+        sub_query={}, options=[ClarificationOption(id="a", label="By revenue", plan={}, explanation=reading),
+                               ClarificationOption(id="b", label="By units sold", plan={}, explanation=reading)])
+    approval = ApprovalRequest(id="ap-1", question="Delete old rows?", hook="review", datasource_id="chinook",
+                               sql="SELECT 1", sql_sha256="0" * 64, reason="A reviewer must approve this query.")
+
+    def turn(status, text, **fields):
+        return Turn(index=1, at=START, kind="message", text=text, status=status, steps=[ToolStep(
+            call=ToolCall(name="ask", args={"question": text}), status=status, question=text, trace_id="trace-wait",
+            result=QueryResult(trace_id="trace-wait", status=status, **fields))])
+
+    return {"Top sales?": turn("needs_clarification", "Top sales?", clarification=clarification),
+            "Run the report": turn("needs_approval", "Run the report", approvals_needed=[approval])}
+
+
+WAITING = _waiting()
+
+
 def build() -> dict:
     """``{file name: its JSON}``, from responses of an app with no real engine behind it."""
     ticks, ids = count(), count(1)
@@ -38,6 +62,8 @@ def build() -> dict:
             """One stored turn that asked a question and was answered, as ``POST /conversations/{id}/turns`` serves it."""
 
             def ask(self, conversation_id, text=None, **kwargs):
+                if text in WAITING:
+                    return WAITING[text]
                 return Turn(index=1, at=START, kind="message", text=text, reply="There are 59 customers.",
                             steps=[ToolStep(call=ToolCall(name="ask", args={"question": text}), status="ok",
                                             question=text, trace_id="trace-0001-fixture")],
@@ -111,7 +137,9 @@ def build() -> dict:
             assert meta.status_code == 200 and "datasources" in meta.json(), meta.text
             turn = client.post("/api/v1/conversations/conv-0001/turns", json={"text": "How many customers are there?"})
             assert turn.status_code == 200, turn.text
-            return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
+            waiting = {name: client.post("/api/v1/conversations/conv-0001/turns", json={"text": text}).json()
+                       for name, text in (("TurnClarification.json", "Top sales?"), ("TurnApproval.json", "Run the report"))}
+            return {**waiting, "ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json(),
                     "JobEval.json": client.get(f"/api/v1/jobs/{evaluated.id}").json(), "Meta.json": meta.json(),
                     "QueryResult.json": answer.json(), "Turn.json": turn.json(),
                     "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
