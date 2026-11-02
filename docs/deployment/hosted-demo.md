@@ -252,8 +252,9 @@ In hosted mode every browser is an anonymous session: a random `nl2sql_demo_sess
 (`visitor-` and 32 hex characters of its SHA-256), and that id is the `user_id` of everything the visitor owns
 (conversations, dashboards, jobs, approvals), the key of the limits below, and what `GET /meta` shows as `caller.user_id`.
 The visitor holds the one visitor role and is never an admin, so the admin routes answer
-`403`. Only the 32-character lowercase hex token this server mints is accepted as the cookie (anything else gets a
-new session), and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
+`403`. Only a token this process minted is accepted as the cookie (it remembers the ids of the last 5,000; a token of the
+right form that it did not mint, such as one a visitor chose, gets a new session, so no one can fix the token another
+browser will use), and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
 at a time, besides the limits below; going over any of them
 is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
@@ -273,7 +274,7 @@ no storage.
 | Limit | Default | Set by | Keyed by |
 | --- | --- | --- | --- |
 | Questions per minute | 6 | `--questions-per-minute` | client address (a token bucket) |
-| Questions per session | 30 | `--questions-per-session` | a random session cookie |
+| Questions per session | 30 | `--questions-per-session` | the visitor id (from the session cookie) |
 | Query timeout | 300s | `settings.pipeline.timeout_s` in the demo's `settings.yaml` | the run |
 | Rows returned | 10,000 | the demo datasources' `limits.row_limit`, bounded by `settings.results.row_limit` | the query |
 

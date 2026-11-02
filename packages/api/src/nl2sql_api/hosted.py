@@ -23,6 +23,7 @@ import re
 import secrets
 import threading
 import time
+from collections import OrderedDict
 from http.cookies import SimpleCookie
 from typing import Callable, Dict, List, NamedTuple, Optional
 
@@ -32,7 +33,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from nl2sql import UserContext
 from nl2sql_api.errors import ApiError, ErrorBody
 
-# The cookie the session cap counts against. It names no visitor: a random token this process made up.
+# The cookie that finds a visitor. It names no one: a random token this process made up and remembers (Hosted.mint).
 SESSION_COOKIE = "nl2sql_demo_session"
 
 DEFAULT_QUESTIONS_PER_MINUTE = 6
@@ -62,23 +63,23 @@ class Limits:
     """Two caps per visitor, in this process's memory and nowhere else.
 
     A token bucket holds the pace down (``per_minute`` questions, refilled steadily) and a counter holds the total down
-    (``per_session`` questions). The bucket is keyed by address; the counter by the session cookie, which is what "per
-    session" means.
+    (``per_session`` questions). The bucket is keyed by address; the counter by the visitor id (:meth:`Hosted.visitor_id`),
+    which is what "per session" means.
     """
 
     def __init__(self, per_minute: int = DEFAULT_QUESTIONS_PER_MINUTE, per_session: int = DEFAULT_QUESTIONS_PER_SESSION,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self.per_minute, self.per_session, self._clock = per_minute, per_session, clock
         self._buckets: Dict[str, List[float]] = {}  # address -> [tokens left, when that was true]
-        self._asked: Dict[str, List[float]] = {}  # session -> [questions asked, when the last one was]
+        self._asked: Dict[str, List[float]] = {}  # visitor -> [questions asked, when the last one was]
         self._lock = threading.Lock()
 
-    def take(self, *, address: str, session: str) -> Optional[Refusal]:
+    def take(self, *, address: str, visitor: str) -> Optional[Refusal]:
         """Spends one question, or says why it cannot be spent."""
         now = self._clock()
         with self._lock:
             self._forget(now)
-            asked = self._asked.setdefault(session, [0.0, now])
+            asked = self._asked.setdefault(visitor, [0.0, now])
             if asked[0] >= self.per_session:
                 asked[1] = now
                 return Refusal(SESSION_MESSAGE.format(cap=self.per_session), int(IDLE_SECONDS))
@@ -92,10 +93,10 @@ class Limits:
             asked[1] = now
             return None
 
-    def asked(self, session: str) -> int:
-        """How many questions this session has spent, for the page's counter."""
+    def asked(self, visitor: str) -> int:
+        """How many questions this visitor has spent, for the page's counter."""
         with self._lock:
-            return int(self._asked.get(session, [0.0])[0])
+            return int(self._asked.get(visitor, [0.0])[0])
 
     def _forget(self, now: float) -> None:
         for store in (self._buckets, self._asked):
@@ -108,13 +109,14 @@ class Limits:
 
 
 class Hosted:
-    """Hosted mode's state: the role every visitor holds, the limits, and the streams each session has open."""
+    """Hosted mode's state: the role every visitor holds, the limits, and the streams each visitor has open."""
 
     def __init__(self, role: Optional[str], limits: Optional[Limits] = None) -> None:
         self.role = role
         self.limits = limits or Limits()
         self._streams: Dict[str, int] = {}
-        self._starting: set = set()  # sessions whose job start is being handled: the slot a parallel start cannot take
+        self._minted: "OrderedDict[str, None]" = OrderedDict()  # ids of the tokens this process made, oldest first
+        self._starting: set = set()  # visitors whose job start is being handled: the slot a parallel start cannot take
         self._lock = threading.Lock()
 
     @staticmethod
@@ -125,46 +127,62 @@ class Hosted:
         an input that is already unguessable."""
         return "visitor-" + hashlib.sha256(b"nl2sql-hosted-visitor:" + token.encode()).hexdigest()[:32]
 
+    def mint(self) -> str:
+        """A new session token, remembered (as its visitor id, never the token) so :meth:`knows` can recognise it. The
+        store holds :data:`MAX_VISITORS`; the oldest is forgotten first, and its holder gets a new session."""
+        token = secrets.token_hex(16)
+        with self._lock:
+            self._minted[self.visitor_id(token)] = None
+            while len(self._minted) > MAX_VISITORS:
+                self._minted.popitem(last=False)
+        return token
+
+    def knows(self, token: str) -> bool:
+        """Whether this process minted ``token``. A cookie of the right form that it did not mint is no session: a
+        visitor cannot choose the token it will be known by (session fixation)."""
+        with self._lock:
+            return _MINTED.fullmatch(token) is not None and self.visitor_id(token) in self._minted
+
     def user(self, visitor: str, tenant_id: Optional[str] = None) -> UserContext:
         """The visitor with id ``visitor`` (from :meth:`visitor_id`): anonymous, with the one role, never an admin."""
         return UserContext(user_id=visitor, tenant_id=tenant_id, roles=[self.role] if self.role else [])
 
-    def open_stream(self, session: str) -> bool:
-        """Reserves one of the session's streams; False when it already has :data:`STREAMS_PER_SESSION` open."""
+    def open_stream(self, visitor: str) -> bool:
+        """Reserves one of the visitor's streams; False when it already has :data:`STREAMS_PER_SESSION` open."""
         with self._lock:
-            if self._streams.get(session, 0) >= STREAMS_PER_SESSION:
+            if self._streams.get(visitor, 0) >= STREAMS_PER_SESSION:
                 return False
-            self._streams[session] = self._streams.get(session, 0) + 1
+            self._streams[visitor] = self._streams.get(visitor, 0) + 1
             return True
 
-    def close_stream(self, session: str) -> None:
+    def close_stream(self, visitor: str) -> None:
         with self._lock:
-            left = self._streams.get(session, 0) - 1
+            left = self._streams.get(visitor, 0) - 1
             if left > 0:
-                self._streams[session] = left
+                self._streams[visitor] = left
             else:
-                self._streams.pop(session, None)
+                self._streams.pop(visitor, None)
 
-    def start_job(self, session: str) -> bool:
-        """Reserves the session's one job slot, atomically; False when a start is already under way."""
+    def start_job(self, visitor: str) -> bool:
+        """Reserves the visitor's one job slot, atomically; False when a start is already under way."""
         with self._lock:
-            if session in self._starting:
+            if visitor in self._starting:
                 return False
-            self._starting.add(session)
+            self._starting.add(visitor)
             return True
 
-    def end_job(self, session: str) -> None:
+    def end_job(self, visitor: str) -> None:
         with self._lock:
-            self._starting.discard(session)
+            self._starting.discard(visitor)
 
-    def job_starting(self, session: str) -> bool:
+    def job_starting(self, visitor: str) -> bool:
         with self._lock:
-            return session in self._starting
+            return visitor in self._starting
 
-    def describe(self, session: str) -> Dict[str, int]:
+    def describe(self, visitor: str) -> Dict[str, int]:
         """What ``GET /meta`` tells a visitor about the limits."""
         return {"questions_per_minute": self.limits.per_minute, "questions_per_session": self.limits.per_session,
-                "asked": self.limits.asked(session), "jobs": JOBS_PER_SESSION, "streams": STREAMS_PER_SESSION}
+                "asked": self.limits.asked(visitor), "jobs": JOBS_PER_SESSION, "streams": STREAMS_PER_SESSION}
 
 
 # What spends a question: a question, a turn (or its retry or stream) and the start of any job. A cancel is a DELETE.
@@ -222,9 +240,9 @@ class HostedMiddleware:
             await self.app(scope, receive, send)
             return
         session = _cookie(scope)
-        fresh = not _MINTED.fullmatch(session)  # only the form this server mints; anything else gets a new session
+        fresh = not self.hosted.knows(session)  # only a token this server minted; anything else gets a new session
         if fresh:
-            session = secrets.token_hex(16)
+            session = self.hosted.mint()
         visitor = Hosted.visitor_id(session)  # from here on the token is only for the Set-Cookie below
         scope.setdefault("state", {})["hosted_visitor"] = visitor
 
@@ -275,7 +293,7 @@ class HostedMiddleware:
                 self.hosted.end_job(visitor)
             return Refusal(STREAM_MESSAGE.format(cap=STREAMS_PER_SESSION), 5)
         if method == "POST" and _SPENDS.match(path):
-            refusal = self.hosted.limits.take(address=_address(scope), session=visitor)
+            refusal = self.hosted.limits.take(address=_address(scope), visitor=visitor)
             if refusal is not None:
                 if streams:
                     self.hosted.close_stream(visitor)

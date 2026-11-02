@@ -14,13 +14,12 @@ from nl2sql import UserContext
 from nl2sql.testing.config import make_config
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
-from nl2sql_api.hosted import SESSION_COOKIE, Hosted, HostedMiddleware, Limits
+from nl2sql_api.hosted import MAX_VISITORS, SESSION_COOKIE, Hosted, HostedMiddleware, Limits
 from nl2sql_api.jobs import IndexJob, Jobs
 from nl2sql_api.main import create_app
 from nl2sql_api.routes import web
 
 POLICIES = {"roles": {"admin": {"description": "role", "allow": ["*"]}, "viewer": {"description": "role", "allow": ["*"]}}, "default_role": "viewer"}
-SESSION = "a" * 32
 
 
 def _engine(folder):
@@ -176,16 +175,18 @@ def test_the_raw_cookie_is_in_no_body_the_engine_is_given_or_a_log_line(make, ca
     engine.dashboards.returns["list"] = []
     client.get("/api/v1/health")
     token = client.cookies[SESSION_COOKIE]
-    job = app.state.jobs.submit("index", IndexJob(), Hosted(role="viewer").user(Hosted.visitor_id(token)),
-                                lambda ctx: None)
 
     with caplog.at_level("DEBUG"):
-        bodies = [client.get(path) for path in (
+        started = client.post("/api/v1/jobs/dashboard", json={"datasource_id": "d"})  # through the middleware and the route
+        assert started.status_code == 202, started.text
+        job = started.json()
+        assert job["created_by"] == Hosted.visitor_id(token)
+        bodies = [started] + [client.get(path) for path in (
             "/api/v1/meta", "/api/v1/approvals", "/api/v1/conversations", "/api/v1/conversations/c1",
-            "/api/v1/dashboards", "/api/v1/jobs", f"/api/v1/jobs/{job.id}", "/api/v1/nowhere")]
+            "/api/v1/dashboards", "/api/v1/jobs", f"/api/v1/jobs/{job['id']}", "/api/v1/nowhere")]
 
-    assert bodies[1].json()[0]["request"]["asker_user_id"] == Hosted.visitor_id(token)
-    assert bodies[3].json()["user_id"] == Hosted.visitor_id(token)
+    assert bodies[2].json()[0]["request"]["asker_user_id"] == Hosted.visitor_id(token)
+    assert bodies[4].json()["user_id"] == Hosted.visitor_id(token)
     for response in bodies:
         assert token not in response.text
     for recorder in (engine.approvals, engine.conversations, engine.dashboards):
@@ -216,7 +217,7 @@ def test_the_hosted_page_carries_the_preview_tags_and_starts_no_session(make, tm
 
 # ---- the job and stream caps, driven through the ASGI app so a stream can stay open
 
-def _scope(method, path, app, session=SESSION):
+def _scope(method, path, app, session):
     return {"type": "http", "method": method, "path": path, "app": app, "state": {},
             "headers": [(b"cookie", f"{SESSION_COOKIE}={session}".encode())]}
 
@@ -251,18 +252,18 @@ def test_hosted_one_job_and_two_streams_per_session():
         await send({"type": "http.response.body", "body": b"done"})
 
     async def run():
-        middleware, app, _ = _wired(inner)
-        stream = "/api/v1/query/stream"
-        opened = [asyncio.create_task(_call(middleware, _scope("POST", stream, app))) for _ in range(2)]
+        middleware, app, hosted = _wired(inner)
+        stream, mine, theirs = "/api/v1/query/stream", hosted.mint(), hosted.mint()
+        opened = [asyncio.create_task(_call(middleware, _scope("POST", stream, app, mine))) for _ in range(2)]
         await asyncio.sleep(0.05)
-        status, headers, body = await _call(middleware, _scope("POST", stream, app))  # the third
+        status, headers, body = await _call(middleware, _scope("POST", stream, app, mine))  # the third
         assert status == 429 and json.loads(body)["error"]["code"] == "LIMIT_REACHED" and "retry-after" in headers
-        other = asyncio.create_task(_call(middleware, _scope("GET", "/api/v1/jobs/abc/events", app, "b" * 32)))
+        other = asyncio.create_task(_call(middleware, _scope("GET", "/api/v1/jobs/abc/events", app, theirs)))
         await asyncio.sleep(0.05)
         assert not other.done()  # another session has two of its own
         release.set()
         assert [r[0] for r in await asyncio.gather(*opened, other)] == [200, 200, 200]
-        assert (await _call(middleware, _scope("POST", stream, app)))[0] == 200  # the slots are given back
+        assert (await _call(middleware, _scope("POST", stream, app, mine)))[0] == 200  # the slots are given back
         app.state.jobs.close()
 
     asyncio.run(run())
@@ -277,11 +278,12 @@ def test_hosted_one_job_per_session():
 
     async def run():
         middleware, app, hosted = _wired(inner)
-        app.state.jobs.submit("index", IndexJob(), hosted.user(Hosted.visitor_id(SESSION)), lambda ctx: release.wait(5))
-        status, _, body = await _call(middleware, _scope("POST", "/api/v1/jobs/dashboard", app))
+        mine, theirs = hosted.mint(), hosted.mint()
+        app.state.jobs.submit("index", IndexJob(), hosted.user(Hosted.visitor_id(mine)), lambda ctx: release.wait(5))
+        status, _, body = await _call(middleware, _scope("POST", "/api/v1/jobs/dashboard", app, mine))
         assert status == 429 and json.loads(body)["error"]["code"] == "LIMIT_REACHED"
-        assert (await _call(middleware, _scope("POST", "/api/v1/jobs/dashboard", app, "c" * 32)))[0] == 202
-        assert (await _call(middleware, _scope("DELETE", "/api/v1/jobs/abc", app)))[0] == 202  # cancelling is free
+        assert (await _call(middleware, _scope("POST", "/api/v1/jobs/dashboard", app, theirs)))[0] == 202
+        assert (await _call(middleware, _scope("DELETE", "/api/v1/jobs/abc", app, mine)))[0] == 202  # cancelling is free
         release.set()
         app.state.jobs.close()
 
@@ -297,15 +299,15 @@ def test_hosted_parallel_job_starts_from_one_session_pass_one_at_a_time():
         await send({"type": "http.response.body", "body": b"{}"})
 
     async def run():
-        middleware, app, _ = _wired(inner)
-        path = "/api/v1/jobs/dashboard"
-        first = asyncio.create_task(_call(middleware, _scope("POST", path, app)))
+        middleware, app, hosted = _wired(inner)
+        path, mine = "/api/v1/jobs/dashboard", hosted.mint()
+        first = asyncio.create_task(_call(middleware, _scope("POST", path, app, mine)))
         await asyncio.sleep(0.05)
-        second = await _call(middleware, _scope("POST", path, app))
+        second = await _call(middleware, _scope("POST", path, app, mine))
         assert second[0] == 429 and json.loads(second[2])["error"]["code"] == "LIMIT_REACHED"
         release.set()
         assert (await first)[0] == 202
-        assert (await _call(middleware, _scope("POST", path, app)))[0] == 202  # the slot is given back
+        assert (await _call(middleware, _scope("POST", path, app, mine)))[0] == 202  # the slot is given back
         app.state.jobs.close()
 
     asyncio.run(run())
@@ -320,13 +322,34 @@ def test_a_refused_job_start_gives_its_slot_back():
         hosted = Hosted(role="viewer", limits=Limits(1000, 1))
         app = SimpleNamespace(state=SimpleNamespace(jobs=Jobs(poll_s=0.01), engine=None, hosted=hosted))
         middleware = HostedMiddleware(inner, hosted=hosted)
-        path = "/api/v1/jobs/dashboard"
-        assert (await _call(middleware, _scope("POST", path, app)))[0] == 202
-        assert (await _call(middleware, _scope("POST", path, app)))[0] == 429  # the session cap, not the slot
-        assert hosted.job_starting(Hosted.visitor_id(SESSION)) is False
+        path, mine = "/api/v1/jobs/dashboard", hosted.mint()
+        assert (await _call(middleware, _scope("POST", path, app, mine)))[0] == 202
+        assert (await _call(middleware, _scope("POST", path, app, mine)))[0] == 429  # the session cap, not the slot
+        assert hosted.job_starting(Hosted.visitor_id(mine)) is False
         app.state.jobs.close()
 
     asyncio.run(run())
+
+
+def test_a_self_chosen_cookie_of_the_right_form_is_replaced(make):
+    """Session fixation: a visitor (or a page that plants a cookie) cannot pick the token it will be known by."""
+    _, client = make()
+    chosen = "a" * 32
+    response = client.get("/api/v1/meta", headers={"Cookie": f"{SESSION_COOKIE}={chosen}"})
+    minted = re.search(rf"{SESSION_COOKIE}=([^;]+)", response.headers["set-cookie"]).group(1)
+
+    assert minted != chosen and re.fullmatch(r"[0-9a-f]{32}", minted)
+    assert response.json()["caller"]["user_id"] == Hosted.visitor_id(minted) != Hosted.visitor_id(chosen)
+
+
+def test_a_token_this_server_minted_is_recognised_until_it_is_forgotten():
+    hosted = Hosted(role="viewer")
+    token = hosted.mint()
+
+    assert re.fullmatch(r"[0-9a-f]{32}", token) and hosted.knows(token) and not hosted.knows("a" * 32)
+    for _ in range(MAX_VISITORS):
+        hosted.mint()
+    assert not hosted.knows(token)  # the oldest is dropped, like any idle visitor: the store stays bounded
 
 
 @pytest.mark.parametrize("value", ["A" * 32, "a" * 31, "a" * 33, "g" * 32])
