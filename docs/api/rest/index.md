@@ -33,7 +33,7 @@ Source: `packages/api/src/nl2sql_api/main.py`
   (`from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...`),
   never an engine submodule. `packages/api/tests/test_architecture.py` enforces it.
 - `create_app(config_path=None)` builds the app: one router module per namespace (`health`, `query`, `approvals`,
-  `conversations`, `dashboards`, `workspaces`, `datasources`, `datasource`, `index`, `indexing`, `knowledge`, `evals`,
+  `conversations`, `dashboards`, `workspaces`, `answers`, `datasources`, `datasource`, `index`, `indexing`, `knowledge`, `evals`,
   `settings`, `llm`, `web`) under `/api/v1` (`web` at the root), and `errors.install` for the
   [error envelope](errors.md). `nl2sql_api.main:app` is `create_app()` for `uvicorn nl2sql_api.main:app`.
 - CORS is restricted to the origins in `api.cors_origins`
@@ -77,6 +77,7 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Evals](evals.md) | `routes/evals.py`, `routes/jobs.py` | The configured suites and the scorers; the eval job. |
 | [Indexing](indexing.md) | `routes/index.py`, `routes/jobs.py` | Index status, drift check, retrieval inspector, the index job. |
 | [Knowledge](knowledge.md) | `routes/knowledge.py`, `routes/jobs.py` | The merged knowledge, proposals, the profile job. |
+| [Saved answers](answers.md) | `routes/answers.py` | Save, list, read, delete and run a person's own answers. |
 | [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 

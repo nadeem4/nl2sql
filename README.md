@@ -442,6 +442,14 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `DELETE` | `/api/v1/jobs/{job_id}` | Cancel a queued or running job |
 | `GET` | `/api/v1/jobs/{job_id}/events` | A job's progress as Server-Sent Events, ending with `job.finished` |
 | `POST` | `/api/v1/jobs/dashboard` | Queue a job that builds the no-model starter dashboard for a datasource (`202`) |
+| `POST` | `/api/v1/jobs/dashboard-build` | Queue a job that builds a dashboard from the guided builder's ticked tiles (`202`) |
+| `GET` | `/api/v1/dashboard-builder/options` | The guided builder's chips for a datasource: curated queries, saved answers, metrics, dimensions, time ranges |
+| `POST` | `/api/v1/dashboard-builder/proposals` | The tiles to tick, from the chosen sources and chips; only `asked` calls a model |
+| `POST` | `/api/v1/answers` | Save the answer of a chat step as the caller's own, and propose it for review |
+| `GET` | `/api/v1/answers` | The caller's saved answers, optionally those of one datasource |
+| `GET` | `/api/v1/answers/{answer_id}` | One saved answer (another caller's is a `404`) |
+| `DELETE` | `/api/v1/answers/{answer_id}` | Delete a saved answer (`204`) |
+| `POST` | `/api/v1/answers/{answer_id}/run` | Run a saved answer's plan again as the caller; no model call |
 | `GET` | `/api/v1/dashboards` | The caller's dashboards, saved or draft, optionally in one workspace |
 | `GET` | `/api/v1/dashboards/{dashboard_id}` | A dashboard and the stored results of its charts; reads only, runs no query |
 | `DELETE` | `/api/v1/dashboards/{dashboard_id}` | Delete a dashboard, its stored results and its schedule |

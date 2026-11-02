@@ -285,7 +285,7 @@ interface (`Scorer`, `Score`, `CaseRun`), and release 0.8's shapes
 `DatasourceKnowledgeView`, `Proposal`, `AcceptReport`, `ReviewError`,
 `ProfileReport`, `ClarificationRequest`, `ClarificationOption`,
 `ClarificationChoice`, `Explanation`, `ExplainedStep`, `TermUse`), and the saved answers (`SavedAnswer`,
-`SaveReport`, `AnswerNotFound`, `AnswerLimitReached`, `NotSavable`). The list is fixed by
+`SaveReport`, `AnswerNotFound`, `AnswerLimitReached`, `NotSavable`), and `LockHeld` (a retryable "busy, try again"). The list is fixed by
 `tests/unit/test_public_surface.py`: adding or removing a name is a semver
 decision. The REST API (`nl2sql-api`) is held to importing only from `nl2sql`
 by an architecture test.

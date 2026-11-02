@@ -12,19 +12,20 @@ import logging
 import queue
 import secrets
 import threading
+import traceback
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from nl2sql import (CancellationToken, Dashboard, DashboardRun, EvalReport, NL2SQLError, ProfileReport,
+from nl2sql import (BuildReport, CancellationToken, Dashboard, DashboardRun, TileProposal, EvalReport, NL2SQLError, ProfileReport,
                     RunCancelled, UserContext)
 from nl2sql_api.errors import ApiError, RequestRefused
 from nl2sql_api.sse import KEEP_ALIVE, frame
 
 logger = logging.getLogger("nl2sql_api")
 
-JobKind = Literal["index", "profile", "eval", "dashboard", "demo"]
+JobKind = Literal["index", "profile", "eval", "dashboard", "dashboard-build", "demo"]
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
@@ -70,6 +71,18 @@ class DashboardJob(BaseModel):
     max_tiles: Optional[int] = Field(None, ge=1)
 
 
+class DashboardBuildJob(BaseModel):
+    """The ticked, reworded tiles of the guided builder (``POST /dashboard-builder/proposals`` made the list)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    datasource_id: str
+    tiles: List[TileProposal]
+    title: Optional[str] = None
+    workspace_id: Optional[str] = None
+    time_column: Optional[str] = None
+
+
 class IndexResult(BaseModel):
     """What an index build did. ``failed`` names the datasources that kept their previous index; the reason is in the
     server log, where a connection string cannot reach a client."""
@@ -98,13 +111,13 @@ class Job(BaseModel):
     id: str  # 22 url-safe characters
     kind: JobKind
     status: JobStatus
-    params: Union[IndexJob, ProfileJob, EvalJob, DashboardJob, DemoJob]  # the request body, typed per kind
+    params: Union[IndexJob, ProfileJob, EvalJob, DashboardJob, DashboardBuildJob, DemoJob]  # the request body, typed per kind
     created_by: Optional[str] = None  # the caller's user_id
     created_at: datetime
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     progress: List[JobProgress] = []
-    result: Union[IndexResult, List[ProfileReport], EvalReport, DashboardJobResult, None] = None  # typed per kind
+    result: Union[IndexResult, List[ProfileReport], EvalReport, DashboardJobResult, BuildReport, None] = None  # typed per kind
     error: Optional[ApiError] = None
 
 
@@ -140,8 +153,9 @@ _INTERNAL = ApiError(code="INTERNAL", message="The job failed.",
 
 
 class _Entry:
-    def __init__(self, job: Job, owner: Tuple[Optional[str], Optional[str]], run: Runner):
+    def __init__(self, job: Job, owner: Tuple[Optional[str], Optional[str]], run: Runner, secrets: Sequence[str] = ()):
         self.job, self.owner, self.run, self.token = job, owner, run, CancellationToken()
+        self.secrets = tuple(secrets)  # request keys the run carries: kept out of the server log
         self.returned = False  # the runner is done: a cancel after this is too late
 
 
@@ -158,8 +172,10 @@ class Jobs:
 
     # ---- the routes' side
 
-    def submit(self, kind: JobKind, params: BaseModel, user: UserContext, run: Runner) -> Job:
-        """Queue ``run`` for ``user``. A caller with a job queued or running gets a 409 naming it."""
+    def submit(self, kind: JobKind, params: BaseModel, user: UserContext, run: Runner, *,
+               secrets: Sequence[str] = ()) -> Job:
+        """Queue ``run`` for ``user``. A caller with a job queued or running gets a 409 naming it. ``secrets`` are
+        request keys the run carries; a failure's traceback is logged with them replaced."""
         owner = _owner(user)
         with self._lock:
             busy = next((e.job for e in self._entries.values()
@@ -169,7 +185,7 @@ class Jobs:
                                      fix="Wait for it to finish, or cancel it with DELETE /jobs/{id}.")
             job = Job(id=self._new_id(), kind=kind, status="queued", params=params, created_by=user.user_id,
                       created_at=self._clock())
-            self._entries[job.id] = _Entry(job, owner, run)
+            self._entries[job.id] = _Entry(job, owner, run, secrets)
             self._prune()
             if self._worker is None:
                 self._worker = threading.Thread(target=self._work, name="nl2sql-jobs", daemon=True)
@@ -263,6 +279,13 @@ class Jobs:
                 entry.job.status, entry.job.started_at = "running", self._clock()
             self._run(entry)
 
+    @staticmethod
+    def _log_failure(entry: _Entry, exc: BaseException) -> None:
+        text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        for secret in entry.secrets:
+            text = text.replace(secret, "[redacted]")
+        logger.error("Job %s (%s) failed: %s", entry.job.id, entry.job.kind, text)
+
     def _run(self, entry: _Entry) -> None:
         def report(step: str, done: int, total: Optional[int]) -> None:
             with self._lock:
@@ -277,12 +300,12 @@ class Jobs:
             error = ApiError(code=exc.code, message=exc.message, fix=exc.fix, details=exc.details)
         except NL2SQLError as exc:
             if exc.status >= 500:  # its text may hold a connection string: the log has it, the job does not
-                logger.exception("Job %s (%s) failed", entry.job.id, entry.job.kind)
+                self._log_failure(entry, exc)
                 error = _INTERNAL
             else:
                 error = ApiError(code=exc.code, message=exc.message, fix=exc.fix, details=getattr(exc, "details", []))
-        except Exception:
-            logger.exception("Job %s (%s) failed", entry.job.id, entry.job.kind)
+        except Exception as exc:
+            self._log_failure(entry, exc)
             error = _INTERNAL
         with self._lock:
             entry.returned = True  # from here a cancel changes nothing

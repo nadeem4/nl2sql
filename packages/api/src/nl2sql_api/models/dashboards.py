@@ -3,7 +3,7 @@ field is a 422. Responses are the engine's own models (``Dashboard``, ``Dashboar
 ``Workspace``), served as they are."""
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql import DashboardFilter, TileArrangement
 
@@ -49,3 +49,16 @@ class MoveBody(_Body):
 
 class WorkspaceBody(_Body):
     name: str
+
+
+class ProposalsBody(_Body):
+    """The chips of the guided builder: which sources to draw on, and what was ticked."""
+
+    datasource_id: str
+    sources: List[Literal["curated", "saved", "asked"]] = Field(min_length=1)
+    curated_ids: List[str] = []
+    saved_ids: List[str] = []
+    metrics: List[str] = []  # glossary terms from the options
+    dimensions: List[str] = []  # "datasource.schema.table.column" from the options
+    time_range: Optional[str] = None  # a range id from the options
+    text: Optional[str] = None

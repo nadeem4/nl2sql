@@ -21,6 +21,7 @@ Every response, error or not, carries the id in the `X-Request-ID` header.
 
 - An `NL2SQLError` (the base of every named facade exception) is answered with its own `status` and `code`:
   for example `NotAuthorized` 403, `ApprovalNotFound` 404, `DashboardBusy` 409, `InvalidArgument` 422.
+- `LockHeld` (another save or run holds the same lease; it is not an `NL2SQLError`) is `409` `CONFLICT`, and the caller may retry.
 - A route or dependency that refuses on its own raises `RequestRefused(status, code, message, fix=..., details=...)`,
   with a message it wrote.
 - A body or parameter that does not validate is `422` `INVALID_REQUEST` with `details`.

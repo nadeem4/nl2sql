@@ -22,7 +22,7 @@ logger = logging.getLogger("nl2sql_api")
 
 # One router per namespace, each in routes/<name>.py, all registered under /api/v1. A route is added to its
 # namespace's file, never here; web serves the page at / and the rest are under /api/v1.
-NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "workspaces", "datasources",
+NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "workspaces", "answers", "datasources",
               "index", "knowledge", "evals", "settings", "jobs", "web")
 
 

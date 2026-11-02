@@ -290,7 +290,8 @@ client keeps or drops, and the rate bucket is keyed by the first hop of `X-Forwa
 either. They never spend a model key (the server holds none), but they do not protect the shared job worker or the
 sample databases from one.
 
-A refused or invalid request still spends a question (the charge comes before the route runs, so a `403` or a `422`
+Builder proposals (`POST /dashboard-builder/proposals`) spend a question like a query, because they may ask the model;
+so does the start of the dashboard build job. A refused or invalid request still spends a question (the charge comes before the route runs, so a `403` or a `422`
 costs one). Writes that start no model work spend none and are uncapped: workspaces, conversations, knowledge
 choices, corrections, example proposals, a dashboard refresh and the retrieval inspector (it spends from the rate
 bucket only); the disk is ephemeral.
