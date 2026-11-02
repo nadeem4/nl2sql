@@ -3,13 +3,14 @@ providers, API keys and the event catalog. Thin over the facade; a refusal is th
 from dataclasses import asdict
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, Response
+from fastapi import APIRouter, Body, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict
 
 from nl2sql import ApiKey, ConfigError, EventInfo, NL2SQL, UserContext
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.errors import ERROR_RESPONSE, RequestRefused
+from nl2sql_api.routes.health import forget_ready
 
 router = APIRouter(tags=["settings"])
 
@@ -64,6 +65,7 @@ def llm_providers(engine: Engine):
                        422: {**ERROR_RESPONSE, "description": "The section is not valid: `error.message` is the "
                                                               "config error."}})
 def replace_llm(
+    request: Request,
     engine: Engine,
     section: Annotated[Dict[str, Any], Body(openapi_examples={"openai": {"value": LLM_SECTION_EXAMPLE}})],
     user: Admin,
@@ -76,7 +78,9 @@ def replace_llm(
     Admin only.
     """
     try:
-        return asdict(engine.llm.replace(section, by=user, via="api"))
+        changed = asdict(engine.llm.replace(section, by=user, via="api"))
+        forget_ready(request.app)  # a fixed or broken key shows in /ready at once
+        return changed
     except ConfigError as e:
         # A ConfigError is written for the operator: it names keys and rules, never a secret value.
         raise RequestRefused(422, "INVALID_CONFIG", str(e), fix="Fix the llm section and send it again.") from None

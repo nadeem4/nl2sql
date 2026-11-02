@@ -10200,7 +10200,7 @@
     },
     "/api/v1/jobs/demo": {
       "post": {
-        "description": "Adds the three sample databases, their verified queries and the demo glossary to the project, then indexes\nthem (`engine.add_demo()`), so a project with no data of its own has something to ask. It runs as the caller\nand needs an admin role. A second call adds nothing and indexes again. `progress` is one step per datasource;\nthe `result` is an `IndexResult`. A project file changed since the engine loaded it fails the job with\n`FILE_CHANGED`, and nothing is added. Admin only.",
+        "description": "Adds the three sample databases, their verified queries and the demo glossary to the project, then indexes\nthem (`engine.add_demo()`), so a project with no data of its own has something to ask. It runs as the caller\nand needs an admin role. A second call adds nothing and indexes again. `progress` is one step per datasource;\nthe `result` is an `IndexResult`. A project file that changed before the job started fails it with\n`FILE_CHANGED` and nothing is added; one that changes while it runs fails it the same way, and files written\nearlier in the run stay written. Reload the engine and run it again: a second call adds only what is missing.\nAdmin only.",
         "operationId": "start_demo_job_api_v1_jobs_demo_post",
         "requestBody": {
           "content": {
@@ -10272,7 +10272,7 @@
     },
     "/api/v1/jobs/eval": {
       "post": {
-        "description": "Runs `suites` (every configured one when left out; each by its file or name in `evals.suites`) in `mode`, on\nthe server's model, never a caller's: `full` needs a cost cap, `max_cost_usd` or `evals.max_cost_usd`; `plans`\nand `retrieval` call no model. `cases` limits it to those ids or tags. `progress` is one step per case\n(`\"case <id>\"`); the `result` is the `EvalReport`. Admin only, in every mode: a report holds every role's\ncases, plans and SQL.",
+        "description": "Runs `suites` (every configured one when left out; each by its file or name in `evals.suites`) in `mode`, on\nthe server's model, never a caller's: `full` needs a cost cap, `max_cost_usd` or `evals.max_cost_usd`; `plans`\nand `retrieval` call no model. `cases` limits it to those ids or tags. No configured suite, or `suites: []`, is a 422. `progress` is one step per case\n(`\"case <id>\"`); the `result` is the `EvalReport`. Admin only, in every mode: a report holds every role's\ncases, plans and SQL.",
         "operationId": "start_eval_job_api_v1_jobs_eval_post",
         "requestBody": {
           "content": {

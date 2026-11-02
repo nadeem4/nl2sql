@@ -351,6 +351,24 @@ def test_add_demo_never_writes_a_second_curated_key(tmp_path, monkeypatch):
     assert sum(line.startswith("curated:") for line in lines) == 1
 
 
+@pytest.mark.parametrize("line", ["curated:\n", "curated: null\n", "curated: ~  # later\n"])
+def test_add_demo_persists_its_verified_queries_into_an_empty_curated_line(tmp_path, monkeypatch, line):
+    _no_build(monkeypatch)
+    project = tmp_path / "p"
+    nl2sql.config.init_project(project, demo=False, provider="replay")
+    toc = project / "nl2sql.yaml"
+    text = toc.read_text(encoding="utf-8").replace("\n", "\r\n")  # CRLF and comments stay
+    toc.write_bytes((text + "# keep me\r\n" + line.replace("\n", "\r\n")).encode("utf-8"))
+    with _project_engine(project) as engine:
+        engine.add_demo()
+
+    after = toc.read_bytes().decode("utf-8")
+    assert "# keep me" in after and after.count("curated:") == 1
+    assert "curated:     { file: curated.yaml }\r\n" in after
+    with _project_engine(project) as reloaded:  # a new engine from disk
+        assert reloaded._runtime.config.curated.datasources["chinook"].verified_queries
+
+
 def test_add_demo_on_a_demo_project_accepts_its_own_copies_and_leaves_curated_alone(tmp_path, monkeypatch):
     _no_build(monkeypatch)
     nl2sql.config.init_project(tmp_path / "p", demo=True, provider="replay")  # has curated.yaml and data/*.db

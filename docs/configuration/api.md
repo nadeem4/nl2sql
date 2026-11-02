@@ -72,8 +72,9 @@ admin roles. See [Admin routes](../api/rest/index.md#admin-routes).
 `./nl2sql.yaml`), after loading the `.env` next to that file without overriding
 a variable already set. It calls `engine.check()` before it accepts requests: a
 `required` datasource that fails, or datasources configured and none ready,
-stops it with `EngineNotReady`; an optional one that fails leaves it serving
-the others. See [Startup](system.md#startup-check-and-required).
+raises `EngineNotReady`: the API logs the report and starts anyway, and
+`GET /api/v1/ready` answers 503 `not_ready` (an admin sees `problems`); an
+optional one that fails leaves it serving the others. See [Startup](system.md#startup-check-and-required).
 
 ```bash
 nl2sql-api serve --config /etc/nl2sql/nl2sql.yaml --host 127.0.0.1 --port 8000

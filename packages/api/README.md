@@ -45,7 +45,7 @@ mount a config folder there, and a volume for `storage.path`.
 - `POST /api/v1/query` - Ask a question as the configured role
 - `POST /api/v1/query/stream` - The same, as Server-Sent Events: each step as it runs, the result manifest, the answer as it is written, then the `/query` response
 - `GET /api/v1/health` - Liveness check
-- `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
+- `GET /api/v1/ready` - Readiness from the engine's check, kept 10 seconds: `200 ready` or `503 not_ready`; an admin also gets `problems`. The API starts even when a required datasource fails; this is where it says so
 - `GET /api/v1/meta` - The mode, the identity source and `request_llm` (no caller needed)
 - `GET /api/v1/about` - What the engine is
 - `GET /api/v1/datasource-types` - The adapters the engine can name, each with its connection schema (admin only)
@@ -63,6 +63,11 @@ mount a config folder there, and a volume for `storage.path`.
 - `GET /api/v1/proposals`, `GET /api/v1/proposals/{proposal_id}`, `POST /api/v1/proposals/accept|reject|examples` - Review proposed knowledge changes (admin only)
 - `PUT /api/v1/settings/llm` - Replace the whole `llm` section in the running process (admin only; 422 with the config error)
 - `GET /api/v1/llm` - Each agent and the model it runs on
-- `GET /api/v1/llm/{agent}` - One agent's model
+- `GET /api/v1/llm/providers` - The LLM providers: key present, verified models, the shape a key must have
+- `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `DELETE /api/v1/api-keys/{key_id}` - List, create (the token is returned once) and revoke API keys (admin only)
+- `GET /api/v1/evals/suites`, `GET /api/v1/evals/scorers` - The configured eval suites and the scorer names (admin only)
+- `POST /api/v1/jobs/eval` - Run the configured eval suites as a job (admin only, `202`; `422` when no suite is configured or named)
+- `POST /api/v1/jobs/demo` - Add the sample databases and index them, as a job (admin only, `202`)
+- `GET /api/v1/events/catalog` - Every event the engine publishes, with its data's JSON Schema
 
 Reference: <https://github.com/nadeem4/nl2sql/blob/main/docs/api/rest/index.md>.

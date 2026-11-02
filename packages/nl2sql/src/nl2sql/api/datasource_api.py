@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import threading
 from dataclasses import replace
 from pathlib import Path
@@ -24,6 +25,10 @@ from nl2sql.runtime import Runtime
 
 # One save at a time in this process, whichever engine: two saves share one ``.env`` and one ``datasources/`` folder.
 _SAVING = threading.Lock()
+
+
+# A top-level ``curated:`` line with no value (or ``null`` / ``~``), whatever follows as a comment.
+_EMPTY_CURATED = re.compile(r"^curated:[ \t]*(?:null|~)?[ \t]*(?:#[^\r\n]*)?(\r?\n|\Z)", re.MULTILINE)
 
 
 def _has_key(text: str, key: str) -> bool:
@@ -163,11 +168,15 @@ class DatasourcesAPI:
         sha256 = self._ctx.curated_sha256
         toc = Path(config.folder) / "nl2sql.yaml" if config.folder is not None else None
         path = curated_path(config)
-        if (path is None and config.curated is None and toc is not None and toc.is_file()
-                and not _has_key(toc.read_text(encoding="utf-8"), "curated")):
+        text = toc.read_text(encoding="utf-8") if toc is not None and toc.is_file() else None
+        if path is None and config.curated is None and text is not None and (
+                not _has_key(text, "curated") or _EMPTY_CURATED.search(text)):
             path = Path(config.folder) / "curated.yaml"  # a project with no curated section yet: give it one
             sha256 = write_curated(path, merged, None)
-            self._append("nl2sql.yaml", "curated:     { file: curated.yaml }\n")
+            if _has_key(text, "curated"):
+                self._replace("nl2sql.yaml", _EMPTY_CURATED, r"curated:     { file: curated.yaml }\1")  # a bare line
+            else:
+                self._append("nl2sql.yaml", "curated:     { file: curated.yaml }\n")
         elif path is not None:
             sha256 = write_curated(path, merged, sha256)
         self._ctx.replace_curated(merged, sha256=sha256)
@@ -212,6 +221,14 @@ class DatasourcesAPI:
             if fits:
                 self._write_file(label, target, candidate)
         return fits
+
+    def _replace(self, label: str, pattern: "re.Pattern[str]", replacement: str) -> None:
+        """Replace the first match of ``pattern`` in a config file, keeping every other byte (comments, line endings)."""
+        target = Path(self._ctx.config.folder) / label
+        with _SAVING:
+            self._unchanged(label)
+            text = target.read_bytes().decode("utf-8")
+            self._write_file(label, target, pattern.sub(replacement, text, count=1))
 
     def _append(self, label: str, line: str) -> None:
         """Add ``line`` to the end of ``nl2sql.yaml`` (or another config file), keeping the rest as it is."""

@@ -4,7 +4,7 @@ import time
 from importlib.metadata import PackageNotFoundError, version
 from typing import Annotated, Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from nl2sql import CheckReport, EngineNotReady, NL2SQL, UserContext
@@ -19,29 +19,27 @@ Visitor = Annotated[Optional[UserContext], Depends(identity.optional_caller)]
 # How long `/ready` keeps the engine's check: an orchestrator polls it every few seconds, and a check connects to every
 # datasource.
 READY_TTL_S = 10
-_checked: Optional[Tuple[NL2SQL, float, CheckReport]] = None
 _lock = threading.Lock()
 
 
-def forget_ready() -> None:
-    """Drop the kept check, so the next `/ready` runs a new one."""
-    global _checked
+def forget_ready(app: FastAPI) -> None:
+    """Drop the app's kept check, so the next `/ready` runs a new one."""
     with _lock:
-        _checked = None
+        app.state.ready_cache = None
 
 
-def _report(engine: NL2SQL) -> CheckReport:
-    """``engine.check()``'s report, kept for ``READY_TTL_S``. A required datasource that fails raises
-    ``EngineNotReady``, which carries the same report."""
-    global _checked
+def _report(app: FastAPI, engine: NL2SQL) -> CheckReport:
+    """``engine.check()``'s report, kept on ``app.state`` for ``READY_TTL_S``. A required datasource that fails
+    raises ``EngineNotReady``, which carries the same report."""
     with _lock:
-        if _checked is not None and _checked[0] is engine and time.monotonic() - _checked[1] < READY_TTL_S:
-            return _checked[2]
+        kept: Optional[Tuple[NL2SQL, float, CheckReport]] = getattr(app.state, "ready_cache", None)
+        if kept is not None and kept[0] is engine and time.monotonic() - kept[1] < READY_TTL_S:
+            return kept[2]
         try:
             report = engine.check()
         except EngineNotReady as exc:
             report = exc.report
-        _checked = (engine, time.monotonic(), report)
+        app.state.ready_cache = (engine, time.monotonic(), report)
         return report
 
 
@@ -66,13 +64,13 @@ def health_check():
 
 @router.get("/ready", response_model=Dict[str, Any], summary="Readiness check",
             responses={503: {"description": "Not ready: `{\"status\": \"not_ready\"}`."}})
-def readiness_check(engine: Engine, user: Visitor):
+def readiness_check(request: Request, engine: Engine, user: Visitor):
     """Whether the engine can answer now, from its own `check()` (kept 10 seconds): every required datasource
     and at least one is up, every agent's key resolves (unless `api.request_llm` is on, or every agent is on
     `replay`) and the index is `ok` or `stale`. 200 `{"status": "ready"}` or 503 `{"status": "not_ready"}` to
     everyone. An admin also gets `problems`: each failing datasource and its stage, each agent whose key does not
     resolve and the index status, never a secret. An optional datasource that failed is a problem, not "not ready"."""
-    report = _report(engine)
+    report = _report(request.app, engine)
     ready = report.ready(keys_optional=_keys_optional(engine))
     body: Dict[str, Any] = {"status": "ready" if ready else "not_ready"}
     if user is not None and identity.is_admin(user, engine):

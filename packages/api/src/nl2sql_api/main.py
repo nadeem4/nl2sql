@@ -40,6 +40,9 @@ def _lifespan(config_path: Optional[str]):
             engine.check()
         except EngineNotReady as exc:
             logger.warning("The engine is not ready; /ready says so.\n%s", exc.report)
+        except Exception:
+            engine.close()  # any other failure stops the start, with no engine left open
+            raise
         app.state.engine = engine
         # One worker thread for the app's lifetime: the queue lives in this process (D206).
         app.state.jobs = Jobs()

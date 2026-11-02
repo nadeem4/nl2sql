@@ -106,6 +106,17 @@ def test_eval_job_refuses_a_suite_that_is_not_configured(stub):
     assert engine.evals.calls == []
 
 
+@pytest.mark.parametrize("body", [{"suites": []}, {}])
+def test_eval_job_with_no_suites_is_a_422(api_client, body):
+    client, engine = api_client(evals={"suites": []} if body == {} else {"suites": [CHINOOK]})
+    engine.evals = Recorder()
+
+    response = client.post(f"{API}/jobs/eval", json={**body, "mode": "plans"})
+
+    assert response.status_code == 422, response.text
+    assert engine.evals.calls == []
+
+
 def test_eval_job_names_a_suite_by_its_file_or_its_name(stub):
     client, engine = stub
     engine.evals.returns["run"] = lambda *a, **k: EvalReport(mode="plans")

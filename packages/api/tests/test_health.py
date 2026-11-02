@@ -5,6 +5,7 @@ import pytest
 from dashboard_stubs import Recorder
 
 from nl2sql import CheckReport, DatasourceInfo, DatasourceStatus, EngineNotReady, UserContext
+from nl2sql_api.main import app
 from nl2sql_api.routes import health
 
 API = "/api/v1"
@@ -36,9 +37,9 @@ class Checking:
 
 @pytest.fixture(autouse=True)
 def no_cache():
-    health.forget_ready()
+    health.forget_ready(app)
     yield
-    health.forget_ready()
+    health.forget_ready(app)
 
 
 @pytest.fixture
@@ -102,7 +103,7 @@ def test_ready_fails_on_a_missing_key_and_passes_with_request_keys(stub):
     client, _ = stub(report)
     assert client.get(f"{API}/ready").status_code == 503
 
-    health.forget_ready()
+    health.forget_ready(app)
     client, _ = stub(report, api={"auth": "static", "static_role": "admin", "request_llm": True})
     assert client.get(f"{API}/ready").status_code == 200
 
@@ -119,11 +120,11 @@ def test_ready_details_only_for_admin(stub):
     report = CheckReport(datasources=[up(), down(required=True)], llm={"default": "OPENAI_API_KEY is not set"},
                          index="missing")
     for api in ({"auth": "static", "static_role": "analyst"}, {"auth": "api_keys"}):
-        health.forget_ready()
+        health.forget_ready(app)
         visitor, _ = stub(report, authenticated=False, api=api)
         assert visitor.get(f"{API}/ready").json() == {"status": "not_ready"}, "a visitor learns the status only"
 
-    health.forget_ready()
+    health.forget_ready(app)
     admin, _ = stub(report)
     body = admin.get(f"{API}/ready").json()
     assert body["status"] == "not_ready"
@@ -139,7 +140,7 @@ def test_ready_is_cached_for_ten_seconds(stub):
         client.get(f"{API}/ready")
     assert engine.check.calls == 1
 
-    health.forget_ready()
+    health.forget_ready(app)
     client.get(f"{API}/ready")
     assert engine.check.calls == 2
     assert health.READY_TTL_S == 10
@@ -186,3 +187,15 @@ def test_about_is_the_engines_description(api_client):
     client, engine = api_client()
     engine.about = lambda: {"version": "1.2.3", "steps": []}
     assert client.get(f"{API}/about").json() == {"version": "1.2.3", "steps": []}
+
+
+def test_the_ready_check_is_kept_on_the_app_not_in_the_module(stub):
+    client, engine = stub(CheckReport(datasources=[up()], llm={}, index="ok"))
+    assert not hasattr(health, "_checked")
+    client.get(f"{API}/ready")
+    client.get(f"{API}/ready")
+    assert engine.check.calls == 1 and app.state.ready_cache is not None
+
+    health.forget_ready(app)
+    client.get(f"{API}/ready")
+    assert engine.check.calls == 2

@@ -103,6 +103,7 @@ def make_client(tmp_path):
     clients = []
 
     def _make(host="127.0.0.1", **sections):
+        sections.setdefault("evals", {"suites": ["evals/chinook.yaml"]})  # an eval job needs a suite to run
         engine = AdminEngine(make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
         if hasattr(app.state, "jobs"):

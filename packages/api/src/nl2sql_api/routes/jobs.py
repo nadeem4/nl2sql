@@ -121,15 +121,18 @@ def _suites(requested, engine: NL2SQL):
     """The configured suites a request names, by file or by name (every one when it names none): never a path the
     caller wrote, so an eval cannot read an arbitrary file. A name that is not in `evals.suites` is a 422."""
     configured = engine.config.evals.suites
-    if requested is None:
-        return list(configured)
     chosen = []
-    for name in requested:
+    if requested is None:
+        chosen = list(configured)
+    for name in requested or []:
         match = next((path for path in configured if name in (path.as_posix(), path.stem)), None)
         if match is None:
             raise RequestRefused(422, "INVALID_REQUEST", f"'{name}' is not one of the configured eval suites.",
                                  fix="Name a suite listed in evals.suites (GET /evals/suites), by its file or its name.")
         chosen.append(match)
+    if not chosen:
+        raise RequestRefused(422, "INVALID_REQUEST", "There is no eval suite to run.",
+                             fix="Configure evals.suites, or name a configured suite.")
     return chosen
 
 
@@ -137,7 +140,7 @@ def _suites(requested, engine: NL2SQL):
 def start_eval_job(body: EvalJob, user: Annotated[UserContext, Depends(identity.admin)], jobs: Queue, engine: Engine):
     """Runs `suites` (every configured one when left out; each by its file or name in `evals.suites`) in `mode`, on
     the server's model, never a caller's: `full` needs a cost cap, `max_cost_usd` or `evals.max_cost_usd`; `plans`
-    and `retrieval` call no model. `cases` limits it to those ids or tags. `progress` is one step per case
+    and `retrieval` call no model. `cases` limits it to those ids or tags. No configured suite, or `suites: []`, is a 422. `progress` is one step per case
     (`"case <id>"`); the `result` is the `EvalReport`. Admin only, in every mode: a report holds every role's
     cases, plans and SQL."""
     suites = _suites(body.suites, engine)
@@ -163,8 +166,10 @@ def start_demo_job(body: DemoJob, user: Annotated[UserContext, Depends(identity.
     """Adds the three sample databases, their verified queries and the demo glossary to the project, then indexes
     them (`engine.add_demo()`), so a project with no data of its own has something to ask. It runs as the caller
     and needs an admin role. A second call adds nothing and indexes again. `progress` is one step per datasource;
-    the `result` is an `IndexResult`. A project file changed since the engine loaded it fails the job with
-    `FILE_CHANGED`, and nothing is added. Admin only."""
+    the `result` is an `IndexResult`. A project file that changed before the job started fails it with
+    `FILE_CHANGED` and nothing is added; one that changes while it runs fails it the same way, and files written
+    earlier in the run stay written. Reload the engine and run it again: a second call adds only what is missing.
+    Admin only."""
 
     def run(ctx: JobContext) -> IndexResult:
         finished = []

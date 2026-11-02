@@ -487,7 +487,6 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `POST` | `/api/v1/proposals/examples` | File starter questions as `example` proposals (admin) |
 | `PUT` | `/api/v1/settings/llm` | Replace the whole `llm` section in the running process (the body is the section as JSON; a bad one is a 422) |
 | `GET` | `/api/v1/llm` | Each agent and the model it runs on |
-| `GET` | `/api/v1/llm/{agent}` | One agent's model |
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \

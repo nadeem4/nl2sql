@@ -13,9 +13,12 @@ Source: `packages/api/src/nl2sql_api/main.py`
   overriding a variable already set), builds one engine with
   `NL2SQL.from_config()` (the file `NL2SQL_CONFIG` names, else `./nl2sql.yaml`)
   and calls `engine.check()` before it serves. A `required` datasource that
-  fails, or no datasource ready at all, raises `EngineNotReady` and the server
-  does not start; an optional one that fails leaves it serving the others. The
-  engine is stored in `app.state.engine` and closed at shutdown. Logs are
+  fails, or no datasource ready at all, raises `EngineNotReady`: the API logs
+  the report and starts anyway (D208), so a restart loop never hides the reason.
+  `GET /ready` then answers `503 not_ready` and an admin reads each failing
+  datasource and its stage under `problems`; an optional one that fails leaves
+  the others serving. Any other failure of `check()` closes the engine and stops
+  the start. The engine is stored in `app.state.engine` and closed at shutdown. Logs are
   text, or JSON lines with `NL2SQL_LOG_FORMAT=json`.
 - Retention: the lifespan calls `engine.storage.purge()` once before it
   serves and then once a day (`purge_daily`, every `PURGE_INTERVAL_S`

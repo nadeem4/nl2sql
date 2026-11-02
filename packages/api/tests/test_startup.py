@@ -11,6 +11,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
+from nl2sql import NL2SQL
 from nl2sql.testing.config import make_config
 from nl2sql_api.main import app
 
@@ -31,14 +32,14 @@ def test_the_api_starts_with_a_failed_required_datasource_and_is_not_ready(tmp_p
     from nl2sql_api.routes import health
 
     monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=True)))
-    health.forget_ready()
+    health.forget_ready(app)
     try:
         with TestClient(app) as client:
             assert client.get("/api/v1/health").status_code == 200
             ready = client.get("/api/v1/ready")
             assert ready.status_code == 503 and ready.json()["status"] == "not_ready"
     finally:
-        health.forget_ready()
+        health.forget_ready(app)
         if hasattr(app.state, "engine"):
             del app.state.engine
 
@@ -193,3 +194,15 @@ def test_the_daily_purge_runs_until_shutdown_and_survives_a_failure():
 
     asyncio.run(run())
     assert len(calls) >= 3
+
+
+def test_a_failure_other_than_not_ready_closes_the_engine_and_raises(tmp_path, monkeypatch):
+    closed = []
+    monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=False)))
+    monkeypatch.setattr(NL2SQL, "check", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(NL2SQL, "close", lambda self: closed.append(True))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        with TestClient(app):
+            pass
+    assert closed == [True]
