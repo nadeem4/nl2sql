@@ -134,6 +134,15 @@
         </a>
 </li>
 <li class="md-tabs__item">
+<a class="md-tabs__link" href="../../apps/web/">
+          
+  
+  
+  Apps
+
+        </a>
+</li>
+<li class="md-tabs__item">
 <a class="md-tabs__link" href="../../conversations/">
           
   
@@ -157,15 +166,6 @@
   
   
   Dashboards
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../apps/web/">
-          
-  
-  
-  Apps
 
         </a>
 </li>
@@ -1432,7 +1432,7 @@
 <span class="md-ellipsis">
     
   
-    Conversations
+    Apps
   
 
     
@@ -1441,6 +1441,44 @@
 </label>
 <nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
 <label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Apps
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../apps/web/">
+<span class="md-ellipsis">
+    
+  
+    Web app
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -1477,8 +1515,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
-<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -1489,8 +1527,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_5">
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -1527,8 +1565,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
-<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -1539,8 +1577,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_6">
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -1555,44 +1593,6 @@
     
   
     Dashboards
-  
-
-    
-  </span>
-</a>
-</li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
-<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Apps
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_7">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Apps
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../apps/web/">
-<span class="md-ellipsis">
-    
-  
-    Web app
   
 
     
@@ -5608,8 +5608,8 @@ no W-PR deletes a file another imports:</p>
 </tr>
 <tr>
 <td><code>AskParts.jsx</code>, <code>Panes.jsx</code>, <code>stream.js</code></td>
-<td>kept until W1</td>
-<td>W1 replaces and deletes them</td>
+<td>deleted in W1</td>
+<td>W1 replaced them with <code>src/chat/</code> and <code>src/api/chat.js</code></td>
 </tr>
 <tr>
 <td><code>RowsTable.jsx</code>, <code>results.js</code></td>
@@ -5756,7 +5756,7 @@ no W-PR deletes a file another imports:</p>
 </tr>
 <tr>
 <td>Golden fixtures</td>
-<td><code>nl2sql-ui/src/api/fixtures/*.json</code>: an <code>ApiError</code> and a <code>Job</code> (D0a-3), a <code>QueryResult</code> (A1), a <code>Turn</code> (A2a), a <code>Dashboard</code> and a <code>DashboardView</code> with its runs (A2b), a <code>Proposal</code> and a <code>DriftReport</code> (A3), a <code>Job</code> with an <code>EvalReport</code> and <code>/meta</code> (A4a). Each is written by that PR's route test from a real response, and <code>test_web_fixtures_are_current</code> fails when one is stale, as <code>openapi.json</code>'s test does. <code>turns.js</code>, <code>chart.js</code>, <code>status.js</code> and the other node tests read them.</td>
+<td><code>nl2sql-ui/src/api/fixtures/*.json</code>: an <code>ApiError</code> and a <code>Job</code> (D0a-3), a <code>QueryResult</code> (A1), a <code>Turn</code> (A2a) and two waiting turns, <code>TurnClarification</code> and <code>TurnApproval</code> (W1), a <code>Dashboard</code> and a <code>DashboardView</code> with its runs (A2b), a <code>Proposal</code> and a <code>DriftReport</code> (A3), a <code>Job</code> with an <code>EvalReport</code> and <code>/meta</code> (A4a). Each is written by that PR's route test from a real response, and <code>test_web_fixtures_are_current</code> fails when one is stale, as <code>openapi.json</code>'s test does. <code>turns.js</code>, <code>chart.js</code>, <code>status.js</code> and the other node tests read them.</td>
 </tr>
 <tr>
 <td><code>test_openapi_snapshot_is_current</code></td>
@@ -7058,6 +7058,26 @@ the export has a clear name (no alias). <code>NL2SQLError</code>, <code>ProfileR
 and <code>init_project</code> were exported already; <code>RegistryError</code>, <code>load_trace</code>, <code>check_file_name</code> and the others above are new.
 <strong>For CL1:</strong> nothing in <code>nl2sql/cli/</code> (outside the playground) imports an engine module, so the move to
 <code>nl2sql_cli</code> is a rename plus repointing the boundary test; <code>demo/playground/</code> must be deleted by X1b first.</p>
+<p><strong>W1 (chat page).</strong> <code>#/chat</code> and <code>#/chat/&lt;id&gt;</code> replace Ask, and <code>#/approvals</code> is new; <code>AskParts.jsx</code>, <code>Panes.jsx</code>,
+<code>stream.js</code> and <code>stream.test.js</code> are deleted. <strong>The code won over the doc:</strong> the doc's <code>Transcript.jsx</code> and
+<code>Correction.jsx</code> are not separate files (the transcript is in <code>pages/Chat.jsx</code>, the correction in
+<code>chat/Feedback.jsx</code>), and the bare-fragment landing page is Chat (<code>FRAGMENT_PAGE</code> in <code>router.js</code>). Every call is in
+<code>src/api/chat.js</code>: <code>listConversations</code>, <code>startConversation</code>, <code>getConversation</code>, <code>deleteConversation</code>, <code>chatTools</code>,
+<code>sendTurn</code>, <code>streamTurn</code> (POST, SSE), <code>retryTurn(id, approvalIds)</code>, <code>runTool(id, name, args)</code>, <code>rate</code>, <code>correct</code>,
+<code>getTrace</code>, <code>listApprovals(status)</code>, <code>grantApproval</code>, <code>denyApproval(id, reason)</code>, <code>listDatasources</code>, <code>saveChoice</code>. The
+Report button calls <code>POST /tools/report</code> through <code>runTool</code> (JSON, with the markdown in <code>output.body</code>); only the <code>GET
+.../report</code> download is unwired. Pure
+modules, each with a test: <code>chat/spine.js</code> (<code>spineOf</code>, <code>liveStations</code>; <code>run.started</code> resets all but the
+steps), <code>chat/turns.js</code> (<code>answerOf</code>, <code>askSteps</code>, <code>pendingClarification</code>, <code>pendingApprovals</code>, <code>outputsOf</code>, <code>offersFor</code>,
+<code>toolButtons</code>, <code>toolArgs</code>, <code>statusLine</code>, <code>errorLine</code>, <code>waitsOf</code>: a clarification or approval wait is live on the last turn
+only), <code>chat/convstate.js</code> (<code>withTurn</code>, <code>withConversation</code>, <code>addressChange</code>: a late result goes to the conversation it was
+sent for), <code>chat/clarify.js</code>, <code>chat/approval.js</code> (<code>approvalState</code>, <code>ownRequest</code>, <code>toDecide</code>), <code>chat/warnings.js</code>,
+<code>chat/why.js</code>, <code>chat/feedback.js</code>. <code>Chat</code> takes <code>param</code> (the conversation id), <code>starter</code> (a question Home wants
+asked), <code>onStarter</code> and <code>onCaller</code> (the owner of a conversation is the caller; <code>App</code> uses it to leave their own requests
+out of the Approvals badge). The <code>TurnClarification.json</code> and <code>TurnApproval.json</code> fixtures are real waiting turns. <code>navItems(page, off, badges)</code> takes the Approvals count; <code>page()</code> in <code>router.js</code> builds a
+route entry. Tool arguments use 1-based <code>turn</code> and <code>step</code>. A 409 from a turn means the conversation is busy.
+<strong>For W4:</strong> Settings, Retrieval and Pipeline still call the old <code>/api/*</code> routes,
+<code>pages/Trace.jsx</code> is still a stub, and <code>ask-page.css</code> and <code>ask-run.css</code> are probably dead rules.</p>
 <p><strong>W2a (outputs and charts).</strong> <code>src/outputs/Output.jsx</code> (<code>Output({ output })</code>, <code>output</code> a <code>ToolOutput</code>) now dispatches by kind: <code>Chart.jsx</code> (a <code>ChartSpec</code> object or its JSON text, via <code>chartSpecOf</code> in <code>output.js</code>), <code>Mermaid.jsx</code> (<code>import("mermaid")</code> is its own chunk, 697 kB; the main bundle grew by about 15 kB; <code>securityLevel: "strict"</code>, theme <code>neutral</code> or <code>dark</code> from <code>prefers-color-scheme</code>), <code>Report.jsx</code> (Markdown through <code>markdown.js</code>, a parser for headings, paragraphs, lists, tables, code and <code>&lt;details&gt;</code> that returns blocks, so no raw HTML passes), and <code>&lt;pre&gt;</code> text for <code>json</code> and unknown kinds. <code>chart.js</code> holds the pure geometry (<code>chartModel(spec, {width, height})</code>, <code>formatValue</code>, <code>niceTicks</code>, <code>truncatedNote</code>); bars are horizontal, a line breaks on a null, and a series column or several measures make one line each. <code>Chart</code> has a <strong>Table</strong> switch (<code>SampleRows</code>) and <strong>Download Vega-Lite</strong> (not for a table). <code>src/api/outputs.js</code>: <code>getChart(traceId, resultId, kind?)</code>, <code>getResultPage(traceId, resultId, offset, limit)</code>, <code>downloadCsv</code>, <code>downloadVegaLite</code> (both return <code>{blob, name}</code>) and <code>saveFile</code>. <code>RowsTable</code>/<code>PagedResult</code> use <code>getResultPage</code> and the <code>/results/...</code> routes; <code>results.js</code> lost its URL builders and the <code>role</code> parameter (gone from the API in A1). <strong>Code won over the doc:</strong> <code>http.js</code> gained <code>download(path)</code> (a GET with the page's headers, returning a <code>Blob</code>; <code>routes.test.js</code> reads <code>download(</code> calls too), because a plain link cannot carry the key headers; the series palette is four hues plus a neutral fifth (<code>--series-1..5</code> in <code>styles/outputs.css</code>), since the dataviz validator rejected a fifth hue on colour-blind separation, and its contrast test is <code>outputs/palette.test.js</code>, not <code>styles.test.js</code>; the legend shows for two or more series. New fixtures <code>ChartLine.json</code>, <code>ChartBar.json</code>, <code>ChartBigNumber.json</code> and <code>ResultPage.json</code>, written by <code>test_web_fixtures.py</code>. <code>docs/apps/web.md</code> is new (nav: Apps). <strong>For W2b:</strong> reuse <code>Chart</code> (<code>{ spec }</code>, a <code>ChartSpec</code>) for a tile's chart, <code>RowsTable</code> (<code>{ result }</code>) for its rows, and <code>formatValue</code> from <code>outputs/chart.js</code> for a big number; <code>Chart</code> sizes itself to its container with a <code>ResizeObserver</code>, so a grid cell needs only a width.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
