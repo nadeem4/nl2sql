@@ -105,6 +105,13 @@ export function createHttp({ fetch, storage }) {
       return response.status === 204 ? null : response.json();
     },
 
+    // A file the server generates (a CSV, a Vega-Lite spec): the bytes as a Blob, fetched with the same headers as any
+    // call, so an `api_keys` caller's key goes with it, which a plain link could not do.
+    async download(path) {
+      const response = await send("GET", path, undefined, "*/*");
+      return response.blob();
+    },
+
     // Server-Sent Events: `onEvent({event, data})` for each frame, `data` parsed as JSON when it is (the text
     // otherwise). A body makes it a POST, none a GET. Resolves when the server ends the stream.
     async stream(path, body, onEvent, signal) {
@@ -139,3 +146,4 @@ const page = () => createHttp({
 
 export const request = (method, path, body) => page().request(method, path, body);
 export const stream = (path, body, onEvent, signal) => page().stream(path, body, onEvent, signal);
+export const download = (path) => page().download(path);

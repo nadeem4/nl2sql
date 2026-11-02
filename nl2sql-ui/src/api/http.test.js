@@ -27,6 +27,7 @@ function reply(status, body, { headers = {}, chunks } = {}) {
     headers: { get: (name) => lower[name.toLowerCase()] ?? null },
     text: async () => text,
     json: async () => JSON.parse(text),
+    blob: async () => new Blob([text]),
     body: {
       getReader() {
         const parts = (chunks || [text]).map((c) => bytes.encode(c));
@@ -185,4 +186,19 @@ test("stream passes the caller's abort signal to fetch", async () => {
   const controller = new AbortController();
   await http.stream("/jobs/j/events", undefined, () => {}, controller.signal);
   assert.equal(calls[0].signal, controller.signal);
+});
+
+test("download sends the identity header and answers the bytes", async () => {
+  const { http, calls } = client({
+    storage: memoryStorage({ "nl2sql.ui.apiKey": BEARER }), answer: () => reply(200, "a,b\n1,2\n"),
+  });
+  const blob = await http.download("/results/t/r.csv");
+  assert.equal(await blob.text(), "a,b\n1,2\n");
+  assert.equal(calls[0].url, "/api/v1/results/t/r.csv");
+  assert.equal(calls[0].headers.Authorization, `Bearer ${BEARER}`);
+});
+
+test("download of a refused file is an ApiError", async () => {
+  const { http } = client({ answer: () => reply(404, ENVELOPE) });
+  await assert.rejects(() => http.download("/results/t/r.csv"), (e) => e instanceof ApiError && e.status === 404);
 });
