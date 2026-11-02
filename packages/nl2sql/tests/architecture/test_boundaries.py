@@ -1245,6 +1245,7 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
     "nl2sql/src/nl2sql/cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate "
                                                 "(wave_c.md, section 7)",
+    "api/src/nl2sql_api/serve.py": "NL2SQL_MODE, the mode of this process (wave_d.md, D229)",
 }
 
 # The one function that loads a .env file, and the entry points that call it.
@@ -1253,7 +1254,7 @@ ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql/src/nl2sql/cli/main.py",
     "nl2sql/src/nl2sql/cli/commands/demo.py",
     "nl2sql/src/nl2sql/cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
-    "api/src/nl2sql_api/main.py",
+    "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model (wave_d.md, A4b)
 }
 
 _ENVIRON_WRITERS = {"pop", "popitem", "setdefault", "update", "clear", "__setitem__", "__delitem__"}
@@ -1336,6 +1337,18 @@ def test_database_url_is_read_only_by_launch():
         "DATABASE_URL is read by nl2sql launch only (wave_c.md, section 7): it is offered as a candidate "
         "to scan(url=...). A library or another command that wants a connection URL takes it as a "
         "parameter or reads ${env:VAR} from nl2sql.yaml.", sorted(readers ^ {launch}))
+
+
+def test_the_environment_variable_is_read_only_at_the_entry_point():
+    """``NL2SQL_MODE`` is named in ``nl2sql_api/serve.py`` and nowhere else: the mode travels in ``Config`` (D229)."""
+    entry = "api/src/nl2sql_api/serve.py"
+    readers = {_where(path) for path in python_files(*SOURCES)
+               for node in ast.walk(_tree(path))
+               if isinstance(node, ast.Constant) and node.value == "NL2SQL_MODE"}
+    assert readers == {entry}, _broke(
+        "NL2SQL_MODE is read by `nl2sql-api serve` only (wave_d.md, D229). It decides the mode once, with "
+        "nl2sql.resolve_mode, and the result travels in Config.mode: the engine and the page read no environment.",
+        sorted(readers ^ {entry}))
 
 
 def test_only_entry_points_load_dotenv():

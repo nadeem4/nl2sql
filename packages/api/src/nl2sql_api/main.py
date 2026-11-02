@@ -4,16 +4,19 @@ import logging
 from contextlib import asynccontextmanager
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from fastapi import FastAPI
 
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from nl2sql import EngineNotReady, NL2SQL, configure_logging, load_env_file
+from nl2sql import Config, EngineNotReady, NL2SQL, configure_logging, load_config
 from nl2sql_api import errors
+from nl2sql_api.identity import StartRefused
+from nl2sql_api.hosted import Hosted, HostedMiddleware
 from nl2sql_api.jobs import Jobs
+from nl2sql_api.routes import web
 
 logger = logging.getLogger("nl2sql_api")
 
@@ -23,17 +26,26 @@ NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "wo
               "index", "knowledge", "evals", "settings", "jobs", "web")
 
 
-def _lifespan(config_path: Optional[str]):
+def _lifespan(config_path: Optional[str], adjust: Optional[Callable[[Config], Config]] = None,
+              hosted: Optional[Hosted] = None):
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # nl2sql.yaml is config_path, else NL2SQL_CONFIG's file, else ./nl2sql.yaml. The .env next
-        # to it is loaded first and never overrides a variable already set.
-        load_env_file(config_path)
+        # nl2sql.yaml is config_path, else NL2SQL_CONFIG's file, else ./nl2sql.yaml. This loads no .env: `nl2sql-api
+        # serve` does, and never for a hosted server, which must hold no model key. `uvicorn nl2sql_api.main:app`
+        # reads the process environment as it stands.
         # The library no longer configures logging on import, so the application
         # entry point owns it - before anything that logs is constructed, at
         # NL2SQL_LOG_LEVEL (else INFO), as text or, with NL2SQL_LOG_FORMAT=json, JSON lines.
         configure_logging()
-        engine = NL2SQL.from_config(config_path)
+        config = load_config(config_path)
+        config = adjust(config) if adjust else config
+        if config.mode == "hosted" and hosted is None:
+            # Only `nl2sql-api serve` builds the sessions and limits; a file's `mode: hosted` alone would serve
+            # a public demo with neither.
+            raise StartRefused("This config says mode: hosted, which needs the hosted server's sessions and limits. "
+                               "Start it with `nl2sql-api serve --hosted` (or `nl2sql-api serve` with "
+                               "NL2SQL_MODE=hosted).")
+        engine = NL2SQL(config)
         # check() marks a datasource that cannot connect and leaves the others serving. The API starts either way:
         # /ready says not ready (D208), where a refusal to start would only show as an orchestrator's restart loop.
         try:
@@ -150,13 +162,20 @@ class ConfigCORSMiddleware:
         await self._for(origins)(scope, receive, send)
 
 
-def create_app(config_path: Optional[str] = None) -> FastAPI:
+def create_app(config_path: Optional[str] = None, *, adjust: Optional[Callable[[Config], Config]] = None,
+               hosted: Optional[Hosted] = None) -> FastAPI:
     """The API over a new engine, built from ``config_path`` (else ``NL2SQL_CONFIG``, else ``./nl2sql.yaml``) when
-    the app starts. Tests that never start it override ``get_engine``."""
-    app = FastAPI(title="NL2SQL API", version=_app_version(), lifespan=_lifespan(config_path))
+    the app starts. ``adjust`` changes the loaded ``Config`` first (``serve`` sets the mode); ``hosted`` makes it the
+    public demo (anonymous sessions and limits). Tests that never start it override ``get_engine``."""
+    app = FastAPI(title="NL2SQL API", version=_app_version(), lifespan=_lifespan(config_path, adjust, hosted))
+    app.state.hosted = hosted
+    if hosted is not None:
+        # Added first, so it is innermost: its 429 still carries the request id and the CORS headers.
+        app.add_middleware(HostedMiddleware, hosted=hosted)
     for name in NAMESPACES:
         app.include_router(import_module(f"nl2sql_api.routes.{name}").router, prefix="" if name == "web" else "/api/v1")
     errors.install(app)
+    web.install(app)
     app.add_middleware(ConfigCORSMiddleware)
     return app
 

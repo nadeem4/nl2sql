@@ -82,7 +82,7 @@ change and each agent's old and new provider and model, never a key. See
 
 ## Structured logging
 
-The library does not configure logging on import; the application entry point calls `nl2sql.configure_logging` after loading the `.env` next to `nl2sql.yaml`, so a `NL2SQL_LOG_LEVEL` there applies (the REST API does it in its lifespan, the CLI before every command, `nl2sql demo` again once the demo project's `.env` is loaded). JSON lines are chosen with `nl2sql --log-format json` (any command) or `NL2SQL_LOG_FORMAT=json` (any entry point); text is the default. Every question's `RunScope` sets the run's `trace_id` and `tenant_id` in the context `TraceContextFilter` reads, inside the run's worker, so a log line written during a run carries them, on LangGraph's worker threads too.
+The library does not configure logging on import; the application entry point calls `nl2sql.configure_logging` after loading the `.env` next to `nl2sql.yaml`, so a `NL2SQL_LOG_LEVEL` there applies (the REST API calls it in its lifespan, after `nl2sql-api serve` has loaded the `.env`; under plain `uvicorn` the variable must already be exported, the CLI before every command, `nl2sql demo` again once the demo project's `.env` is loaded). JSON lines are chosen with `nl2sql --log-format json` (any command) or `NL2SQL_LOG_FORMAT=json` (any entry point); text is the default. Every question's `RunScope` sets the run's `trace_id` and `tenant_id` in the context `TraceContextFilter` reads, inside the run's worker, so a log line written during a run carries them, on LangGraph's worker threads too.
 
 ## Source references
 

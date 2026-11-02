@@ -270,7 +270,7 @@ Config(..., conversations=Conversations(context_turns=5), chat_tools=["chart", "
 mode: your_data    # demo | your_data | hosted (default your_data)
 ```
 
-What the project is for: the bundled `demo`, your own data, or a `hosted` public demo ([Wave D](../architecture/wave_d.md), D229). It is a top-level key, not a section. The engine only validates it. `nl2sql.resolve_mode(flag, env, file)` picks the mode a process runs in: the launcher flag, else the value of `NL2SQL_MODE`, else this key. It is a pure function; the entry point reads the environment and passes the value in (`nl2sql-api` does this in a later Wave D PR). An unknown value is an error naming the three.
+What the project is for: the bundled `demo`, your own data, or a `hosted` public demo ([Wave D](../architecture/wave_d.md), D229). It is a top-level key, not a section. The engine only validates it. `nl2sql.resolve_mode(flag, env, file)` picks the mode a process runs in: the launcher flag, else the value of `NL2SQL_MODE`, else this key. It is a pure function; the entry point reads the environment and passes the value in: `nl2sql-api serve` is the one place that reads `NL2SQL_MODE`, resolves it with the `--demo` and `--hosted` flags and the file, and builds the engine with the result in its `Config`. An unknown value is an error naming the three.
 
 ### Strict keys and errors
 
@@ -300,6 +300,7 @@ Only these are read directly:
 | Variable | Read by | Purpose |
 | --- | --- | --- |
 | `NL2SQL_CONFIG` | `load_config()` with no path, the CLI, `nl2sql-api` | Path to `nl2sql.yaml`. Without it, `./nl2sql.yaml`. |
+| `NL2SQL_MODE` | `nl2sql-api serve` | `demo`, `your_data` or `hosted`: the mode when no flag sets it. It beats the config's `mode:` and loses to `--demo` and `--hosted`. |
 | `NL2SQL_LOG_LEVEL` | `configure_logging()` | The log level when the caller passes none (`DEBUG`, `INFO`, ...). Without it, `INFO`. |
 | `NL2SQL_LOG_FORMAT` | `configure_logging()` | `text` or `json` (one JSON object per line, with its `trace_id`) when the caller chooses neither; the CLI's `--log-format` chooses for any command. Without it, `text`; any other value is an error (`ValueError`; the CLI prints it on one line and exits 1). |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | `nl2sql/llm/` | The fallback key when `llm.api_key` (or an agent's, or `embeddings.api_key`) is not set. |

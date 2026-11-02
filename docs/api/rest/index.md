@@ -9,8 +9,7 @@ engine over HTTP. Implementation lives in `packages/api/src/nl2sql_api/`.
 
 Source: `packages/api/src/nl2sql_api/main.py`
 
-- `lifespan` configures logging, loads the `.env` next to `nl2sql.yaml` (never
-  overriding a variable already set), builds one engine with
+- `lifespan` configures logging, builds one engine with
   `NL2SQL.from_config()` (the file `NL2SQL_CONFIG` names, else `./nl2sql.yaml`)
   and calls `engine.check()` before it serves. A `required` datasource that
   fails, or no datasource ready at all, raises `EngineNotReady`: the API logs
@@ -102,7 +101,7 @@ event loop.
 ## Configuration
 
 The REST API is configured by the same `nl2sql.yaml` as the engine. Beyond the
-runtime server options of `nl2sql-api serve` (`--config`, `--host`, `--port`; one worker, no reload),
+runtime server options of `nl2sql-api serve` (`--config`, `--host`, `--port`, `--demo`, `--dir`, `--hosted`, `--questions-per-minute`, `--questions-per-session`; one worker, no reload; see [Hosted demo](../../deployment/hosted-demo.md)),
 its own settings are the `api` section of that file (see
 [The `api` section](../../configuration/api.md)), and the admin roles are
 `policies.admin_roles`. The engine validates the `api` section and never reads it.
