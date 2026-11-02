@@ -91,9 +91,9 @@ OPENAI_ENV = PROVIDER_PRESETS["openai"].api_key_env
 OPENROUTER_ENV = PROVIDER_PRESETS["openrouter"].api_key_env
 ANTHROPIC_ENV = PROVIDER_PRESETS["anthropic"].api_key_env
 
-# The providers a key selects, and the variables they read it from, in preset order.
 # The hint for a missing langchain-anthropic, for a command that explains it (``nl2sql doctor``).
 ANTHROPIC_EXTRA_HINT = EXTRA_HINT
+# The providers a key selects, and the variables they read it from, in preset order.
 KEYED_PROVIDERS: Tuple[str, ...] = tuple(name for name, p in PROVIDER_PRESETS.items() if p.api_key_env)
 PROVIDER_KEYS: Tuple[str, ...] = tuple(PROVIDER_PRESETS[name].api_key_env for name in KEYED_PROVIDERS)
 

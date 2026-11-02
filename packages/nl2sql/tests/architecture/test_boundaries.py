@@ -645,6 +645,20 @@ CLI_FILES_STILL_IMPORTING_INSIDE = {
 }
 
 
+def _outside_the_cli(path):
+    """The ``nl2sql`` modules a file imports, relative imports resolved, that are not ``nl2sql`` or ``nl2sql.cli``.
+
+    ``imports`` yields ``from nl2sql import X`` as ``nl2sql`` and ``nl2sql.X``; the second is a facade
+    export, not a module, so it is skipped when the same line also imported the bare ``nl2sql``.
+    """
+    found = list(imports(path))
+    facade_lines = {lineno for lineno, name, _ in found if name == "nl2sql"}
+    return [(lineno, name) for lineno, name, _ in found
+            if name.partition(".")[0] == "nl2sql" and name != "nl2sql"
+            and name != "nl2sql.cli" and not name.startswith("nl2sql.cli.")
+            and not (lineno in facade_lines and name.count(".") == 1)]
+
+
 def test_the_cli_imports_only_the_public_nl2sql():
     """The CLI is a client of the facade, like the API: ``from nl2sql import ...``, never the engine's internals.
 
@@ -656,14 +670,12 @@ def test_the_cli_imports_only_the_public_nl2sql():
         relative = path.relative_to(CLI).as_posix()
         if relative.startswith("demo/playground/") or relative in CLI_FILES_STILL_IMPORTING_INSIDE:
             continue
-        for lineno, name in _engine_imports(path):
-            if name != "nl2sql" and not name.startswith("nl2sql.cli"):
-                offenders.append(f"{_where(path)}:{lineno} {name}")
+        offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name in _outside_the_cli(path)]
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
                       if name.partition(".")[0] == "nl2sql_sdk"]
     stale = [name for name in CLI_FILES_STILL_IMPORTING_INSIDE
              if not (CLI / name).is_file()
-             or all(n == "nl2sql" or n.startswith("nl2sql.cli") for _, n in _engine_imports(CLI / name))]
+             or not _outside_the_cli(CLI / name)]
     assert not offenders, _broke(
         "The CLI imports only the top-level nl2sql (and its own nl2sql.cli package), never the engine's "
         "internals or nl2sql_sdk. What a command needs is a facade method or export every caller can use.",
