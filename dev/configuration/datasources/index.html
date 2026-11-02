@@ -5222,14 +5222,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/datasource/" class="md-nav__link">
+      <a href="../../api/rest/datasources/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Datasource
+    Datasources
   
 
     
@@ -5286,6 +5286,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
   
 
     
@@ -6430,7 +6458,7 @@ question:</p>
 <p>RBAC is unchanged: a preferred table the role may not read loses its data like
 any other table, and the validator refuses a plan that reads it.</p>
 <p>A name that is not in the indexed schema is a warning, not an error: <code>nl2sql
-doctor</code> and the index status (<code>engine.index.health()</code>, <code>GET /api/v1/index/status</code>)
+doctor</code> and the index status (<code>engine.index.health()</code>, <code>GET /api/v1/index</code>)
 print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
 usual cause is a view created after the last index; re-index the datasource.</p>
 <h2 id="when-a-datasource-fails-to-start">When a datasource fails to start</h2>
@@ -6445,9 +6473,9 @@ broken one is marked unavailable:</p>
 <ul>
 <li>the log has an error: <code>Datasource 'sales' is unavailable: &lt;reason&gt;</code>;</li>
 <li><code>check()</code> reports it <code>failed</code> at stage <code>connect</code>, with a fix;</li>
-<li><code>engine.datasources.list()</code> (and <code>GET /api/v1/datasource</code>) shows it with
+<li><code>engine.datasources.list()</code> (and <code>GET /api/v1/datasources</code>) shows it with
   <code>status: "failed"</code> and the <code>reason</code>, and nothing is routed to it;</li>
-<li>the index status (<code>engine.index.health()</code>, <code>GET /api/v1/index/status</code>) carries
+<li>the index status (<code>engine.index.health()</code>, <code>GET /api/v1/index</code>) carries
   the same sentence as a warning;</li>
 <li>a query with <code>datasource_id</code> set to it, and <code>nl2sql index</code> or
   <code>engine.index.build([...])</code> naming it, fail with that reason.</li>
@@ -6471,7 +6499,8 @@ from, and nothing else. It needs:</p>
 <li>an admin <code>by</code> (<code>policies.admin_roles</code>; under <code>allow_all</code> any caller) - a caller without one gets <code>PermissionError</code>;</li>
 <li>an engine loaded from a <code>nl2sql.yaml</code> whose <code>datasources</code> section is a folder (<code>datasources: { file: datasources/ }</code>,
   one <code>&lt;id&gt;.yaml</code> each, as <code>nl2sql init</code> writes it). An engine built in code, or with the datasources inline in
-  <code>nl2sql.yaml</code>, raises <code>ValueError</code>.</li>
+  <code>nl2sql.yaml</code>, or one whose folder cannot be written, raises <code>ReviewError</code> with code <code>NOT_WRITABLE</code>
+  (not a <code>ValueError</code>; the REST API answers 403).</li>
 </ul>
 <p><strong>The file is checked before it is replaced.</strong> The engine records each datasource file's SHA-256 when it loads the
 config, as an accept does for the glossary. If the file changed on disk since (somebody edited it), <code>save</code> raises
@@ -6524,8 +6553,8 @@ connection handled as above (<code>NL2SQL_LLM_API_KEY</code>, <code>NL2SQL_LLM_A
 an object instead of data (an adapter, store, hook or chat model object) and loads what it wrote before it returns.
 <code>nl2sql.config.starter_config(llm=..., path=...)</code> is a config with no datasources, <code>allow_all</code> policies, local
 embeddings and a <code>yaml</code> knowledge source; <code>nl2sql.config.write_env_values(folder, values)</code> writes the <code>.env</code>.</p>
-<p>Over REST, <code>POST /api/v1/datasource</code> with <code>"save": true</code> calls the same method; see
-<a href="../../api/rest/datasource/">Datasource API</a>.</p>
+<p>Over REST, <code>POST /api/v1/datasources</code> with <code>"save": true</code> calls the same method; see
+<a href="../../api/rest/datasources/">Datasource API</a>.</p>
 <h2 id="notes">Notes</h2>
 <ul>
 <li>Use <code>${env:VAR}</code> for environment variables, or <code>${provider:key}</code> for a secret
@@ -6534,8 +6563,8 @@ embeddings and a <code>yaml</code> knowledge source; <code>nl2sql.config.write_e
 <li>From Python, <code>engine.datasources.add(Datasource(...))</code> adds one to a running
   engine (built, not connected), <code>engine.datasources.save(id, by=admin)</code> writes it to <code>datasources/&lt;id&gt;.yaml</code>
   (<a href="#saving-a-datasource">Saving a datasource</a>), and <code>engine.datasources.remove(id)</code> takes one
-  out; <code>nl2sql-api</code>'s <code>POST /api/v1/datasource</code> takes
-  the same shape as JSON, and <code>POST /api/v1/datasource/test</code> and <code>GET /api/v1/datasource-types</code> are the Connect a
+  out; <code>nl2sql-api</code>'s <code>POST /api/v1/datasources</code> takes
+  the same shape as JSON, and <code>POST /api/v1/datasources/test</code> and <code>GET /api/v1/datasource-types</code> are the Connect a
   database form's other two calls.</li>
 </ul>
 

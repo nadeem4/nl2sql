@@ -5311,14 +5311,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rest/datasource/" class="md-nav__link">
+      <a href="../../rest/datasources/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Datasource
+    Datasources
   
 
     
@@ -5375,6 +5375,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
   
 
     
@@ -6443,7 +6471,7 @@ builds are deleted. Other datasources' entries are never touched. A changed
 embedding model needs no special build: its namespace starts empty.</p>
 <h3 id="indexhealth">index.health</h3>
 <p>Signature:
-<code>health() -&gt; dict</code></p>
+<code>health(*, user_context=None) -&gt; dict</code></p>
 <p>Health of the configured embedding model's index: <code>status</code> (<code>ok</code>,
 <code>empty</code>, <code>stale</code>, <code>missing</code>), <code>total</code>, <code>counts</code> by entry type, <code>built_at</code>,
 <code>embedding_model</code>, <code>namespace</code>, one entry per registered datasource
@@ -6452,6 +6480,10 @@ from, and <code>built_at</code>), <code>problems</code> and <code>warnings</code
 no namespace yet (never indexed, or the model changed): run <code>nl2sql index</code>.
 A datasource that failed to start is a warning: "Datasource 'x' is
 unavailable: <reason>". <code>check()</code> reports its <code>status</code>.</p>
+<p>Without <code>user_context</code> it is the whole report. With one that holds none of <code>policies.admin_roles</code> (and no
+<code>allow_all</code>), only the datasources its roles reach are listed, a failed one is named without the driver's text, and a
+warning about a preferred table (it names a table the scope may hide) is left out; <code>status</code> and <code>counts</code> stay the whole
+index's.</p>
 <h3 id="indexclear">index.clear</h3>
 <p>Signature:
 <code>clear() -&gt; None</code></p>
@@ -6493,7 +6525,7 @@ glossary items it breaks); <code>error</code> (redacted) for <code>failed</code>
 once per drift and engine.
 Nothing is stored and nothing is rebuilt. <code>user_context</code> is required: the
 caller sees drift only in tables its scope may read, a datasource it cannot
-reach is left out (or, named, is a <code>ValueError</code> like an unknown one). See
+reach is left out (or, named, is a <code>DatasourceNotFound</code> (a <code>ValueError</code>) like an unknown one). See
 <a href="../../../schema/drift/">Schema Drift</a>.</p>
 <h3 id="indexversions">index.versions</h3>
 <p>Signature:

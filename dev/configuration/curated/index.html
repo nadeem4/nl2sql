@@ -5294,14 +5294,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/datasource/" class="md-nav__link">
+      <a href="../../api/rest/datasources/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Datasource
+    Datasources
   
 
     
@@ -5358,6 +5358,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
   
 
     
@@ -6579,7 +6607,7 @@ makes no model call, so it takes seconds. The datasource must have been
 indexed once with plain <code>nl2sql index</code>. A plain <code>nl2sql index</code> also picks up
 the file, and a schema re-index always keeps the verified queries.</p>
 <p>Until you re-index, <code>nl2sql doctor</code> and the index status (<code>engine.index.health()</code>,
-<code>GET /api/v1/index/status</code>) warn:</p>
+<code>GET /api/v1/index</code>) warn:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --refresh --datasource chinook`.
 </code></pre></div>
 <p>It is a warning, not a failure: the index stays <code>ok</code>, because the stale

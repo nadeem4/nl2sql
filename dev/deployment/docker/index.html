@@ -5200,14 +5200,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/datasource/" class="md-nav__link">
+      <a href="../../api/rest/datasources/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Datasource
+    Datasources
   
 
     
@@ -5264,6 +5264,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
   
 
     
@@ -6153,7 +6181,7 @@ published port is a <code>403</code>, so set <code>api.auth</code> for a contain
 <ul>
 <li>Schema indexing is not automatic; you must run indexing in your operational
   flow: <code>nl2sql --config /etc/nl2sql/nl2sql.yaml index</code> against the same
-  storage, or <code>POST /api/v1/index-all</code> (admin role).</li>
+  storage, or <code>POST /api/v1/jobs/index</code> (admin role).</li>
 <li>Observability exporters require network access. They are observers in the
   config's <code>observers</code> section: an <code>otel</code> observer with its <code>endpoint</code> (the
   API image installs the <code>otel</code> extra; see

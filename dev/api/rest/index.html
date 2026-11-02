@@ -5262,14 +5262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="datasource/" class="md-nav__link">
+      <a href="datasources/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Datasource
+    Datasources
   
 
     
@@ -5326,6 +5326,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
   
 
     
@@ -6263,8 +6291,8 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
 <p>Source: <code>packages/api/src/nl2sql_api/dependencies.py</code></p>
 <ul>
 <li><code>get_engine(request)</code> returns the singleton <code>NL2SQL</code> instance.</li>
-<li>Service providers (<code>DatasourceService</code>, <code>QueryService</code>, <code>LLMService</code>,
-  <code>IndexingService</code>, <code>HealthService</code>) are created per-request with the engine.</li>
+<li>Routes are thin over the engine's namespaces (<code>engine.datasources</code>, <code>engine.index</code>, ...); there are no service
+  classes between them.</li>
 <li><code>identity.caller</code> (in <code>nl2sql_api/identity.py</code>) returns the caller's
   <code>UserContext</code>; see <a href="#identity">Identity</a>.</li>
 <li><code>identity.admin</code> guards the routes that change datasources, LLMs or the
@@ -6317,9 +6345,9 @@ server on a config:</p>
 <td>Conversations: start, list, read, delete, send a turn (whole or streamed), retry, run a chat tool, report.</td>
 </tr>
 <tr>
-<td><a href="datasource/">Datasource</a></td>
-<td><code>routes/datasource.py</code></td>
-<td>Manage datasource configs.</td>
+<td><a href="datasources/">Datasources</a></td>
+<td><code>routes/datasources.py</code></td>
+<td>Connect a database, list datasources, read a schema or its diagram.</td>
 </tr>
 <tr>
 <td><a href="llm/">LLM</a></td>
@@ -6328,8 +6356,13 @@ server on a config:</p>
 </tr>
 <tr>
 <td><a href="indexing/">Indexing</a></td>
-<td><code>routes/indexing.py</code></td>
-<td>Index management and status.</td>
+<td><code>routes/index.py</code>, <code>routes/jobs.py</code></td>
+<td>Index status, drift check, retrieval inspector, the index job.</td>
+</tr>
+<tr>
+<td><a href="knowledge/">Knowledge</a></td>
+<td><code>routes/knowledge.py</code>, <code>routes/jobs.py</code></td>
+<td>The merged knowledge, proposals, the profile job.</td>
 </tr>
 <tr>
 <td><a href="dashboards/">Dashboards</a></td>
@@ -6343,7 +6376,7 @@ server on a config:</p>
 </tr>
 </tbody>
 </table>
-<p>The routers <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code> and <code>web</code> are empty
+<p>The routers <code>evals</code>, <code>settings</code> and <code>web</code> are empty
 for now: later rows fill them. The committed contract is <code>packages/api/openapi.json</code>; <code>test_openapi_snapshot_is_current</code>
 fails when a route changes without it (rewrite it with <code>python packages/api/tests/test_openapi_snapshot.py</code>).</p>
 <h2 id="error-handling">Error Handling</h2>
@@ -6425,10 +6458,11 @@ reverse proxy on the same host or a DNS-rebinding page is not taken for the oper
 <p>The routes that change the running process need an admin role, checked by the
 <code>identity.admin</code> dependency:</p>
 <ul>
-<li><code>POST /api/v1/datasource</code> and <code>DELETE /api/v1/datasource/{datasource_id}</code></li>
-<li>The Connect routes <code>GET /api/v1/datasource-types</code> and <code>POST /api/v1/datasource/test</code></li>
+<li><code>POST /api/v1/datasources</code> and <code>DELETE /api/v1/datasources/{datasource_id}</code></li>
+<li>The Connect routes <code>GET /api/v1/datasource-types</code> and <code>POST /api/v1/datasources/test</code></li>
 <li><code>PUT /api/v1/settings/llm</code></li>
-<li><code>POST /api/v1/index/{datasource_id}</code>, <code>POST /api/v1/index-all</code> and <code>DELETE /api/v1/index</code></li>
+<li><code>POST /api/v1/jobs/index</code>, <code>POST /api/v1/jobs/profile</code>, <code>DELETE /api/v1/index</code> and <code>GET /api/v1/index/check</code></li>
+<li><code>POST /api/v1/knowledge/reload</code> and every <code>/api/v1/proposals</code> route</li>
 </ul>
 <table>
 <thead>
@@ -6449,8 +6483,8 @@ reverse proxy on the same host or a DNS-rebinding page is not taken for the oper
 <p>A caller whose roles include one in <code>policies.admin_roles</code> is let through; one with
 roles but none of them admin is <code>HTTP 403</code>; one with no identity is <code>HTTP 401</code>. The check
 uses <code>admin_roles</code> alone, so <code>policies.allow_all</code> does not make a caller an admin.</p>
-<p>The read-only routes (<code>/health</code>, <code>/ready</code>, <code>/meta</code>, <code>GET /datasource</code>, <code>GET /llm</code>, which
-never returns API keys, and <code>GET /index/status</code>) need no role.</p>
+<p>The read-only routes (<code>/health</code>, <code>/ready</code>, <code>/meta</code>, <code>GET /datasources</code>, <code>GET /llm</code>, which
+never returns API keys, and <code>GET /index</code>) need no role.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># The proxy sets X-NL2SQL-Roles; only "ops" may change datasources and the index.</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># api.yaml</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy</span>

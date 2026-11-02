@@ -5093,14 +5093,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../datasource/" class="md-nav__link">
+      <a href="../datasources/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Datasource
+    Datasources
   
 
     
@@ -5157,6 +5157,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
   
 
     
@@ -6162,6 +6190,14 @@ under the owner's data scope, so it is the owner's alone (in <code>GET /jobs</co
 <tr>
 <td><code>POST /api/v1/jobs/dashboard</code></td>
 <td>A starter dashboard for one datasource, as the caller; any caller. See <a href="../dashboards/#generate-a-starter-dashboard">Dashboards</a>.</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/jobs/index</code></td>
+<td>Build the index for <code>datasource_ids</code> (every datasource when left out); admin. Progress is one step per datasource, <code>&lt;id&gt; (failed)</code> for one that failed; the result is <code>{ok, stats, empty, failed}</code>. See <a href="../indexing/#start-an-index-build">Indexing</a>.</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/jobs/profile</code></td>
+<td>Profile <code>datasource_ids</code> into proposals (<code>draft</code>, <code>max_cost_usd</code>), on the server's key only; admin. The result is a list of profile reports. See <a href="../knowledge/#start-a-profile">Knowledge</a>.</td>
 </tr>
 </tbody>
 </table>
