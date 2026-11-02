@@ -131,6 +131,15 @@ def test_the_meta_route_reports_the_hosted_limits_to_a_visitor(make):
     assert client.get("/api/v1/meta").json()["limits"]["asked"] == 1
 
 
+def test_meta_names_a_hosted_visitor_without_its_session_token(make):
+    _, client = make()
+    body = client.get("/api/v1/meta")
+    token = client.cookies[SESSION_COOKIE]
+
+    assert body.json()["caller"] == {"admin": False}  # the id is the cookie's secret, so none is told
+    assert token not in body.text
+
+
 def test_the_hosted_page_carries_the_preview_tags_and_starts_no_session(make, tmp_path, monkeypatch):
     (tmp_path / "static").mkdir()
     (tmp_path / "static" / "index.html").write_text("<html><head></head><body></body></html>", encoding="utf-8")

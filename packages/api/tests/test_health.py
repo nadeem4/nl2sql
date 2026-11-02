@@ -1,8 +1,10 @@
 """``/health``, ``/ready``, ``/meta`` and ``/about`` (docs/architecture/wave_d.md, "Health and readiness")."""
 from importlib.metadata import version
+from types import SimpleNamespace
 
 import pytest
 from dashboard_stubs import Recorder
+from fastapi.testclient import TestClient
 
 from nl2sql import CheckReport, DatasourceInfo, DatasourceStatus, EngineNotReady, UserContext
 from nl2sql_api.main import app
@@ -181,6 +183,77 @@ def test_meta_lists_sample_questions_and_recorded(stub):
     assert body["recorded_with"] == {"provider": "openai", "model": "gpt-x"}
     assert "connection" not in str(body["datasources"])
     assert engine.datasources.called("list") == [((), {"user_context": UserContext(user_id="static", roles=["analyst"])})]
+
+
+def _caller(client, **kw):
+    return client.get(f"{API}/meta", **kw).json().get("caller")
+
+
+def test_meta_without_a_caller_names_no_caller(stub):
+    client, _ = stub(CheckReport(), authenticated=False, api={"auth": "api_keys"})
+
+    assert "caller" not in client.get(f"{API}/meta").json()
+
+
+def test_meta_names_the_static_caller_and_whether_it_is_an_admin(stub):
+    for role, admin in (("admin", True), ("analyst", False)):
+        client, _ = stub(CheckReport(), api={"auth": "static", "static_role": role})
+        assert _caller(client) == {"user_id": "static", "admin": admin}
+
+
+def test_meta_names_the_api_key_holder(stub):
+    client, engine = stub(CheckReport(), api={"auth": "api_keys"})
+    token = "tok-" + "x" * 8  # built, not a real key
+    engine.api_keys = SimpleNamespace(verify=lambda t: UserContext(user_id="ada", roles=["admin"]) if t == token else None)
+
+    assert _caller(client, headers={"Authorization": f"Bearer {token}"}) == {"user_id": "ada", "admin": True}
+    assert token not in client.get(f"{API}/meta", headers={"Authorization": f"Bearer {token}"}).text
+
+
+def test_meta_names_the_proxy_caller(stub):
+    api = {"auth": "proxy", "proxy": {"user_header": "X-User", "roles_header": "X-Roles", "tenant_header": None,
+                                      "trusted_from": ["10.0.0.0/8"]}}
+    _, _ = stub(CheckReport(), api=api)
+    proxied = TestClient(app, client=("10.1.2.3", 5))
+
+    assert _caller(proxied, headers={"X-User": "bo", "X-Roles": "viewer"}) == {"user_id": "bo", "admin": False}
+    assert "caller" not in proxied.get(f"{API}/meta").json()  # no header, no caller
+
+
+def test_meta_names_the_local_operator_as_an_admin(stub):
+    _, _ = stub(CheckReport(), api={"auth": "none"})
+    local = TestClient(app, base_url="http://localhost:8000", client=("127.0.0.1", 5))
+
+    assert _caller(local) == {"user_id": "local", "admin": True}
+
+
+def test_meta_admin_is_the_answer_the_admin_routes_give(stub):
+    policies = {"roles": {"boss": {"description": "r", "allow": ["*"]}, "analyst": {"description": "r", "allow": ["*"]}},
+                "default_role": "analyst", "admin_roles": ["boss"]}
+    for role in ("boss", "analyst"):
+        client, _ = stub(CheckReport(), api={"auth": "static", "static_role": role}, policies=policies)
+        route = client.get(f"{API}/evals/suites")  # an admin route: 200 for an admin, 403 for anyone else
+        assert route.status_code == (200 if role == "boss" else 403)
+        assert _caller(client)["admin"] is (route.status_code == 200)
+
+
+def test_meta_local_operator_is_not_admin_when_no_admin_role_is_defined(stub):
+    policies = {"roles": {"analyst": {"description": "r", "allow": ["*"]}}, "default_role": "analyst",
+                "admin_roles": []}
+    _, _ = stub(CheckReport(), api={"auth": "none"}, policies=policies)
+    local = TestClient(app, base_url="http://localhost:8000", client=("127.0.0.1", 5))
+
+    assert _caller(local) == {"user_id": "local", "admin": False}
+    assert local.get(f"{API}/evals/suites").status_code == 403
+
+
+def test_meta_never_carries_another_users_data(stub):
+    client, engine = stub(CheckReport(), api={"auth": "static", "static_role": "analyst"})
+
+    body = client.get(f"{API}/meta").json()
+
+    assert set(body["caller"]) <= {"user_id", "admin"}
+    assert "roles" not in body["caller"] and "tenant_id" not in body["caller"]
 
 
 def test_about_is_the_engines_description(api_client):

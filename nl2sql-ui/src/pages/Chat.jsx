@@ -18,9 +18,8 @@ function describe(e) {
 
 // The conversation page: a list of the caller's conversations and one transcript. A turn streams its steps while it
 // runs and is then replaced by the stored turn the server sends last, so what stays is exactly what was saved.
-// `starter` is a question another page wants asked (Home's sample question); `onStarter` says it was taken;
-// `onCaller(user id)` tells the app who the signed-in user is, since a conversation's owner is its caller.
-export default function Chat({ param, starter, onStarter, onCaller }) {
+// `starter` is a question another page wants asked (Home's sample question); `onStarter` says it was taken.
+export default function Chat({ param, starter, onStarter }) {
   const [list, setList] = useState([]);
   const [conv, setConv] = useState(null);
   const [tools, setTools] = useState([]);
@@ -53,8 +52,6 @@ export default function Chat({ param, starter, onStarter, onCaller }) {
     getConversation(param).then((c) => current && setConv(c)).catch((e) => { if (current) { setConv(null); setError(describe(e)); } });
     return () => { current = false; };
   }, [param]);
-
-  useEffect(() => { if (conv && conv.user_id && onCaller) onCaller(conv.user_id); }, [conv && conv.user_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (body, label) => {
     if (busy) return;

@@ -33,7 +33,7 @@ function Request({ record, busy, own, onGrant, onDeny }) {
 }
 
 // The pending approvals the caller may decide. A decision removes the request from the list.
-// `callerId` is the signed-in user's id when the page knows it; the server still refuses a decision from anyone else.
+// `callerId` is the signed-in user's id from /meta (none for a hosted visitor, and until /meta answers); the server still refuses a decision from anyone else.
 export default function Approvals({ callerId }) {
   const [records, setRecords] = useState(null);
   const [busy, setBusy] = useState(false);

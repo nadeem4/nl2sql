@@ -6,6 +6,8 @@ import RetrievalInspector from "./pages/Retrieval.jsx";
 import Home from "./pages/Home.jsx";
 import { sampleQuestion } from "./pages/home.js";
 import { listApprovals } from "./api/chat.js";
+import { getMeta } from "./api/meta.js";
+import { callerOf } from "./lib/caller.js";
 import { toDecide } from "./chat/approval.js";
 import { needsKey } from "./pages/firstRun.js";
 import { modeStatus } from "./pages/status.js";
@@ -139,8 +141,9 @@ export default function App() {
   // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
   const [starter, setStarter] = useState(null);
   const [waiting, setWaiting] = useState([]);
-  // The signed-in user's id, once a conversation has told us (its owner is the caller). Their own requests are not theirs to decide.
-  const [callerId, setCallerId] = useState(null);
+  // Who the caller is, from GET /meta (A4c): their own approval requests are not theirs to decide, and Connect and
+  // Knowledge offer admin work only to an admin. Null until /meta answers, or when it names no caller.
+  const [caller, setCaller] = useState(null);
   // The hosted demo keys and step choices: this tab, never the server.
   const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
   const [stepModels, setStepModels] = useState(() => readModels(window.sessionStorage));
@@ -154,6 +157,7 @@ export default function App() {
         if (m.roles.length) setRole(m.roles.includes("admin") ? "admin" : m.roles[0]);
       })
       .catch((e) => setError(e.message));
+    getMeta().then((m) => setCaller(callerOf(m))).catch(() => {});
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
     getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
     getJson("/api/pipeline").then(setPipeline).catch((e) => setPipelineError(e.message));
@@ -207,7 +211,7 @@ export default function App() {
     // Hosted, Settings is not off: it is where the visitor puts their own key.
     settings: settings && !settings.available && !settings.hosted,
     retrieval: retrieval && !retrieval.available,
-  }, { approvals: toDecide(waiting, callerId).length });
+  }, { approvals: toDecide(waiting, caller && caller.id).length });
 
   return (
     <div className="app">
@@ -264,13 +268,13 @@ export default function App() {
 
         {page === "chat" && (
           <Suspense fallback={null}>
-            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} onCaller={setCallerId} />
+            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} />
           </Suspense>
         )}
 
         {page === "approvals" && (
           <Suspense fallback={null}>
-            <Approvals callerId={callerId} />
+            <Approvals callerId={caller && caller.id} />
           </Suspense>
         )}
 
@@ -298,7 +302,7 @@ export default function App() {
 
         {STUB_PAGES[page] && (
           <Suspense fallback={null}>
-            {React.createElement(STUB_PAGES[page], { param })}
+            {React.createElement(STUB_PAGES[page], { param, caller })}
           </Suspense>
         )}
       </main>
