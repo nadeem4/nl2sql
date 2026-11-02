@@ -561,6 +561,109 @@
         "title": "ArtifactRef",
         "type": "object"
       },
+      "BuildReport": {
+        "additionalProperties": false,
+        "properties": {
+          "built": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Built",
+            "type": "array"
+          },
+          "dashboard": {
+            "$ref": "#/components/schemas/Dashboard"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedQuestion"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dashboard",
+          "built"
+        ],
+        "title": "BuildReport",
+        "type": "object"
+      },
+      "BuilderOptions": {
+        "additionalProperties": false,
+        "description": "The chips of the builder: everything on it exists and is readable by the caller (D245).",
+        "properties": {
+          "curated": {
+            "items": {
+              "$ref": "#/components/schemas/BuilderQuestion"
+            },
+            "title": "Curated",
+            "type": "array"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnOption"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricOption"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "ranges": {
+            "items": {
+              "$ref": "#/components/schemas/TimeRange"
+            },
+            "title": "Ranges",
+            "type": "array"
+          },
+          "saved": {
+            "items": {
+              "$ref": "#/components/schemas/BuilderQuestion"
+            },
+            "title": "Saved",
+            "type": "array"
+          },
+          "time_columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnOption"
+            },
+            "title": "Time Columns",
+            "type": "array"
+          }
+        },
+        "title": "BuilderOptions",
+        "type": "object"
+      },
+      "BuilderQuestion": {
+        "additionalProperties": false,
+        "description": "A curated query or a saved answer the person may tick.",
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "datasource_id"
+        ],
+        "title": "BuilderQuestion",
+        "type": "object"
+      },
       "CaseWhen": {
         "additionalProperties": false,
         "description": "Represents a single WHEN ... THEN ... clause in a CASE expression.\n\nAttributes:\n    condition (Expr): The condition expression to evaluate.\n    result (Expr): The result expression if the condition is true.",
@@ -1103,6 +1206,30 @@
         "title": "ColumnKnowledge",
         "type": "object"
       },
+      "ColumnOption": {
+        "additionalProperties": false,
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "column",
+          "table"
+        ],
+        "title": "ColumnOption",
+        "type": "object"
+      },
       "ColumnRef": {
         "properties": {
           "column_name": {
@@ -1473,6 +1600,62 @@
           "updated_at"
         ],
         "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardBuildJob": {
+        "additionalProperties": false,
+        "description": "The ticked, reworded tiles of the guided builder (``POST /dashboard-builder/proposals`` made the list).",
+        "properties": {
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "tiles": {
+            "items": {
+              "$ref": "#/components/schemas/TileProposal"
+            },
+            "title": "Tiles",
+            "type": "array"
+          },
+          "time_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Column"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "tiles"
+        ],
+        "title": "DashboardBuildJob",
         "type": "object"
       },
       "DashboardFilter": {
@@ -3238,6 +3421,7 @@
               "profile",
               "eval",
               "dashboard",
+              "dashboard-build",
               "demo"
             ],
             "title": "Kind",
@@ -3256,6 +3440,9 @@
               },
               {
                 "$ref": "#/components/schemas/DashboardJob"
+              },
+              {
+                "$ref": "#/components/schemas/DashboardBuildJob"
               },
               {
                 "$ref": "#/components/schemas/DemoJob"
@@ -3287,6 +3474,9 @@
               },
               {
                 "$ref": "#/components/schemas/DashboardJobResult"
+              },
+              {
+                "$ref": "#/components/schemas/BuildReport"
               },
               {
                 "type": "null"
@@ -3710,6 +3900,40 @@
           "arrangements"
         ],
         "title": "LayoutBody",
+        "type": "object"
+      },
+      "MetricOption": {
+        "additionalProperties": false,
+        "description": "A glossary term that names columns the caller can read.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "columns"
+        ],
+        "title": "MetricOption",
         "type": "object"
       },
       "MetricSpec": {
@@ -4294,6 +4518,89 @@
           "created_at"
         ],
         "title": "Proposal",
+        "type": "object"
+      },
+      "ProposalsBody": {
+        "additionalProperties": false,
+        "description": "The chips of the guided builder: which sources to draw on, and what was ticked.",
+        "properties": {
+          "curated_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Curated Ids",
+            "type": "array"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "dimensions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "metrics": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "saved_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Saved Ids",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "enum": [
+                "curated",
+                "saved",
+                "asked"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          }
+        },
+        "required": [
+          "datasource_id",
+          "sources"
+        ],
+        "title": "ProposalsBody",
         "type": "object"
       },
       "QueryRequest": {
@@ -4882,6 +5189,21 @@
         "title": "RuleUse",
         "type": "object"
       },
+      "RunAnswerBody": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Ids",
+            "type": "array"
+          }
+        },
+        "title": "RunAnswerBody",
+        "type": "object"
+      },
       "RunStop": {
         "description": "A run stopped at a limit: which one, its configured ``value``, and what was ``spent`` when it stopped.",
         "properties": {
@@ -4949,6 +5271,155 @@
           "message"
         ],
         "title": "RunWarning",
+        "type": "object"
+      },
+      "SaveBody": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "step": {
+            "$ref": "#/components/schemas/StepRef"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "conversation_id",
+          "step"
+        ],
+        "title": "SaveBody",
+        "type": "object"
+      },
+      "SaveReport": {
+        "additionalProperties": false,
+        "description": "What ``engine.answers.save`` did. The answer is always saved (D241); the proposal may not be filed.",
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/SavedAnswer"
+          },
+          "not_proposed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Proposed Reason"
+          },
+          "proposal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposal Id"
+          },
+          "proposed": {
+            "title": "Proposed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answer",
+          "proposed"
+        ],
+        "title": "SaveReport",
+        "type": "object"
+      },
+      "SavedAnswer": {
+        "additionalProperties": false,
+        "description": "One answer its owner kept: the question and the typed plan that answered it. No rows and no SQL text are\nstored; a re-run builds both again under the viewer's scope (D240).",
+        "properties": {
+          "chart": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "line",
+              "bar",
+              "big_number",
+              "table"
+            ],
+            "title": "Chart",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "datasource_id": {
+            "title": "Datasource Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ChartPlan"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "datasource_id",
+          "plan",
+          "created_at",
+          "trace_id"
+        ],
+        "title": "SavedAnswer",
         "type": "object"
       },
       "Schedule": {
@@ -5192,6 +5663,30 @@
         "title": "SelectItem",
         "type": "object"
       },
+      "SkippedQuestion": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "code",
+          "message"
+        ],
+        "title": "SkippedQuestion",
+        "type": "object"
+      },
       "SkippedTile": {
         "additionalProperties": false,
         "properties": {
@@ -5245,6 +5740,34 @@
           }
         },
         "title": "StartRequest",
+        "type": "object"
+      },
+      "StepRef": {
+        "additionalProperties": false,
+        "description": "An ``ask`` step of the conversation, by turn and step number (both 1-based). Without ``turn``: the latest\nturn, which in a chat is the one being answered.",
+        "properties": {
+          "step": {
+            "minimum": 1.0,
+            "title": "Step",
+            "type": "integer"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StepRef",
         "type": "object"
       },
       "SubQuery": {
@@ -5754,6 +6277,64 @@
         "title": "TileLayout",
         "type": "object"
       },
+      "TileProposal": {
+        "additionalProperties": false,
+        "description": "One tile to tick, untick or reword. ``ref`` is the verified or saved id; a new question has none.",
+        "properties": {
+          "chart": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "line",
+              "bar",
+              "big_number",
+              "table"
+            ],
+            "title": "Chart",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "source": {
+            "enum": [
+              "curated",
+              "saved",
+              "asked"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "ticked": {
+            "default": true,
+            "title": "Ticked",
+            "type": "boolean"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "question"
+        ],
+        "title": "TileProposal",
+        "type": "object"
+      },
       "TileRun": {
         "additionalProperties": false,
         "description": "The last result of a chart; stored with a timestamp.",
@@ -5857,6 +6438,25 @@
           "status"
         ],
         "title": "TileRun",
+        "type": "object"
+      },
+      "TimeRange": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "TimeRange",
         "type": "object"
       },
       "TitleBody": {
@@ -6578,6 +7178,337 @@
         "summary": "The pipeline and its models",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/answers": {
+      "get": {
+        "description": "The caller's saved answers, optionally those of one datasource.",
+        "operationId": "list_answers_api_v1_answers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "datasource_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Datasource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedAnswer"
+                  },
+                  "title": "Response List Answers Api V1 Answers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List saved answers",
+        "tags": [
+          "answers"
+        ]
+      },
+      "post": {
+        "description": "Keeps the answer of an `ask` step of the caller's conversation and rates its run up. The plan comes from the\nstored step, never from the request. The reply says whether a proposal for the shared set was filed\n(`proposed`, `proposal_id`) or why not (`not_proposed_reason`). Saving the same run again returns the same\nanswer.",
+        "operationId": "save_answer_api_v1_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such conversation for this caller."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller is at the cap of saved answers: ANSWER_LIMIT_REACHED."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The step did not answer, kept no plan, or is not the run named: NOT_SAVABLE."
+          }
+        },
+        "summary": "Save an answer",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/v1/answers/{answer_id}": {
+      "delete": {
+        "description": "Deletes one saved answer.",
+        "operationId": "delete_answer_api_v1_answers__answer_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such saved answer (or one that is not the caller's): ANSWER_NOT_FOUND."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete a saved answer",
+        "tags": [
+          "answers"
+        ]
+      },
+      "get": {
+        "description": "One saved answer, with its question and typed plan.",
+        "operationId": "get_answer_api_v1_answers__answer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such saved answer (or one that is not the caller's): ANSWER_NOT_FOUND."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a saved answer",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/v1/answers/{answer_id}/run": {
+      "post": {
+        "description": "Runs the stored plan again as the caller: their data scope, hooks and approvals apply, and no model is\ncalled. `approval_ids` are request ids granted through `/approvals`. A plan the schema has outgrown comes back\nwith status `error` and a first error coded `TILE_NEEDS_FIXING`.",
+        "operationId": "run_answer_api_v1_answers__answer_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RunAnswerBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such saved answer (or one that is not the caller's): ANSWER_NOT_FOUND."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run a saved answer",
+        "tags": [
+          "answers"
         ]
       }
     },
@@ -7708,6 +8639,115 @@
         "summary": "Send a message and follow it",
         "tags": [
           "conversations"
+        ]
+      }
+    },
+    "/api/v1/dashboard-builder/options": {
+      "get": {
+        "description": "The chips of the guided builder for one datasource, as the caller may read it: curated queries, the caller's\nsaved answers, glossary metrics, dimensions, time columns and five time ranges. No model call, nothing runs.",
+        "operationId": "builder_options_api_v1_dashboard_builder_options_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "datasource_id",
+            "required": true,
+            "schema": {
+              "title": "Datasource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuilderOptions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The datasource has no index or the caller cannot reach it (NOT_INDEXED), an unknown source or range, or no key for a new question (MISSING_PROVIDER_KEY)."
+          }
+        },
+        "summary": "What the dashboard builder offers",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboard-builder/proposals": {
+      "post": {
+        "description": "The tiles a dashboard could have, to tick, untick and reword. Curated and saved ids become tiles with no model\ncall; with `asked`, one model call turns the chips and `text` into at most three questions (a key is needed: the\nserver's, or one sent in headers as for `POST /query`). Read-only: nothing is run or saved.",
+        "operationId": "builder_proposals_api_v1_dashboard_builder_proposals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TileProposal"
+                  },
+                  "title": "Response Builder Proposals Api V1 Dashboard Builder Proposals Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The datasource has no index or the caller cannot reach it (NOT_INDEXED), an unknown source or range, or no key for a new question (MISSING_PROVIDER_KEY)."
+          }
+        },
+        "summary": "Propose dashboard tiles",
+        "tags": [
+          "dashboards"
         ]
       }
     },
@@ -10198,6 +11238,68 @@
           }
         },
         "summary": "Generate a starter dashboard",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/dashboard-build": {
+      "post": {
+        "description": "Builds the dashboard the guided builder's ticked tiles describe, as the caller, and saves it in their workspace.\nCurated and saved tiles call no model; a new question needs a key (the server's, or one sent in headers as for\n`POST /query`). `progress` is one step per tile (`tile 2 of 5`); the `result` is a `BuildReport`: the\n`dashboard`, the `built` tile ids and the `skipped` questions with their code. No tile that could be built is a\n`NO_TILES` job error; cancelling stops before the next tile and saves nothing.",
+        "operationId": "start_dashboard_build_job_api_v1_jobs_dashboard_build_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardBuildJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller already has a job queued or running."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Build a dashboard from ticked tiles",
         "tags": [
           "jobs"
         ]

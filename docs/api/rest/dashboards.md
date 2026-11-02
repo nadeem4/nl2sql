@@ -49,6 +49,43 @@ can be cancelled between charts, and `result` is `{dashboard, run}`: the saved `
 `DashboardRun`. Any caller may start one, and the dashboard is theirs. No index is a `422` `NOT_INDEXED` and a
 datasource with nothing to chart a `422` `NO_TILES`, both as the job's `error`.
 
+## Build a dashboard from chosen tiles
+
+The guided builder is three calls. None runs a tile; the job does.
+
+`GET /api/v1/dashboard-builder/options?datasource_id=chinook` returns what the caller may tick, with no model call:
+
+```json
+{"curated": [{"id": "v_revenue", "question": "Revenue by month?", "datasource_id": "chinook"}],
+ "saved": [{"id": "a1", "question": "Top countries?", "datasource_id": "chinook"}],
+ "metrics": [{"term": "revenue", "columns": ["chinook.main.invoices.total"], "definition": null}],
+ "dimensions": [{"label": "Country", "column": "chinook.main.customers.country", "table": "customers"}],
+ "time_columns": [{"label": "Invoice date", "column": "chinook.main.invoices.date", "table": "invoices"}],
+ "ranges": [{"id": "last_30_days", "label": "last 30 days"}]}
+```
+
+`POST /api/v1/dashboard-builder/proposals` takes the chips and returns the tiles to tick (a `200` list of
+`TileProposal`: `source`, `ref`, `question`, `title`, `chart`, `ticked`). Only `datasource_id` and `sources` (one or
+more of `curated`, `saved`, `asked`) are required; the rest default to empty:
+
+```json
+{"datasource_id": "chinook", "sources": ["curated", "saved", "asked"], "curated_ids": ["v_revenue"],
+ "saved_ids": ["a1"], "metrics": ["revenue"], "dimensions": ["chinook.main.customers.country"],
+ "time_range": "last_30_days", "text": "by country"}
+```
+
+Curated and saved ids become tiles with no model call. `asked` makes one model call and needs a key: the server's, or
+one sent in headers as for `POST /query`; without one it is a `422` `MISSING_PROVIDER_KEY`, and the hosted keyless demo
+refuses it the same way. Nothing is saved.
+
+`POST /api/v1/jobs/dashboard-build` is a [job](jobs.md) (`202`, the queued `Job`). Body: `datasource_id` and `tiles`
+(the reviewed `TileProposal` list, unticked ones may be left out) are required; `title`, `workspace_id` and
+`time_column` (from the options; adds a date filter) are optional. `progress` has one step per tile (`tile 2 of 5`),
+the job can be cancelled between tiles (nothing is saved), and `result` is a `BuildReport`: `{dashboard, built,
+skipped}`, where `skipped` lists `{question, code, message}` for tiles that could not be built. A tile limit
+overflow is a `422` `INVALID_ARGUMENT`, and nothing buildable a `NO_TILES` error, both as the job's `error`. Only
+the owner reads the job's result. Request keys are passed to the build as to a question.
+
 ## Starter questions
 
 `GET /api/v1/datasources/{id}/starter-questions?n=5` returns the questions of the first `n` charts the starter
@@ -71,6 +108,6 @@ when the caller reaches no table; a datasource with no index (or one the caller 
 |---|---|
 | `404` `NOT_FOUND` | No such dashboard or workspace, or one that belongs to someone else; on refresh, also an unknown, waiting, denied or expired approval id. |
 | `409` `CONFLICT` | The dashboard is being refreshed or edited. |
-| `422` | `NOT_PINNABLE`, `CHART_NOT_SUPPORTED`, `UNKNOWN_TILE`, `UNKNOWN_FILTER`, `SCHEDULE_TOO_FREQUENT`, `WORKSPACE_NOT_EMPTY`, `NOT_INDEXED`, `NO_TILES`, `INVALID_ARGUMENT`, or `INVALID_REQUEST` for a body that does not validate. |
+| `422` | `NOT_PINNABLE`, `CHART_NOT_SUPPORTED`, `UNKNOWN_TILE`, `UNKNOWN_FILTER`, `SCHEDULE_TOO_FREQUENT`, `WORKSPACE_NOT_EMPTY`, `NOT_INDEXED`, `NO_TILES`, `MISSING_PROVIDER_KEY`, `INVALID_ARGUMENT`, or `INVALID_REQUEST` for a body that does not validate. |
 
 See [Errors](errors.md) for the envelope.

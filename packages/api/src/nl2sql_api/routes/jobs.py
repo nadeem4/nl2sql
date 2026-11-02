@@ -1,17 +1,18 @@
 """The `jobs` namespace of `/api/v1`: a background job's state, progress and cancellation. The routes that start a job
 (`POST /jobs/<kind>`) are added to this file by the rows that own each kind (docs/architecture/wave_d.md, "Jobs")."""
 import logging
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from nl2sql import EvalReport, NL2SQL, ProfileReport, UserContext
+from nl2sql import BuildReport, EvalReport, LLMOverride, NL2SQL, ProfileReport, UserContext
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine, get_jobs
 from nl2sql_api.errors import ERROR_RESPONSE, RequestRefused
-from nl2sql_api.jobs import (DashboardJob, DashboardJobResult, DemoJob, EvalJob, IndexJob, IndexResult, Job, JobContext,
+from nl2sql_api.jobs import (DashboardBuildJob, DashboardJob, DashboardJobResult, DemoJob, EvalJob, IndexJob, IndexResult, Job, JobContext,
                              Jobs, ProfileJob)
+from nl2sql_api.overrides import llm_override
 from nl2sql_api.sse import SSE_HEADERS
 
 logger = logging.getLogger("nl2sql_api")
@@ -57,6 +58,25 @@ def start_dashboard_job(body: DashboardJob, user: Caller, jobs: Queue, engine: E
         return DashboardJobResult(dashboard=dashboard, run=first)
 
     return jobs.submit("dashboard", body, user, run)
+
+
+@router.post("/jobs/dashboard-build", response_model=Job, status_code=202, summary="Build a dashboard from ticked tiles",
+             responses=_STARTED)
+def start_dashboard_build_job(body: DashboardBuildJob, user: Caller, jobs: Queue, engine: Engine,
+                              override: Annotated[Optional[LLMOverride], Depends(llm_override)]):
+    """Builds the dashboard the guided builder's ticked tiles describe, as the caller, and saves it in their workspace.
+    Curated and saved tiles call no model; a new question needs a key (the server's, or one sent in headers as for
+    `POST /query`). `progress` is one step per tile (`tile 2 of 5`); the `result` is a `BuildReport`: the
+    `dashboard`, the `built` tile ids and the `skipped` questions with their code. No tile that could be built is a
+    `NO_TILES` job error; cancelling stops before the next tile and saves nothing."""
+
+    def run(ctx: JobContext) -> BuildReport:
+        return engine.dashboards.build(
+            body.datasource_id, body.tiles, user_context=user, title=body.title, workspace_id=body.workspace_id,
+            time_column=body.time_column, cancellation_token=ctx.token, llm_override=override,
+            on_tile=lambda tile: ctx.progress(f"tile {tile.done} of {tile.total}", tile.done, tile.total))
+
+    return jobs.submit("dashboard-build", body, user, run)
 
 
 _ADMIN_STARTED = {**_STARTED, **identity.ADMIN_RESPONSES}

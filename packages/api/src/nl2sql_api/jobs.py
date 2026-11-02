@@ -17,14 +17,14 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from nl2sql import (CancellationToken, Dashboard, DashboardRun, EvalReport, NL2SQLError, ProfileReport,
+from nl2sql import (BuildReport, CancellationToken, Dashboard, DashboardRun, TileProposal, EvalReport, NL2SQLError, ProfileReport,
                     RunCancelled, UserContext)
 from nl2sql_api.errors import ApiError, RequestRefused
 from nl2sql_api.sse import KEEP_ALIVE, frame
 
 logger = logging.getLogger("nl2sql_api")
 
-JobKind = Literal["index", "profile", "eval", "dashboard", "demo"]
+JobKind = Literal["index", "profile", "eval", "dashboard", "dashboard-build", "demo"]
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
@@ -70,6 +70,18 @@ class DashboardJob(BaseModel):
     max_tiles: Optional[int] = Field(None, ge=1)
 
 
+class DashboardBuildJob(BaseModel):
+    """The ticked, reworded tiles of the guided builder (``POST /dashboard-builder/proposals`` made the list)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    datasource_id: str
+    tiles: List[TileProposal]
+    title: Optional[str] = None
+    workspace_id: Optional[str] = None
+    time_column: Optional[str] = None
+
+
 class IndexResult(BaseModel):
     """What an index build did. ``failed`` names the datasources that kept their previous index; the reason is in the
     server log, where a connection string cannot reach a client."""
@@ -98,13 +110,13 @@ class Job(BaseModel):
     id: str  # 22 url-safe characters
     kind: JobKind
     status: JobStatus
-    params: Union[IndexJob, ProfileJob, EvalJob, DashboardJob, DemoJob]  # the request body, typed per kind
+    params: Union[IndexJob, ProfileJob, EvalJob, DashboardJob, DashboardBuildJob, DemoJob]  # the request body, typed per kind
     created_by: Optional[str] = None  # the caller's user_id
     created_at: datetime
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     progress: List[JobProgress] = []
-    result: Union[IndexResult, List[ProfileReport], EvalReport, DashboardJobResult, None] = None  # typed per kind
+    result: Union[IndexResult, List[ProfileReport], EvalReport, DashboardJobResult, BuildReport, None] = None  # typed per kind
     error: Optional[ApiError] = None
 
 

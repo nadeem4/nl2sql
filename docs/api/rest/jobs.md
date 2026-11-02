@@ -38,6 +38,7 @@ under the owner's data scope, so it is the owner's alone (in `GET /jobs`, `GET /
 | Route | Starts |
 |---|---|
 | `POST /api/v1/jobs/dashboard` | A starter dashboard for one datasource, as the caller; any caller. See [Dashboards](dashboards.md#generate-a-starter-dashboard). |
+| `POST /api/v1/jobs/dashboard-build` | A dashboard from the guided builder's ticked tiles, as the caller; any caller. See [Dashboards](dashboards.md#build-a-dashboard-from-chosen-tiles). |
 | `POST /api/v1/jobs/index` | Build the index for `datasource_ids` (every datasource when left out); admin. Progress is one step per datasource, `<id> (failed)` for one that failed; the result is `{ok, stats, empty, failed}`. See [Indexing](indexing.md#start-an-index-build). |
 | `POST /api/v1/jobs/profile` | Profile `datasource_ids` into proposals (`draft`, `max_cost_usd`), on the server's key only; admin. The result is a list of profile reports. See [Knowledge](knowledge.md#start-a-profile). |
 

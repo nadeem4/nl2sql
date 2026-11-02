@@ -198,6 +198,7 @@ nav:
       - Evals: api/rest/evals.md
       - Indexing: api/rest/indexing.md
       - Knowledge: api/rest/knowledge.md
+      - Saved answers: api/rest/answers.md
       - Dashboards: api/rest/dashboards.md
       - Jobs: api/rest/jobs.md
       - Conversations: api/rest/conversations.md

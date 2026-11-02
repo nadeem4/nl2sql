@@ -9,12 +9,14 @@ from typing import Annotated, Any, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from nl2sql import NL2SQL, Dashboard, DashboardInfo, DashboardRun, DashboardView, UserContext
+from nl2sql import (NL2SQL, BuilderOptions, Dashboard, DashboardInfo, DashboardRun, DashboardView, LLMOverride,
+                    TileProposal, UserContext)
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.errors import ERROR_RESPONSE
-from nl2sql_api.models.dashboards import (ChartBody, FiltersBody, LayoutBody, MoveBody, PinBody, RefreshBody,
-                                          ScheduleBody, TitleBody)
+from nl2sql_api.models.dashboards import (ChartBody, FiltersBody, LayoutBody, MoveBody, PinBody, ProposalsBody,
+                                          RefreshBody, ScheduleBody, TitleBody)
+from nl2sql_api.overrides import llm_override
 
 router = APIRouter(tags=["dashboards"])
 
@@ -147,3 +149,29 @@ def starter_questions(datasource_id: str, user: Caller, engine: Engine, n: Annot
     """The questions of the first `n` charts the starter dashboard would build, as the caller may read the
     datasource. Nothing runs and nothing is saved. Empty when the caller reaches no table."""
     return engine.dashboards.suggest_questions(datasource_id, user_context=user, n=n)
+
+
+_BUILDER = {422: {**ERROR_RESPONSE, "description": "The datasource has no index or the caller cannot reach it "
+                                                    "(NOT_INDEXED), an unknown source or range, or no key for a new "
+                                                    "question (MISSING_PROVIDER_KEY)."}, **identity.AUTH_RESPONSES}
+
+
+@router.get("/dashboard-builder/options", response_model=BuilderOptions, summary="What the dashboard builder offers",
+            responses=_BUILDER)
+def builder_options(datasource_id: str, user: Caller, engine: Engine):
+    """The chips of the guided builder for one datasource, as the caller may read it: curated queries, the caller's
+    saved answers, glossary metrics, dimensions, time columns and five time ranges. No model call, nothing runs."""
+    return engine.dashboards.builder_options(datasource_id, user_context=user)
+
+
+@router.post("/dashboard-builder/proposals", response_model=List[TileProposal], summary="Propose dashboard tiles",
+             responses=_BUILDER)
+def builder_proposals(body: ProposalsBody, user: Caller, engine: Engine,
+                      override: Annotated[Optional[LLMOverride], Depends(llm_override)]):
+    """The tiles a dashboard could have, to tick, untick and reword. Curated and saved ids become tiles with no model
+    call; with `asked`, one model call turns the chips and `text` into at most three questions (a key is needed: the
+    server's, or one sent in headers as for `POST /query`). Read-only: nothing is run or saved."""
+    return engine.dashboards.propose_tiles(
+        body.datasource_id, user_context=user, sources=body.sources, curated_ids=body.curated_ids,
+        saved_ids=body.saved_ids, metrics=body.metrics, dimensions=body.dimensions, time_range=body.time_range,
+        text=body.text, llm_override=override)
