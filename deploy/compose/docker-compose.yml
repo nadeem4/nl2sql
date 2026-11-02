@@ -1,0 +1,30 @@
+# Self-host nl2sql: one service, one volume. See README.md here and docs/deployment/compose.md.
+#
+#   cp .env.example .env     # then set a provider key
+#   docker compose up -d --build
+#   docker compose run --rm api nl2sql index
+name: nl2sql
+
+services:
+  api:
+    image: nl2sql-api:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    env_file: .env
+    volumes:
+      - ./config:/etc/nl2sql:ro
+      - nl2sql-data:/data
+    ports:
+      - "8000:8000"
+    # Not ready until the index exists: /api/v1/ready says why.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  nl2sql-data: {}

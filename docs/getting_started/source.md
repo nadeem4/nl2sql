@@ -59,7 +59,7 @@ NL2SQL_CONFIG=my-demo/nl2sql.yaml nl2sql-api --port 8000
 or in Docker:
 
 ```bash
-docker build -f packages/api/Dockerfile -t nl2sql-api .
+docker build -t nl2sql-api .
 docker run --rm -p 8000:8000 -v "$PWD/my-demo:/etc/nl2sql" nl2sql-api
 ```
 

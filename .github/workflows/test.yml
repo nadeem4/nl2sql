@@ -258,11 +258,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: nl2sql-ui/package-lock.json
+
+      # The nl2sql-api wheel carries the built web app (D226), so it is built first.
+      - name: Build the web app
+        run: npm ci && npm run build
+        working-directory: nl2sql-ui
+
       - name: Build all distributions
         run: |
           for pkg in packages/sdk packages/nl2sql packages/api; do
             python -m build "$pkg" --outdir dist
           done
+
+      - name: The API wheel carries the web app
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          wheel = glob.glob("dist/nl2sql_api-*.whl")[0]
+          assert "nl2sql_api/web/static/index.html" in zipfile.ZipFile(wheel).namelist(), "wheel has no static/index.html"
+          PY
 
       - name: Smoke test the built wheels
         run: |
@@ -279,8 +299,7 @@ jobs:
           path: dist/
 
   # Builds the image the release's `ghcr` job publishes, the same way (repo
-  # root as context, packages/api/Dockerfile named explicitly), and never
-  # pushes it. Until this job existed nothing built that image before a
+  # root as context, its Dockerfile named explicitly), and never pushes it. Until this job existed nothing built that image before a
   # release did, so v0.2.0 reached PyPI with an image still on Python 3.11
   # that pip refused to install the packages into.
   api-image:
@@ -289,10 +308,28 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the API image (no push)
-        run: docker build -f packages/api/Dockerfile -t nl2sql-api:ci .
+        run: docker build -f Dockerfile -t nl2sql-api:ci .
 
       - name: Import the API inside the image
         run: docker run --rm nl2sql-api:ci python -c "import nl2sql, nl2sql_api.main"
+
+      - name: The SQL Server driver is installed
+        run: docker run --rm nl2sql-api:ci python -c "import pyodbc; d = pyodbc.drivers(); print(d); assert any('ODBC Driver 18' in x for x in d)"
+
+      - name: Record the image size
+        run: |
+          size=$(docker image inspect nl2sql-api:ci --format '{{.Size}}')
+          echo "API image: ${size} bytes" >> "$GITHUB_STEP_SUMMARY"
+
+      # `serve` with the example config's shape: API keys on, so it may bind beyond loopback. The page is the built UI.
+      - name: GET / answers the built page
+        run: |
+          mkdir -p /tmp/cfg /tmp/data
+          cp deploy/compose/config/nl2sql.yaml /tmp/cfg/
+          docker run -d --name api -p 8000:8000 -v /tmp/cfg:/etc/nl2sql:ro -v /tmp/data:/data             -e NL2SQL_DATA_DIR=/data -e OPENAI_API_KEY=ci-placeholder --user "$(id -u)" nl2sql-api:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/ -o /tmp/index.html && break; sleep 2; done
+          grep -qi '<div id="root"' /tmp/index.html
+          docker logs api | tail -20
 
   # Installs the wheels `build` just made into an empty virtualenv the way a
   # user does -- `pip install "nl2sql-engine[demo]"` -- and boots

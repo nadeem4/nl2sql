@@ -38,7 +38,7 @@ with the request id also in the `X-Request-ID` header.
 The routes that change datasources, LLMs or the index need a role listed in
 `policies.admin_roles` (default `[admin]`), else HTTP 403.
 
-The Docker image (`packages/api/Dockerfile`) reads `/etc/nl2sql/nl2sql.yaml`:
+The Docker image (the `Dockerfile` at the repository root, which also builds the web app) reads `/etc/nl2sql/nl2sql.yaml`:
 mount a config folder there, and a volume for `storage.path`.
 
 ## Endpoints

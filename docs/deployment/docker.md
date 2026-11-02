@@ -2,6 +2,9 @@
 
 NL2SQL can be deployed as a standalone HTTP service using the `nl2sql-api` package and Docker. You can also embed the core library in your own service.
 
+For a ready-made stack (one service, one volume, API keys on), see
+[Docker Compose](compose.md).
+
 For the playground served as a public demo of the sample databases, where each
 visitor brings their own API key, see [Hosted demo](hosted-demo.md).
 
@@ -9,7 +12,7 @@ visitor brings their own API key, see [Hosted demo](hosted-demo.md).
 
 - Install `nl2sql-engine` and add adapters via extras (e.g. `nl2sql-engine[postgres]`).
 - Provide the config: `nl2sql.yaml` and the files it includes, at the path
-  `NL2SQL_CONFIG` names. `packages/api/Dockerfile` sets
+  `NL2SQL_CONFIG` names. the `Dockerfile` at the repository root sets
   `NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml`, so mount a config folder there.
 - Provide the provider keys and any variable the config reads as `${env:VAR}`,
   in the environment or in a `.env` next to `nl2sql.yaml` (loaded at startup,

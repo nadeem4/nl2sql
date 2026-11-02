@@ -44,3 +44,7 @@ logs
 artifacts
 .env
 .env.*
+
+# The web app builds in the image's Node stage; a local build or node_modules must not leak into the context
+**/node_modules
+packages/api/src/nl2sql_api/web/static

@@ -47,6 +47,8 @@ serves the playground.
 - **Production**: a mounted config, `storage.path` on a persistent volume,
   secrets from a secret provider, `required: true` on the datasources the
   service cannot run without, an observability exporter enabled.
+- **Self-hosted**: the `nl2sql-api` image with the web app, run by
+  [Docker Compose](compose.md): one service, one data volume, API keys on.
 - **Hosted demo**: the playground on the shipped sample databases, holding no
   API key of its own; each visitor brings theirs. See
   [Hosted demo](hosted-demo.md).

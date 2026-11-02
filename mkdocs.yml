@@ -151,6 +151,7 @@ nav:
   - Deployment:
     - Deployment Architecture: deployment/architecture.md
     - Docker: deployment/docker.md
+    - Docker Compose: deployment/compose.md
     - Kubernetes: deployment/kubernetes.md
     - Hosted demo: deployment/hosted-demo.md
   - Development:
