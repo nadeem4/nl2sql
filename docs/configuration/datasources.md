@@ -47,7 +47,7 @@ The section can also be a file holding the list
 | `preferred_tables` | `[]` | Tables or views the planner should reach for first. See [Preferred tables](#preferred-tables). |
 | `sample_questions` | `[]` | Questions the datasource answers. Each is indexed as an entry of its own (`schema.datasource_example`), one of the signals routing votes with. |
 | `domains` | `[]` | A routing hint written by people. Routing does not read it yet. |
-| `required` | `false` | `engine.check()` fails (`EngineNotReady`) when this datasource cannot connect, and the CLI, `nl2sql-api` and the demo refuse to start. See [Startup](system.md#startup-check-and-required). |
+| `required` | `false` | `engine.check()` fails (`EngineNotReady`) when this datasource cannot connect, and the CLI and the demo refuse to start. `nl2sql-api` starts anyway and `/ready` answers 503 `not_ready`. See [Startup](system.md#startup-check-and-required). |
 
 In Python, `Datasource(id=..., adapter=MyAdapter(...))` passes a built adapter
 object instead of `type`.

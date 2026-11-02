@@ -6,12 +6,12 @@ from typing import Annotated, List
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from nl2sql import NL2SQL, ProfileReport, UserContext
+from nl2sql import EvalReport, NL2SQL, ProfileReport, UserContext
 from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine, get_jobs
-from nl2sql_api.errors import ERROR_RESPONSE
-from nl2sql_api.jobs import (DashboardJob, DashboardJobResult, IndexJob, IndexResult, Job, JobContext, Jobs,
-                             ProfileJob)
+from nl2sql_api.errors import ERROR_RESPONSE, RequestRefused
+from nl2sql_api.jobs import (DashboardJob, DashboardJobResult, DemoJob, EvalJob, IndexJob, IndexResult, Job, JobContext,
+                             Jobs, ProfileJob)
 from nl2sql_api.sse import SSE_HEADERS
 
 logger = logging.getLogger("nl2sql_api")
@@ -60,6 +60,7 @@ def start_dashboard_job(body: DashboardJob, user: Caller, jobs: Queue, engine: E
 
 
 _ADMIN_STARTED = {**_STARTED, **identity.ADMIN_RESPONSES}
+DEMO_DATASOURCES = 3  # the sample databases `engine.add_demo()` adds
 
 
 @router.post("/jobs/index", response_model=Job, status_code=202, summary="Build the index",
@@ -114,6 +115,80 @@ def start_profile_job(body: ProfileJob, user: Annotated[UserContext, Depends(ide
                                         cancellation_token=ctx.token)
 
     return jobs.submit("profile", body, user, run)
+
+
+def _suites(requested, engine: NL2SQL):
+    """The configured suites a request names, by file or by name (every one when it names none): never a path the
+    caller wrote, so an eval cannot read an arbitrary file. A name that is not in `evals.suites` is a 422."""
+    configured = engine.config.evals.suites
+    chosen = []
+    if requested is None:
+        chosen = list(configured)
+    for name in requested or []:
+        match = next((path for path in configured if name in (path.as_posix(), path.stem)), None)
+        if match is None:
+            raise RequestRefused(422, "INVALID_REQUEST", f"'{name}' is not one of the configured eval suites.",
+                                 fix="Name a suite listed in evals.suites (GET /evals/suites), by its file or its name.")
+        chosen.append(match)
+    if not chosen:
+        raise RequestRefused(422, "INVALID_REQUEST", "There is no eval suite to run.",
+                             fix="Configure evals.suites, or name a configured suite.")
+    return chosen
+
+
+@router.post("/jobs/eval", response_model=Job, status_code=202, summary="Run the evals", responses=_ADMIN_STARTED)
+def start_eval_job(body: EvalJob, user: Annotated[UserContext, Depends(identity.admin)], jobs: Queue, engine: Engine):
+    """Runs `suites` (every configured one when left out; each by its file or name in `evals.suites`) in `mode`, on
+    the server's model, never a caller's: `full` needs a cost cap, `max_cost_usd` or `evals.max_cost_usd`; `plans`
+    and `retrieval` call no model. `cases` limits it to those ids or tags. No configured suite, or `suites: []`, is a 422. `progress` is one step per case
+    (`"case <id>"`); the `result` is the `EvalReport`. Admin only, in every mode: a report holds every role's
+    cases, plans and SQL."""
+    suites = _suites(body.suites, engine)
+    if body.mode == "full" and body.max_cost_usd is None and engine.config.evals.max_cost_usd is None:
+        raise RequestRefused(422, "INVALID_REQUEST", "A run in mode full needs a cost cap: max_cost_usd.",
+                             fix="Send max_cost_usd, or set max_cost_usd in evals.yaml.")
+
+    def run(ctx: JobContext) -> EvalReport:
+        done = []
+
+        def on_case(config_name: str, case, dollars: float) -> None:
+            done.append(case["id"])
+            ctx.progress(f"case {case['id']}", len(done), None)
+
+        return engine.evals.run(suites, mode=body.mode, cases=body.cases, max_cost_usd=body.max_cost_usd,
+                                on_case=on_case, cancellation_token=ctx.token)
+
+    return jobs.submit("eval", body, user, run)
+
+
+@router.post("/jobs/demo", response_model=Job, status_code=202, summary="Try the demo", responses=_ADMIN_STARTED)
+def start_demo_job(body: DemoJob, user: Annotated[UserContext, Depends(identity.admin)], jobs: Queue, engine: Engine):
+    """Adds the three sample databases, their verified queries and the demo glossary to the project, then indexes
+    them (`engine.add_demo()`), so a project with no data of its own has something to ask. It runs as the caller
+    and needs an admin role. A second call adds nothing and indexes again. `progress` is one step per datasource;
+    the `result` is an `IndexResult`. A project file that changed before the job started fails it with
+    `FILE_CHANGED` and nothing is added; one that changes while it runs fails it the same way, and files written
+    earlier in the run stay written. Reload the engine and run it again: a second call adds only what is missing.
+    Admin only."""
+
+    def run(ctx: JobContext) -> IndexResult:
+        finished = []
+
+        def on_datasource(event) -> None:
+            if event.state == "started":
+                return
+            finished.append(event.datasource_id)
+            failed = event.state == "failed"
+            step = f"{event.datasource_id} (failed)" if failed else event.datasource_id
+            ctx.progress(step, len(finished), DEMO_DATASOURCES)
+
+        built = engine.add_demo(user_context=user, on_datasource=on_datasource)
+        for error in built.errors:
+            logger.error("Indexing %s failed: %s", error["datasource_id"], error["error"])
+        return IndexResult(ok=built.ok, stats=built.stats, empty=built.empty,
+                           failed=[error["datasource_id"] for error in built.errors])
+
+    return jobs.submit("demo", body, user, run)
 
 
 @router.get("/jobs", response_model=List[Job], summary="List jobs", responses=identity.AUTH_RESPONSES)

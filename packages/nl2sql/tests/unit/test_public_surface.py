@@ -10,7 +10,7 @@ PUBLIC_SURFACE = {
     "NL2SQL", "QueryResult", "SubQueryResult", "RowSample", "AnswerSource",
     "CancellationToken", "RunCancelled", "UserContext", "QuestionUsage", "RunStop", "ApprovalRequest", "Approval", "ApprovalRecord", "VerifiedRef", "SuppliedPlan",
     # Events
-    "Event", "Observer",
+    "Event", "Observer", "EventInfo",
     # Saved results
     "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "TraceNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return

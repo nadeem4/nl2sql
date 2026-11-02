@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from datetime import datetime, timezone
 
-from nl2sql import AcceptReport, DatasourceStatus, LLMChange, Proposal
+from nl2sql import AcceptReport, ApiKey, DatasourceStatus, EvalReport, LLMChange, Proposal
 
 from nl2sql.testing.config import make_config
 from nl2sql_api.dependencies import get_engine
@@ -30,6 +30,13 @@ ADMIN_ROUTES = [
     ("put", "/api/v1/settings/llm", {"provider": "openai", "model": "gpt-test"}),
     ("post", "/api/v1/jobs/index", {}),
     ("post", "/api/v1/jobs/profile", {}),
+    ("post", "/api/v1/jobs/eval", {"mode": "plans"}),
+    ("post", "/api/v1/jobs/demo", {}),
+    ("get", "/api/v1/evals/suites", None),
+    ("get", "/api/v1/evals/scorers", None),
+    ("get", "/api/v1/api-keys", None),
+    ("post", "/api/v1/api-keys", {"user_id": "ann", "roles": ["analyst"]}),
+    ("delete", "/api/v1/api-keys/ab12cd34", None),
     ("delete", "/api/v1/index", None),
     ("get", "/api/v1/index/check", None),
     ("post", "/api/v1/knowledge/reload", None),
@@ -78,6 +85,10 @@ class AdminEngine:
             "add": None, "remove": None, "list": list, "types": list, "save": Path("datasources/ds.yaml"),
             "test": DatasourceStatus(id="ds", status="ready")})
         self.llm = _Recorder(self, {"replace": lambda: LLMChange()})
+        self.evals = _Recorder(self, {"load": list, "scorers": list, "run": lambda: EvalReport(mode="plans")})
+        self.api_keys = _Recorder(self, {"list": list, "revoke": None, "create": lambda: (ApiKey(
+            id="ab12cd34", label="", user_id="ann", created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)), "t")})
+        self.add_demo = lambda **kwargs: SimpleNamespace(ok=True, stats=[], empty=[], errors=[])
         self.index = _Recorder(self, {"build": lambda: SimpleNamespace(ok=True, stats=[], empty=[], errors=[],
                                                                        cancelled=False),
                                       "clear": None, "health": lambda: {"status": "ok"}, "check": list})
@@ -92,6 +103,7 @@ def make_client(tmp_path):
     clients = []
 
     def _make(host="127.0.0.1", **sections):
+        sections.setdefault("evals", {"suites": ["evals/chinook.yaml"]})  # an eval job needs a suite to run
         engine = AdminEngine(make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
         if hasattr(app.state, "jobs"):
@@ -131,7 +143,7 @@ def test_auth_none_refuses_a_foreign_host_header(make_client, method, path, body
 def test_auth_none_allows_the_local_operator(make_client, method, path, body, host):
     client, _ = make_client()
     response = _call(client, method, path, body, headers={"Host": host})
-    assert response.status_code in (200, 202), response.text
+    assert response.status_code in (200, 201, 202, 204), response.text
 
 
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
@@ -147,7 +159,7 @@ def test_a_role_that_is_not_admin_is_a_403(make_client, method, path, body):
 def test_the_admin_role_is_accepted(make_client, method, path, body):
     client, _ = make_client(host="203.0.113.7", api=PROXY)
     response = _call(client, method, path, body, headers=_as("viewer, admin"))
-    assert response.status_code in (200, 202), response.text
+    assert response.status_code in (200, 201, 202, 204), response.text
 
 
 def test_a_proxy_request_without_a_user_header_is_a_401(make_client):

@@ -192,6 +192,7 @@ class _Loader:
         # The datasources folder and the SHA-256 of each file read from it (what datasources.save checks).
         self.datasources_folder: Optional[Path] = None
         self.file_hashes: Dict[str, str] = {}
+        self.section_hashes: Dict[str, str] = {}
 
     # -- reporting
 
@@ -234,11 +235,18 @@ class _Loader:
             self._file_problem(label, "", f"Not valid YAML{where}: {problem}.", loc)
             return False, None
 
+    def _hash(self, label: str, path: Path) -> None:
+        try:
+            self.section_hashes[label] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            pass  # _read reports it
+
     def load(self) -> Config:
         if not self.path.is_file():
             raise ConfigError([Problem(
                 file=self.name, path="", message=f"{self.shown} not found.",
                 fix="Write nl2sql.yaml (`nl2sql init`), or point NL2SQL_CONFIG at it.")], source=self.name)
+        self._hash(self.name, self.path)
         ok, data = self._read(self.path, self.name, ())
         if not ok:
             raise self._fail()
@@ -262,6 +270,7 @@ class _Loader:
         config._sources = dict(self.sources)
         config._datasources_folder = self.datasources_folder
         config._file_hashes = dict(self.file_hashes)
+        config._section_hashes = dict(self.section_hashes)
         return config
 
     def _check_version(self, data: Dict[str, Any]) -> None:
@@ -316,6 +325,7 @@ class _Loader:
             return
 
         self.sources[section] = ("file", label)
+        self._hash(label, target)
         ok, body = self._read(target, label, loc)
         body = self._body(body, label, loc, as_list=section in LIST_SECTIONS) if ok else None
         if body is None:

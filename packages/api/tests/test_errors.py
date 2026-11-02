@@ -161,8 +161,9 @@ EXCEPTIONS = {
 }
 
 
-# Routes that do not call the engine, and the stream, which reports a failure as its last event.
-ANSWERS_200 = {"/api/v1/health", "/api/v1/ready", "/api/v1/meta", "/api/v1/query/stream"}
+# Routes that do not call the engine (or, for evals/suites, not when no suite is configured), and the stream, which reports a failure as its last event.
+ANSWERS_200 = {"/api/v1/health", "/api/v1/ready", "/api/v1/meta", "/api/v1/query/stream",
+               "/api/v1/evals/suites"}  # suites: [] with none configured, before any engine call
 
 
 @pytest.mark.parametrize("kind", EXCEPTIONS)

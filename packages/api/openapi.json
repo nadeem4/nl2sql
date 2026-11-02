@@ -176,6 +176,135 @@
         "title": "ApiError",
         "type": "object"
       },
+      "ApiKey": {
+        "additionalProperties": false,
+        "description": "An API key as `engine.api_keys` lists it: never the secret (D127).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "user_id",
+          "created_at"
+        ],
+        "title": "ApiKey",
+        "type": "object"
+      },
+      "ApiKeyCreated": {
+        "description": "The new key and its `token`, shown once: only a hash of it is stored.",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/ApiKey"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "token"
+        ],
+        "title": "ApiKeyCreated",
+        "type": "object"
+      },
+      "ApiKeyRequest": {
+        "additionalProperties": false,
+        "description": "``POST /api-keys``: the user the key's requests run as, with their roles.",
+        "properties": {
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "roles": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "ApiKeyRequest",
+        "type": "object"
+      },
       "ApprovalRecord": {
         "description": "One stored request: ``status`` is ``pending``, ``granted`` or ``denied``; ``id`` is the request's id.",
         "properties": {
@@ -1857,6 +1986,12 @@
         "title": "DecomposerResponse",
         "type": "object"
       },
+      "DemoJob": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "DemoJob",
+        "type": "object"
+      },
       "DenyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2062,6 +2197,7 @@
         "type": "object"
       },
       "EvalJob": {
+        "additionalProperties": false,
         "properties": {
           "cases": {
             "anyOf": [
@@ -2080,6 +2216,7 @@
           "max_cost_usd": {
             "anyOf": [
               {
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -2252,6 +2389,56 @@
           "mode"
         ],
         "title": "EvalReport",
+        "type": "object"
+      },
+      "EventInfo": {
+        "description": "What ``engine.events.catalog()`` returns per event: its name, description and data's JSON Schema.",
+        "properties": {
+          "audit": {
+            "default": false,
+            "title": "Audit",
+            "type": "boolean"
+          },
+          "audit_only": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Audit Only",
+            "type": "object"
+          },
+          "data_schema": {
+            "additionalProperties": true,
+            "title": "Data Schema",
+            "type": "object"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "run": {
+            "title": "Run",
+            "type": "boolean"
+          },
+          "stream": {
+            "default": false,
+            "title": "Stream",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "run",
+          "data_schema"
+        ],
+        "title": "EventInfo",
         "type": "object"
       },
       "ExamplesRequest": {
@@ -3064,6 +3251,9 @@
               },
               {
                 "$ref": "#/components/schemas/DashboardJob"
+              },
+              {
+                "$ref": "#/components/schemas/DemoJob"
               }
             ],
             "title": "Params"
@@ -5258,40 +5448,33 @@
         "title": "SubQueryResult",
         "type": "object"
       },
-      "SuccessResponse": {
+      "SuiteInfo": {
+        "description": "One eval suite named in ``evals.suites``: ``path`` is as configured, and ``approved`` counts the cases that run.",
         "properties": {
-          "data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
+          "approved": {
+            "title": "Approved",
+            "type": "integer"
           },
-          "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message"
+          "cases": {
+            "title": "Cases",
+            "type": "integer"
           },
-          "success": {
-            "title": "Success",
-            "type": "boolean"
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
           }
         },
         "required": [
-          "success"
+          "name",
+          "path",
+          "cases",
+          "approved"
         ],
-        "title": "SuccessResponse",
+        "title": "SuiteInfo",
         "type": "object"
       },
       "TableKnowledge": {
@@ -6390,6 +6573,178 @@
         "summary": "The pipeline and its models",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/api-keys": {
+      "get": {
+        "description": "Every key, newest first, revoked ones included: its `id`, `label`, user, tenant, roles, who made it and\nwhen. Never a token or a hash. Admin only.",
+        "operationId": "list_api_keys_api_v1_api_keys_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApiKey"
+                  },
+                  "title": "Response List Api Keys Api V1 Api Keys Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "List API keys",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "description": "A key whose requests run as `user_id` with `roles` (and `tenant_id`). The `token` is in this response only:\nkeep it, the server stores a hash. Send it as `Authorization: Bearer <token>`. Admin only.",
+        "operationId": "create_api_key_api_v1_api_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The user is empty or a role is not one of `policies.roles`."
+          }
+        },
+        "summary": "Create an API key",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/v1/api-keys/{key_id}": {
+      "delete": {
+        "description": "The key stops verifying at once. Revoking a revoked key changes nothing. Admin only.",
+        "operationId": "revoke_api_key_api_v1_api_keys__key_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such key."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke an API key",
+        "tags": [
+          "settings"
         ]
       }
     },
@@ -9132,6 +9487,134 @@
         ]
       }
     },
+    "/api/v1/evals/scorers": {
+      "get": {
+        "description": "The registered scorer names: the built-ins and every plugin's. Admin only.",
+        "operationId": "scorers_api_v1_evals_scorers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Scorers Api V1 Evals Scorers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "List the eval scorers",
+        "tags": [
+          "evals"
+        ]
+      }
+    },
+    "/api/v1/evals/suites": {
+      "get": {
+        "description": "The suites `evals.suites` names, in order, each with its `name`, its `path` as configured and its case\ncounts (`cases` in the file, `approved` of them run). Empty when none is configured. Admin only.",
+        "operationId": "suites_api_v1_evals_suites_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SuiteInfo"
+                  },
+                  "title": "Response Suites Api V1 Evals Suites Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          }
+        },
+        "summary": "List the eval suites",
+        "tags": [
+          "evals"
+        ]
+      }
+    },
+    "/api/v1/events/catalog": {
+      "get": {
+        "description": "Every event the engine publishes: its name, description, whether a run has it, whether a caller's stream\ncarries it and whether the audit observer writes it, with its data's JSON Schema.",
+        "operationId": "events_catalog_api_v1_events_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EventInfo"
+                  },
+                  "title": "Response Events Catalog Api V1 Events Catalog Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          }
+        },
+        "summary": "List the engine's events",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/v1/feedback": {
       "get": {
         "description": "Every rating, newest first. Admin only: it spans all callers.",
@@ -9715,6 +10198,150 @@
         ]
       }
     },
+    "/api/v1/jobs/demo": {
+      "post": {
+        "description": "Adds the three sample databases, their verified queries and the demo glossary to the project, then indexes\nthem (`engine.add_demo()`), so a project with no data of its own has something to ask. It runs as the caller\nand needs an admin role. A second call adds nothing and indexes again. `progress` is one step per datasource;\nthe `result` is an `IndexResult`. A project file that changed before the job started fails it with\n`FILE_CHANGED` and nothing is added; one that changes while it runs fails it the same way, and files written\nearlier in the run stay written. Reload the engine and run it again: a second call adds only what is missing.\nAdmin only.",
+        "operationId": "start_demo_job_api_v1_jobs_demo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller already has a job queued or running."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Try the demo",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/eval": {
+      "post": {
+        "description": "Runs `suites` (every configured one when left out; each by its file or name in `evals.suites`) in `mode`, on\nthe server's model, never a caller's: `full` needs a cost cap, `max_cost_usd` or `evals.max_cost_usd`; `plans`\nand `retrieval` call no model. `cases` limits it to those ids or tags. No configured suite, or `suites: []`, is a 422. `progress` is one step per case\n(`\"case <id>\"`); the `result` is the `EvalReport`. Admin only, in every mode: a report holds every role's\ncases, plans and SQL.",
+        "operationId": "start_eval_job_api_v1_jobs_eval_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Queued: follow it with `GET /jobs/{id}` or `GET /jobs/{id}/events`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller already has a job queued or running."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run the evals",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/v1/jobs/index": {
       "post": {
         "description": "Indexes `datasource_ids` (every configured datasource when left out), one at a time, beside the live entries\nand switching each over when it is written. `progress` is one step per datasource (`\"<id>\"`, or `\"<id>\n(failed)\"`); the `result` is an `IndexResult`, where `failed` names the datasources that kept their previous\nindex (the reason is in the server log). Admin only.",
@@ -10266,62 +10893,64 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
           }
         },
         "summary": "List the agents' models",
         "tags": [
-          "llm"
+          "settings"
         ]
       }
     },
-    "/api/v1/llm/{agent}": {
+    "/api/v1/llm/providers": {
       "get": {
-        "description": "One agent's entry, by its name in the `llm` section (`default`, `ast_planner`, ...). 404 for\nan unknown agent.",
-        "operationId": "get_llm_api_v1_llm__agent__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "agent",
-            "required": true,
-            "schema": {
-              "title": "Agent",
-              "type": "string"
-            }
-          }
-        ],
+        "description": "Every provider the engine can name (`engine.llm.providers()`): its `name`, `key_variable`, whether the key\nis present (`key_present`), the verified `models` and the `key_shape` a key must match, for a form to check one\nbefore sending it. Never a key.",
+        "operationId": "llm_providers_api_v1_llm_providers_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Llm Api V1 Llm  Agent  Get",
-                  "type": "object"
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Llm Providers Api V1 Llm Providers Get",
+                  "type": "array"
                 }
               }
             },
             "description": "Successful Response"
           },
-          "422": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "No identity: see `api.auth`."
           }
         },
-        "summary": "Get one agent's model",
+        "summary": "List the LLM providers",
         "tags": [
-          "llm"
+          "settings"
         ]
       }
     },
     "/api/v1/meta": {
       "get": {
-        "description": "Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and\n`request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key.",
+        "description": "Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and\n`request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key. With a caller, also\n`datasources`: each one the caller may reach, with its `id`, `description`, `sample_questions` and `recorded`\n(the ones the `replay` provider can answer with no key), and `recorded_with`, the provider and model those\nrecordings came from (or null).",
         "operationId": "meta_api_v1_meta_get",
         "responses": {
           "200": {
@@ -10927,18 +11556,23 @@
     },
     "/api/v1/ready": {
       "get": {
-        "description": "Returns `success: true`. It does not yet check datasources, the LLM or the index.",
+        "description": "Whether the engine can answer now, from its own `check()` (kept 10 seconds): every required datasource\nand at least one is up, every agent's key resolves (unless `api.request_llm` is on, or every agent is on\n`replay`) and the index is `ok` or `stale`. 200 `{\"status\": \"ready\"}` or 503 `{\"status\": \"not_ready\"}` to\neveryone. An admin also gets `problems`: each failing datasource and its stage, each agent whose key does not\nresolve and the index status, never a secret. An optional datasource that failed is a problem, not \"not ready\".",
         "operationId": "readiness_check_api_v1_ready_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
+                  "additionalProperties": true,
+                  "title": "Response Readiness Check Api V1 Ready Get",
+                  "type": "object"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "503": {
+            "description": "Not ready: `{\"status\": \"not_ready\"}`."
           }
         },
         "summary": "Readiness check",
@@ -11362,7 +11996,7 @@
         },
         "summary": "Replace the LLM",
         "tags": [
-          "llm"
+          "settings"
         ]
       }
     },
