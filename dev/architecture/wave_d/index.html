@@ -2730,6 +2730,42 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/results/">
+<span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Traces and feedback
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/approvals/">
+<span class="md-ellipsis">
+    
+  
+    Approvals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/rest/datasource/">
 <span class="md-ellipsis">
     
@@ -5178,7 +5214,7 @@ beside Wave A's <code>evals.run(llm=)</code>) to <code>run_query</code>, <code>s
 </table>
 <p><code>test_request_key_headers_refused_without_request_llm</code>,
 <code>test_model_override_without_request_key_is_422_even_when_server_has_key</code>,
-<code>test_request_key_never_in_a_response_log_or_trace</code>.</p>
+<code>test_request_key_never_in_a_response_or_the_server_log</code>.</p>
 <h3 id="saving-a-datasource-final-design-d14">Saving a datasource (final-design D14)</h3>
 <p>Connect tests a connection, registers it with <code>datasources.add</code>, and saves
 it only through Wave C's writer (D212):</p>
@@ -6463,7 +6499,7 @@ in exactly one part.</p>
 <td>A1</td>
 <td><strong>Query, results, traces, feedback, approvals routes.</strong> Files: <code>routes/query.py</code> (rewritten), <code>routes/approvals.py</code>, <code>models/query.py</code>, fixtures (<code>QueryResult</code>); delete <code>services/query.py</code>.</td>
 <td>D0a-3, G1, G2a, G3a</td>
-<td><code>test_query_body_question_choice_and_approval_ids</code>, <code>test_choice_with_approval_ids_is_422</code>, <code>test_query_stream_yields_wave_a_events</code>, <code>test_results_route_hides_another_users_rows</code>, <code>test_trace_route_hides_another_users_trace</code>, <code>test_chart_route_and_vega_lite_format</code>, <code>test_feedback_records_from_the_trace</code>, <code>test_correct_returns_a_proposal</code>, <code>test_approver_grants_and_asker_retries</code>, <code>test_request_key_headers_refused_without_request_llm</code>, <code>test_model_override_without_request_key_is_422_even_when_server_has_key</code>, <code>test_request_key_never_in_a_response_log_or_trace</code>, <code>test_query_docs_name_no_removed_variable</code> (B203)</td>
+<td><code>test_query_body_question_choice_and_approval_ids</code>, <code>test_choice_with_approval_ids_is_422</code>, <code>test_query_stream_yields_wave_a_events</code>, <code>test_results_route_hides_another_users_rows</code>, <code>test_trace_route_hides_another_users_trace</code>, <code>test_chart_route_and_vega_lite_format</code>, <code>test_feedback_records_from_the_trace</code>, <code>test_correct_returns_a_proposal</code>, <code>test_approver_grants_and_asker_retries</code>, <code>test_request_key_headers_refused_without_request_llm</code>, <code>test_model_override_without_request_key_is_422_even_when_server_has_key</code>, <code>test_request_key_never_in_a_response_or_the_server_log</code>, <code>test_query_docs_name_no_removed_variable</code> (B203)</td>
 <td><code>api/rest/query.md</code>, new <code>api/rest/results.md</code> and <code>api/rest/approvals.md</code> (with nav entries)</td>
 </tr>
 <tr>
@@ -6830,6 +6866,35 @@ in <code>models</code> are ignored, as the registry always has. A provider with 
 dict[provider, key]</code> are top-level exports. The old playground (<code>cli/demo/playground/</code>) still imports <code>nl2sql.llm.*</code>
 directly; it is deleted by X1b, so it was not rewritten. Code on main wins over the row's file list: <code>api/llm_api.py</code>
 and <code>registry.py</code> needed no change beyond the docstring, and <code>api/types.py</code> was not touched.</p>
+<p><strong>A1 (query, results, traces, feedback, approvals routes).</strong> <code>POST /query</code> and <code>/query/stream</code> take <code>question</code> (was
+<code>natural_language</code>; the old name is a 422, every body is <code>extra="forbid"</code>), <code>choice</code> and <code>approval_ids</code>; both together are
+a 422 <code>CLARIFICATION_INVALID</code> raised in the route before the engine is called. Both routes depend on
+<code>overrides.llm_override</code> and pass <code>llm_override=</code> to the facade. <code>QueryResponse</code> and <code>SubQueryResponse</code> are gone: the
+response model is the facade's own <code>QueryResult</code> (the openapi schema names are now <code>QueryResult</code>, <code>SubQueryResult</code>), and
+<code>services/query.py</code>, <code>QueryService</code> and <code>get_query_service</code> are deleted (the routes call <code>engine</code> directly). The stream route
+calls <code>engine.stream_query</code> in the handler, so a refusal (<code>CLARIFICATION_INVALID</code>, a key refused, a bad choice) is the
+error envelope before the 200, then hands a guarded iterator to <code>sse.event_stream</code>, which adds the keep-alive comment; a
+mid-stream exception is logged and ends in a generic <code>run.failed</code>. Results moved to <code>GET /results/{trace_id}</code> (manifest),
+<code>/results/{trace_id}/{result_id}</code> (page), <code>.csv</code>, and <code>/chart</code> (<code>?kind=line|bar|big_number|table</code>, 422 otherwise;
+<code>?format=vega-lite</code> returns <code>ChartSpec.to_vega_lite()</code>, 422 for a table); the old <code>/query/{id}/results/...</code> paths are
+removed, not aliased. <code>GET /traces/{trace_id}</code> maps a <code>None</code> or a non-plain id to 404. <code>POST /feedback</code> takes <code>rating</code>
+<code>up|down</code>; <code>POST /feedback/correct</code> takes exactly one of <code>sql</code> and <code>plan</code> (422 otherwise) and <strong>never passes
+<code>as_operator</code></strong> (a test greps the API source for the word and pins that another caller's run is a 404 for the trace,
+the rating and the correction). <code>CorrectionRefused</code> is a top-level <code>nl2sql</code> export (lazy, <code>import nl2sql</code> stays light)
+and the route catches it by type: <code>no_run</code> is a 404, every other code a 422 <code>CORRECTION_REFUSED</code> whose <code>details</code> are
+<code>{code, msg}</code> per <code>.messages</code>; any other <code>NL2SQLError</code> from <code>correct</code> keeps its own status and code. <code>trace_id</code> in
+<code>FeedbackRequest</code> and <code>CorrectionRequest</code> must be a plain token (422 otherwise). <code>ChartNotSupported</code> passes through
+with its own code <code>CHART_NOT_SUPPORTED</code>. Review fixes in the engine: <code>traces.get(..., user_context=)</code> returns the
+caller's view of a trace (<code>tracing/document.py</code> <code>for_caller</code>): no <code>settings</code> block, <code>llm.configured</code> cut to provider,
+model and temperature, and, when the trace's new <code>results_withheld</code> flag is set (<code>query_api.results_withheld</code>, the
+rule <code>result_from_state</code> already used to withhold rows), every <code>rows</code> and <code>terminal_results</code> value and every LLM call's
+<code>messages</code>, <code>response</code> and <code>parsed</code> removed; the operator (<code>user_context=None</code>) reads the whole document. The server
+log masks the request's key headers, tracebacks included, for unhandled errors and failed streams. <code>GET /feedback</code> is admin only.
+<code>routes/approvals.py</code> has <code>GET /approvals?status=</code>, <code>POST /approvals/{id}/grant</code> and <code>/deny</code> (optional <code>{"reason"}</code>),
+all thin over <code>engine.approvals</code>; the 403 and 404 are the engine's. Web fixtures gained <code>QueryResult.json</code> and
+<code>openapi.json</code> was regenerated. The web app (<code>nl2sql-ui</code>) still calls the old result and feedback paths and the old
+body field; W1 and W2a rework it, so it was not touched. Code on main wins over the row's file list: the results
+routes stay in <code>routes/query.py</code> (no <code>routes/results.py</code>), and there is no <code>models/query.py</code> model for responses.</p>
 <p><strong>A2b (dashboards and workspaces routes).</strong> Thin over <code>engine.dashboards</code> and <code>engine.workspaces</code>; every handler passes
 <code>user_context=</code> and calls one named method, so another caller's dashboard is the facade's own 404. Routes: <code>GET
 /dashboards</code> (<code>workspace_id</code>, <code>status</code> saved or draft), <code>GET /dashboards/{id}</code> (<code>open(refresh_due=False)</code>, reads only,

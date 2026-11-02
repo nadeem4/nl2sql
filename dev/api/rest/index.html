@@ -5178,6 +5178,90 @@
   
   
     <li class="md-nav__item">
+      <a href="results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Traces and feedback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="approvals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Approvals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="datasource/" class="md-nav__link">
         
   
@@ -6182,7 +6266,22 @@ server on a config:</p>
 <tr>
 <td><a href="query/">Query</a></td>
 <td><code>routes/query.py</code></td>
-<td>Execute natural language queries, whole or streamed as Server-Sent Events; page through or download a run's saved result.</td>
+<td>Execute natural language queries, whole or streamed as Server-Sent Events, with a clarification <code>choice</code> or granted <code>approval_ids</code>, and a request's own keys and models.</td>
+</tr>
+<tr>
+<td><a href="results/">Results</a></td>
+<td><code>routes/query.py</code></td>
+<td>A run's manifest, pages, CSV and chart (<code>/results/{trace_id}/...</code>).</td>
+</tr>
+<tr>
+<td><a href="feedback/">Traces and feedback</a></td>
+<td><code>routes/query.py</code></td>
+<td>A run's trace, ratings, and corrections as proposals.</td>
+</tr>
+<tr>
+<td><a href="approvals/">Approvals</a></td>
+<td><code>routes/approvals.py</code></td>
+<td>List, grant and deny the approvals a hook asked for.</td>
 </tr>
 <tr>
 <td><a href="datasource/">Datasource</a></td>
@@ -6220,7 +6319,7 @@ fails when a route changes without it (rewrite it with <code>python packages/api
 subclasses) is mapped to its status; anything else, a built-in <code>ValueError</code>, <code>KeyError</code>, <code>PermissionError</code> or a
 pydantic <code>ValidationError</code> included, is a <code>500</code> that names a request id and never the exception's text. Routes carry
 no <code>except Exception</code>.</p>
-<p><code>POST /api/v1/query</code> still returns pipeline errors as a normal <code>HTTP 200</code> inside <code>QueryResponse.errors</code>.</p>
+<p><code>POST /api/v1/query</code> still returns pipeline errors as a normal <code>HTTP 200</code> inside <code>QueryResult.errors</code>.</p>
 <p>Route handlers that call blocking engine code are declared with <code>def</code> rather than
 <code>async def</code>, so Starlette runs them in its threadpool instead of blocking the
 event loop.</p>

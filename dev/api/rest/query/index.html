@@ -16,7 +16,7 @@
         <link rel="prev" href="../health/">
       
       
-        <link rel="next" href="../datasource/">
+        <link rel="next" href="../results/">
       
       
         
@@ -5064,10 +5064,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#subqueryresponse" class="md-nav__link">
+  <a href="#subqueryresult" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SubQueryResponse
+        SubQueryResult
       
     </span>
   </a>
@@ -5075,21 +5075,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#queryresponse" class="md-nav__link">
+  <a href="#queryresult" class="md-nav__link">
     <span class="md-ellipsis">
       
-        QueryResponse
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resultpage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ResultPage
+        QueryResult
       
     </span>
   </a>
@@ -5135,39 +5124,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#get-apiv1queryrequest_idresultsresult_id" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GET /api/v1/query/{request_id}/results/{result_id}
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-apiv1queryrequest_idresultsresult_idcsv" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GET /api/v1/query/{request_id}/results/{result_id}.csv
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#errors-and-scope-of-the-result-routes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Errors and scope of the result routes
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5188,6 +5144,90 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Traces and feedback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../approvals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Approvals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -6018,10 +6058,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#subqueryresponse" class="md-nav__link">
+  <a href="#subqueryresult" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SubQueryResponse
+        SubQueryResult
       
     </span>
   </a>
@@ -6029,21 +6069,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#queryresponse" class="md-nav__link">
+  <a href="#queryresult" class="md-nav__link">
     <span class="md-ellipsis">
       
-        QueryResponse
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resultpage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ResultPage
+        QueryResult
       
     </span>
   </a>
@@ -6083,39 +6112,6 @@
     <span class="md-ellipsis">
       
         POST /api/v1/query/stream
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-apiv1queryrequest_idresultsresult_id" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GET /api/v1/query/{request_id}/results/{result_id}
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-apiv1queryrequest_idresultsresult_idcsv" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GET /api/v1/query/{request_id}/results/{result_id}.csv
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#errors-and-scope-of-the-result-routes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Errors and scope of the result routes
       
     </span>
   </a>
@@ -6170,10 +6166,10 @@
 </thead>
 <tbody>
 <tr>
-<td><code>natural_language</code></td>
+<td><code>question</code></td>
 <td><code>str</code></td>
 <td>yes</td>
-<td>User query.</td>
+<td>The question. (It was <code>natural_language</code>; that name is now a <code>422</code>.)</td>
 </tr>
 <tr>
 <td><code>datasource_id</code></td>
@@ -6187,10 +6183,23 @@
 <td>no</td>
 <td>Execute SQL against datasource (default <code>true</code>).</td>
 </tr>
+<tr>
+<td><code>choice</code></td>
+<td><code>Optional[ClarificationChoice]</code></td>
+<td>no</td>
+<td>The option picked from an earlier <code>clarification_request</code>: send <code>{"request_id", "option_id"}</code> with the same <code>question</code> to answer it.</td>
+</tr>
+<tr>
+<td><code>approval_ids</code></td>
+<td><code>List[str]</code></td>
+<td>no</td>
+<td>Ids of <a href="../approvals/">approvals</a> an approver granted, from an earlier run a hook held. <code>choice</code> and <code>approval_ids</code> together are a <code>422</code> <code>CLARIFICATION_INVALID</code>, before the engine is called.</td>
+</tr>
 </tbody>
 </table>
-<h3 id="subqueryresponse"><code>SubQueryResponse</code></h3>
-<p>Derives from <code>nl2sql.SubQueryResult</code>, so it has exactly the engine's fields.</p>
+<p>The body is strict: a field it does not name is a <code>422</code>, so a misspelt or removed field is never silently ignored.</p>
+<h3 id="subqueryresult"><code>SubQueryResult</code></h3>
+<p>The engine's own <code>nl2sql.SubQueryResult</code>, served as is.</p>
 <table>
 <thead>
 <tr>
@@ -6281,9 +6290,8 @@
 </tr>
 </tbody>
 </table>
-<h3 id="queryresponse"><code>QueryResponse</code></h3>
-<p>Derives from <code>nl2sql.QueryResult</code> (only <code>sub_queries</code> is narrowed to
-<code>SubQueryResponse</code>), so the HTTP response cannot drift from what the engine returns.</p>
+<h3 id="queryresult"><code>QueryResult</code></h3>
+<p>The engine's own <code>nl2sql.QueryResult</code>, served as is: the route's <code>response_model</code> is that class, so the HTTP response cannot drift from what the engine returns.</p>
 <table>
 <thead>
 <tr>
@@ -6296,7 +6304,7 @@
 <tbody>
 <tr>
 <td><code>sub_queries</code></td>
-<td><code>List[SubQueryResponse]</code></td>
+<td><code>List[SubQueryResult]</code></td>
 <td>no</td>
 <td>One entry per decomposed sub-query, each with its SQL.</td>
 </tr>
@@ -6383,61 +6391,7 @@
 <p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
 result set is written to artifact storage and addressed through <code>artifact_refs</code>
 (<code>uri</code>, <code>format</code>, <code>row_count</code>, <code>columns</code>). The run's combined results are listed in
-<code>result_manifest</code> and read back, a page at a time or as CSV, with
-<a href="#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>
-and <a href="#get-apiv1queryrequest_idresultsresult_idcsv"><code>.../{result_id}.csv</code></a>.</p>
-<h3 id="resultpage"><code>ResultPage</code></h3>
-<table>
-<thead>
-<tr>
-<th>field</th>
-<th>type</th>
-<th>meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>request_id</code></td>
-<td><code>str</code></td>
-<td>The run's <code>trace_id</code>.</td>
-</tr>
-<tr>
-<td><code>result_id</code></td>
-<td><code>str</code></td>
-<td>The result's <code>node_id</code> from <code>result_manifest</code>.</td>
-</tr>
-<tr>
-<td><code>columns</code></td>
-<td><code>List[str]</code></td>
-<td>Column names, in row order.</td>
-</tr>
-<tr>
-<td><code>rows</code></td>
-<td><code>List[List[Any]]</code></td>
-<td><code>rows[i]</code> is row <code>offset + i</code> of the result.</td>
-</tr>
-<tr>
-<td><code>offset</code></td>
-<td><code>int</code></td>
-<td>The first row returned, from 0.</td>
-</tr>
-<tr>
-<td><code>limit</code></td>
-<td><code>int</code></td>
-<td>The page size used, after the cap of 1,000.</td>
-</tr>
-<tr>
-<td><code>total_rows</code></td>
-<td><code>int</code></td>
-<td>Rows in the whole result.</td>
-</tr>
-<tr>
-<td><code>next_offset</code></td>
-<td><code>Optional[int]</code></td>
-<td>Where the next page starts, or <code>null</code> when this page reaches the end.</td>
-</tr>
-</tbody>
-</table>
+<code>result_manifest</code> and read back, a page at a time or as CSV, with the <a href="../results/">results routes</a>.</p>
 <p>An <code>errors[]</code> entry for a key the provider rejected:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"node"</span><span class="p">:</span><span class="w"> </span><span class="s2">"datasource_resolver"</span><span class="p">,</span>
@@ -6455,16 +6409,22 @@ response" disclosure. The codes are listed under
 <h3 id="post-apiv1query"><code>POST /api/v1/query</code></h3>
 <p>Source: <code>packages/api/src/nl2sql_api/routes/query.py</code></p>
 <p>Request model: <code>QueryRequest</code></p>
-<p>Response model: <code>QueryResponse</code></p>
+<p>Response model: <code>QueryResult</code></p>
 <p>Execution flow:
 - The <code>identity.caller</code> dependency supplies the caller's <code>UserContext</code> (see
   <a href="../#identity">Identity</a>); with no identity it answers <code>HTTP 401</code>
   before the engine runs.
 - Delegates to <code>engine.run_query(...)</code>, which returns a <code>QueryResult</code>.
-- Returns that <code>QueryResult</code> as a <code>QueryResponse</code> (its subclass); there is no field mapping.</p>
+- Returns that <code>QueryResult</code> unchanged; there is no field mapping.</p>
 <p>The handler is declared with <code>def</code>, not <code>async def</code>: the pipeline performs blocking
 LLM and database calls, so Starlette runs it in its threadpool instead of on the
 event loop.</p>
+<p>Keys and models in the request: where <code>api.request_llm</code> is on, a request may send <code>X-NL2SQL-Api-Key-&lt;provider&gt;</code>
+headers (one provider's key each) and <code>X-NL2SQL-Models</code> (a JSON object of agent name to <code>"provider:model"</code>, no secret)
+for this run only. A model is honoured only on a provider the same request sent a key for, so it can never move a step
+onto the operator's account, even if the server has a key for it (<code>422</code> <code>MISSING_PROVIDER_KEY</code>). With <code>request_llm</code>
+off the headers are a <code>403</code>. A key is never logged, stored in a trace or echoed in a response. The stream route takes
+the same headers.</p>
 <p>Errors:
 - Pipeline failures are a normal <code>HTTP 200</code> carrying <code>errors</code>; they are not HTTP failures.
 - Genuinely unexpected failures return <code>HTTP 500</code> with a generic detail; the
@@ -6546,7 +6506,7 @@ are exactly those of <code>/query</code>. Delegates to <code>engine.stream_query
 <p>The events are the engine's own run events
 (<a href="../../../observability/events/">Events</a>), from the caller-safe allow-list. Each
 is an <code>event:</code> line naming it and one <code>data:</code> line holding the whole event as
-JSON: <code>name</code>, <code>at</code> (UTC), <code>trace_id</code> (the run's, its <code>request_id</code> for the result
+JSON: <code>name</code>, <code>at</code> (UTC), <code>trace_id</code> (the run's, its <code>trace_id</code> in the result
 routes), <code>tenant_id</code> and <code>data</code>. The table lists each event's <code>data</code>:</p>
 <table>
 <thead>
@@ -6575,7 +6535,7 @@ routes), <code>tenant_id</code> and <code>data</code>. The table lists each even
 <tr>
 <td><code>result.manifest</code></td>
 <td><code>results</code></td>
-<td>The aggregator saved the run's results. <code>results</code> is the <code>result_manifest</code> the final response will carry, so a client can start paging the rows (with the event's <code>trace_id</code> as <code>request_id</code>) before the answer is written.</td>
+<td>The aggregator saved the run's results. <code>results</code> is the <code>result_manifest</code> the final response will carry, so a client can start paging the rows (with the event's <code>trace_id</code>) before the answer is written.</td>
 </tr>
 <tr>
 <td><code>answer.delta</code></td>
@@ -6589,7 +6549,7 @@ routes), <code>tenant_id</code> and <code>data</code>. The table lists each even
 </tr>
 <tr>
 <td><code>run.finished</code></td>
-<td>the run's summary, plus <code>result</code>: the <code>QueryResponse</code></td>
+<td>the run's summary, plus <code>result</code>: the <code>QueryResult</code></td>
 <td>The last event of a run that finished: <code>result</code> is exactly what <code>/query</code> returns for it. A refusal or a provider failure is a <code>run.finished</code> with <code>status: "error"</code>, as <code>/query</code> returns it.</td>
 </tr>
 <tr>
@@ -6626,7 +6586,7 @@ operator's, through <code>engine.events.subscribe</code>.</p>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query/stream<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$NL2SQL_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"natural_language": "Who are the top 5 customers by revenue?"}'</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"question": "Who are the top 5 customers by revenue?"}'</span>
 </code></pre></div>
 <p>What streams token by token: only the answer. The answer model is asked to stream
 on this route (and on this route only; <code>/query</code> is unchanged), on both wires:
@@ -6643,91 +6603,12 @@ OpenAI wire).</p>
 <p>The route answers <code>Cache-Control: no-cache</code> and <code>X-Accel-Buffering: no</code>, so a
 proxy passes each event on as it comes. Closing the connection cancels the run
 before its next step or model call.</p>
-<h3 id="get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></h3>
-<p>One page of a run's saved result.</p>
-<table>
-<thead>
-<tr>
-<th>parameter</th>
-<th>in</th>
-<th>default</th>
-<th>meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>request_id</code></td>
-<td>path</td>
-<td></td>
-<td>The run's <code>trace_id</code>.</td>
-</tr>
-<tr>
-<td><code>result_id</code></td>
-<td>path</td>
-<td></td>
-<td>A <code>node_id</code> from the run's <code>result_manifest</code>.</td>
-</tr>
-<tr>
-<td><code>offset</code></td>
-<td>query</td>
-<td><code>0</code></td>
-<td>First row, from 0. Negative is <code>HTTP 422</code>.</td>
-</tr>
-<tr>
-<td><code>limit</code></td>
-<td>query</td>
-<td><code>100</code></td>
-<td>Rows per page, at least 1 (else <code>HTTP 422</code>). Above 1,000 it is cut to 1,000; <code>limit</code> in the response says which.</td>
-</tr>
-</tbody>
-</table>
-<p>Response model: <code>ResultPage</code>. Delegates to <code>engine.results.page(...)</code>, which
-reads the rows lazily from the result's parquet artifact: only the slice asked for
-is read. A page past the end has no rows.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$NL2SQL_KEY</span><span class="s2">"</span><span class="w">   </span><span class="s2">"http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&amp;limit=100"</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span><span class="nt">"request_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0f1c..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"result_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"combine_g1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">],</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"acme"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="s2">"globex"</span><span class="p">,</span><span class="w"> </span><span class="mi">40</span><span class="p">]],</span><span class="w"> </span><span class="nt">"offset"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">"limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w"> </span><span class="nt">"total_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="nt">"next_offset"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}</span>
-</code></pre></div>
-<h3 id="get-apiv1queryrequest_idresultsresult_idcsv"><code>GET /api/v1/query/{request_id}/results/{result_id}.csv</code></h3>
-<p>The whole of a run's saved result as <code>text/csv</code> (UTF-8, header first), sent as an
-attachment named <code>&lt;request_id&gt;_&lt;result_id&gt;.csv</code>. Delegates to
-<code>engine.results.csv(...)</code>, which reads the parquet artifact a slice at a time
-and streams each slice out, so the result is never built in memory on the server.</p>
-<h3 id="errors-and-scope-of-the-result-routes">Errors and scope of the result routes</h3>
-<ul>
-<li>Both need a role, as <code>/query</code> does: no role is <code>HTTP 401</code>.</li>
-<li>A run is readable only by the caller who asked it: the request's caller (from
-  the auth settings) is passed to <code>engine.results</code> as <code>user_context</code>, and must
-  match the run's recorded asker. Results are read from the engine's own
-  tenant folder (<code>TENANT_ID</code>, the <code>&lt;tenant_id&gt;</code> of the artifact path) and nowhere
-  else. An unknown <code>request_id</code>, another user's run, a run of another tenant, a
-  <code>result_id</code> the run's manifest does not list, and an id that is not a plain
-  token (letters, digits, <code>_</code> and <code>-</code>, so no <code>/</code>, <code>.</code> or <code>..</code>) are all
-  <code>HTTP 404</code>, so a caller cannot tell one from the other or reach a path outside
-  the run's folder.</li>
-<li>A caller with a <code>user_id</code> (an API key, or a proxy that sets the user header) reads only its own runs. A
-  <code>static</code> caller has roles and no <code>user_id</code>, so its runs are anonymous: readable by any caller of the same tenant with the same
-  roles, and by no caller with other roles: a <code>viewer</code> holding an <code>admin</code> run's trace id
-  gets <code>HTTP 404</code>. See <a href="../../core/results/#who-can-read-a-run">Who can read a run</a>.</li>
-<li>The request body never names the caller: <code>user_context</code> is not a field of <code>POST /query</code>.</li>
-</ul>
 <h2 id="tests">Tests</h2>
-<p><code>packages/api/tests/test_query_results_routes.py</code> covers the result routes over the
-real facade and a local artifact store: paging, the cap, <code>HTTP 422</code> for a bad
-offset or limit, the complete CSV, <code>HTTP 404</code> for unknown, foreign and crafted ids
-and for an anonymous run read with other roles, and <code>HTTP 401</code> without a role.</p>
-<p><code>packages/api/tests/test_query_routes.py</code> and
-<code>packages/api/tests/test_query_response_shape.py</code> cover this endpoint with FastAPI's
-<code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override) and a stubbed
-caller (<code>identity.caller</code> override, role <code>admin</code>), so no datasource, LLM or
-network access is required. <code>packages/api/tests/test_identity.py</code> covers the
-identity sources and the 401.</p>
-<p><code>packages/api/tests/test_query_stream_route.py</code> covers the stream route the same
-way: the content type, the events in order, a <code>run.finished</code> whose <code>result</code> equals
-the <code>/query</code> response, the 401 and the <code>run.failed</code> event. <code>packages/nl2sql/tests/e2e/test_stream_fake_llm.py</code>
-streams a question on the demo databases through this route with no key.</p>
+<p><code>packages/api/tests/test_query_routes.py</code>, <code>test_query_stream_route.py</code> and <code>test_query_response_shape.py</code> cover these
+routes with FastAPI's <code>TestClient</code>, a stubbed engine (<code>get_engine</code> override) and a stubbed caller, so no datasource, LLM
+or network access is required. <code>packages/api/tests/test_identity.py</code> covers the identity sources and the 401.
+<code>packages/nl2sql/tests/e2e/test_stream_fake_llm.py</code> streams a question on the demo databases through the stream route
+with no key. The results, traces, feedback and approvals routes have their own pages and test files.</p>
 
 
 
