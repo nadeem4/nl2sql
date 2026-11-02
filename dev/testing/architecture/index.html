@@ -1664,6 +1664,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/compose/">
+<span class="md-ellipsis">
+    
+  
+    Docker Compose
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../deployment/kubernetes/">
 <span class="md-ellipsis">
     
@@ -2830,14 +2842,17 @@ release. Its <code>realdb-gate</code> job always runs and is the required check.
 <p>Three more jobs test the package rather than the source tree:</p>
 <ul>
 <li>
-<p><strong><code>api-image</code></strong> builds <code>packages/api/Dockerfile</code> from the repository root,
-  the image the release pushes to GHCR, without pushing it, and imports
-  <code>nl2sql_api.main</code> inside it. <code>tests/unit/test_docker_images.py</code> separately
+<p><strong><code>api-image</code></strong> builds the root <code>Dockerfile</code> (the web app's Node stage, then
+  the API), the image the release pushes to GHCR, without pushing it. It
+  imports <code>nl2sql_api.main</code> inside it, checks that <code>pyodbc.drivers()</code> lists the
+  SQL Server driver, records the image size in the job summary and checks that
+  <code>GET /</code> answers the built page. <code>tests/unit/test_docker_images.py</code> separately
   checks that every Dockerfile's <code>FROM python:X.Y</code> satisfies every package's
   <code>requires-python</code>.</p>
 </li>
 <li>
-<p><strong><code>build</code></strong> builds the three wheels and sdists, installs them into a clean
+<p><strong><code>build</code></strong> builds the web app first, then the three wheels and sdists (the
+  <code>nl2sql-api</code> wheel must carry <code>static/index.html</code>), installs them into a clean
   virtualenv and runs <code>import nl2sql</code> and <code>nl2sql --help</code>.</p>
 </li>
 <li>

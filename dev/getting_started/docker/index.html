@@ -3933,6 +3933,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../deployment/compose/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Compose
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../deployment/kubernetes/" class="md-nav__link">
         
   
@@ -6143,22 +6171,21 @@
 <p>Use this path when you want the HTTP API only.</p>
 <h2 id="build-the-image">Build the image</h2>
 <p>From the repo root:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
 </code></pre></div>
-<p>The image installs the local packages from the build context -
-<code>packages/sdk</code>, <code>packages/nl2sql[postgres,mysql]</code> and <code>packages/api</code> - so
-the build context has to be the repo root. The <code>COPY ./packages/...</code> lines
-resolve against the context, so <code>-f packages/api/Dockerfile .</code> is the only
-correct invocation; building with <code>packages/api</code> as the context fails with
-<code>"/packages/sdk": not found</code>.</p>
+<p>The <code>Dockerfile</code> is at the repo root. Its first stage builds the web app
+(<code>nl2sql-ui</code>); the second installs the local packages from the build context -
+<code>packages/sdk</code>, <code>packages/nl2sql[postgres,mysql,mssql,duckdb,anthropic,otel]</code> and
+<code>packages/api</code> - and serves the built app, so the build context has to be the
+repo root. For a running stack with a volume and API keys, see
+<a href="../../deployment/compose/">Docker Compose</a>.</p>
 <p>The root <code>.dockerignore</code> keeps that context to the sources the build actually
 needs - it drops <code>.git</code>, virtualenvs, <code>docs/</code>, <code>site/</code>, <code>chroma_db/</code>, <code>data/</code>,
 <code>logs/</code> and stale <code>build/</code>, <code>dist/</code> and <code>*.egg-info</code> directories.</p>
 <h2 id="adapters">Adapters</h2>
-<p>The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
-the <code>nl2sql-engine</code> distribution; an extra only adds the driver it needs, so add another
-extra to the <code>pip install</code> line in <code>packages/api/Dockerfile</code> to include one -
-for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
+<p>The image ships all five adapters' drivers (PostgreSQL, MySQL, SQL Server with
+Microsoft's ODBC driver 18, DuckDB, SQLite) and the Anthropic provider. One image,
+no slim variant.</p>
 <h2 id="configuration">Configuration</h2>
 <p>The image sets <code>NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml</code>. Mount a config folder
 there: <code>nl2sql.yaml</code>, the files it includes, and optionally a <code>.env</code> next to
@@ -6174,9 +6201,9 @@ Write one with <code>nl2sql init</code> (see
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">static_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin</span><span class="w">      </span><span class="c1"># one role for every request</span>
 </code></pre></div>
-<p><code>api.auth: static</code> pins the RBAC role for every request; the default, <code>none</code>,
-answers only requests made straight to <code>localhost</code>, so a request through a
-published Docker port is HTTP 403. See <a href="../../api/rest/#identity">Identity</a>
+<p><code>api.auth: static</code> pins the RBAC role for every request. The image runs
+<code>nl2sql-api serve --host 0.0.0.0</code>, which refuses to start while <code>api.auth</code> is
+the default, <code>none</code>, so the container needs <code>api_keys</code>, <code>proxy</code> or <code>static</code>. See <a href="../../api/rest/#identity">Identity</a>
 and <a href="../../configuration/api/">API settings</a>.</p>
 <p>The routes that register datasources or LLMs and build or clear the index need a
 role listed in <code>policies.admin_roles</code> (default <code>[admin]</code>), so <code>static_role: admin</code>

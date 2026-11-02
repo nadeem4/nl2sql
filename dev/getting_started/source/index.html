@@ -3911,6 +3911,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../deployment/compose/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Compose
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../deployment/kubernetes/" class="md-nav__link">
         
   
@@ -6134,9 +6162,12 @@ and <a href="../../configuration/system/">Configuration</a>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>my-demo/nl2sql.yaml<span class="w"> </span>nl2sql-api<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
 </code></pre></div>
 <p>or in Docker:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/my-demo:/etc/nl2sql"</span><span class="w"> </span>nl2sql-api
 </code></pre></div>
+<p>The image listens beyond localhost, so it needs <code>api.auth</code> set (<code>api_keys</code>, <code>proxy</code> or <code>static</code>) in the config;
+with the default <code>none</code> it exits at start-up. For a demo, add <code>api: { auth: static, static_role: admin }</code> to
+<code>my-demo/nl2sql.yaml</code>, or use the <a href="../../deployment/compose/">Compose stack</a>, which ships <code>api_keys</code>.</p>
 <p>See <a href="../docker/">Docker (REST API)</a> for adapter extras, the role settings and
 the data volume.</p>
 

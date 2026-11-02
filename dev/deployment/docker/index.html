@@ -16,7 +16,7 @@
         <link rel="prev" href="../architecture/">
       
       
-        <link rel="next" href="../kubernetes/">
+        <link rel="next" href="../compose/">
       
       
         
@@ -3944,6 +3944,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../compose/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Compose
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../kubernetes/" class="md-nav__link">
         
   
@@ -6163,17 +6191,20 @@
 
 <h1 id="docker-deployment">Docker Deployment</h1>
 <p>NL2SQL can be deployed as a standalone HTTP service using the <code>nl2sql-api</code> package and Docker. You can also embed the core library in your own service.</p>
+<p>For a ready-made stack (one service, one volume, API keys on), see
+<a href="../compose/">Docker Compose</a>.</p>
 <p>For the playground served as a public demo of the sample databases, where each
 visitor brings their own API key, see <a href="../hosted-demo/">Hosted demo</a>.</p>
 <h2 id="container-requirements">Container requirements</h2>
 <ul>
 <li>Install <code>nl2sql-engine</code> and add adapters via extras (e.g. <code>nl2sql-engine[postgres]</code>).</li>
 <li>Provide the config: <code>nl2sql.yaml</code> and the files it includes, at the path
-  <code>NL2SQL_CONFIG</code> names. <code>packages/api/Dockerfile</code> sets
+  <code>NL2SQL_CONFIG</code> names. The <code>Dockerfile</code> at the repository root sets
   <code>NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml</code>, so mount a config folder there.</li>
 <li>Provide the provider keys and any variable the config reads as <code>${env:VAR}</code>,
-  in the environment or in a <code>.env</code> next to <code>nl2sql.yaml</code> (loaded at startup,
-  never overriding a variable already set).</li>
+  in the environment or in a <code>.env</code> next to <code>nl2sql.yaml</code> (loaded by <code>nl2sql-api serve</code>, the image's
+  command, never overriding a variable already set, and never when hosted; plain
+  uvicorn does not load it).</li>
 </ul>
 <h2 id="persistence-mounts">Persistence mounts</h2>
 <p>Everything the engine writes lives under <code>storage.path</code>: the vector index
@@ -6199,9 +6230,13 @@ and left out of routing. Mark the datasources the service cannot run without
 <h2 id="api-roles">API roles</h2>
 <p><code>nl2sql-api</code> identifies callers from <code>api.auth</code> (<code>api_keys</code>, <code>proxy</code>, <code>static</code>
 or <code>none</code>), and <code>policies.admin_roles</code> (default <code>[admin]</code>) says which roles may
-change datasources, LLMs and the index. Under the default <code>none</code>, only a
-request made straight to <code>localhost</code> is answered, and a request through a
-published port is a <code>403</code>, so set <code>api.auth</code> for a container. See
+change datasources, LLMs and the index. The image binds <code>0.0.0.0</code>, and
+<code>serve</code> refuses to start under the default <code>none</code>, so set <code>api.auth</code> for a
+container, for example <code>api_keys</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">api</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span>
+</code></pre></div>
+<p>Create keys with <code>nl2sql keys create</code>. See
 <a href="../../configuration/api/">API settings</a>,
 <a href="../../api/rest/#identity">Identity</a> and
 <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>

@@ -2229,6 +2229,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/compose/">
+<span class="md-ellipsis">
+    
+  
+    Docker Compose
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../deployment/kubernetes/">
 <span class="md-ellipsis">
     
@@ -6984,6 +6996,7 @@ top-level exports (the code on main wins over the plan: <code>engine.llm.provide
 <code>default_llm</code>, <code>starter_config</code>, <code>write_env_values</code>, <code>write_project</code>, <code>check_file_name</code>, <code>Policies</code>-loading in <code>mcp.py</code>,
 <code>looks_like_api_key</code>/<code>KEY_SHAPE_MESSAGE</code> and the <code>nl2sql.mcp</code> start are the names still to expose. The <code>STILL_IMPORTED_FROM_INSIDE</code>
 list is unchanged (the playground and <code>demo.py</code>, X1b).</p>
+<p><strong>K1 (Image and Compose).</strong> The <code>Dockerfile</code> moved to the repository root (<code>git mv</code>; <code>packages/api/Dockerfile</code> is gone) and has two stages: <code>node:22-slim</code> runs <code>npm ci</code> and <code>npm run build</code> in <code>nl2sql-ui</code> (which writes into <code>packages/api/src/nl2sql_api/web/static</code>), and <code>python:3.12-slim-bookworm</code> installs the three packages with <code>[postgres,mysql,mssql,duckdb,anthropic,otel]</code>, Microsoft's <code>msodbcsql18</code> and <code>unixodbc</code>, copies the build over the API package, runs as uid 1000 with <code>/data</code> for the volume, bakes the sample databases at <code>/opt/nl2sql/samples</code> (<code>nl2sql init --demo</code>, then indexed once to pull the local ONNX model into <code>~/.cache/chroma</code>; the index is deleted), and ends with <code>HEALTHCHECK</code> on <code>/api/v1/ready</code> and <code>CMD ["nl2sql-api", "serve", "--host", "0.0.0.0", "--port", "8000"]</code>: <code>serve.main</code>, not bare uvicorn on <code>main:app</code>, because the mode checks and the <code>.env</code> load live there (A4b review). No <code>nl2sql-cli</code> (CL2, D230). <code>deploy/compose/</code> holds <code>docker-compose.yml</code>, <code>config/nl2sql.yaml</code> (inline sections, <code>api.auth: api_keys</code>, <code>storage.path: "${env:NL2SQL_DATA_DIR}"</code>, roles <code>admin</code> and <code>analyst</code>), <code>.env.example</code> (<code>.gitignore</code> gained <code>!.env.example</code>) and the page <code>docs/deployment/compose.md</code>. <code>test.yml</code>'s <code>build</code> job and <code>publish_pypi.yaml</code>'s build both run the UI build before <code>python -m build</code> and fail when the <code>nl2sql-api</code> wheel lacks <code>nl2sql_api/web/static/index.html</code> (D226; <code>package-data</code> already carried <code>static/*</code> and <code>static/assets/*</code>); <code>api-image</code> builds <code>-f Dockerfile</code>, checks <code>pyodbc.drivers()</code>, records the size in the summary and starts the image on the example config to see <code>GET /</code> answer the page; the <code>ghcr</code> job's <code>file:</code> is <code>Dockerfile</code>. <strong>Code wins over the doc:</strong> the base is <code>python:3.12-slim-bookworm</code> (Microsoft's repository path is Debian 12), the config uses inline sections rather than section files, and the example's <code>api.auth: api_keys</code> is what lets it bind <code>0.0.0.0</code> (D205). <strong>arm64:</strong> not checked here; Microsoft's documentation lists <code>msodbcsql18</code> for Debian 12 on amd64 and arm64, so the image should build on both, but CI builds <code>linux/amd64</code> only and no arm64 image is published (D213 stands until that is built once). <strong>For X1a / CL2:</strong> the <code>Dockerfile</code> is at the root and the <code>ghcr</code> and <code>api-image</code> jobs name it; CL2 adds the <code>nl2sql-cli</code> install to stage two (the image already has an <code>nl2sql</code> command from the engine until then, which <code>docker compose run --rm api nl2sql index</code> and <code>nl2sql keys create</code> use); X1a's <code>deploy/huggingface/Dockerfile</code> stays its own file.</p>
 <p><strong>CL0b (CLI on the facade: the rest).</strong> The whole CLI imports only the top-level <code>nl2sql</code> (and <code>nl2sql.cli</code>):
 <code>CLI_FILES_STILL_IMPORTING_INSIDE</code> is deleted from <code>test_boundaries.py</code> and <code>test_the_cli_imports_only_the_public_nl2sql</code>
 has no exception but the playground (<code>demo/playground/</code>, <code>demo/</code> and <code>commands/demo.py</code>, which X1a/X1b remove; <code>STILL_IMPORTED_FROM_INSIDE</code> is unchanged). <strong>Where the code

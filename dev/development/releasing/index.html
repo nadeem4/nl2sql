@@ -1664,6 +1664,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/compose/">
+<span class="md-ellipsis">
+    
+  
+    Docker Compose
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../deployment/kubernetes/">
 <span class="md-ellipsis">
     
@@ -3098,7 +3110,7 @@ the outside before the release counts as done.</p>
 <p>The same chain runs on every pull request up to the point of publishing: the
 <code>build</code> and <code>fresh-install</code> jobs in <code>test.yml</code> build the wheels, install them
 the way a user does and boot the demo, and the <code>api-image</code> job builds the GHCR
-image from <code>packages/api/Dockerfile</code> (without pushing it), so a release does
+image from the root <code>Dockerfile</code> (without pushing it), so a release does
 not meet these checks for the first time.</p>
 <h3 id="1-commit-messages-decide-the-version">1. Commit messages decide the version</h3>
 <p>The bump comes from <a href="https://www.conventionalcommits.org/">Conventional Commits</a>
@@ -3300,9 +3312,9 @@ the release decision.</p>
    <a href="#pypi-pending-publishers">PyPI pending publishers</a>.</li>
 <li>
 <p><strong><code>ghcr</code></strong> — <code>needs: pypi</code>, which waits for every leg of the matrix. Builds
-   <code>packages/api/Dockerfile</code> and pushes <code>ghcr.io/nadeem4/nl2sql-api</code> at both the
+   the root <code>Dockerfile</code> and pushes <code>ghcr.io/nadeem4/nl2sql-api</code> at both the
    tag and <code>latest</code>. The build context is the <strong>repository root</strong> (<code>context: .</code>)
-   with the Dockerfile named explicitly (<code>file: packages/api/Dockerfile</code>),
+   with the Dockerfile named explicitly (<code>file: Dockerfile</code>),
    because the Dockerfile installs the three packages from their local sources
    and its <code>COPY ./packages/...</code> paths resolve against the build context. A
    context of <code>packages/api</code> makes them resolve to
