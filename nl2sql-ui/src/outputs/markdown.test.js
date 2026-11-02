@@ -54,3 +54,28 @@ test("an empty report has no blocks", () => {
   assert.deepEqual(parseMarkdown(""), []);
   assert.deepEqual(parseMarkdown(null), []);
 });
+
+test("the engine's report shape: details with the summary on one line, then a fenced block", () => {
+  const src = "## Q\n\nanswer\n\n<details><summary>SQL</summary>\n\n```sql\nSELECT 1\n```\n\n</details>\n\nTrace: t1";
+  const blocks = parseMarkdown(src);
+  assert.deepEqual(blocks.map((b) => b.type), ["heading", "paragraph", "details", "paragraph"]);
+  assert.equal(blocks[2].summary, "SQL");
+  assert.deepEqual(blocks[2].blocks, [{ type: "code", lang: "sql", text: "SELECT 1" }]);
+});
+
+test("fences accept info text and longer runs of backticks", () => {
+  assert.deepEqual(parseMarkdown("```c++\nx\n```"), [{ type: "code", lang: "c++", text: "x" }]);
+  assert.deepEqual(parseMarkdown("```sql title\nx\n```"), [{ type: "code", lang: "sql", text: "x" }]);
+  assert.deepEqual(parseMarkdown("````\n```\ninner\n```\n````"), [{ type: "code", lang: "", text: "```\ninner\n```" }]);
+});
+
+test("every line is consumed: odd lines never hang the parser", () => {
+  for (const src of ["<details>\n", "<details open>\nx", "```", "<details><summary>a</summary>", "#nospace", "  ```"]) {
+    assert.ok(Array.isArray(parseMarkdown(src)), src);
+  }
+});
+
+test("an escaped pipe stays inside its table cell", () => {
+  const [t] = parseMarkdown("| a | b |\n|---|---|\n| x \\| y | 2 |");
+  assert.deepEqual(t.rows, [["x | y", "2"]]);
+});

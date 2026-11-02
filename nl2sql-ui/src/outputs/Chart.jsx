@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { downloadVegaLite, saveFile } from "../api/outputs.js";
 import { chartModel, truncatedNote } from "./chart.js";
 import { SampleRows } from "./RowsTable.jsx";
@@ -7,15 +7,16 @@ import { SampleRows } from "./RowsTable.jsx";
 // the page's own tokens (styles/outputs.css). It is sized to its container, so it redraws at a new width instead of
 // scaling its text. A table spec, or the "Table" switch, shows the rows the chart was drawn from.
 
+// A callback ref on the card, which stays mounted when the Table switch swaps the body, so the width is always tracked.
 function useWidth() {
-  const ref = useRef(null);
+  const watch = useRef(null);
   const [width, setWidth] = useState(640);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return undefined;
-    const watch = new ResizeObserver(([entry]) => setWidth(Math.max(280, Math.round(entry.contentRect.width))));
-    watch.observe(el);
-    return () => watch.disconnect();
+  const ref = useCallback((el) => {
+    if (watch.current) watch.current.disconnect();
+    watch.current = null;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    watch.current = new ResizeObserver(([entry]) => setWidth(Math.max(280, Math.round(entry.contentRect.width))));
+    watch.current.observe(el);
   }, []);
   return [ref, width];
 }
@@ -34,20 +35,20 @@ function Lines({ model }) {
   return (
     <svg className="chart-svg" viewBox={`0 0 ${model.width} ${model.height}`} aria-hidden="true">
       {model.yTicks.map((t) => (
-        <g key={t.label}>
+        <g key={t.y}>
           <line className="chart-grid" x1={plot.x0} x2={plot.x1} y1={t.y} y2={t.y} />
           <text x={plot.x0 - 8} y={t.y} textAnchor="end" dominantBaseline="middle">{t.label}</text>
         </g>
       ))}
       <line className="chart-axis" x1={plot.x0} x2={plot.x1} y1={plot.y1} y2={plot.y1} />
       {model.xTicks.map((t) => (
-        <text key={t.label} x={t.x} y={plot.y1 + 18} textAnchor="middle">{t.label}</text>
+        <text key={t.x} x={t.x} y={plot.y1 + 18} textAnchor="middle">{t.label}</text>
       ))}
       {model.lines.map((line) => (
         <g key={line.name} className={`s${line.slot}`}>
           <path className="chart-line" d={line.d} />
-          {line.points.map((p) => (
-            <circle key={p.label + p.value} className="chart-dot" cx={p.x} cy={p.y} r={4}>
+          {line.points.map((p, n) => (
+            <circle key={n} className="chart-dot" cx={p.x} cy={p.y} r={4}>
               <title>{`${line.name}, ${p.label}: ${p.full}`}</title>
             </circle>
           ))}
@@ -62,20 +63,20 @@ function Bars({ model }) {
   return (
     <svg className="chart-svg" viewBox={`0 0 ${model.width} ${model.height}`} aria-hidden="true">
       {model.ticks.map((t) => (
-        <g key={t.label}>
+        <g key={t.x}>
           <line className="chart-grid" x1={t.x} x2={t.x} y1={plot.y0} y2={plot.y1} />
           <text x={t.x} y={plot.y1 + 18} textAnchor="middle">{t.label}</text>
         </g>
       ))}
       <line className="chart-axis" x1={model.zeroX} x2={model.zeroX} y1={plot.y0} y2={plot.y1} />
-      {model.groups.map((group) => (
-        <g key={group.full}>
+      {model.groups.map((group, row) => (
+        <g key={row}>
           <text className="cat" x={plot.x0 - 8} y={group.bars[0].y + (group.bars.at(-1).y + group.bars.at(-1).h - group.bars[0].y) / 2}
             textAnchor="end" dominantBaseline="middle">
             {group.label}<title>{group.full}</title>
           </text>
-          {group.bars.map((bar) => (
-            <g key={bar.name} className={`s${bar.slot}`}>
+          {group.bars.map((bar, k) => (
+            <g key={k} className={`s${bar.slot}`}>
               <rect className="chart-bar" rx={4} x={bar.x} y={bar.y} width={bar.w} height={bar.h}>
                 <title>{`${group.full}, ${bar.name}: ${bar.full}`}</title>
               </rect>
@@ -101,7 +102,7 @@ export default function Chart({ spec }) {
   const exportVega = () => downloadVegaLite(traceId, resultId, spec.kind).then(saveFile).catch((e) => setError(e.message));
 
   return (
-    <div className="art art-chart">
+    <div className="art art-chart" ref={box}>
       <div className="art-head">
         <span className="art-label">{spec.title}</span>
         <span className="output-actions">
@@ -116,7 +117,7 @@ export default function Chart({ spec }) {
         </span>
       </div>
       {model ? (
-        <div className="chart-body" ref={box} role="img" aria-label={label}>
+        <div className="chart-body" role="img" aria-label={label}>
           {model.kind === "big_number" && (
             <p className="chart-big"><strong>{model.text}</strong><span title={model.full}>{model.label}</span></p>
           )}

@@ -44,7 +44,8 @@ export function niceTicks(min, max, count = 4) {
   const unit = raw / power;
   const step = (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power;
   const ticks = [];
-  for (let v = Math.floor(lo / step) * step; v <= Math.ceil(hi / step) * step + step / 1e6; v += step) {
+  const end = Math.ceil(hi / step) * step + step / 1e6;
+  for (let v = Math.floor(lo / step) * step; v <= end && ticks.length < 50; v += step) {
     ticks.push(Number(v.toFixed(10)));
   }
   return ticks;
@@ -123,8 +124,8 @@ function lines(spec, { width, height = 260 }) {
   const plot = { x0: 56, x1: width - 16, y0: 12, y1: height - 28 };
   const at = column(spec, spec.x);
   const rawX = spec.data.rows.map((r) => r[at]);
-  const times = rawX.map((v) => (typeof v === "string" || typeof v === "number" ? Date.parse(v) : NaN));
-  const temporal = times.length > 0 && times.every((t) => !Number.isNaN(t));
+  const times = rawX.map((v) => (typeof v === "string" ? Date.parse(v) : NaN));
+  const temporal = spec.x.kind === "temporal" && times.length > 0 && times.every((t) => !Number.isNaN(t));
   // A non-date x (a quarter label, a week number) is placed by its order of appearance.
   const distinct = [...new Set(rawX.map(String))];
   const position = rawX.map((v, i) => (temporal ? times[i] : distinct.indexOf(String(v))));

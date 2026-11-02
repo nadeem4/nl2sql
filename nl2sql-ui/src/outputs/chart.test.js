@@ -117,3 +117,17 @@ test("series beyond the fourth share the neutral slot rather than a fifth hue", 
   const m = chartModel({ ...line, data: { ...line.data, rows } }, { width: 640 });
   assert.deepEqual(m.lines.map((l) => l.slot), [1, 2, 3, 4, 5, 5]);
 });
+
+test("a numeric x is placed by order, not labelled as a date", () => {
+  const spec = { ...line, x: { ...line.x, kind: "quantitative" }, series: null,
+    y: [line.y[0]], data: { ...line.data, columns: ["n", "revenue"], rows: [[1, 10], [2, 20], [3, 30]] } };
+  spec.x = { ...spec.x, field: "n" };
+  spec.y = [{ ...line.y[0], field: "revenue" }];
+  const m = chartModel(spec, { width: 600 });
+  assert.deepEqual(m.xTicks.map((t) => t.label), ["1", "2", "3"]);
+});
+
+test("niceTicks stops on a huge or odd range", () => {
+  assert.ok(niceTicks(0, 1e300).length <= 50);
+  assert.ok(niceTicks(0, Number.MAX_VALUE).length <= 50);
+});

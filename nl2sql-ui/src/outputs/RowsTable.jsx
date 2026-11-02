@@ -70,6 +70,7 @@ function PagedResult({ requestId, summary, subQueries, view, onPage }) {
   const [page, setPage] = useState(empty);
   const [loading, setLoading] = useState(!empty);
   const [error, setError] = useState(null);
+  const [csvError, setCsvError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const resultId = summary.node_id;
   const offset = view.offset;
@@ -104,7 +105,7 @@ function PagedResult({ requestId, summary, subQueries, view, onPage }) {
         <span className="art-meta" id="rows-total">{rowCount(summary)}</span>
         {summary.row_count > 0 && (
           <button type="button" className="inspect-close art-download" id="rows-csv"
-            onClick={() => downloadCsv(requestId, resultId).then(saveFile).catch((e) => setError(e.message))}>
+            onClick={() => downloadCsv(requestId, resultId).then(saveFile).catch((e) => setCsvError(e.message))}>
             Download CSV
           </button>
         )}
@@ -121,6 +122,7 @@ function PagedResult({ requestId, summary, subQueries, view, onPage }) {
           </div>
         )
       )}
+      {csvError && <p className="rows-error" role="alert">Could not download the CSV. {csvError}</p>}
       {error && (
         <p className="rows-error" role="alert">
           Could not load these rows. {error}{" "}

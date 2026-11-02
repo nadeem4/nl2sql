@@ -22,7 +22,8 @@ export function inline(text) {
   return out;
 }
 
-const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+const cells = (line) =>
+  line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "").split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
 const isDivider = (line) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
 const alignOf = (cell) => (cell.endsWith(":") ? (cell.startsWith(":") ? "center" : "right") : cell.startsWith(":") ? "left" : null);
 
@@ -36,29 +37,37 @@ export function parseMarkdown(source) {
       i += 1;
       continue;
     }
-    const fence = line.match(/^```(\w*)\s*$/);
+    const fence = line.match(/^(`{3,})\s*([^\s`]*)[^`]*$/);
     if (fence) {
       const body = [];
       i += 1;
-      while (i < lines.length && !/^```\s*$/.test(lines[i])) body.push(lines[i++]);
+      const closes = (l) => /^(`{3,})\s*$/.test(l) && l.trim().length >= fence[1].length;
+      while (i < lines.length && !closes(lines[i])) body.push(lines[i++]);
       i += 1;
-      blocks.push({ type: "code", lang: fence[1], text: body.join("\n") });
+      blocks.push({ type: "code", lang: fence[2], text: body.join("\n") });
       continue;
     }
-    if (/^<details>\s*$/.test(line.trim())) {
+    const open = line.trim().match(/^<details\b[^>]*>\s*(<summary>(.*?)<\/summary>)?\s*$/);
+    if (open) {
       const body = [];
       i += 1;
       let depth = 1;
       while (i < lines.length) {
-        if (/^<details>\s*$/.test(lines[i].trim())) depth += 1;
+        if (/^<details\b[^>]*>/.test(lines[i].trim())) depth += 1;
         if (/^<\/details>\s*$/.test(lines[i].trim()) && --depth === 0) break;
         body.push(lines[i++]);
       }
       i += 1;
-      const first = body.findIndex((l) => l.trim());
-      const summary = first >= 0 ? body[first].match(/^\s*<summary>(.*)<\/summary>\s*$/) : null;
-      if (summary) body.splice(first, 1);
-      blocks.push({ type: "details", summary: summary ? summary[1] : "Details", blocks: parseMarkdown(body.join("\n")) });
+      let summary = open[2];
+      if (summary === undefined) {
+        const first = body.findIndex((l) => l.trim());
+        const m = first >= 0 ? body[first].match(/^\s*<summary>(.*)<\/summary>\s*$/) : null;
+        if (m) {
+          summary = m[1];
+          body.splice(first, 1);
+        }
+      }
+      blocks.push({ type: "details", summary: summary ?? "Details", blocks: parseMarkdown(body.join("\n")) });
       continue;
     }
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
@@ -90,9 +99,9 @@ export function parseMarkdown(source) {
       continue;
     }
     const text = [];
-    while (i < lines.length && lines[i].trim() && !/^(```|#{1,6}\s|<details>)/.test(lines[i]) && !/^\s*([-*]|\d+\.)\s+/.test(lines[i])) {
+    do {
       text.push(lines[i++].trim());
-    }
+    } while (i < lines.length && lines[i].trim() && !/^(```|#{1,6}\s|<details\b)/.test(lines[i]) && !/^\s*([-*]|\d+\.)\s+/.test(lines[i]));
     blocks.push({ type: "paragraph", text: text.join(" ") });
   }
   return blocks;
