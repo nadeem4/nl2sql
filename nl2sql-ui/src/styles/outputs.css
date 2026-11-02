@@ -1,0 +1,82 @@
+/* ---- Outputs ----
+   A chat tool's result: a chart, a diagram or a report, each a card in the same frame as the rows (artifacts.css).
+   The charts are SVG drawn from a ChartSpec (outputs/chart.js). Four series colours, then one neutral for every series
+   after them; each holds 3:1 on --raised in both themes (outputs/palette.test.js), and the legend names every series,
+   so colour is never the only way to tell one from another. */
+
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #6250d6;
+  --series-4: #12915f;
+  --series-5: var(--ink-3);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #9085e9;
+    --series-4: #199e70;
+  }
+}
+
+.tool-output { margin: 0; }
+.tool-output .art-label, .tool-output .art-meta { overflow-wrap: anywhere; }
+.output-actions { margin-left: auto; display: flex; gap: var(--sp-1); }
+.output-actions .inspect-close { margin-left: 0; }
+.output-error { margin: 0; padding: var(--sp-3) var(--sp-5); font-size: var(--fs-2); color: var(--fault); }
+
+/* Chart */
+.chart-body { padding: var(--sp-3) var(--sp-5) var(--sp-2); min-width: 0; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-svg text { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+.chart-svg .cat { font-family: var(--sans); font-size: var(--fs-1); fill: var(--ink); }
+.chart-svg .val { fill: var(--ink); }
+.chart-grid { stroke: var(--hair); stroke-width: 1; }
+.chart-axis { stroke: var(--rule-strong); stroke-width: 1; }
+.s1 { --c: var(--series-1); }
+.s2 { --c: var(--series-2); }
+.s3 { --c: var(--series-3); }
+.s4 { --c: var(--series-4); }
+.s5 { --c: var(--series-5); }
+.chart-line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { fill: var(--c); stroke: var(--raised); stroke-width: 2; }
+.chart-bar { fill: var(--c); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); margin: var(--sp-2) 0 0; padding: 0; list-style: none; }
+.chart-legend li { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-1); color: var(--ink-2); }
+.chart-legend i { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
+.chart-big { margin: 0; padding: var(--sp-5) 0 var(--sp-3); }
+.chart-big strong { display: block; font-size: var(--fs-6); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.1; }
+.chart-big span { font-size: var(--fs-1); color: var(--ink-3); }
+.chart-takeaway { margin: 0; padding: var(--sp-2) var(--sp-5) var(--sp-3); font-size: var(--fs-3); color: var(--ink); }
+.chart-reason { margin-right: auto; }
+
+/* Diagram */
+.mermaid-body { padding: var(--sp-4) var(--sp-5); overflow: auto; max-height: 560px; }
+.mermaid-body svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.mermaid-wait { padding: var(--sp-5); font-size: var(--fs-2); color: var(--ink-3); }
+.mermaid-source { margin: 0; padding: var(--sp-3) var(--sp-5); border-top: 1px solid var(--hair); font-size: var(--fs-1); overflow: auto; background: var(--surface); }
+
+/* Report */
+.report-body { padding: var(--sp-4) var(--sp-5); font-size: var(--fs-3); line-height: 1.6; overflow-wrap: anywhere; }
+.report-body > :first-child { margin-top: 0; }
+.report-body h3, .report-body h4, .report-body h5, .report-body h6 { margin: var(--sp-5) 0 var(--sp-2); line-height: 1.25; }
+.report-body h3 { font-size: var(--fs-5); }
+.report-body h4 { font-size: var(--fs-4); }
+.report-body h5, .report-body h6 { font-size: var(--fs-3); }
+.report-body p, .report-body ul, .report-body ol { margin: 0 0 var(--sp-3); }
+.report-body ul, .report-body ol { padding-left: var(--sp-5); }
+.report-body code { font-family: var(--mono); font-size: .9em; background: var(--well); padding: 1px 4px; border-radius: 4px; }
+.report-body pre { margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-well); overflow: auto; font-family: var(--mono); font-size: var(--fs-2); line-height: 1.6; }
+.report-body pre code { background: none; padding: 0; }
+.report-body details { margin: 0 0 var(--sp-3); border: 1px solid var(--hair); border-radius: var(--r-well); padding: var(--sp-2) var(--sp-4); }
+.report-body summary { cursor: pointer; font-weight: var(--fw-medium); }
+.report-table { margin: 0 0 var(--sp-3); overflow: auto; }
+.report-table table { border-collapse: collapse; font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
+.report-table th, .report-table td { padding: var(--sp-1) var(--sp-4); border-bottom: 1px solid var(--hair); text-align: left; white-space: nowrap; }
+.report-table th { font-family: var(--mono); font-weight: var(--fw-regular); font-size: var(--fs-1); color: var(--ink-2); border-bottom-color: var(--rule); }
+
+@media (max-width: 640px) {
+  .chart-body, .mermaid-body, .report-body { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  .chart-takeaway { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+}

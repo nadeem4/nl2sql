@@ -104,6 +104,8 @@ nav:
     - Diagrams: charts/diagrams.md
   - Dashboards:
     - Dashboards: dashboards/index.md
+  - Apps:
+    - Web app: apps/web.md
   - Configuration:
     - Configuration System: configuration/system.md
     - Datasources: configuration/datasources.md

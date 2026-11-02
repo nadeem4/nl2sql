@@ -1,0 +1,27 @@
+{
+  "data": {
+    "columns": [
+      "n"
+    ],
+    "result_id": "sq1",
+    "rows": [
+      [
+        59
+      ]
+    ],
+    "trace_id": "trace-0001-fixture",
+    "truncated": false
+  },
+  "kind": "big_number",
+  "reason": "one row and one number",
+  "series": null,
+  "takeaway": null,
+  "title": "How many customers?",
+  "value": {
+    "field": "n",
+    "kind": "number",
+    "title": "N"
+  },
+  "x": null,
+  "y": []
+}
