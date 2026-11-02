@@ -1,8 +1,8 @@
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { barShares, firstNumericColumn, numericColumns } from "../lib/artifacts.js";
+import { downloadCsv, getResultPage, saveFile } from "../api/outputs.js";
 import {
-  PAGE_SIZE, csvUrl, firstPage, initialView, pageNav, pageRange, resultTabs, rowCount, rowsView, truncatedNotice,
-  viewUrl,
+  PAGE_SIZE, firstPage, initialView, pageNav, pageRange, resultTabs, rowCount, rowsView, truncatedNotice,
 } from "./results.js";
 
 // A run's saved results as a card: one tab per result when there are several,
@@ -65,39 +65,36 @@ function Grid({ columns, rows, busy = false }) {
 // loads, so Next never blanks the card.
 // `view` (results.js, `rowsView`) says which result and which offset; a new
 // result remounts this, so no page of the last one is shown under its tab.
-function PagedResult({ requestId, role, summary, subQueries, view, onPage }) {
+function PagedResult({ requestId, summary, subQueries, view, onPage }) {
   const empty = firstPage(summary);
   const [page, setPage] = useState(empty);
   const [loading, setLoading] = useState(!empty);
   const [error, setError] = useState(null);
+  const [csvError, setCsvError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const resultId = summary.node_id;
   const offset = view.offset;
 
   useEffect(() => {
     if (empty) return undefined;
-    const controller = new AbortController();
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(viewUrl(requestId, view, role, PAGE_SIZE), { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          const reply = await response.json().catch(() => ({}));
-          throw new Error(typeof reply.detail === "string" ? reply.detail : `The server answered ${response.status}.`);
-        }
-        return response.json();
-      })
+    getResultPage(requestId, resultId, offset, PAGE_SIZE)
       .then((next) => {
+        if (cancelled) return;
         setPage(next);
         setLoading(false);
       })
       .catch((e) => {
-        if (e.name === "AbortError") return;
+        if (cancelled) return;
         setError(e.message);
         setLoading(false);
       });
-    return () => controller.abort();
-  }, [requestId, role, resultId, offset, attempt]);
+    return () => {
+      cancelled = true;
+    };
+  }, [requestId, resultId, offset, attempt]);
 
   const cut = truncatedNotice(summary, subQueries);
   const nav = page ? pageNav(page) : { prev: null, next: null };
@@ -107,9 +104,10 @@ function PagedResult({ requestId, role, summary, subQueries, view, onPage }) {
         <span className="art-label">Result</span>
         <span className="art-meta" id="rows-total">{rowCount(summary)}</span>
         {summary.row_count > 0 && (
-          <a className="inspect-close art-download" id="rows-csv" href={csvUrl(requestId, resultId, role)} download>
+          <button type="button" className="inspect-close art-download" id="rows-csv"
+            onClick={() => downloadCsv(requestId, resultId).then(saveFile).catch((e) => setCsvError(e.message))}>
             Download CSV
-          </a>
+          </button>
         )}
       </div>
       {cut && <p className="rows-cut" id="rows-truncated">{cut}</p>}
@@ -124,6 +122,7 @@ function PagedResult({ requestId, role, summary, subQueries, view, onPage }) {
           </div>
         )
       )}
+      {csvError && <p className="rows-error" role="alert">Could not download the CSV. {csvError}</p>}
       {error && (
         <p className="rows-error" role="alert">
           Could not load these rows. {error}{" "}
@@ -163,10 +162,8 @@ export function SampleRows({ rows }) {
 }
 
 // The rows a run saved, read from `result_manifest`. A tab per result only
-// when there is more than one; a tab opens on its result's first page. `role`
-// is the role the run was asked as: the server serves an anonymous run's rows
-// to that role only.
-export default function RowsTable({ result, role }) {
+// when there is more than one; a tab opens on its result's first page.
+export default function RowsTable({ result }) {
   const manifest = result.result_manifest || [];
   const tabs = resultTabs(manifest);
   const [view, dispatch] = useReducer(rowsView, manifest, initialView);
@@ -203,7 +200,7 @@ export default function RowsTable({ result, role }) {
       )}
       <div id="rows-panel" role={tabs.length ? "tabpanel" : undefined}
         aria-labelledby={tabs.length ? `rows-tab-${tabs.findIndex((t) => t.id === summary.node_id)}` : undefined}>
-        <PagedResult key={summary.node_id} requestId={result.trace_id} role={role} summary={summary}
+        <PagedResult key={summary.node_id} requestId={result.trace_id} summary={summary}
           subQueries={result.sub_queries} view={{ ...view, active: summary.node_id }}
           onPage={(offset) => dispatch({ type: "page", offset })} />
       </div>

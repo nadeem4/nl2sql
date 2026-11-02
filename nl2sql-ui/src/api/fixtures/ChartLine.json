@@ -1,0 +1,66 @@
+{
+  "data": {
+    "columns": [
+      "month",
+      "region",
+      "revenue"
+    ],
+    "result_id": "sq1",
+    "rows": [
+      [
+        "2025-01-01",
+        "East",
+        1200
+      ],
+      [
+        "2025-01-01",
+        "West",
+        900
+      ],
+      [
+        "2025-02-01",
+        "East",
+        1500
+      ],
+      [
+        "2025-02-01",
+        "West",
+        1100
+      ],
+      [
+        "2025-03-01",
+        "East",
+        1450
+      ],
+      [
+        "2025-03-01",
+        "West",
+        1700
+      ]
+    ],
+    "trace_id": "trace-0001-fixture",
+    "truncated": false
+  },
+  "kind": "line",
+  "reason": "one date column, one number and one category",
+  "series": {
+    "field": "region",
+    "kind": "text",
+    "title": "Region"
+  },
+  "takeaway": "West overtook East in March.",
+  "title": "Revenue by month per region",
+  "value": null,
+  "x": {
+    "field": "month",
+    "kind": "temporal",
+    "title": "Month"
+  },
+  "y": [
+    {
+      "field": "revenue",
+      "kind": "number",
+      "title": "Revenue"
+    }
+  ]
+}

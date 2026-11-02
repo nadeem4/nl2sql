@@ -14,6 +14,7 @@ function callsIn(source) {
   const found = [];
   for (const m of source.matchAll(/\brequest\(\s*"([A-Z]+)"\s*,\s*([`"])([^`"]+)\2/g)) found.push([m[1], m[3]]);
   for (const m of source.matchAll(/\bstream\(\s*([`"])([^`"]+)\1[^\n]*\/\/\s*(GET|POST)\b/g)) found.push([m[3], m[2]]);
+  for (const m of source.matchAll(/\bdownload\(\s*([`"])([^`"]+)/g)) found.push(["GET", m[2]]);
   return found.map(([method, path]) => [method, path.replace(/\$\{[^}]*\}/g, "{}").replace(/\?.*$/, "")]);
 }
 
@@ -28,9 +29,11 @@ test("callsIn reads the calls a client file makes", () => {
     'request("POST", "/jobs/index", body);',
     "stream(`/jobs/${id}/events`, undefined, onEvent); // GET",
     'request("GET", `/dashboards?workspace=${w}`);',
+    'download(`/results/${t}/${r}.csv`);',
   ].join("\n");
   assert.deepEqual(callsIn(source), [
     ["GET", "/jobs/{}"], ["POST", "/jobs/index"], ["GET", "/dashboards"], ["GET", "/jobs/{}/events"],
+    ["GET", "/results/{}/{}.csv"],
   ]);
 });
 
@@ -38,8 +41,8 @@ test("the contract's paths are written under /api/v1", () => {
   assert.ok(contractPaths.has(`${BASE}/jobs/{}`));
 });
 
-// Every request( or stream( call in a source text, whether callsIn could read it or not.
-const callCount = (source) => (source.match(/\b(request|stream)\(/g) || []).length;
+// Every request(, stream( or download( call in a source text, whether callsIn could read it or not.
+const callCount = (source) => (source.match(/\b(request|stream|download)\(/g) || []).length;
 
 test("callCount sees a call callsIn cannot read", () => {
   const source = 'request("GET", path);\nstream(`/a`, undefined, f);';

@@ -1,0 +1,22 @@
+{
+  "columns": [
+    "genre",
+    "tracks"
+  ],
+  "limit": 2,
+  "next_offset": 2,
+  "offset": 0,
+  "request_id": "trace-0001-fixture",
+  "result_id": "sq1",
+  "rows": [
+    [
+      "Rock",
+      1297
+    ],
+    [
+      "Latin",
+      579
+    ]
+  ],
+  "total_rows": 4
+}

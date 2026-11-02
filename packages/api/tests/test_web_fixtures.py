@@ -1,4 +1,4 @@
-"""The golden files the web app's node tests read: ``ApiError``, ``Job``, ``QueryResult``, ``Turn``, the ``Dashboard`` and
+"""The golden files the web app's node tests read: ``ApiError``, ``Job``, ``QueryResult``, ``Turn``, the ``ChartSpec``s (a line of two series, a bar, a big number) and a ``ResultPage``, the ``Dashboard`` and
 ``DashboardView``, the ``Proposal``, the ``DriftReport`` (a ``drifted`` one with its diff and impact, and an ``unchanged`` one),
 an eval ``Job`` (its result an ``EvalReport``) and ``/meta`` for a signed-in caller (docs/architecture/wave_d.md, "Testing").
 
@@ -16,7 +16,7 @@ from itertools import count
 from dashboard_stubs import AT, Recorder, dashboard, view
 from fastapi.testclient import TestClient
 
-from nl2sql import ApprovalRequest, QueryResult, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
+from nl2sql import ApprovalRequest, ChartData, ChartSpec, Encoding, QueryResult, ResultPage, RowSample, SubQueryResult, ToolCall, ToolStep, Turn, UserContext
 from nl2sql.testing.config import make_config
 from nl2sql import DatasourceInfo, DriftReport, EvalReport, Proposal
 from nl2sql.schema.impact import DriftImpact, ImpactedQuery
@@ -69,7 +69,45 @@ def build() -> dict:
                                             question=text, trace_id="trace-0001-fixture")],
                             status="answered", trace_id="trace-0001-turn")
 
+        def encoding(field, kind):
+            return Encoding(field=field, kind=kind, title=field.replace("_", " ").capitalize())
+
+        def data(columns, rows, truncated=False):
+            return ChartData(trace_id="trace-0001-fixture", result_id="sq1", columns=columns, rows=rows,
+                             truncated=truncated)
+
+        charts = {
+            "line": ChartSpec(
+                kind="line", title="Revenue by month per region", x=encoding("month", "temporal"),
+                y=[encoding("revenue", "number")], series=encoding("region", "text"),
+                data=data(["month", "region", "revenue"], [
+                    ["2025-01-01", "East", 1200], ["2025-01-01", "West", 900], ["2025-02-01", "East", 1500],
+                    ["2025-02-01", "West", 1100], ["2025-03-01", "East", 1450], ["2025-03-01", "West", 1700]]),
+                takeaway="West overtook East in March.", reason="one date column, one number and one category"),
+            "bar": ChartSpec(
+                kind="bar", title="Top genres by tracks", x=encoding("genre", "text"), y=[encoding("tracks", "number")],
+                data=data(["genre", "tracks"], [["Rock", 1297], ["Latin", 579], ["Metal", 374], ["Jazz", 130]],
+                          truncated=True),
+                takeaway="Rock has more tracks than the next two genres together.",
+                reason="one category and one number"),
+            "big_number": ChartSpec(
+                kind="big_number", title="How many customers?", value=encoding("n", "number"),
+                data=data(["n"], [[59]]), reason="one row and one number"),
+        }
+
+        class Results:
+            @staticmethod
+            def chart(trace_id, result_id, *, user_context, kind=None):
+                return charts[kind or "line"]
+
+            @staticmethod
+            def page(trace_id, result_id, *, user_context, offset=0, limit=100):
+                return ResultPage(request_id=trace_id, result_id=result_id, columns=["genre", "tracks"],
+                                  rows=[["Rock", 1297], ["Latin", 579]], offset=offset, limit=limit, total_rows=4,
+                                  next_offset=2)
+
         class Engine:
+            results = Results()
             config = make_config(pathlib.Path(folder), api={"auth": "static", "static_role": "analyst"})
             conversations = Conversations()
             dashboards = Recorder()
@@ -135,6 +173,9 @@ def build() -> dict:
                 time.sleep(0.005)
             meta = client.get("/api/v1/meta")
             assert meta.status_code == 200 and "datasources" in meta.json(), meta.text
+            chart_url = "/api/v1/results/trace-0001-fixture/sq1/chart"
+            page = client.get("/api/v1/results/trace-0001-fixture/sq1?limit=2")
+            assert page.status_code == 200, page.text
             turn = client.post("/api/v1/conversations/conv-0001/turns", json={"text": "How many customers are there?"})
             assert turn.status_code == 200, turn.text
             waiting = {name: client.post("/api/v1/conversations/conv-0001/turns", json={"text": text}).json()
@@ -144,6 +185,10 @@ def build() -> dict:
                     "QueryResult.json": answer.json(), "Turn.json": turn.json(),
                     "Dashboard.json": client.put("/api/v1/dashboards/d1/title", json={"title": "Sales overview"}).json(),
                     "DashboardView.json": client.get("/api/v1/dashboards/d1").json(),
+                    "ChartLine.json": client.get(chart_url).json(),
+                    "ChartBar.json": client.get(chart_url, params={"kind": "bar"}).json(),
+                    "ChartBigNumber.json": client.get(chart_url, params={"kind": "big_number"}).json(),
+                    "ResultPage.json": page.json(),
                     "Proposal.json": client.get("/api/v1/proposals/p-1").json(),
                     "DriftReport.json": client.get("/api/v1/index/check").json()[0],
                     "DriftReportUnchanged.json": client.get("/api/v1/index/check").json()[1]}
