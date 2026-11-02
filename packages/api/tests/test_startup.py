@@ -3,7 +3,7 @@
 docs/architecture/configuration_v2.md, "Lifecycle" and the ``nl2sql-api`` row of
 "Impact on the consumers": the lifespan loads the ``.env`` next to
 ``NL2SQL_CONFIG``'s file (never overriding a variable already set), builds the
-engine with ``NL2SQL.from_config()``, and refuses to start on ``EngineNotReady``.
+engine with ``NL2SQL.from_config()``, and starts even when a required datasource fails (``/ready`` then says not ready).
 """
 import os
 import sqlite3
@@ -11,7 +11,6 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from nl2sql import EngineNotReady
 from nl2sql.testing.config import make_config
 from nl2sql_api.main import app
 
@@ -27,12 +26,21 @@ def _project(tmp_path, *, required):
     return tmp_path / "nl2sql.yaml"
 
 
-def test_entry_points_refuse_to_start_when_a_required_datasource_fails(tmp_path, monkeypatch):
-    monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=True)))
+def test_the_api_starts_with_a_failed_required_datasource_and_is_not_ready(tmp_path, monkeypatch):
+    """D208: a restart loop would hide the reason; the API serves, `/ready` is 503 and an admin reads why."""
+    from nl2sql_api.routes import health
 
-    with pytest.raises(EngineNotReady, match="lost"):
-        with TestClient(app):
-            pass
+    monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=True)))
+    health.forget_ready()
+    try:
+        with TestClient(app) as client:
+            assert client.get("/api/v1/health").status_code == 200
+            ready = client.get("/api/v1/ready")
+            assert ready.status_code == 503 and ready.json()["status"] == "not_ready"
+    finally:
+        health.forget_ready()
+        if hasattr(app.state, "engine"):
+            del app.state.engine
 
 
 def test_the_api_starts_degraded_from_its_config_and_loads_the_env_file(tmp_path, monkeypatch):

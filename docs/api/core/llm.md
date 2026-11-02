@@ -90,6 +90,14 @@ Signature:
 The `questions` the `replay` provider can answer from its recordings, in the order asked. See
 [the `replay` provider](../../configuration/llm.md#replay-recorded-answers-no-key).
 
+### llm.recorded_with
+
+Signature:
+`recorded_with() -> dict | None`
+
+`{"provider", "model"}` the `replay` provider's recordings were made with, or `None` when the recordings name no
+model. The start screen says which model its keyless answers came from.
+
 ### llm.providers
 
 Signature:
@@ -162,7 +170,7 @@ Raises:
   registered or not installed, an agent whose API key does not resolve, or,
   with `settings.pipeline.max_cost_usd` set, a model with no price.
   Nothing changes. `nl2sql-api` answers it as HTTP 422 with the same text
-  ([`PUT /api/v1/settings/llm`](../rest/llm.md)).
+  ([`PUT /api/v1/settings/llm`](../rest/settings.md)).
 
 Side Effects:
 - Builds the new clients (no model call), then swaps the engine's `LLMSet`

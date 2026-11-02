@@ -72,6 +72,13 @@ class LLMAPI:
         """
         return self._ctx.registry.load("llm", "replay").store.covered(questions)
 
+    def recorded_with(self) -> Optional[Dict[str, Optional[str]]]:
+        """``{"provider", "model"}`` the ``replay`` provider's recordings were made with, or None when unknown.
+
+        The demo's start screen says which model the keyless answers came from.
+        """
+        return self._ctx.registry.load("llm", "replay").store.recorded_with
+
     def prices(self) -> Dict[str, Any]:
         """The prices every model call is costed with: the dated table with ``llm.prices`` applied.
 

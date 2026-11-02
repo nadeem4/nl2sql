@@ -394,7 +394,8 @@ error is one envelope, `{"error": {"code", "message", "fix", "details", "request
 
 The routes that change the process (`POST /api/v1/datasources`, `DELETE /api/v1/datasources/{id}`, and the
 Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasources/test`,
-`PUT /api/v1/settings/llm`, `POST /api/v1/jobs/index`, `POST /api/v1/jobs/profile`, `DELETE /api/v1/index`,
+`PUT /api/v1/settings/llm`, the `/api/v1/api-keys` and `/api/v1/evals` routes, `POST /api/v1/jobs/index`,
+`POST /api/v1/jobs/profile`, `POST /api/v1/jobs/eval`, `POST /api/v1/jobs/demo`, `DELETE /api/v1/index`,
 `GET /api/v1/index/check`, `POST /api/v1/knowledge/reload` and every `/proposals` route)
 also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403.
 
@@ -424,9 +425,18 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `GET` | `/api/v1/conversations/{conversation_id}/report` | The conversation as a Markdown report |
 | `GET` | `/api/v1/chat-tools` | The chat tools a conversation can use |
 | `GET` | `/api/v1/health` | Liveness check |
-| `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
-| `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller |
+| `GET` | `/api/v1/ready` | Readiness from the engine's check, kept 10 s: `200 ready` or `503 not_ready` (an admin also gets `problems`) |
+| `GET` | `/api/v1/meta` | The mode, the identity source and whether callers may send their own LLM; needs no caller. With a caller: the datasources, which questions are recorded, and `recorded_with` |
 | `GET` | `/api/v1/about` | What the engine is: version and pipeline steps |
+| `GET` | `/api/v1/events/catalog` | Every event the engine publishes, with its data's JSON Schema |
+| `GET` | `/api/v1/llm/providers` | The LLM providers: key present, verified models, the shape a key must have |
+| `GET` | `/api/v1/api-keys` | List API keys, revoked ones included, never a token (admin) |
+| `POST` | `/api/v1/api-keys` | Create a key for a user and roles; the token is returned once (admin, `201`) |
+| `DELETE` | `/api/v1/api-keys/{key_id}` | Revoke a key (admin, `204`) |
+| `GET` | `/api/v1/evals/suites` | The configured eval suites and their case counts (admin) |
+| `GET` | `/api/v1/evals/scorers` | The registered scorer names (admin) |
+| `POST` | `/api/v1/jobs/eval` | Start an eval run (admin, `202`): `suites`, `mode`, `cases`; `full` needs a cost cap |
+| `POST` | `/api/v1/jobs/demo` | Start the demo job (admin, `202`): add the sample databases and index them |
 | `GET` | `/api/v1/jobs` | The caller's background jobs, newest first (an admin sees all, without their results) |
 | `GET` | `/api/v1/jobs/{job_id}` | One job: status, progress, result or error |
 | `DELETE` | `/api/v1/jobs/{job_id}` | Cancel a queued or running job |

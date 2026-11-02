@@ -285,6 +285,72 @@ def test_add_demo_persists_the_verified_queries_and_the_glossary_source(tmp_path
         assert len(engine._runtime.config.knowledge) == 2
 
 
+def test_add_demo_keeps_every_comment_in_the_files_it_edits(tmp_path, monkeypatch):
+    _no_build(monkeypatch)
+    project = tmp_path / "p"
+    nl2sql.config.init_project(project, demo=False, provider="replay")
+    knowledge, toc = project / "knowledge.yaml", project / "nl2sql.yaml"
+    knowledge.write_text(knowledge.read_text(encoding="utf-8").replace("path: glossary.yaml",
+                                                                       "path: glossary.yaml  # ours"), encoding="utf-8")
+    toc.write_text(toc.read_text(encoding="utf-8") + "# keep me\n", encoding="utf-8")
+    with _project_engine(project) as engine:
+        engine.add_demo()
+
+    assert "path: glossary.yaml  # ours" in knowledge.read_text(encoding="utf-8")
+    assert "# The knowledge sources" in knowledge.read_text(encoding="utf-8")
+    assert "# keep me" in toc.read_text(encoding="utf-8")
+    with _project_engine(project) as engine:
+        assert len(engine._runtime.config.knowledge) == 2
+
+
+@pytest.mark.parametrize("changed", ["nl2sql.yaml", "knowledge.yaml"])
+def test_add_demo_refuses_a_config_file_that_changed_since_the_engine_loaded_it(tmp_path, monkeypatch, changed):
+    from nl2sql.review.models import ReviewError, ReviewErrorCode
+
+    _no_build(monkeypatch)
+    project = tmp_path / "p"
+    nl2sql.config.init_project(project, demo=False, provider="replay")
+    with _project_engine(project) as engine:
+        (project / changed).write_text((project / changed).read_text(encoding="utf-8") + "# edited by hand\n",
+                                       encoding="utf-8")
+        before = {p.name: p.read_bytes() for p in project.rglob("*.yaml")}
+        known = engine.datasources.list()
+        with pytest.raises(ReviewError) as refused:
+            engine.add_demo()
+
+        assert refused.value.code == ReviewErrorCode.FILE_CHANGED and refused.value.status == 409
+        assert engine.datasources.list() == known and engine._runtime.config.curated is None  # nothing was added
+    assert {p.name: p.read_bytes() for p in project.rglob("*.yaml")} == before
+
+
+def test_a_second_engine_on_the_same_project_cannot_add_the_demo_twice(tmp_path, monkeypatch):
+    from nl2sql.review.models import ReviewError
+
+    _no_build(monkeypatch)
+    project = tmp_path / "p"
+    nl2sql.config.init_project(project, demo=False, provider="replay")
+    with _project_engine(project) as first, _project_engine(project) as second:
+        first.add_demo()
+        with pytest.raises(ReviewError):
+            second.add_demo()
+    lines = (project / "nl2sql.yaml").read_text(encoding="utf-8").splitlines()
+    assert sum(line.startswith("curated:") for line in lines) == 1
+
+
+def test_add_demo_never_writes_a_second_curated_key(tmp_path, monkeypatch):
+    _no_build(monkeypatch)
+    project = tmp_path / "p"
+    nl2sql.config.init_project(project, demo=False, provider="replay")
+    toc = project / "nl2sql.yaml"
+    toc.write_text(toc.read_text(encoding="utf-8") + "curated:\n", encoding="utf-8")  # a key with no body yet
+    with _project_engine(project) as engine:
+        engine.add_demo()
+        assert engine._runtime.config.curated.datasources["chinook"].verified_queries  # in memory
+
+    lines = toc.read_text(encoding="utf-8").splitlines()
+    assert sum(line.startswith("curated:") for line in lines) == 1
+
+
 def test_add_demo_on_a_demo_project_accepts_its_own_copies_and_leaves_curated_alone(tmp_path, monkeypatch):
     _no_build(monkeypatch)
     nl2sql.config.init_project(tmp_path / "p", demo=True, provider="replay")  # has curated.yaml and data/*.db

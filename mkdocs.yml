@@ -190,7 +190,8 @@ nav:
       - Traces and feedback: api/rest/feedback.md
       - Approvals: api/rest/approvals.md
       - Datasources: api/rest/datasources.md
-      - LLM: api/rest/llm.md
+      - Settings and API keys: api/rest/settings.md
+      - Evals: api/rest/evals.md
       - Indexing: api/rest/indexing.md
       - Knowledge: api/rest/knowledge.md
       - Dashboards: api/rest/dashboards.md

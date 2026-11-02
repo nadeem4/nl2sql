@@ -207,7 +207,7 @@ When the engine was loaded from a `nl2sql.yaml` all of it is saved there and is 
 there after a restart: each database under `datasources/`, the verified queries in
 `curated.yaml` (with a `curated:` line in `nl2sql.yaml` if the project had none), and
 the glossary as a second source in `knowledge.yaml`. A section written inline in
-`nl2sql.yaml` is left alone. An engine built in code has no file, so for it the
+`nl2sql.yaml` is left alone. The files are appended to, never rewritten, so your comments stay, and a file you edited since the engine loaded it is refused (`changed on disk`) with nothing added. An engine built in code has no file, so for it the
 verified queries and the glossary are added to that engine only and `add_demo` has to
 run again after a restart. An id such as `chinook` that is already a database of
 yours (another file, even one named `chinook.db`) is refused with a `DatasourceExists`

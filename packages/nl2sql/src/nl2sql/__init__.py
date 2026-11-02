@@ -27,6 +27,7 @@ _EXPORTS = {
     "nl2sql.common.logger": ("configure_logging", "TraceContextFilter"),
     # Wave A: events, the run's stop and approval shapes.
     "nl2sql_sdk.events": ("Event", "Observer"),
+    "nl2sql.events.catalog": ("EventInfo",),
     "nl2sql.limits": ("RunStop",),
     "nl2sql.hooks.approval": ("ApprovalRequest", "Approval", "VerifiedRef"),
     "nl2sql.approvals.api": ("ApprovalRecord",),
@@ -224,6 +225,7 @@ __all__ = [
     "Found",
     "DiscoverableAdapter",
     "ApiKey",
+    "EventInfo",
     "ConversationNotFound",
     "ConversationBusy",
     "DashboardNotFound",

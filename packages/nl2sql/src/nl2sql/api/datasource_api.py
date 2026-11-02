@@ -26,6 +26,11 @@ from nl2sql.runtime import Runtime
 _SAVING = threading.Lock()
 
 
+def _has_key(text: str, key: str) -> bool:
+    """Whether ``text`` already has a top-level ``key:`` line (even one with no body)."""
+    return any(line.startswith(f"{key}:") for line in text.splitlines())
+
+
 class DatasourcesAPI:
     """``engine.datasources``. Internal: reach it through ``NL2SQL``."""
 
@@ -100,7 +105,9 @@ class DatasourcesAPI:
         that engine only. It keeps the engine's
         LLM provider: with no key, ``provider: replay`` answers the guided questions.
         ``on_datasource`` goes to ``index.build`` (an ``IndexProgress`` per
-        datasource). With ``user_context`` the caller needs an admin role.
+        datasource). With ``user_context`` the caller needs an admin role. Each file it writes is checked against the
+        hash read at load (a file edited since is a ``ConfigError``, so nothing is added) and is appended to as text,
+        so its comments stay.
 
         Returns:
             The ``RebuildResult`` of the build over the demo's datasources.
@@ -127,6 +134,8 @@ class DatasourcesAPI:
                 raise DatasourceExists(
                     f"A datasource with the id '{datasource.id}' is already configured and is not the demo's "
                     "database. Rename or remove it before adding the demo.")
+        for label in self._demo_files():
+            self._unchanged(label)  # before anything is added: a stale engine adds nothing
         added = []
         for datasource in demo.datasources:
             if datasource.id not in have:
@@ -143,7 +152,6 @@ class DatasourcesAPI:
 
     def _add_demo_curated(self, Curated: Any, demo_curated: Dict[str, Any]) -> None:
         """Merge the demo's verified queries into ``curated``: written to the section's file when the engine has one."""
-        from nl2sql.config.writer import write_atomic
         from nl2sql.review.curated_file import curated_path, write_curated
 
         config = self._ctx.config
@@ -155,12 +163,11 @@ class DatasourcesAPI:
         sha256 = self._ctx.curated_sha256
         toc = Path(config.folder) / "nl2sql.yaml" if config.folder is not None else None
         path = curated_path(config)
-        if path is None and config.curated is None and toc is not None and toc.is_file():
+        if (path is None and config.curated is None and toc is not None and toc.is_file()
+                and not _has_key(toc.read_text(encoding="utf-8"), "curated")):
             path = Path(config.folder) / "curated.yaml"  # a project with no curated section yet: give it one
             sha256 = write_curated(path, merged, None)
-            text = toc.read_text(encoding="utf-8")
-            addition = "curated:     { file: curated.yaml }\n"
-            write_atomic(toc, (text if text.endswith("\n") else text + "\n").encode("utf-8") + addition.encode("utf-8"))
+            self._append("nl2sql.yaml", "curated:     { file: curated.yaml }\n")
         elif path is not None:
             sha256 = write_curated(path, merged, sha256)
         self._ctx.replace_curated(merged, sha256=sha256)
@@ -169,8 +176,6 @@ class DatasourcesAPI:
         """Copy the demo glossary into the project and add it as a ``yaml`` source: listed in the ``knowledge``
         section's file when the engine has one, so a restart keeps it."""
         import shutil
-
-        from nl2sql.config.writer import dump_yaml, write_atomic
 
         config = self._ctx.config
         folder = Path(config.folder or config.storage.path)
@@ -187,14 +192,64 @@ class DatasourcesAPI:
             shutil.copyfile(packaged, copy)
         file = config.locate("knowledge")[0] if config.folder is not None else "nl2sql.yaml"
         target = folder / file
-        if file != "nl2sql.yaml" and target.is_file():
-            text = target.read_text(encoding="utf-8")
-            entries = yaml.safe_load(text) or []
-            comments = "".join(line + "\n" for line in text.splitlines() if line.startswith("#"))
-            write_atomic(target, (comments + dump_yaml([*entries, {"type": "yaml", "path": copy.name}])).encode("utf-8"))
+        if file != "nl2sql.yaml" and target.is_file() and self._append_entry(file, target, copy.name):
             self._ctx.add_knowledge_source(KnowledgeSourceConfig(type="yaml", path=copy.name))
         else:
             self._ctx.add_knowledge_source(KnowledgeSourceConfig(type="yaml", path=copy.as_posix()))
+
+    def _append_entry(self, label: str, target: Path, name: str) -> bool:
+        """Add ``- type: yaml`` and ``path: <name>`` to the end of the knowledge file, as text, so every comment stays.
+        False (nothing written) when the file is not a block list a line can be added to, such as ``[]``."""
+        entry = f"- type: yaml\n  path: {name}\n"
+        with _SAVING:
+            self._unchanged(label)
+            text = target.read_bytes().decode("utf-8")
+            candidate = (text if not text or text.endswith("\n") else text + "\n") + entry
+            try:
+                fits = yaml.safe_load(candidate) == [*(yaml.safe_load(text) or []), {"type": "yaml", "path": name}]
+            except yaml.YAMLError:
+                fits = False
+            if fits:
+                self._write_file(label, target, candidate)
+        return fits
+
+    def _append(self, label: str, line: str) -> None:
+        """Add ``line`` to the end of ``nl2sql.yaml`` (or another config file), keeping the rest as it is."""
+        target = Path(self._ctx.config.folder) / label
+        with _SAVING:
+            self._unchanged(label)
+            text = target.read_bytes().decode("utf-8")
+            self._write_file(label, target, (text if text.endswith("\n") else text + "\n") + line)
+
+    def _write_file(self, label: str, target: Path, text: str) -> None:
+        from nl2sql.config.writer import write_atomic
+        from nl2sql.review.models import ReviewError, ReviewErrorCode
+
+        data = text.encode("utf-8")
+        try:
+            write_atomic(target, data)
+        except OSError:  # the cause (a path, a permission) stays out of the message
+            raise ReviewError(ReviewErrorCode.NOT_WRITABLE, f"{label} could not be written: the config folder is "
+                              "read-only.", fix="Mount the config folder writable, or add the demo by hand.") from None
+        self._ctx.config.record_section_file(label, hashlib.sha256(data).hexdigest())
+
+    def _demo_files(self) -> List[str]:
+        """The config files ``add_demo`` may edit: ``nl2sql.yaml`` and the ``knowledge`` section's own file."""
+        config = self._ctx.config
+        if config.folder is None:
+            return []
+        knowledge = config.locate("knowledge")[0]
+        return ["nl2sql.yaml"] + ([knowledge] if knowledge != "nl2sql.yaml" else [])
+
+    def _unchanged(self, label: str) -> None:
+        """``ReviewError(FILE_CHANGED)`` (409) when ``label`` is not as the engine last saw it."""
+        from nl2sql.config.writer import file_sha256
+        from nl2sql.review.models import ReviewError, ReviewErrorCode
+
+        config = self._ctx.config
+        if file_sha256(Path(config.folder) / label) != config.section_file_hash(label):
+            raise ReviewError(ReviewErrorCode.FILE_CHANGED, f"{label} changed on disk since the engine loaded it.",
+                              fix="Reload the engine (build it again from nl2sql.yaml) and add the demo again.")
 
     def remove(self, datasource_id: str) -> None:
         """Take a datasource out of routing and out of ``engine.config``, and close its pool.
