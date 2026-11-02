@@ -1274,7 +1274,6 @@ ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql/src/nl2sql/cli/main.py",
     "nl2sql/src/nl2sql/cli/commands/demo.py",
     "nl2sql/src/nl2sql/cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
-    "api/src/nl2sql_api/main.py",
     "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model (wave_d.md, A4b)
 }
 

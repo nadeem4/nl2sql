@@ -9,8 +9,7 @@ engine over HTTP. Implementation lives in `packages/api/src/nl2sql_api/`.
 
 Source: `packages/api/src/nl2sql_api/main.py`
 
-- `lifespan` configures logging, loads the `.env` next to `nl2sql.yaml` (never
-  overriding a variable already set), builds one engine with
+- `lifespan` configures logging, builds one engine with
   `NL2SQL.from_config()` (the file `NL2SQL_CONFIG` names, else `./nl2sql.yaml`)
   and calls `engine.check()` before it serves. A `required` datasource that
   fails, or no datasource ready at all, raises `EngineNotReady`: the API logs

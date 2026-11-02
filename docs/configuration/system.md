@@ -300,6 +300,7 @@ Only these are read directly:
 | Variable | Read by | Purpose |
 | --- | --- | --- |
 | `NL2SQL_CONFIG` | `load_config()` with no path, the CLI, `nl2sql-api` | Path to `nl2sql.yaml`. Without it, `./nl2sql.yaml`. |
+| `NL2SQL_MODE` | `nl2sql-api serve` | `demo`, `your_data` or `hosted`: the mode when no flag sets it. It beats the config's `mode:` and loses to `--demo` and `--hosted`. |
 | `NL2SQL_LOG_LEVEL` | `configure_logging()` | The log level when the caller passes none (`DEBUG`, `INFO`, ...). Without it, `INFO`. |
 | `NL2SQL_LOG_FORMAT` | `configure_logging()` | `text` or `json` (one JSON object per line, with its `trace_id`) when the caller chooses neither; the CLI's `--log-format` chooses for any command. Without it, `text`; any other value is an error (`ValueError`; the CLI prints it on one line and exits 1). |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | `nl2sql/llm/` | The fallback key when `llm.api_key` (or an agent's, or `embeddings.api_key`) is not set. |

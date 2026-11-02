@@ -154,3 +154,46 @@ def test_the_demo_reads_the_env_file_beside_its_project(tmp_path, served):
     _project(tmp_path, served)
     serve.main(["serve", "--demo", "--dir", str(tmp_path / "demo")])
     assert served["env_files"] == [str(tmp_path / "demo" / "nl2sql.yaml")]
+
+
+# ---- the .env: loaded here, before the key check, and never by a hosted server
+
+@pytest.mark.parametrize("via", ["flag", "variable", "file"])
+def test_a_hosted_server_loads_no_env_file(tmp_path, served, monkeypatch, via):
+    _, path = _project(tmp_path, served, **({"mode": "hosted"} if via == "file" else {}))
+    if via == "variable":
+        monkeypatch.setenv("NL2SQL_MODE", "hosted")
+    serve.main(["serve", "--config", path, *(["--hosted"] if via == "flag" else [])])
+    assert served["hosted"] is not None and served["env_files"] == []
+
+
+def test_a_server_that_is_not_hosted_loads_the_env_file_beside_its_config(tmp_path, served):
+    _, path = _project(tmp_path, served)
+    serve.main(["serve", "--config", path])
+    assert served["env_files"] == [path] and served["hosted"] is None
+
+
+def test_a_key_in_the_env_file_beside_a_hosted_config_never_reaches_the_process(tmp_path, launched, monkeypatch):
+    import os
+
+    name = "OPENAI_" + "API_KEY"
+    monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("NL2SQL_MODE", raising=False)
+    make_config(tmp_path, mode="hosted", policies={"roles": {"viewer": {"description": "role", "allow": ["*"]}}, "default_role": "viewer"})
+    (tmp_path / ".env").write_text(f"{name}=fake-{'k' * 12}\n", encoding="utf-8")
+    serve.main(["serve", "--config", str(tmp_path / "nl2sql.yaml")])
+    assert len(launched) == 1 and name not in os.environ
+
+
+def test_a_key_in_the_env_file_of_a_server_that_is_not_hosted_is_loaded(tmp_path, launched, monkeypatch):
+    import os
+
+    name = "NL2SQL_SERVE_TEST_" + "VALUE"
+    monkeypatch.delenv(name, raising=False)
+    config = _config(tmp_path)
+    (tmp_path / ".env").write_text(f"{name}=from-file\n", encoding="utf-8")
+    try:
+        serve.main(["serve", "--config", config])
+        assert os.environ[name] == "from-file"
+    finally:
+        os.environ.pop(name, None)
