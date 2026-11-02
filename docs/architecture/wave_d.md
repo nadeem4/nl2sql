@@ -118,6 +118,18 @@ D13 to D16** and records how each is applied.
 | D235 | **Dashboard edits are `PUT` on sub-resources, one per facade method:** `PUT /dashboards/{id}/title`, `/chart` (under a tile), `/layout`, `/filters`, `/schedule`, and the workspace rename is `PUT /workspaces/{id}/name`, the same style. | decided by owner 2026-10-30 | [Routes](#the-routes) |
 | D236 | **A refresh takes request ids like a query does:** G3a adds request ids to `dashboards.refresh`, as it does for `run_query`, `stream_query` and `conversations.retry` (D215), so the route's `approval_ids` have something to resolve against. A2b depends on G3a. | decided by owner 2026-10-30 | [Routes](#the-routes) |
 | D237 | **Try the demo is a facade method and a job route:** G2b adds `engine.add_demo()` (it adds the three sample databases and the demo glossary to the project, then indexes them); A4a exposes it as `POST /jobs/demo` (admin; a job because it indexes); W4b's start screen calls it. A4a depends on G2b. | decided by owner 2026-10-30 | [The start screen](#the-start-screen) |
+| D238 | **Answer memory is a saved answer plus a proposal, from one click.** "Yes" under a chat answer saves a personal answer and files the existing thumbs-up proposal; "Not quite" is the existing correction flow, unchanged. | decided by owner 2026-11-02 | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D239 | **A saved answer is a typed plan, not SQL:** the question, its datasource and a `ChartPlan` (the shape a dashboard tile already holds), in a per-owner store beside dashboards. The proposal stays a SQL `verified_query` filed through `engine.feedback`; no second proposal kind. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D240 | **A saved answer re-runs as the viewer, every time,** through the same path as a tile; a plan the schema has outgrown reports `needs_fixing`, as a tile does. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D241 | **"Yes" saves even when no proposal can be filed** (several statements, a verified answer, no SQL); the reply says `proposed: false` and why. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D242 | **At most 100 saved answers per user** (`answers.max_per_user`). A full store refuses the next save with a named error; it never drops one silently. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D243 | **The builder mixes three sources: Curated, My saved answers, Tell us what matters.** Only the third calls a model. | decided by owner 2026-11-02 | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D244 | **Two steps, propose then build.** Propose is read-only and runs nothing; build is a job. Curated and saved tiles need no model and no conversation, through two new typed edits (`add_verified_tile`, `add_saved_tile`); new questions run as `ask` steps of one builder conversation and join by the existing `add_tile`. There is no second pipeline. | no-second-pipeline decided by owner 2026-11-02; the rest default | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D245 | **Chips come from what exists:** glossary terms that name columns (metrics), column roles dimension and temporal from the index (the starter's rules, D115), and five fixed time ranges. A range sets the dashboard's time filter and is a hint in the model's prompt. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D246 | **Limits:** at most three questions go to the model (owner's 2 to 3), and the proposal is capped at `dashboards.max_tiles`. | question cap decided by owner 2026-11-02; tile cap default | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D247 | **Saved answers are owner-only, with no admin read,** and a tile built from one carries a copy of the plan, so a shared dashboard never exposes another person's saved answer and each viewer's tile runs in their own scope. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D248 | **Hosted keyless demo: Curated and saved only.** "Tell us what matters" without a key is refused with the missing-key error; with the visitor's key (D210) it works. | decided by owner 2026-11-02 | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
+| D249 | **The Generate button (W2c) stays** as the one-click starter; "Build a dashboard" sits beside it. The first-time hint is a browser-local flag, never server state. | default, owner may change | [18](#18-guided-dashboard-builder-and-answer-memory-d-db1) |
 
 ## Where 0.9 will leave us
 
@@ -1638,6 +1650,7 @@ needs the owner (R1) is a stop, not a batch.
 | D-S5 | W1, W2a, W2b, W3 | One area each; the shell, `http.js`, `src/lib/` and `styles/base.css` are D0b's. |
 | D-S6 | W4a, W4b, X1a, X1b | X1a is done when the scratch Space passes (above). |
 | R1 | The owner's own task | Re-record, rehearse again, browser pass. |
+| D-DB | DB1a, DB1b, DB1c, DB1d, DB1e | Guided dashboard builder and answer memory ([section 18](#18-guided-dashboard-builder-and-answer-memory-d-db1)). Needs W2c and A4d (merged); independent of D-S6 and D-S7, so it can run before either. |
 | D-S7 | CL1, CL2, T1 | The CLI leaves the engine only after X1b has deleted the playground (D231). |
 | Release | One release, after D-S7 | None between X1b and CL1 ([section 15](#15-release)). |
 
@@ -1710,6 +1723,8 @@ surface) and the split of the foundation (D223). The other decisions from D200
 to D222 still read "owner to confirm", except D208, which the owner confirmed on 2026-11-02. The layout decisions D225 to D233 are
 the owner's, made on 2026-10-30 and answering every question section 17 raised
 ([section 17](#17-repository-layout-the-ui-and-the-cli-app)).
+
+Section 18 (D238 to D249) records the owner's decisions of 2026-11-02 and nine defaults the owner may change, each marked in the decisions table; no question blocks the build.
 
 ## 17. Repository layout: the UI and the CLI app
 
@@ -1844,3 +1859,169 @@ facade the method, the CLI switches to it; otherwise CL0a or CL0b adds it.
 | PyPI publish | `publish_pypi.yaml` builds and uploads three | Four, in dependency order: SDK, engine, API, CLI (CL2) |
 | Dockerfile that builds the UI | none | One two-stage `Dockerfile` at the repository root, moved from `packages/api/Dockerfile`; the three workflows that name it change (K1, D233) |
 | Docs | `releasing.md` says "three distributions" | "Four distributions"; `CONTRIBUTING.md` lists the folders (CL2) |
+
+## 18. Guided dashboard builder and answer memory (D-DB1)
+
+Decisions D238 to D249. Order of work: design (this section), package, API, UI.
+
+### Intent
+
+- A person who is not an analyst can end a session with a dashboard they trust, without writing a prompt.
+- The product remembers what worked: an answer someone confirmed is not asked again, and the best ones reach the admin as proposals for the shared set.
+
+### Goals, non-goals, anti-goals
+
+- **Goals**
+  - A light "Did this answer it?" under each chat answer.
+  - A "Build a dashboard" flow that mixes three sources and ends in an ordinary dashboard.
+  - Both work with no model key, except the one source that asks a model.
+- **Non-goals**
+  - A visual query builder, drag-and-drop tile design, or a second dashboard model.
+  - Sharing a personal answer with a named person (a shared answer is an accepted proposal).
+  - Learning from "Not quite" beyond the existing correction proposal.
+- **Anti-goals**
+  - No second pipeline: the builder runs questions through chat's `ask` and edits through `dashboards.edit`.
+  - No parallel store of verified answers: personal answers are plans, shared ones stay `curated.yaml` rows.
+  - No modal, no forced rating, nothing that blocks the next question.
+  - No server state for UI conveniences (the first-time hint).
+
+### Decided by the owner (2026-11-02)
+
+- "Did this answer it? Yes / Not quite" under each answer, not a modal, with a first-time hint (D238).
+- Yes saves a personal answer (typed plan, re-run with the viewer's scope) and proposes it to the review queue; Not quite uses the correction flow (D238).
+- The builder mixes Curated (no key), My saved answers (no key) and Tell us what matters (needs a key) (D243).
+- Inputs are clickable chips (glossary metrics, dimension breakdowns, time ranges) plus optional free text, 2 to 3 questions at most (D245, D246).
+- The builder reuses chat's dashboard tool, no second pipeline (D244).
+- It shows a proposed tile list (question and chart type) to tick, untick or reword, then Build; tiles are validated like chat and unanswerable ones say so.
+- The hosted keyless demo gets Curated and saved only (D248).
+- W2c (#427) is the first step and is merged.
+
+### Default calls (owner may change)
+
+- D239: personal answers hold plans, proposals stay SQL.
+- D240: re-run as the viewer every time.
+- D241: save even when no proposal can be filed.
+- D242: cap of 100 saved answers per user.
+- D244: two new edits for no-model tiles (the rest of D244 follows the owner's reuse rule).
+- D245: chips from terms, column roles and five ranges.
+- D246: tile cap from `dashboards.max_tiles`.
+- D247: owner-only, no admin read.
+- D249: Generate stays; the hint is browser-local.
+
+### What exists and is reused
+
+| Piece | Where | Used for |
+|---|---|---|
+| Thumbs-up proposal | `FeedbackAPI.record` and `_propose` in `api/feedback_api.py`; `feedback/proposals.py` (`skip_reason`, `verified_query`) | The "Yes" proposal. It already files a `verified_query` from a generated answer, so the queue gains nothing new. |
+| Correction flow | `FeedbackAPI.correct`, `feedback/corrections.py`; `POST /feedback/correct`; `nl2sql-ui/src/chat/Feedback.jsx` | "Not quite". Unchanged. |
+| Review queue | `review/queue.py` (`propose`, `visible`), `ProposalsAPI`, the `/proposals*` routes | Where a shared candidate waits; accept writes `curated.yaml`. |
+| Tile plan | `ChartPlan` and `Tile` in `dashboards/models.py` (a whole run's plans, or a `verified` ref) | The saved answer's plan. |
+| Edits | `DashboardsAPI.edit`, `dashboards/edits.py` (`_add_tile`, `_from_step`), the `DashboardEdit` union | Build applies edits only. The chat tool `chat_tools/dashboard_edit.py` takes the two new kinds for free. |
+| Owner-scoped documents | `put_dashboard` and `list_dashboards(tenant, user)` in `storage/sqlite.py` | The pattern for the saved-answer store. |
+| Starter column roles | `DashboardsAPI.generate` and `suggest_questions`, `dashboards/templates.py` (D115) | Dimension and temporal chips. |
+| Job | `POST /jobs/dashboard` in `nl2sql_api/routes/jobs.py`, `DashboardJob` in `nl2sql_api/jobs.py` | The pattern for the build job. |
+| Caller and limits | `GET /meta` (A4c `caller`, hosted `limits`), `nl2sql_api/hosted.py` | Who saves; what the keyless demo may do. |
+| Per-call key | `llm_override` (D210) | Free text on the hosted demo with the visitor's key. |
+
+Gap found: `CuratedAPI` (`api/curated_api.py`) only validates and tests; DB1b adds a `list` that returns the verified queries the caller can reach.
+
+### Data model
+
+- **Saved answer** (`SavedAnswer`, a strict pydantic model in `nl2sql/answers/models.py`):
+  - `id`, `owner` (`user_id`, `tenant_id`), `question`, `datasource_id`, `plan: ChartPlan`, `chart: ChartChoice`, `created_at`, `trace_id` (the run it came from).
+  - No rows, no key.
+- **Store:** one more document kind in the state store beside dashboards (`put_saved_answer`, `list_saved_answers(tenant, user)`, `get`, `delete`). Same table shape, same owner filter.
+- **Proposal:** the existing `Proposal` (`kind: verified_query`, `origin: thumbs_up`), unchanged.
+- **Builder types** (`dashboards/builder.py`):
+  - `BuilderOptions`: `curated` (id, question), `saved` (id, question), `metrics` (glossary terms with columns), `dimensions` (label, column), `time_columns`, `ranges`.
+  - `TileProposal`: `source` (`curated`, `saved` or `asked`), `ref` (verified or saved id, else none), `question`, `chart`, `ticked`.
+  - `BuildReport`: `dashboard`, `built` (tile ids), `skipped` (question, code, message).
+
+### Access rule
+
+- A saved answer is read, run, deleted and listed only by its owner. Another caller gets 404, an admin included (D247). The in-process operator path is not offered over REST.
+- Re-running is a normal run as the viewer (D240): scope, hooks, validator and approvals apply; nothing is shared across users.
+- A proposal follows the existing queue rule (`review.queue.visible`: the caller's scope must reach every table it names); accepting stays admin only.
+- A built dashboard is owned by the builder. A tile copies the plan and runs in each viewer's scope, as every tile does.
+- The curated list shows only verified queries whose tables the caller reaches.
+
+### Engine facade (package)
+
+- `engine.answers` (`api/answers_api.py`, `AnswersAPI`):
+  - `save(*, trace_id, conversation_id, step, user_context, note=None) -> SaveReport` with `answer`, `proposed`, `proposal_id`, `not_proposed_reason`. It rates the run up through `FeedbackAPI.record`, then stores the plan taken from the conversation step by the helper `AddTile` uses.
+  - `list(*, user_context, datasource_id=None)`, `get(id, *, user_context)`, `delete(id, *, user_context)`.
+  - `run(id, *, user_context, llm_override=None) -> QueryResult`.
+  - Raises `AnswerNotFound`, `AnswerLimitReached` (D242) and `NotSavable` (a failed or clarifying step), all deriving from the facade's base exception (D202).
+- `engine.dashboards`:
+  - `builder_options(datasource_id, *, user_context) -> BuilderOptions`. Reads only; no model.
+  - `propose_tiles(datasource_id, *, user_context, sources, curated_ids=(), saved_ids=(), metrics=(), dimensions=(), time_range=None, text=None, llm_override=None) -> List[TileProposal]`. Curated and saved become proposals directly. If `asked` is in `sources`, one structured model call turns chips and text into at most 3 questions (D246).
+  - `build(datasource_id, tiles, *, user_context, title=None, workspace_id=None, on_tile=None, cancellation_token=None, llm_override=None) -> BuildReport`.
+- New typed edits in `dashboards/models.py`: `AddVerifiedTile(verified_id, params, title)` and `AddSavedTile(saved_id, title)`. Both are checked as the caller, as any tile is.
+- Setting: `answers.max_per_user` (default 100) in the engine config.
+- Facade exports and the SDK, storage and dashboards pages change in the same PRs.
+
+### REST routes (`nl2sql_api`)
+
+- Answers (new router `routes/answers.py`):
+  - `POST /answers` (body: `trace_id`, `conversation_id`, `step`, optional `note`) returns `SaveReport`.
+  - `GET /answers`, `GET /answers/{id}`, `DELETE /answers/{id}`.
+  - `POST /answers/{id}/run` returns the `QueryResult`, with approval request ids as `run_query` has.
+- Builder (in `routes/dashboards.py`; distinct paths, so `/dashboards/{id}` never captures them):
+  - `GET /dashboard-builder/options?datasource_id=`.
+  - `POST /dashboard-builder/proposals` returns the tile list.
+  - `POST /jobs/dashboard-build` (D206): one progress step per tile; the result is `BuildReport`. The body carries the ticked, reworded tiles.
+- Error codes: `ANSWER_NOT_FOUND` (404), `ANSWER_LIMIT_REACHED` (409), `NOT_SAVABLE` (422), and the existing missing-key error for `asked` without a key.
+- Hosted: the visitor id is the owner (A4d); `hosted.start_job` caps already apply; `/meta` is unchanged.
+
+### UI (`nl2sql-ui/`)
+
+- **Chat:** `chat/Feedback.jsx` gains the light bar "Did this answer it? Yes / Not quite", with no modal.
+  - Yes calls `POST /answers`, then shows "Saved to My answers" and, if proposed, "Sent for review".
+  - Not quite opens the existing correction form in place.
+  - First-time hint: one line, dismissed by the first click, remembered in `localStorage` (guarded, D249).
+- **My answers:** a list on the Dashboards page with Run and Delete. Run shows the result in the usual answer card.
+- **Dashboards page:** "Build a dashboard" beside Generate (W2c). One panel, four steps, not a route per step:
+  1. Pick sources (three checkboxes; "Tell us what matters" shows a key note when there is no key, D248).
+  2. Pick chips (metrics, breakdowns, a time range) and optional free text.
+  3. Review the proposed tiles: tick, untick, reword, change the chart. A tile the engine cannot answer is shown struck through with its reason.
+  4. Build: job progress (`JobProgress`), then open the dashboard.
+- Pure modules under `node --test` (D217): `answers.js` (request and reply shapes, hint flag) and `builder.js` (chip state to proposal request, tick state to job body, source gating), plus golden response files for the new routes.
+- The contract test (every called route is in `openapi.json`) covers the new calls.
+
+### Keyless and hosted behaviour
+
+- Self-hosted without a key: Curated and My answers work; Tell us what matters is disabled with the reason.
+- Hosted keyless demo (D248): the same, with the visitor id as owner. Saved answers live under the instance's storage like conversations do, bounded by the cap (D242) and the job caps. With the visitor's own key, the third source works through `llm_override`.
+- A recorded (replay) demo has no recording for a builder question: it ends `REPLAY_MISS`, shown as unanswerable, not as an error page.
+
+### Tests to write first
+
+- **DB1a:**
+  - Saving rates the run up and files the proposal; saving the same answer twice is one proposal.
+  - `proposed: false` with a reason for multi-statement, verified and failed runs.
+  - Another user's answer is `AnswerNotFound`; the 101st save is refused.
+  - `run` applies the viewer's scope; a changed schema gives `needs_fixing`.
+  - The boundary test still passes.
+- **DB1b:**
+  - Options list only what the caller reaches.
+  - `propose_tiles` with curated and saved calls no model (a fake LLM that fails if called); with `asked`, one call, at most 3 questions, tile cap applied.
+  - `add_verified_tile` and `add_saved_tile` validate as the caller and refuse a plan the caller may not read.
+  - `build` skips an unanswerable question with a code and keeps the rest; a cancel saves nothing, as `generate` does.
+- **DB1c:** route tests with a fake engine for every route and error code; another user's answer is 404; hosted visitor ownership; the job's progress and result; the `openapi.json` snapshot and the README route table.
+- **DB1d, DB1e:** `node --test` for the pure modules and the contract test; component tests where the repo has them.
+
+### Slices
+
+One session batch, `D-DB`, stacked in this order. Each is about 500 to 1,000 changed lines with its tests and docs, built by one agent and reviewed by a separate one.
+
+| Slice | Title | Scope | Main files | Depends on | Est. lines |
+|---|---|---|---|---|---|
+| DB1a | Saved answers (package) | `SavedAnswer`, the owner-scoped store, `engine.answers` (`save`, `list`, `get`, `delete`, `run`), the cap setting, errors, facade exports | `nl2sql/answers/`, `api/answers_api.py`, `storage/sqlite.py`, `public_api.py`, `config/`, SDK and storage docs | W2c (merged) | 800 |
+| DB1b | Builder engine (package) | `builder_options`, `propose_tiles`, `build`, the two new edits, the one model call for free text, `CuratedAPI.list` | `dashboards/builder.py`, `dashboards/models.py`, `dashboards/edits.py`, `api/dashboards_api.py`, `api/curated_api.py`, dashboards docs | DB1a | 900 (split at propose and build if over 1,000) |
+| DB1c | REST routes | Answers router, builder routes, build job, error codes, hosted ownership | `nl2sql_api/routes/answers.py`, `routes/dashboards.py`, `routes/jobs.py`, `jobs.py`, `main.py`, README route table, API docs | DB1b | 700 |
+| DB1d | Answer memory in the UI | Feedback bar, first-time hint, My answers list and run | `nl2sql-ui/src/chat/Feedback.jsx`, `src/api/answers.js`, `src/chat/answers.js`, the dashboards list, golden files | DB1c | 600 |
+| DB1e | Dashboard builder in the UI | The four-step panel (sources, chips, review, build), key gating, job progress | `nl2sql-ui/src/dashboards/Builder.jsx`, `builder.js`, `src/api/dashboards.js`, styles, golden files | DB1c, DB1d (shares the list) | 900 |
+
+- Slices that touch the same file (`public_api.py`, `routes/dashboards.py`, `Dashboards.jsx`) edit separate functions; the stacking order keeps conflicts out.
+- The tracker row D-DB1 becomes DB1a to DB1e, each with batch `D-DB`.
+- Release: with the next release after the batch; none between slices.
