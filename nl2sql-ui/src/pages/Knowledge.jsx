@@ -38,6 +38,7 @@ function Schema({ id }) {
 }
 
 export default function Knowledge({ caller = null }) {
+  const admin = mayAdminister(caller);
   const [sources, setSources] = useState(null);
   const [current, setCurrent] = useState("");
   const [view, setView] = useState(null);
@@ -64,14 +65,14 @@ export default function Knowledge({ caller = null }) {
   }, [current]);
 
   useEffect(() => {
-    if (!current || !mayAdminister(caller)) return undefined;
+    if (!current || !admin) return undefined;
     let live = true;
     setProposalFault(null);
     listProposals(current)
       .then((list) => live && setProposals(list))
       .catch((err) => { if (live && err.status !== 403) setProposalFault(message(err)); });
     return () => { live = false; };
-  }, [current, reload, caller]);
+  }, [current, reload, admin]);
 
   useEffect(() => { setProposals(null); }, [current]);
 

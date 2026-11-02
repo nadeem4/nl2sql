@@ -228,13 +228,23 @@ def test_meta_names_the_local_operator_as_an_admin(stub):
 
 
 def test_meta_admin_is_the_answer_the_admin_routes_give(stub):
-    from nl2sql_api import identity
     policies = {"roles": {"boss": {"description": "r", "allow": ["*"]}, "analyst": {"description": "r", "allow": ["*"]}},
                 "default_role": "analyst", "admin_roles": ["boss"]}
     for role in ("boss", "analyst"):
-        client, engine = stub(CheckReport(), api={"auth": "static", "static_role": role}, policies=policies)
-        user = UserContext(user_id="static", roles=[role])
-        assert _caller(client)["admin"] is identity.is_admin(user, engine) is (role == "boss")
+        client, _ = stub(CheckReport(), api={"auth": "static", "static_role": role}, policies=policies)
+        route = client.get(f"{API}/evals/suites")  # an admin route: 200 for an admin, 403 for anyone else
+        assert route.status_code == (200 if role == "boss" else 403)
+        assert _caller(client)["admin"] is (route.status_code == 200)
+
+
+def test_meta_local_operator_is_not_admin_when_no_admin_role_is_defined(stub):
+    policies = {"roles": {"analyst": {"description": "r", "allow": ["*"]}}, "default_role": "analyst",
+                "admin_roles": []}
+    _, _ = stub(CheckReport(), api={"auth": "none"}, policies=policies)
+    local = TestClient(app, base_url="http://localhost:8000", client=("127.0.0.1", 5))
+
+    assert _caller(local) == {"user_id": "local", "admin": False}
+    assert local.get(f"{API}/evals/suites").status_code == 403
 
 
 def test_meta_never_carries_another_users_data(stub):
