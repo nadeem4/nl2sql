@@ -25,8 +25,8 @@ caller may reach as `{id, description, sample_questions, recorded}` (`recorded` 
 provider can answer with no key), and `recorded_with`, the provider and model those recordings came from, or `null`.
 It also names the caller as `caller: {"user_id": "...", "admin": true | false}`. `admin` is whether the caller holds a role
 in `policies.admin_roles`, which is the check every admin route makes. `user_id` is the key's owner under `api_keys`, the
-proxy's user header under `proxy`, `static` under `static` and `local` under `none`; it is left out on the hosted demo,
-where a visitor's id is its session cookie, a secret. Nothing else about the caller (roles, tenant) or any other user
+proxy's user header under `proxy`, `static` under `static` and `local` under `none`; on the hosted demo it is `visitor-` and a
+one-way hash of the session cookie, never the cookie itself. Nothing else about the caller (roles, tenant) or any other user
 is returned, and whether the caller may approve a request is not here: each hook names its own approvers, so the
 approvals routes decide.
 

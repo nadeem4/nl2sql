@@ -125,7 +125,7 @@ def caller(request: Request, engine: NL2SQL = Depends(get_engine)) -> UserContex
     for a request that is not the local operator."""
     hosted = getattr(request.app.state, "hosted", None)
     if hosted is not None:  # the public demo: an anonymous session, never an admin (nl2sql_api.hosted)
-        return hosted.user(request.state.hosted_session, engine.config.settings.tenant_id)
+        return hosted.user(request.state.hosted_visitor, engine.config.settings.tenant_id)
     auth = engine.config.api.auth
     if auth == "api_keys":
         return _api_keys(request, engine)

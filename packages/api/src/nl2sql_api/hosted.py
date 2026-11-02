@@ -2,8 +2,11 @@
 
 ``nl2sql-api serve --demo --hosted`` is a public server where nobody is trusted and nothing is kept for long:
 
-* **Identity.** Every browser is an anonymous session: a random 128-bit id in the ``HttpOnly`` cookie
-  :data:`SESSION_COOKIE`, used as the ``user_id`` with one non-admin role. It is not a value of ``api.auth``:
+* **Identity.** Every browser is an anonymous session: a random 128-bit token in the ``HttpOnly`` cookie
+  :data:`SESSION_COOKIE`. The token is a secret, so it only finds the session: the middleware turns it into a one-way
+  visitor id (:meth:`Hosted.visitor_id`) and everything after that (the ``user_id`` with one non-admin role, the
+  limits, the job and stream caps, every owner the engine stores) uses the id, never the token. It is not a value of
+  ``api.auth``:
   :func:`nl2sql_api.identity.caller` asks :meth:`Hosted.user` first, so no header makes a visitor an admin and the
   admin routes answer 403 for the same reason they do anywhere else.
 * **Limits.** Questions, turns and ``POST /jobs/<kind>`` spend from a token bucket (per client address: the first hop
@@ -14,6 +17,7 @@
 
 State is in this process's memory only; a visitor who has been idle for an hour is forgotten.
 """
+import hashlib
 import math
 import re
 import secrets
@@ -113,9 +117,17 @@ class Hosted:
         self._starting: set = set()  # sessions whose job start is being handled: the slot a parallel start cannot take
         self._lock = threading.Lock()
 
-    def user(self, session: str, tenant_id: Optional[str] = None) -> UserContext:
-        """The visitor behind ``session``: anonymous, with the one role, never an admin."""
-        return UserContext(user_id=session, tenant_id=tenant_id, roles=[self.role] if self.role else [])
+    @staticmethod
+    def visitor_id(token: str) -> str:
+        """The id of the visitor whose cookie is ``token``: a SHA-256 of it, cut to 128 bits, safe to store, show and
+        log. The token is 128 random bits, so the id cannot be run back to it and knowing the id lets nobody act as
+        the visitor. A plain hash is enough and needs no new configuration: an HMAC key would add nothing against
+        an input that is already unguessable."""
+        return "visitor-" + hashlib.sha256(b"nl2sql-hosted-visitor:" + token.encode()).hexdigest()[:32]
+
+    def user(self, visitor: str, tenant_id: Optional[str] = None) -> UserContext:
+        """The visitor with id ``visitor`` (from :meth:`visitor_id`): anonymous, with the one role, never an admin."""
+        return UserContext(user_id=visitor, tenant_id=tenant_id, roles=[self.role] if self.role else [])
 
     def open_stream(self, session: str) -> bool:
         """Reserves one of the session's streams; False when it already has :data:`STREAMS_PER_SESSION` open."""
@@ -213,7 +225,8 @@ class HostedMiddleware:
         fresh = not _MINTED.fullmatch(session)  # only the form this server mints; anything else gets a new session
         if fresh:
             session = secrets.token_hex(16)
-        scope.setdefault("state", {})["hosted_session"] = session
+        visitor = Hosted.visitor_id(session)  # from here on the token is only for the Set-Cookie below
+        scope.setdefault("state", {})["hosted_visitor"] = visitor
 
         async def send_with_session(message: Message) -> None:
             if fresh and message["type"] == "http.response.start":
@@ -226,7 +239,7 @@ class HostedMiddleware:
         method = scope["method"]
         streams = bool(_STREAMS_POST.match(path) if method == "POST" else method == "GET" and _STREAMS_GET.match(path))
         job = method == "POST" and bool(_JOB_START.match(path))
-        refusal = self._refusal(scope, session, method, path, streams, job)
+        refusal = self._refusal(scope, visitor, method, path, streams, job)
         if refusal is not None:
             body = ErrorBody(error=ApiError(code="LIMIT_REACHED", message=refusal.message,
                                             fix="Wait and try again.")).model_dump(mode="json")
@@ -237,11 +250,11 @@ class HostedMiddleware:
             await self.app(scope, receive, send_with_session)
         finally:
             if streams:
-                self.hosted.close_stream(session)
+                self.hosted.close_stream(visitor)
             if job:
-                self.hosted.end_job(session)
+                self.hosted.end_job(visitor)
 
-    def _refusal(self, scope: Scope, session: str, method: str, path: str, streams: bool,
+    def _refusal(self, scope: Scope, visitor: str, method: str, path: str, streams: bool,
                  job: bool) -> Optional[Refusal]:
         """Why this request is refused, else None. A stream or job slot it reserves is the caller's to give back
         when it returns None, and is given back here when it refuses."""
@@ -251,22 +264,22 @@ class HostedMiddleware:
             engine = getattr(getattr(app, "state", None), "engine", None)
             tenant = engine.config.settings.tenant_id if engine is not None else None
             if jobs is not None and any(job.status in ("queued", "running")
-                                        for job in jobs.list(self.hosted.user(session, tenant))):
+                                        for job in jobs.list(self.hosted.user(visitor, tenant))):
                 return Refusal(JOB_MESSAGE, 5)
             # The job is only submitted inside the route, so parallel starts would all pass the check above:
             # one reserves the slot, the others are refused until the response is done.
-            if not self.hosted.start_job(session):
+            if not self.hosted.start_job(visitor):
                 return Refusal(JOB_MESSAGE, 5)
-        if streams and not self.hosted.open_stream(session):
+        if streams and not self.hosted.open_stream(visitor):
             if job:
-                self.hosted.end_job(session)
+                self.hosted.end_job(visitor)
             return Refusal(STREAM_MESSAGE.format(cap=STREAMS_PER_SESSION), 5)
         if method == "POST" and _SPENDS.match(path):
-            refusal = self.hosted.limits.take(address=_address(scope), session=session)
+            refusal = self.hosted.limits.take(address=_address(scope), session=visitor)
             if refusal is not None:
                 if streams:
-                    self.hosted.close_stream(session)
+                    self.hosted.close_stream(visitor)
                 if job:
-                    self.hosted.end_job(session)
+                    self.hosted.end_job(visitor)
             return refusal
         return None

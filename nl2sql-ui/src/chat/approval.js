@@ -9,7 +9,7 @@ export function approvalState(needed, records) {
   return { state: "waiting", ids: [] };
 }
 
-// The list also holds the caller's own requests, which only an approver may decide. Without a known caller nothing
-// is told apart, and the server's refusal says so.
-export const ownRequest = (record, callerId) => Boolean(callerId) && record.request.asker_user_id === callerId;
-export const toDecide = (records, callerId) => records.filter((r) => !ownRequest(r, callerId));
+// The list also holds the caller's own requests. The server marks them (`own`, A4d), so the page compares no ids and
+// holds no approval rule: it only leaves the buttons off requests the caller asked.
+export const ownRequest = (record) => record.own === true;
+export const toDecide = (records) => records.filter((r) => !ownRequest(r));

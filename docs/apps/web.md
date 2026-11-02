@@ -73,9 +73,9 @@ is not used by the page.
 each with the question, who asked, the plan, the SQL it would run and why it
 stopped. **Grant** and **Deny** call the matching routes. The list also holds requests you
 asked yourself; those show no buttons, since only an approver may decide them,
-and the nav count leaves them out. The page learns your user id from `GET /meta`
-(`caller.user_id`). On the hosted demo there is none, so it cannot tell them apart
-and the server refuses a decision that is not yours, with its reason shown.
+and the nav count leaves them out. The server marks them (`own` on each
+record), so the page compares no ids; it never decides who may approve, and the
+server refuses a decision that is not yours, with its reason shown.
 
 ## Charts, diagrams, reports
 

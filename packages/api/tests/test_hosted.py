@@ -78,7 +78,7 @@ def test_a_visitor_is_an_anonymous_non_admin_with_the_default_role(make):
     app.router.routes.insert(0, app.router.routes.pop())  # ahead of the page's catch-all
     client.get("/api/v1/whoami")
     TestClient(app).get("/api/v1/whoami")
-    assert seen[0].roles == ["viewer"] and seen[0].user_id == client.cookies[SESSION_COOKIE]
+    assert seen[0].roles == ["viewer"] and seen[0].user_id == Hosted.visitor_id(client.cookies[SESSION_COOKIE])
     assert seen[1].user_id != seen[0].user_id  # nothing a visitor makes is visible to another
 
 
@@ -131,13 +131,77 @@ def test_the_meta_route_reports_the_hosted_limits_to_a_visitor(make):
     assert client.get("/api/v1/meta").json()["limits"]["asked"] == 1
 
 
-def test_meta_names_a_hosted_visitor_without_its_session_token(make):
+def test_a_visitors_id_is_a_one_way_hash_of_its_cookie():
+    token, other = "a" * 32, "b" * 32
+
+    visitor = Hosted.visitor_id(token)
+
+    assert re.fullmatch(r"visitor-[0-9a-f]{32}", visitor) and token not in visitor
+    assert visitor == Hosted.visitor_id(token) != Hosted.visitor_id(other)
+
+
+def test_meta_names_a_hosted_visitor_by_its_derived_id(make):
     _, client = make()
-    body = client.get("/api/v1/meta")
+    response = client.get("/api/v1/meta")
     token = client.cookies[SESSION_COOKIE]
 
-    assert body.json()["caller"] == {"admin": False}  # the id is the cookie's secret, so none is told
-    assert token not in body.text
+    assert response.json()["caller"] == {"user_id": Hosted.visitor_id(token), "admin": False}
+    assert token not in response.text
+
+
+def _record(user_context, **_):
+    from nl2sql import ApprovalRequest
+    request = ApprovalRequest.build(question="Q?", asker=user_context, hook="h", datasource_id="d", sql="SELECT 1",
+                                    reason="r", approver_roles=["boss"])
+    from datetime import datetime, timezone
+    from nl2sql.approvals.api import ApprovalRecord
+    now = datetime.now(timezone.utc)
+    return [ApprovalRecord(id=request.id, status="pending", request=request, created_at=now, updated_at=now,
+                           own=True)]
+
+
+def test_the_raw_cookie_is_in_no_body_the_engine_is_given_or_a_log_line(make, caplog):
+    from datetime import datetime, timezone
+    from nl2sql import Conversation
+    app, client = make()
+    engine = app.state.engine
+    engine.approvals = Recorder()
+    engine.approvals.returns["list"] = _record
+    engine.conversations = Recorder()
+    engine.conversations.returns["list"] = []
+    engine.conversations.returns["get"] = lambda cid, user_context: Conversation(
+        id=cid, user_id=user_context.user_id, title="t", created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc))
+    engine.dashboards = Recorder()
+    engine.dashboards.returns["list"] = []
+    client.get("/api/v1/health")
+    token = client.cookies[SESSION_COOKIE]
+    job = app.state.jobs.submit("index", IndexJob(), Hosted(role="viewer").user(Hosted.visitor_id(token)),
+                                lambda ctx: None)
+
+    with caplog.at_level("DEBUG"):
+        bodies = [client.get(path) for path in (
+            "/api/v1/meta", "/api/v1/approvals", "/api/v1/conversations", "/api/v1/conversations/c1",
+            "/api/v1/dashboards", "/api/v1/jobs", f"/api/v1/jobs/{job.id}", "/api/v1/nowhere")]
+
+    assert bodies[1].json()[0]["request"]["asker_user_id"] == Hosted.visitor_id(token)
+    assert bodies[3].json()["user_id"] == Hosted.visitor_id(token)
+    for response in bodies:
+        assert token not in response.text
+    for recorder in (engine.approvals, engine.conversations, engine.dashboards):
+        assert token not in repr(recorder.calls)
+    assert token not in caplog.text
+
+
+def test_visitor_b_never_sees_visitor_as_cookie(make):
+    app, a = make()
+    a.get("/api/v1/health")
+    token_a = a.cookies[SESSION_COOKIE]
+    b = TestClient(app, raise_server_exceptions=False)
+    body = b.get("/api/v1/meta")
+
+    assert b.cookies[SESSION_COOKIE] != token_a
+    assert token_a not in body.text and body.json()["caller"]["user_id"] != a.get("/api/v1/meta").json()["caller"]["user_id"]
 
 
 def test_the_hosted_page_carries_the_preview_tags_and_starts_no_session(make, tmp_path, monkeypatch):
@@ -213,7 +277,7 @@ def test_hosted_one_job_per_session():
 
     async def run():
         middleware, app, hosted = _wired(inner)
-        app.state.jobs.submit("index", IndexJob(), hosted.user(SESSION), lambda ctx: release.wait(5))
+        app.state.jobs.submit("index", IndexJob(), hosted.user(Hosted.visitor_id(SESSION)), lambda ctx: release.wait(5))
         status, _, body = await _call(middleware, _scope("POST", "/api/v1/jobs/dashboard", app))
         assert status == 429 and json.loads(body)["error"]["code"] == "LIMIT_REACHED"
         assert (await _call(middleware, _scope("POST", "/api/v1/jobs/dashboard", app, "c" * 32)))[0] == 202
@@ -259,7 +323,7 @@ def test_a_refused_job_start_gives_its_slot_back():
         path = "/api/v1/jobs/dashboard"
         assert (await _call(middleware, _scope("POST", path, app)))[0] == 202
         assert (await _call(middleware, _scope("POST", path, app)))[0] == 429  # the session cap, not the slot
-        assert hosted.job_starting(SESSION) is False
+        assert hosted.job_starting(Hosted.visitor_id(SESSION)) is False
         app.state.jobs.close()
 
     asyncio.run(run())

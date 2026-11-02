@@ -33,8 +33,8 @@ function Request({ record, busy, own, onGrant, onDeny }) {
 }
 
 // The pending approvals the caller may decide. A decision removes the request from the list.
-// `callerId` is the signed-in user's id from /meta (none for a hosted visitor, and until /meta answers); the server still refuses a decision from anyone else.
-export default function Approvals({ callerId }) {
+// The server marks the caller's own requests (`own`); it still refuses a decision from anyone who may not make it.
+export default function Approvals() {
   const [records, setRecords] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -62,7 +62,7 @@ export default function Approvals({ callerId }) {
       {records && records.length === 0 && <p className="page-note">Nothing is waiting for approval.</p>}
       <ul className="approval-list">
         {(records || []).map((record) => (
-          <Request key={record.id} record={record} busy={busy} own={ownRequest(record, callerId)}
+          <Request key={record.id} record={record} busy={busy} own={ownRequest(record)}
             onGrant={(id) => decide(grantApproval, id)} onDeny={(id) => decide((i) => denyApproval(i), id)} />
         ))}
       </ul>

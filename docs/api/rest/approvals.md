@@ -25,7 +25,9 @@ sequenceDiagram
 The requests the caller asked, plus those their roles may decide. `status` (`pending` by default, `granted` or
 `denied`; anything else is a `422`) filters them. Each is an `ApprovalRecord`: the request (its `question`, `sql`,
 `reason`, `hook` and the `approver_roles` who may decide), its `status`, and when and by whom it was decided. Who
-granted it, with the roles they held, is the engine's record and is not returned.
+granted it, with the roles they held, is the engine's record and is not returned. Each record also has `own`: `true`
+when the caller asked it (same tenant, same `user_id`), set by the server so a page never compares ids; `grant` and
+`deny` return it the same way. `own` says nothing about who may decide: the engine answers that on the call.
 
 ### `POST /api/v1/approvals/{request_id}/grant`
 

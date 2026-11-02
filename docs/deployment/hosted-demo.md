@@ -248,7 +248,10 @@ admin role. `NL2SQL_MODE` (`demo`, `your_data` or `hosted`) sets the mode when n
 key of `nl2sql.yaml`; `GET /api/v1/meta` reports it.
 
 In hosted mode every browser is an anonymous session: a random `nl2sql_demo_session` cookie (`HttpOnly`,
-`SameSite=Lax`) is its identity, it holds the one visitor role and is never an admin, so the admin routes answer
+`SameSite=Lax`) finds it. The cookie is a secret and is never sent back: the server turns it into a one-way visitor id
+(`visitor-` and 32 hex characters of its SHA-256), and that id is the `user_id` of everything the visitor owns
+(conversations, dashboards, jobs, approvals), the key of the limits below, and what `GET /meta` shows as `caller.user_id`.
+The visitor holds the one visitor role and is never an admin, so the admin routes answer
 `403`. Only the 32-character lowercase hex token this server mints is accepted as the cookie (anything else gets a
 new session), and the cookie is `Secure` when the request came over HTTPS (directly, or as `X-Forwarded-Proto`). Each
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
@@ -296,8 +299,8 @@ stops still counts toward both limits. Stopping does end the work: the page
 aborts its request, the server sees the connection close and cancels the run
 before its next step or model call (the call already in flight finishes).
 
-The session cookie is a random token this process made up. It names no visitor,
-carries no key, and exists only so the session cap has something to count. A
+The session cookie is a random token this process made up. It carries no key and names no one; it is the visitor's
+only credential, so it appears in no response body, stored record or log line (only the id derived from it does). A
 visitor who clears their cookies starts a new session; the rate limit, keyed by the
 address the client reports, is what holds an honest browser's pace down in the meantime.
 
