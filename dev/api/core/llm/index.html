@@ -6416,7 +6416,11 @@ form to check one before sending it). Never the key.</p>
 <p><code>nl2sql.provider_for_key(key) -&gt; str</code> names the provider a key belongs to
 (from its prefix), and <code>nl2sql.provider_keys_in_environment() -&gt; dict[str, str]</code>
 maps each keyed provider whose variable is set to its key (print only a masked
-form). Both are top-level exports, so an app never imports <code>nl2sql.llm.providers</code>.</p>
+form). Both are top-level exports, so an app never imports <code>nl2sql.llm.providers</code>.
+So are the stateless facts a command-line tool prints before any engine exists:
+<code>nl2sql.KEYED_PROVIDERS</code> (the providers that read a key), <code>nl2sql.env_var_for_provider(provider)</code>,
+<code>nl2sql.api_key_from_env(provider)</code> (the key, or None; print it masked) and
+<code>nl2sql.ANTHROPIC_EXTRA_HINT</code> (what to install when <code>langchain-anthropic</code> is missing).</p>
 <h3 id="llmprices">llm.prices</h3>
 <p>Signature:
 <code>prices() -&gt; dict</code></p>
