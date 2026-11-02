@@ -1,0 +1,36 @@
+/* ---------- connect: add, test, index, profile ----------
+   Cards in the rail's quiet vocabulary: rules and wells, mono for names, no shadow. */
+
+.conn, .kn { display: grid; gap: var(--sp-5); max-width: 760px; }
+.conn-card { display: grid; gap: var(--sp-3); padding: var(--sp-4); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-well); }
+.conn-card h3 { font-size: var(--fs-3); }
+.conn-card h4 { font-size: var(--fs-2); margin-top: var(--sp-2); }
+.conn-field { display: grid; gap: 4px; }
+.conn-field input:not([type="checkbox"]), .conn-field select, .conn-field textarea, .settings-row input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font-size: var(--fs-2);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+}
+.conn-field textarea { font-family: var(--mono); resize: vertical; }
+.conn-field input:focus-visible, .conn-field textarea:focus-visible { outline-offset: 0; border-color: var(--focus); }
+.conn-field [aria-invalid="true"] { border-color: var(--fault); }
+.conn-help { font-size: var(--fs-1); color: var(--ink-2); max-width: 68ch; }
+.conn-error { font-size: var(--fs-1); color: var(--fault); }
+.conn-fields { display: grid; gap: var(--sp-3); }
+.conn-group { display: grid; gap: var(--sp-3); margin: 0; padding: var(--sp-3); border: 1px solid var(--rule); border-radius: var(--r-control); }
+.conn-group legend { padding: 0 var(--sp-1); font-size: var(--fs-2); color: var(--ink-2); }
+.conn-advanced { display: grid; gap: var(--sp-3); }
+.conn-advanced > summary { font-size: var(--fs-2); color: var(--ink-2); padding: 6px 0; }
+.conn-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.conn-result { padding-left: var(--sp-3); border-left: 2px solid var(--fault); font-size: var(--fs-2); }
+.conn-result[data-ok="true"] { border-left-color: var(--ok); }
+.conn-job, .conn-profile, .conn-questions { display: grid; gap: var(--sp-2); justify-items: start; }
+.conn-qlist, .conn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-1); }
+.conn-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); font-size: var(--fs-2); }
+.conn-list [data-status="failed"] { color: var(--fault); }
+.conn-list .inspect-close { margin-left: auto; }
+.conn-review { font-size: var(--fs-2); }
+
+/* The seven steps, as a row of words; the current one is bold, done ones are quiet. */
+.steps { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); list-style: none; margin: 0; padding: 0; font-size: var(--fs-1); color: var(--ink-3); }
+.steps li[data-state="current"] { color: var(--ink); font-weight: var(--fw-bold); }
+.steps li[data-state="done"] { color: var(--ink-2); }

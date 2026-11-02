@@ -1,6 +1,84 @@
-import React from "react";
-import PageStub from "../components/PageStub.jsx";
+import React, { useCallback, useEffect, useState } from "react";
+import { getSchema, listDatasources } from "../api/connect.js";
+import { listProposals, showKnowledge } from "../api/knowledge.js";
+import Drift from "../knowledge/Drift.jsx";
+import Glossary from "../knowledge/Glossary.jsx";
+import Proposals from "../knowledge/Proposals.jsx";
+
+// Knowledge: what the engine knows about a datasource (anyone), the proposals waiting for review and the drift check
+// (admins; the routes answer 403 to everyone else, so those sections are not shown).
+function Schema({ id }) {
+  const [schema, setSchema] = useState(null);
+  useEffect(() => {
+    setSchema(null);
+    getSchema(id).then(setSchema).catch(() => setSchema(false));
+  }, [id]);
+  if (schema === false) return <p className="quiet">The schema could not be read.</p>;
+  if (!schema) return null;
+  return (
+    <details className="kn-section">
+      <summary>Schema <span className="art-meta">{schema.tables.length} tables</span></summary>
+      <ul className="kn-list">
+        {schema.tables.map((t) => (
+          <li key={t.name}>
+            <span className="mono">{t.name}</span>
+            <span className="art-meta"> {t.columns.map((c) => c.name).join(", ")}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 export default function Knowledge() {
-  return <PageStub row="W3" />;
+  const [sources, setSources] = useState(null);
+  const [current, setCurrent] = useState("");
+  const [view, setView] = useState(null);
+  const [proposals, setProposals] = useState(null);
+  const [fault, setFault] = useState(null);
+
+  useEffect(() => {
+    listDatasources()
+      .then((list) => { setSources(list); if (list.length) setCurrent(list[0].id); })
+      .catch((err) => setFault(err.message || "Something went wrong."));
+  }, []);
+
+  const load = useCallback(() => {
+    if (!current) return;
+    showKnowledge(current).then((views) => setView(views[0] || null)).catch((err) => setFault(err.message));
+    listProposals(current).then(setProposals).catch(() => setProposals(null)); // 403: not an admin
+  }, [current]);
+  useEffect(() => { setView(null); setProposals(null); load(); }, [load]);
+
+  if (fault) return <p className="fault" role="alert">{fault}</p>;
+  if (!sources) return <p className="quiet" role="status">Loading.</p>;
+  if (!sources.length) return <p className="quiet">No datasources yet. <a href="#/connect">Connect one</a>.</p>;
+
+  return (
+    <div className="kn">
+      <div className="conn-field">
+        <label className="settings-label" htmlFor="kn-source">Datasource</label>
+        <select id="kn-source" value={current} onChange={(e) => setCurrent(e.target.value)}>
+          {sources.map((d) => <option key={d.id} value={d.id}>{d.id}</option>)}
+        </select>
+      </div>
+      <section className="conn-card" aria-labelledby="kn-known-h">
+        <h3 id="kn-known-h">What the engine knows</h3>
+        {view ? <Glossary view={view} /> : <p className="quiet" role="status">Loading.</p>}
+        <Schema id={current} />
+      </section>
+      {proposals && (
+        <section className="conn-card" aria-labelledby="kn-prop-h">
+          <h3 id="kn-prop-h">Waiting for review</h3>
+          <Proposals proposals={proposals} onChanged={load} />
+        </section>
+      )}
+      {proposals && (
+        <section className="conn-card" aria-labelledby="kn-drift-h">
+          <h3 id="kn-drift-h">Drift</h3>
+          <Drift datasourceIds={sources.map((d) => d.id)} />
+        </section>
+      )}
+    </div>
+  );
 }

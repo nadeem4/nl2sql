@@ -1553,6 +1553,29 @@ and `init_project` were exported already; `RegistryError`, `load_trace`, `check_
 **For CL1:** nothing in `nl2sql/cli/` (outside the playground) imports an engine module, so the move to
 `nl2sql_cli` is a rename plus repointing the boundary test; `demo/playground/` must be deleted by X1b first.
 
+**W3 (Connect, Knowledge, review, drift).** `#/connect` and `#/knowledge` are real pages in the nav (`router.js`; the
+stubs for them are gone). Connect (`pages/Connect.jsx`, `src/connect/`): the type list comes from `GET
+/datasource-types`; `schemaForm.js` turns a type's `connection_schema` into fields (it resolves `$ref` and
+`anyOf [T, null]`, hides `format: password` behind a password input with a note to type an `${env:NAME}` reference,
+puts `group: advanced` fields behind a disclosure, and sends only values that differ from the default).
+`flow.js` words the Test result (`POST /datasources/test` answers 200 even on failure, with `stage`, `reason`,
+`fix`) and the Add result. A `NOT_WRITABLE` answer is shown as added but not saved (D212: it works until the
+server restarts); a 422 puts each `loc` against its field. Add sends the "Save to the project config" checkbox as
+`save`. After Add the page offers Index (`POST /jobs/index`), Profile (`POST /jobs/profile`; "draft with the
+model" sends `draft` and the required `max_cost_usd`), and starter questions (`GET
+/datasources/{id}/starter-questions`, filed with `POST /proposals/examples`), each job followed with `followJob`
+and shown in `JobProgress`. Knowledge (`pages/Knowledge.jsx`, `src/knowledge/`): the merged knowledge from `GET
+/knowledge` (terms, rules, joins, tables, columns with their origin, problems), the schema from `GET
+/datasources/{id}/schema`, then, only when `GET /proposals` does not answer 403, the review list and the drift
+check. `proposals.js` groups by kind, sends only the edits that changed (`acceptBody`) and words the
+`AcceptReport`; `drift.js` words a `DriftReport` (changes, then what they may break). **No Connect page on the hosted
+demo or for a non-admin:** `GET /datasource-types` answers 403 and the page shows a note instead of a form. The
+page does not read the old `/api/meta`; admin and hosted are inferred from that 403. **Differs from the plan:** the
+schema diagram (`GET /datasources/{id}/diagram` is `text/plain`, which `request()` cannot read) waits for the
+`download()` helper and `Mermaid.jsx` of W2a, so Knowledge lists the tables and columns instead; one
+`schemaForm.js` test file covers the form, so `SchemaForm.jsx` and `Steps.jsx` have no test of their own;
+`SchemaPanel.jsx` and `datasources.js` were already in `src/connect/` from D0b.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below
