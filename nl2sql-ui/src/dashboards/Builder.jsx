@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { listDatasources } from "../api/chat.js";
 import { builderOptions, proposeTiles, startBuildJob } from "../api/dashboards.js";
 import { cancelJob, followJob } from "../api/jobs.js";
@@ -7,19 +7,21 @@ import { answerDate } from "../chat/answers.js";
 import JobProgress from "../components/JobProgress.jsx";
 import { readKeys } from "../lib/hostedKey.js";
 import {
-  askedBlock, buildBody, buildFlow, canAdvance, describeBuilderError, emptyState, proposalsBody, reword, skippedLines,
+  askedBlock, buildBody, buildFlow, canAdvance, describeBuilderError, effectiveState, emptyState, canReword, setChart, CHARTS, proposalsBody, reword, skippedLines,
   sourceChoices, tick, toggle, withTiles,
 } from "./builder.js";
 
 const api = { startJob: startBuildJob, follow: followJob };
 const running = (job) => job && ["queued", "running"].includes(job.status);
+const CHART_NAMES = { auto: "Auto", line: "Line", bar: "Bar", big_number: "Big number", table: "Table" };
 const NAMES = { sources: "Sources", inputs: "What to ask", review: "Review", build: "Build" };
 
 function Chips({ label, items, chosen, onToggle, disabled }) {
   if (!items.length) return null;
+  const id = useId();
   return (
-    <div className="build-group">
-      <p className="build-label">{label}</p>
+    <div className="build-group" role="group" aria-labelledby={id}>
+      <p className="build-label" id={id}>{label}</p>
       <ul className="chip-list">
         {items.map((i) => (
           <li key={i.id}>
@@ -47,6 +49,7 @@ export default function Builder({ workspaces, selected, onOpen }) {
   const [fault, setFault] = useState(null);
   const [busy, setBusy] = useState(false);
   const abort = useRef(new AbortController());
+  const heading = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,6 +65,9 @@ export default function Builder({ workspaces, selected, onOpen }) {
     return () => controller.abort();
   }, []);
 
+  // Next, Back and Build unmount the button that was pressed; move focus to the new step's heading.
+  useEffect(() => { if (heading.current) heading.current.focus(); }, [step]);
+
   const datasourceId = state.datasourceId;
   useEffect(() => {
     if (!datasourceId) return undefined;
@@ -75,8 +81,7 @@ export default function Builder({ workspaces, selected, onOpen }) {
 
   const set = (patch) => setState((s) => ({ ...s, ...patch }));
   const sources = sourceChoices(block);
-  // A model source chosen before the key was known is dropped, not sent.
-  const chosen = block ? { ...state, sources: state.sources.filter((s) => s !== "asked") } : state;
+  const chosen = effectiveState(state, block);
   const into = (workspaces || []).some((w) => w.id === state.workspaceId) ? state.workspaceId : selected || "";
   const index = ["sources", "inputs", "review", "build"].indexOf(step);
 
@@ -112,12 +117,13 @@ export default function Builder({ workspaces, selected, onOpen }) {
         else onOpen(out.hash);
       }
     } catch (e) {
-      if (e.name !== "AbortError") setFault(describeBuilderError(e));
+      if (e.name !== "AbortError") setFault(describeBuilderError(e, "build"));
     } finally {
       setBusy(false);
     }
   };
 
+  const back = () => { setStep("review"); setJob(null); setReport(null); setFault(null); };
   const restart = () => { setStep("sources"); setJob(null); setReport(null); setFault(null); set({ tiles: [] }); };
   const over = Boolean(job) && !running(job);
   const advance = step !== "build" && step !== "review";
@@ -131,6 +137,8 @@ export default function Builder({ workspaces, selected, onOpen }) {
             <li key={s} aria-current={s === step ? "step" : undefined} data-done={i < index}>{NAMES[s]}</li>
           ))}
         </ol>
+
+        <h3 className="build-step-title" tabIndex={-1} ref={heading}>{NAMES[step]}</h3>
 
         {step === "sources" && (
           <>
@@ -196,12 +204,17 @@ export default function Builder({ workspaces, selected, onOpen }) {
 
         {step === "review" && (
           <>
-            <p className="page-note">Untick what you do not want, or change the wording.</p>
+            <p className="page-note">Untick what you do not want, change the chart, or reword a new question.</p>
             <ul className="build-tiles">
               {state.tiles.map((t, i) => (
                 <li key={`${t.source}-${t.ref || i}`}>
                   <input type="checkbox" aria-label={`Include: ${t.question}`} checked={t.ticked} onChange={(e) => set({ tiles: tick(state.tiles, i, e.target.checked) })} />
-                  <input className="dash-input" aria-label="Question" value={t.question} onChange={(e) => set({ tiles: reword(state.tiles, i, e.target.value) })} />
+                  {canReword(t)
+                    ? <input className="dash-input" aria-label="Question" value={t.question} onChange={(e) => set({ tiles: reword(state.tiles, i, e.target.value) })} />
+                    : <span className="build-question">{t.question}</span>}
+                  <select aria-label={`Chart for: ${t.question}`} value={t.chart} onChange={(e) => set({ tiles: setChart(state.tiles, i, e.target.value) })}>
+                    {CHARTS.map((c) => <option key={c} value={c}>{CHART_NAMES[c]}</option>)}
+                  </select>
                   <span className="dash-meta">{{ curated: "curated", saved: "saved", asked: "new" }[t.source]}</span>
                 </li>
               ))}
@@ -248,7 +261,12 @@ export default function Builder({ workspaces, selected, onOpen }) {
           {advance && <button type="button" className="index-rebuild is-primary" disabled={busy || !canAdvance(step, chosen)}
             onClick={() => go(step === "sources" ? "inputs" : "review")}>{step === "inputs" && busy ? "Finding questions" : "Next"}</button>}
           {step === "review" && <button type="button" className="index-rebuild is-primary" disabled={busy || !canAdvance("review", chosen) || !buildBody(chosen).tiles.length} onClick={build}>Build</button>}
-          {step === "build" && (over || fault) && !running(job) && <button type="button" className="index-rebuild" onClick={restart}>Start over</button>}
+          {step === "build" && (over || fault) && !running(job) && (
+            <>
+              <button type="button" className="index-rebuild is-primary" onClick={back}>Back to review</button>
+              <button type="button" className="index-rebuild" onClick={restart}>Start over</button>
+            </>
+          )}
         </div>
       </div>
     </details>

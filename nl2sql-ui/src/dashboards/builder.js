@@ -57,6 +57,16 @@ export function proposalsBody(state) {
   return body;
 }
 
+// A model source chosen before the key was known is dropped, not sent.
+export const effectiveState = (state, block) => (block ? { ...state, sources: state.sources.filter((s) => s !== "asked") } : state);
+
+// A curated or saved tile runs its own stored query; its question is only a caption, so only a new tile is reworded.
+export const canReword = (tile) => tile.source === "asked";
+
+// The chart kinds the API accepts for a tile (ChartChoice).
+export const CHARTS = ["auto", "line", "bar", "big_number", "table"];
+export const setChart = (tiles, at, chart) => (CHARTS.includes(chart) ? tiles.map((t, i) => (i === at ? { ...t, chart } : t)) : tiles);
+
 export const withTiles = (state, tiles) => ({ ...state, tiles });
 export const tick = (tiles, at, ticked) => tiles.map((t, i) => (i === at ? { ...t, ticked } : t));
 // A reworded question gets a new title from the server, so the old one is dropped.
@@ -73,9 +83,10 @@ export function buildBody(state) {
 
 export const skippedLines = (skipped) => (skipped || []).map((s) => `Couldn't answer "${s.question}": ${s.message}`);
 
-export function describeBuilderError(e) {
+// Only the build job's start can be refused because another job is running (`where` is "build"); any other 409 reads as its own message.
+export function describeBuilderError(e, where) {
   if (e && e.code === "MISSING_PROVIDER_KEY") return "Writing new questions needs a model key. Add yours under Settings, or untick \"Tell us what matters\".";
-  if (e && e.status === 409) return "You already have a job running. Wait for it to finish or cancel it, then try again.";
+  if (e && e.status === 409 && where === "build") return "You already have a job running. Wait for it to finish or cancel it, then try again.";
   return `${(e && e.message) || String(e)}${e && e.fix ? ` ${e.fix}` : ""}`;
 }
 

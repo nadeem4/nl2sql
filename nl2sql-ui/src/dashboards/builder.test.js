@@ -5,7 +5,7 @@ import * as jobs from "../api/jobs.js";
 import { fakeApi } from "./fakeApi.js";
 import {
   askedBlock, buildBody, buildFlow, canAdvance, describeBuilderError, emptyState, proposalsBody, reword,
-  skippedLines, sourceChoices, tick, toggle, withTiles,
+  skippedLines, sourceChoices, tick, toggle, withTiles, CHARTS, canReword, effectiveState, setChart,
 } from "./builder.js";
 
 test("a chip toggles in and out of a list without touching the original", () => {
@@ -117,7 +117,8 @@ test("skipped questions read plainly, with the reason", () => {
 
 test("errors read in one sentence; a missing key points to Settings", () => {
   assert.match(describeBuilderError({ code: "MISSING_PROVIDER_KEY", message: "no key" }), /Settings/);
-  assert.match(describeBuilderError({ status: 409, message: "x" }), /already have a job running/);
+  assert.match(describeBuilderError({ status: 409, message: "x" }, "build"), /already have a job running/);
+  assert.doesNotMatch(describeBuilderError({ status: 409, code: "CONFLICT", message: "Changed meanwhile." }), /job running/);
   assert.equal(describeBuilderError({ code: "NO_TILES", message: "Nothing was built.", fix: "Pick others." }), "Nothing was built. Pick others.");
 });
 
@@ -184,4 +185,26 @@ test("a cancelled or aborted build opens nothing", async () => {
     await buildFlow({ startJob: async () => queued, follow: async () => cancelled }, emptyState("a"), { signal: controller.signal }),
     { aborted: true },
   );
+});
+
+test("only a new (asked) tile can be reworded; curated and saved tiles keep their question", () => {
+  assert.equal(canReword({ source: "asked" }), true);
+  assert.equal(canReword({ source: "curated" }), false);
+  assert.equal(canReword({ source: "saved" }), false);
+});
+
+test("a tile's chart is set to one of the kinds the API accepts, and the others stay as they were", () => {
+  assert.deepEqual(CHARTS, ["auto", "line", "bar", "big_number", "table"]);
+  const tiles = [{ chart: "auto" }, { chart: "bar" }];
+  const out = setChart(tiles, 0, "line");
+  assert.equal(out[0].chart, "line");
+  assert.equal(out[1].chart, "bar");
+  assert.equal(tiles[0].chart, "auto");
+  assert.equal(setChart(tiles, 0, "pie"), tiles);
+});
+
+test("the model source is dropped when it is blocked, and kept when it is not", () => {
+  const state = { ...emptyState("d"), sources: ["curated", "asked"] };
+  assert.deepEqual(effectiveState(state, "Needs a key").sources, ["curated"]);
+  assert.equal(effectiveState(state, null), state);
 });

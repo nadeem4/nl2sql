@@ -81,9 +81,12 @@
 .build-sources, .build-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
 .build-sources li { display: grid; gap: 2px; }
 .build-tiles li { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
-.build-tiles .dash-input { flex: 1 1 auto; min-width: 0; }
+.build-tiles .dash-input, .build-question { flex: 1 1 auto; min-width: 0; }
+.build-step-title { margin: 0; font-size: var(--fs-3); font-weight: 600; }
+.build-step-title:focus { outline: none; }
 .build-group { display: grid; gap: var(--sp-2); }
 .build-label { margin: 0; font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.dash-build .chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .dash-build .chip { white-space: normal; text-align: left; padding-top: 6px; padding-bottom: 6px; }
 .dash-build .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--raised); }
 .build-report { display: grid; gap: var(--sp-2); justify-items: start; }
