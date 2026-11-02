@@ -226,6 +226,12 @@ another trace format.
 reason=None)`. The asker's re-run names a granted id in `approvals=` of `run_query`, `stream_query`,
 `conversations.retry` and `dashboards.refresh`. See [Query API → Approval](query.md#approval).
 
+### Saved answers
+
+`engine.answers` keeps a person's own answers: `save(*, trace_id, conversation_id, step, user_context, note=None)`,
+`list(*, user_context, datasource_id=None)`, `get(id, *, user_context)`, `delete(id, *, user_context)` and
+`run(id, *, user_context, llm_override=None, approvals=None)`. See [Saved answers](answers.md).
+
 ### Storage
 
 `engine.storage.info()` returns each store slot's `type` and `location` (and
@@ -278,7 +284,8 @@ interface (`Scorer`, `Score`, `CaseRun`), and release 0.8's shapes
 (`KnowledgeSourceConfig`, `CostRule`, `KnowledgeSourceInfo`,
 `DatasourceKnowledgeView`, `Proposal`, `AcceptReport`, `ReviewError`,
 `ProfileReport`, `ClarificationRequest`, `ClarificationOption`,
-`ClarificationChoice`, `Explanation`, `ExplainedStep`, `TermUse`). The list is fixed by
+`ClarificationChoice`, `Explanation`, `ExplainedStep`, `TermUse`), and the saved answers (`SavedAnswer`,
+`SaveReport`, `AnswerNotFound`, `AnswerLimitReached`, `NotSavable`). The list is fixed by
 `tests/unit/test_public_surface.py`: adding or removing a name is a semver
 decision. The REST API (`nl2sql-api`) is held to importing only from `nl2sql`
 by an architecture test.

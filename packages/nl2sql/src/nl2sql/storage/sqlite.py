@@ -225,6 +225,20 @@ def _approvals(connection: sqlite3.Connection) -> None:
     """)
 
 
+def _saved_answers(connection: sqlite3.Connection) -> None:
+    """Wave D: a person's saved answers, one JSON document per id, owned by (tenant_id, user_id) (D238)."""
+    _script(connection, """
+        CREATE TABLE IF NOT EXISTS saved_answers (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT,
+            user_id TEXT,
+            created_at TEXT NOT NULL,
+            doc_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_saved_answers_owner ON saved_answers (tenant_id, user_id, created_at);
+    """)
+
+
 MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0001_adopt_0_5_tables", _adopt_0_5),
     ("0002_feedback_datasources_and_source", _feedback_datasources_and_source),
@@ -233,6 +247,7 @@ MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0005_proposals", _proposals),
     ("0006_conversations_dashboards_and_keys", _conversations_dashboards_and_keys),
     ("0007_approvals", _approvals),
+    ("0008_saved_answers", _saved_answers),
 ]
 
 # -- feedback columns --------------------------------------------------------------
@@ -285,7 +300,7 @@ def _locked(method):
 class SqliteState:
     """The built-in ``StateStore``, on one SQLite file (or ``:memory:``, for tests)."""
 
-    interface_version: ClassVar[int] = 5
+    interface_version: ClassVar[int] = 6
     slot: ClassVar[str] = "state"
     config_model: ClassVar[type] = NoKeys
 
@@ -682,6 +697,36 @@ class SqliteState:
                                "(SELECT id FROM dashboards WHERE status = 'draft' AND updated_at < ?);", (cutoff,))
             return connection.execute("DELETE FROM dashboards WHERE status = 'draft' AND updated_at < ?;",
                                       (cutoff,)).rowcount
+
+    # -- saved answers ------------------------------------------------------------
+
+    @_locked
+    def put_saved_answer(self, doc: Dict[str, Any]) -> None:
+        """Stores ``doc``, replacing the saved answer with its ``id``."""
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO saved_answers (id, tenant_id, user_id, created_at, doc_json) "
+                "VALUES (?, ?, ?, ?, ?);",
+                (doc["id"], doc.get("tenant_id"), doc.get("user_id"), _stamp(doc["created_at"]), json.dumps(doc)))
+
+    @_locked
+    def get_saved_answer(self, answer_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn().execute("SELECT doc_json FROM saved_answers WHERE id = ?;", (answer_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    @_locked
+    def list_saved_answers(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[Dict[str, Any]]:
+        rows = self._conn().execute(
+            "SELECT doc_json FROM saved_answers WHERE tenant_id IS ? AND user_id IS ? "
+            "ORDER BY created_at DESC, id;", (tenant_id, user_id)).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def delete_saved_answer(self, answer_id: str) -> bool:
+        connection = self._conn()
+        with connection:
+            return connection.execute("DELETE FROM saved_answers WHERE id = ?;", (answer_id,)).rowcount > 0
 
     @_locked
     def list_scheduled_dashboards(self) -> List[Dict[str, Any]]:

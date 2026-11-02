@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from nl2sql.api.chat_tools_api import ChatToolsAPI
     from nl2sql.api.conversations_api import ConversationsAPI
     from nl2sql.api.curated_api import CuratedAPI
+    from nl2sql.api.answers_api import AnswersAPI
     from nl2sql.api.dashboards_api import DashboardsAPI
     from nl2sql.api.workspaces_api import WorkspacesAPI
     from nl2sql.api.datasource_api import DatasourcesAPI
@@ -247,6 +248,14 @@ class NL2SQL:
         from nl2sql.api.dashboards_api import DashboardsAPI
 
         return DashboardsAPI(self._runtime)
+
+    @cached_property
+    def answers(self) -> "AnswersAPI":
+        """A person's saved answers: ``save`` (rates the run up and files its proposal), ``list``, ``get``,
+        ``delete``, ``run``. Every method takes the caller; an answer is its owner's alone."""
+        from nl2sql.api.answers_api import AnswersAPI
+
+        return AnswersAPI(self._runtime)
 
     @cached_property
     def api_keys(self) -> "ApiKeysAPI":

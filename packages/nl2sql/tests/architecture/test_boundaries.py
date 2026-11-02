@@ -1071,6 +1071,7 @@ WAVE_C_CALLER_METHODS = {
         "get", "list", "open", "refresh", "edit", "rename", "rename_tile", "set_tile_chart", "remove_tile",
         "arrange", "set_filters", "set_schedule", "move", "pin", "delete", "generate", "filter_values",
         "suggest_questions", "create_draft")),
+    ("api/answers_api.py", "AnswersAPI"): ("user_context", ("save", "list", "get", "delete", "run")),
     ("api/api_keys_api.py", "ApiKeysAPI"): ("by", ("create", "list", "revoke")),
     ("api/datasource_api.py", "DatasourcesAPI"): ("user_context", ("diagram",)),
 }

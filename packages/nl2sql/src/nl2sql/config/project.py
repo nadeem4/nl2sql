@@ -63,7 +63,7 @@ PACKAGED_SUITES = Path(__file__).resolve().parents[1] / "evaluation" / "suites"
 GLOSSARY_FILE = "glossary.yaml"
 # The sections beyond the six every project has: written when the config sets them.
 OPTIONAL_SECTIONS = ("curated", "secrets", "settings", "api", "observers", "hooks", "evals", "conversations",
-                     "chat_tools", "dashboards", "mcp")
+                     "chat_tools", "dashboards", "answers", "mcp")
 
 
 def default_llm(provider: str) -> LLM:
