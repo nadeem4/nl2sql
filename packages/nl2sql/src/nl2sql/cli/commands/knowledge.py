@@ -22,8 +22,7 @@ from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
 
 if TYPE_CHECKING:
-    from nl2sql import NL2SQL, UserContext
-    from nl2sql.knowledge.models import DatasourceKnowledgeView
+    from nl2sql import NL2SQL, UserContext, DatasourceKnowledgeView
 
 app = typer.Typer(help="The glossary as the engine uses it: `show`, `export`, `sources`.", no_args_is_help=True)
 

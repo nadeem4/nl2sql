@@ -629,22 +629,6 @@ def test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2s
         "the engine is a facade method every caller can use.", offenders)
 
 
-# The CLI files that still import the engine's internals, and what CL0b gives each. The list only
-# shrinks and CL0b empties it. ``commands/demo.py`` is also held to ``STILL_IMPORTED_FROM_INSIDE`` above.
-CLI_FILES_STILL_IMPORTING_INSIDE = {
-    "commands/demo.py": "the replay server, the recording proxy and the guided questions (CL0b)",
-    "commands/eval.py": "evaluation presets and records, the LLM file model (CL0b)",
-    "commands/info.py": "the registry's error type (CL0b)",
-    "commands/knowledge.py": "the knowledge view type (CL0b)",
-    "commands/launch.py": "config writers and provider key helpers (CL0b)",
-    "commands/mcp.py": "the MCP server's start (D232) and the policies model (CL0b)",
-    "commands/profile.py": "the profile report type (CL0b)",
-    "commands/trace.py": "the trace document loader (CL0b)",
-    "common/decorators.py": "the engine's error base class (CL0b)",
-    "demo/llm_config.py": "the provider catalogue (CL0b)",
-}
-
-
 def _outside_the_cli(path):
     """The ``nl2sql`` modules a file imports, relative imports resolved, that are not ``nl2sql`` or ``nl2sql.cli``.
 
@@ -662,26 +646,22 @@ def _outside_the_cli(path):
 def test_the_cli_imports_only_the_public_nl2sql():
     """The CLI is a client of the facade, like the API: ``from nl2sql import ...``, never the engine's internals.
 
-    ``CLI_FILES_STILL_IMPORTING_INSIDE`` names the files CL0b still has to
-    move; the playground is held to the older rule above until it is deleted.
+    The playground, ``cli/demo/`` and ``commands/demo.py`` are held to the older rule above until X1a/X1b
+    delete them (they are in ``STILL_IMPORTED_FROM_INSIDE``); nothing else is excepted.
     """
     offenders = []
     for path in python_files(CLI):
         relative = path.relative_to(CLI).as_posix()
-        if relative.startswith("demo/playground/") or relative in CLI_FILES_STILL_IMPORTING_INSIDE:
+        # X1a turns demo.py into a launcher and X1b deletes demo/: both go before the CLI moves (CL1).
+        if relative.startswith("demo/") or relative == "commands/demo.py":
             continue
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name in _outside_the_cli(path)]
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
                       if name.partition(".")[0] == "nl2sql_sdk"]
-    stale = [name for name in CLI_FILES_STILL_IMPORTING_INSIDE
-             if not (CLI / name).is_file()
-             or not _outside_the_cli(CLI / name)]
     assert not offenders, _broke(
         "The CLI imports only the top-level nl2sql (and its own nl2sql.cli package), never the engine's "
         "internals or nl2sql_sdk. What a command needs is a facade method or export every caller can use.",
         offenders)
-    assert not stale, _broke(
-        "CLI_FILES_STILL_IMPORTING_INSIDE names files that no longer need an exception: delete the entries.", stale)
 
 
 def test_mcp_uses_only_the_public_api():
