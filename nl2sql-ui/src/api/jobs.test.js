@@ -28,3 +28,12 @@ test("followJob falls back to the job record when the stream ends early", async 
   assert.deepEqual(await followJob("j", (s) => steps.push(s)), { id: "j", status: "running" });
   assert.deepEqual(steps, [{ step: "a" }]);
 });
+
+test("listJobs reads the caller's jobs", async () => {
+  const { listJobs } = await import("./jobs.js");
+  const seen = [];
+  globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (url, init = {}) => { seen.push([init.method, String(url)]); return new Response("[]", { status: 200 }); };
+  assert.deepEqual(await listJobs(), []);
+  assert.deepEqual(seen, [["GET", "/api/v1/jobs"]]);
+});

@@ -68,3 +68,7 @@
   .dash-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }
   .dash-tile { grid-column: 1; grid-row: auto; min-height: 220px; }
 }
+
+.dash-gen { font-size: var(--fs-2); }
+.dash-gen summary { cursor: pointer; color: var(--ink-2); }
+.dash-gen-form { display: grid; gap: var(--sp-2); justify-items: start; margin-top: var(--sp-2); }

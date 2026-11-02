@@ -64,3 +64,8 @@ export const renameWorkspace = (id, name) => request("PUT", `/workspaces/${enc(i
 
 // An empty workspace only; a non-empty one is a 422 (WorkspaceNotEmpty).
 export const deleteWorkspace = (id) => request("DELETE", `/workspaces/${enc(id)}`);
+
+// ---- generate
+// Starts the no-model starter dashboard job; answers the queued `Job`. Follow it with `followJob` (jobs.js).
+// `body` is `{datasource_id, title?, workspace_id?, max_tiles?}` (generate.js `generateBody`).
+export const startDashboardJob = (body) => request("POST", "/jobs/dashboard", body);
