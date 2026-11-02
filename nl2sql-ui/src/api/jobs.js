@@ -2,6 +2,9 @@
 // JobProgress shares. The call that starts a job belongs to the page for its kind.
 import { request, stream } from "./http.js";
 
+// The caller's jobs, newest first.
+export const listJobs = () => request("GET", "/jobs");
+
 export const getJob = (id) => request("GET", `/jobs/${encodeURIComponent(id)}`);
 
 export const cancelJob = (id) => request("DELETE", `/jobs/${encodeURIComponent(id)}`);

@@ -18,17 +18,35 @@ export function withStep(job, step) {
   return job ? { ...job, status: "running", progress: [...job.progress, step] } : job;
 }
 
-// `api` is `{startJob(body), follow(id, onStep)}` (api/dashboards.js `startDashboardJob`, api/jobs.js `followJob`).
-// `onJob(job)` hears the queued job, each step and the finished job. Resolves `{hash, dashboard}` for a dashboard to
-// open, or `{cancelled: true}`; a failed job throws its error (`message`, `fix`).
-export async function generateFlow(api, input, { onJob = () => {} } = {}) {
-  let job = await api.startJob(generateBody(input));
+// The dashboard job the caller already has queued or running, if any (from `GET /jobs`, newest first).
+export function findRunning(list) {
+  return (list || []).find((j) => j.kind === "dashboard" && ["queued", "running"].includes(j.status)) || null;
+}
+
+// `api` is `{startJob(body), follow(id, onStep, signal)}` (api/dashboards.js `startDashboardJob`, api/jobs.js `followJob`).
+// `onStarted()` fires once the start request has returned or failed, `onJob(job)` hears the queued job, each step and
+// the finished job. `signal` stops it: an aborted flow never opens a dashboard. Resolves `{hash, dashboard}` to open,
+// `{cancelled: true}` or `{aborted: true}`; a failed job throws its error (`message`, `fix`).
+export async function generateFlow(api, input, { onJob = () => {}, onStarted = () => {}, signal } = {}) {
+  let job;
+  try {
+    job = await api.startJob(generateBody(input));
+  } finally {
+    onStarted();
+  }
+  return resumeFlow(api, job, { onJob, signal });
+}
+
+// Follow a job that is already started (a new one, or one found running on load) to its end.
+export async function resumeFlow(api, job, { onJob = () => {}, signal } = {}) {
   onJob(job);
+  if (signal && signal.aborted) return { aborted: true };
   const finished = await api.follow(job.id, (step) => {
     job = withStep(job, step);
     onJob(job);
-  });
+  }, signal);
   onJob(finished);
+  if (signal && signal.aborted) return { aborted: true };
   if (finished.status === "cancelled") return { cancelled: true };
   if (finished.status === "failed") {
     const error = finished.error || {};

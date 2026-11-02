@@ -118,7 +118,7 @@ routes](../api/rest/dashboards.md) and never a model.
   wider or narrower, taller or shorter, and remove. It also renames the dashboard, **moves** it to another workspace
   (or **pins** a draft into one; with no workspace yet, **Pin** makes "General"), removes a filter, and deletes the dashboard. The grid has four columns; charts are
   packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here.
-- **Generate a starter dashboard** (at the top of the page) builds one for a datasource from what the project already knows, with no model and no key. Pick the datasource, and optionally a title, the workspace to save into (the chosen one by default) and how many charts. Progress shows as "tile 3 of 8" and can be cancelled; when it is saved the new dashboard opens. Only one job per person runs at a time, so a second start is told to wait.
+- **Generate a starter dashboard** (at the top of the page) builds one for a datasource from what the project already knows, with no model and no key. Pick the datasource, and optionally a title, the workspace to save into (the chosen one by default) and how many charts. Progress shows as "tile 3 of 8" and can be cancelled; when it is saved the new dashboard opens. Only one job per person runs at a time: the form locks while the start request is in flight, a job already running (after a reload, say) comes back with its progress and Cancel, and leaving the page stops following it without opening anything.
 
 ## Connect and review
 

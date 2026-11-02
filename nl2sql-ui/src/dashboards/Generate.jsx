@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { listDatasources } from "../api/chat.js";
 import { startDashboardJob } from "../api/dashboards.js";
-import { cancelJob, followJob } from "../api/jobs.js";
+import { cancelJob, followJob, listJobs } from "../api/jobs.js";
 import JobProgress from "../components/JobProgress.jsx";
-import { describeGenerateError, generateFlow } from "./generate.js";
+import { describeGenerateError, findRunning, generateFlow, resumeFlow } from "./generate.js";
 
 const api = { startJob: startDashboardJob, follow: followJob };
 const running = (job) => job && ["queued", "running"].includes(job.status);
@@ -18,29 +18,44 @@ export default function Generate({ workspaces, selected, onOpen }) {
   const [maxTiles, setMaxTiles] = useState("");
   const [job, setJob] = useState(null);
   const [fault, setFault] = useState(null);
+  const [starting, setStarting] = useState(false);
   const abort = useRef(null);
 
   useEffect(() => {
     listDatasources()
       .then((all) => setSources(all.filter((d) => !String(d.status || "").startsWith("failed"))))
       .catch((e) => { setSources([]); setFault(describeGenerateError(e)); });
-    return () => abort.current && abort.current.abort();
+    // A job the caller already has (a reload, another tab) comes back with its progress and Cancel.
+    const controller = new AbortController();
+    abort.current = controller;
+    listJobs().then((all) => {
+      const found = findRunning(all);
+      if (found && !controller.signal.aborted) follow(resumeFlow(api, found, { onJob: setJob, signal: controller.signal }));
+    }).catch(() => {});
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const chosen = (sources || []).some((d) => d.id === datasourceId) ? datasourceId : (sources && sources[0] ? sources[0].id : "");
-  const into = (workspaces || []).some((w) => w.id === workspaceId) ? workspaceId : selected || "";
-  const busy = running(job);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setFault(null);
-    abort.current = new AbortController();
+  const follow = async (promise) => {
     try {
-      const out = await generateFlow(api, { datasourceId: chosen, title, workspaceId: into, maxTiles }, { onJob: setJob });
+      const out = await promise;
       if (out.hash) onOpen(out.hash);
     } catch (err) {
       if (err.name !== "AbortError") setFault(describeGenerateError(err));
     }
+  };
+
+  const chosen = (sources || []).some((d) => d.id === datasourceId) ? datasourceId : (sources && sources[0] ? sources[0].id : "");
+  const into = (workspaces || []).some((w) => w.id === workspaceId) ? workspaceId : selected || "";
+  const busy = running(job) || starting;
+
+  const submit = (e) => {
+    e.preventDefault();
+    setFault(null);
+    setStarting(true);
+    const signal = abort.current.signal;
+    return follow(generateFlow(api, { datasourceId: chosen, title, workspaceId: into, maxTiles },
+      { onJob: setJob, onStarted: () => setStarting(false), signal }));
   };
 
   return (
