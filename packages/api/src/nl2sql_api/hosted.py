@@ -17,7 +17,8 @@
   address. A session has at most one job and two open streams. A refusal is a 429
   ``LIMIT_REACHED`` with ``Retry-After``, sent before the route runs, so it never starts a model call.
 
-State is in this process's memory only; a visitor who has been idle for an hour is forgotten.
+The signing key is the one thing on disk (``hosted_session.key`` in the storage directory); the rest of this state is in
+this process's memory only, and a visitor who has been idle for an hour is forgotten.
 """
 import hashlib
 import hmac
@@ -117,7 +118,7 @@ class Hosted:
 
     def __init__(self, role: Optional[str], limits: Optional[Limits] = None, key: Optional[bytes] = None) -> None:
         self.role = role
-        self._key = key or secrets.token_bytes(32)  # without one, tokens last only as long as this process
+        self._key = key if key is not None else secrets.token_bytes(32)  # without one, tokens last only as long as this process
         self.limits = limits or Limits()
         self._streams: Dict[str, int] = {}
         self._starting: set = set()  # visitors whose job start is being handled: the slot a parallel start cannot take
@@ -237,11 +238,16 @@ def load_session_key(directory: Path) -> bytes:
             made.write(secrets.token_bytes(32))
         try:
             os.link(temp, path)  # whole or not at all, and the first of several workers to start wins
-        except FileExistsError:
-            pass
-        finally:
             os.unlink(temp)
-    return path.read_bytes()
+        except FileExistsError:
+            os.unlink(temp)
+        except OSError:
+            os.replace(temp, path)  # a volume without hard links: still whole, though the last worker to start wins
+    key = path.read_bytes()
+    if len(key) != 32:
+        raise ValueError(f"{path} should hold exactly 32 bytes and holds {len(key)}. Delete it to make a new key "
+                         "(every visitor then starts a new session).")
+    return key
 
 
 def _cookie(scope: Scope) -> str:

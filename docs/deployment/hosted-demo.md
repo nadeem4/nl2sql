@@ -310,7 +310,7 @@ OS supports it), in the storage directory (`storage.path`), beside the state sto
 approvals also survive a restart. So a restart or a redeploy on the same volume keeps every visitor's cookie, and with it
 their work. Jobs and the limits' counters are in memory and start again. Several workers sharing that directory share the
 key, so a cookie one signed is valid at all of them (the limits and job slots are still counted per worker). On a
-volume that is wiped, the key is made again and every visitor starts a new session. The key is never read from the
+volume that is wiped, the key is made again and every visitor starts a new session. A key file that is not exactly 32 bytes stops the start with a message; delete it to make a new one. The key is never read from the
 environment and is not part of any response or log.
 
 ## What is off, and what is on

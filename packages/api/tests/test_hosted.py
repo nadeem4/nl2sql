@@ -377,6 +377,25 @@ def test_the_session_key_is_made_once_and_kept_so_a_restart_keeps_every_visitor(
         assert (tmp_path / "hosted_session.key").stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.parametrize("content", [b"", b"short", b"k" * 33])
+def test_a_key_file_that_is_not_32_bytes_is_refused_not_used(tmp_path, content):
+    (tmp_path / "hosted_session.key").write_bytes(content)
+
+    with pytest.raises(ValueError, match="hosted_session.key"):
+        load_session_key(tmp_path)
+
+
+def test_a_volume_without_hard_links_still_gets_its_key(tmp_path, monkeypatch):
+    def no_links(*_):
+        raise OSError("hard links are not supported here")
+
+    monkeypatch.setattr(os, "link", no_links)
+    key = load_session_key(tmp_path)
+
+    assert len(key) == 32 and load_session_key(tmp_path) == key
+    assert [p.name for p in tmp_path.iterdir()] == ["hosted_session.key"]
+
+
 def test_without_a_key_a_server_makes_its_own_and_forgets_it_on_restart():
     token = Hosted(role="viewer").mint()
 
