@@ -191,8 +191,9 @@ class Hosted:
                 "asked": self.limits.asked(visitor), "jobs": JOBS_PER_SESSION, "streams": STREAMS_PER_SESSION}
 
 
-# What spends a question: a question, a turn (or its retry or stream) and the start of any job. A cancel is a DELETE.
-_SPENDS = re.compile(r"^/api/v1/(query(/stream)?|conversations/[^/]+/(turns(/stream)?|retry)|jobs/[^/]+)$")
+# What spends a question: a question, a turn (or its retry or stream), builder proposals (which may ask the model) and
+# the start of any job (the dashboard build included). A cancel is a DELETE.
+_SPENDS = re.compile(r"^/api/v1/(query(/stream)?|conversations/[^/]+/(turns(/stream)?|retry)|dashboard-builder/proposals|jobs/[^/]+)$")
 _STREAMS_POST = re.compile(r"^/api/v1/(query/stream|conversations/[^/]+/turns/stream)$")
 _STREAMS_GET = re.compile(r"^/api/v1/jobs/[^/]+/events$")
 _JOB_START = re.compile(r"^/api/v1/jobs/[^/]+$")

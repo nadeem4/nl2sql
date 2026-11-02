@@ -240,6 +240,23 @@ def test_build_failure_is_the_jobs_error(stub):
     assert job["status"] == "failed" and job["error"]["code"] == "NO_TILES"
 
 
+def test_a_request_key_in_a_failed_builds_error_never_reaches_the_log(api_client, caplog):
+    key = "sk-secret-" + "k" * 20
+    client, engine = api_client(api={"request_llm": True})
+    engine.dashboards = Recorder()
+
+    def build(*args, **kwargs):
+        raise RuntimeError(f"provider rejected key {key}")
+
+    engine.dashboards.returns["build"] = build
+    with caplog.at_level("DEBUG"):
+        job = client.post(f"{API}/jobs/dashboard-build", json=BUILD, headers={"X-NL2SQL-Api-Key-openai": key}).json()
+        done = wait_for(client, job["id"])
+
+    assert done["status"] == "failed" and done["error"]["code"] == "INTERNAL"
+    assert "provider rejected key" in caplog.text and key not in caplog.text
+
+
 def test_build_passes_a_request_key(api_client):
     client, engine = api_client(api={"request_llm": True})
     engine.dashboards = Recorder()

@@ -108,6 +108,12 @@ def test_hosted_limits_are_429_with_retry_after(make):
     assert client.post("/api/v1/query", json={}).status_code != 429
 
 
+def test_builder_proposals_spend_a_question_like_a_query(make):
+    _, client = make(per_session=2)
+    codes = [client.post("/api/v1/dashboard-builder/proposals", json={}).status_code for _ in range(3)]
+    assert 429 not in codes[:2] and codes[2] == 429
+
+
 def test_the_session_cap_is_per_session(make):
     _, client = make(per_session=2)
     assert 429 not in [client.post("/api/v1/query", json={}).status_code for _ in range(2)]
