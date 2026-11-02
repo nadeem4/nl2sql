@@ -2102,6 +2102,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dashboards-and-workspaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dashboards and workspaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#connect-and-review" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6238,6 +6249,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dashboards-and-workspaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dashboards and workspaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#connect-and-review" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6375,6 +6397,30 @@ server refuses a decision that is not yours, with its reason shown.</p>
 each mark has a hover title with its full value. The series colours keep 3:1 contrast against the card in both themes
 (<code>src/outputs/palette.test.js</code>). Downloads are fetched with the page's own request headers, so they work with the
 same keys and identity as every other call.</p>
+<h2 id="dashboards-and-workspaces">Dashboards and workspaces</h2>
+<p>The <strong>Dashboards</strong> page (<code>#/dashboards</code>, and <code>#/dashboards/{id}</code> for one dashboard) shows whole dashboards, which
+the chat builds as drafts and a person pins into a workspace. It calls the <a href="../../api/rest/dashboards/">dashboards and workspaces
+routes</a> and never a model.</p>
+<ul>
+<li><strong>Workspaces</strong> are listed on the left: create, rename, and delete (an empty one only; the server's sentence is shown
+  otherwise). The chosen workspace lists its saved dashboards; <strong>Drafts</strong> lists those not yet pinned.</li>
+<li><strong>Opening</strong> a dashboard only reads: each chart appears with its stored result and how old it is ("Refreshed 10 min
+  ago"). The charts the server reports as due are then refreshed one at a time. <strong>Refresh</strong> re-runs every chart.</li>
+<li><strong>Charts</strong> are drawn with the same chart card as the chat. A chart that cannot show says why: <em>needs fixing</em> (what
+  broke, with <strong>Remove this chart</strong>), <em>denied</em> (you may not read its data), <em>needs approval</em> (the reason, a link to
+  Approvals, and <strong>Run again</strong>: it names the request, then runs the chart with it once it is granted, or says it is still
+  waiting), or no rows.</li>
+<li><strong>Filters</strong> apply values to every chart: a list of a column's values for an <code>in</code> filter, two ends for a <code>between</code>
+  filter. <strong>Apply</strong> shows the filtered result and stores nothing; <strong>Clear</strong> brings back the stored results
+  (it opens the dashboard again). A chart a filter does not reach is marked "Not filtered". The header's age is that of
+  the oldest result shown.</li>
+<li><strong>Schedule</strong> sets how often the dashboard refreshes itself, or stops it. An interval under the server's minimum is
+  refused with its own sentence.</li>
+<li><strong>Edit</strong> turns on, per chart: rename, chart type (automatic, line, bar, big number, table; the chart runs once so the new type shows), move earlier or later,
+  wider or narrower, taller or shorter, and remove. It also renames the dashboard, <strong>moves</strong> it to another workspace
+  (or <strong>pins</strong> a draft into one; with no workspace yet, <strong>Pin</strong> makes "General"), removes a filter, and deletes the dashboard. The grid has four columns; charts are
+  packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here, and so is generating a dashboard for a datasource.</li>
+</ul>
 <h2 id="connect-and-review">Connect and review</h2>
 <p><strong>Connect</strong> (<code>#/connect</code>) adds a datasource to the running server.</p>
 <ol>
