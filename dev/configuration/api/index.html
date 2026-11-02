@@ -6200,6 +6200,11 @@ optional one that fails leaves it serving the others. See <a href="../system/#st
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql-api<span class="w"> </span>serve<span class="w"> </span>--config<span class="w"> </span>/etc/nl2sql/nl2sql.yaml<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># or: NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml uvicorn nl2sql_api.main:app</span>
 </code></pre></div>
+<p><code>--demo</code> prepares and serves the demo project, and <code>--hosted</code> makes it the public demo; <code>NL2SQL_MODE</code> or the
+<code>mode:</code> key picks the mode when no flag does (see <a href="../../deployment/hosted-demo/#serving-it-with-nl2sql-api">Hosted demo</a>).</p>
+<p><code>serve</code> loads the <code>.env</code> beside <code>nl2sql.yaml</code> (never overriding a variable already set), except for a hosted server,
+which never loads one. <code>uvicorn nl2sql_api.main:app</code> loads no <code>.env</code>: export the variables first. It also refuses
+to start over a config with <code>mode: hosted</code>, which needs <code>nl2sql-api serve</code>.</p>
 <p><code>serve</code> runs one worker, and with <code>auth: none</code> it refuses to bind any host but
 loopback, naming <code>api.auth</code> in the message.</p>
 <p>The <code>NL2SQL_API_*</code> variables of 0.4 are not read; see

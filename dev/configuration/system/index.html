@@ -6914,7 +6914,7 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <h3 id="mode">Mode</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_data</span><span class="w">    </span><span class="c1"># demo | your_data | hosted (default your_data)</span>
 </code></pre></div>
-<p>What the project is for: the bundled <code>demo</code>, your own data, or a <code>hosted</code> public demo (<a href="../../architecture/wave_d/">Wave D</a>, D229). It is a top-level key, not a section. The engine only validates it. <code>nl2sql.resolve_mode(flag, env, file)</code> picks the mode a process runs in: the launcher flag, else the value of <code>NL2SQL_MODE</code>, else this key. It is a pure function; the entry point reads the environment and passes the value in (<code>nl2sql-api</code> does this in a later Wave D PR). An unknown value is an error naming the three.</p>
+<p>What the project is for: the bundled <code>demo</code>, your own data, or a <code>hosted</code> public demo (<a href="../../architecture/wave_d/">Wave D</a>, D229). It is a top-level key, not a section. The engine only validates it. <code>nl2sql.resolve_mode(flag, env, file)</code> picks the mode a process runs in: the launcher flag, else the value of <code>NL2SQL_MODE</code>, else this key. It is a pure function; the entry point reads the environment and passes the value in: <code>nl2sql-api serve</code> is the one place that reads <code>NL2SQL_MODE</code>, resolves it with the <code>--demo</code> and <code>--hosted</code> flags and the file, and builds the engine with the result in its <code>Config</code>. An unknown value is an error naming the three.</p>
 <h3 id="strict-keys-and-errors">Strict keys and errors</h3>
 <p>Every section forbids unknown keys and suggests the closest known one. Names
 resolved through the <a href="../../development/">registry</a> (<code>type:</code>,
@@ -6946,6 +6946,11 @@ it is in (an included file, not <code>nl2sql.yaml</code>):</p>
 <td><code>NL2SQL_CONFIG</code></td>
 <td><code>load_config()</code> with no path, the CLI, <code>nl2sql-api</code></td>
 <td>Path to <code>nl2sql.yaml</code>. Without it, <code>./nl2sql.yaml</code>.</td>
+</tr>
+<tr>
+<td><code>NL2SQL_MODE</code></td>
+<td><code>nl2sql-api serve</code></td>
+<td><code>demo</code>, <code>your_data</code> or <code>hosted</code>: the mode when no flag sets it. It beats the config's <code>mode:</code> and loses to <code>--demo</code> and <code>--hosted</code>.</td>
 </tr>
 <tr>
 <td><code>NL2SQL_LOG_LEVEL</code></td>

@@ -6286,8 +6286,7 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
 <h3 id="application-lifecycle">Application lifecycle</h3>
 <p>Source: <code>packages/api/src/nl2sql_api/main.py</code></p>
 <ul>
-<li><code>lifespan</code> configures logging, loads the <code>.env</code> next to <code>nl2sql.yaml</code> (never
-  overriding a variable already set), builds one engine with
+<li><code>lifespan</code> configures logging, builds one engine with
   <code>NL2SQL.from_config()</code> (the file <code>NL2SQL_CONFIG</code> names, else <code>./nl2sql.yaml</code>)
   and calls <code>engine.check()</code> before it serves. A <code>required</code> datasource that
   fails, or no datasource ready at all, raises <code>EngineNotReady</code>: the API logs
@@ -6427,7 +6426,7 @@ no <code>except Exception</code>.</p>
 event loop.</p>
 <h2 id="configuration">Configuration</h2>
 <p>The REST API is configured by the same <code>nl2sql.yaml</code> as the engine. Beyond the
-runtime server options of <code>nl2sql-api serve</code> (<code>--config</code>, <code>--host</code>, <code>--port</code>; one worker, no reload),
+runtime server options of <code>nl2sql-api serve</code> (<code>--config</code>, <code>--host</code>, <code>--port</code>, <code>--demo</code>, <code>--dir</code>, <code>--hosted</code>, <code>--questions-per-minute</code>, <code>--questions-per-session</code>; one worker, no reload; see <a href="../../deployment/hosted-demo/">Hosted demo</a>),
 its own settings are the <code>api</code> section of that file (see
 <a href="../../configuration/api/">The <code>api</code> section</a>), and the admin roles are
 <code>policies.admin_roles</code>. The engine validates the <code>api</code> section and never reads it.</p>

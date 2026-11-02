@@ -1745,6 +1745,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#serving-it-with-nl2sql-api">
+<span class="md-ellipsis">
+      
+        Serving it with nl2sql-api
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#limits">
 <span class="md-ellipsis">
       
@@ -2790,6 +2799,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#serving-it-with-nl2sql-api">
+<span class="md-ellipsis">
+      
+        Serving it with nl2sql-api
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#limits">
 <span class="md-ellipsis">
       
@@ -3162,6 +3180,28 @@ miss that asks for a key (see <a href="#recorded-answers-without-a-key">above</a
 malformed key answers <code>400</code> without quoting what was sent, and no refusal
 ever repeats something shaped like a key, not even when one was pasted into the
 model header by hand.</p>
+<h2 id="serving-it-with-nl2sql-api">Serving it with <code>nl2sql-api</code></h2>
+<p>The same demo is served by the API server, which also serves the web app:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>nl2sql-api<span class="w"> </span>serve<span class="w"> </span>--demo<span class="w"> </span>--hosted<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">7860</span><span class="w"> </span>--questions-per-minute<span class="w"> </span><span class="m">6</span><span class="w"> </span>--questions-per-session<span class="w"> </span><span class="m">30</span>
+</code></pre></div>
+<p><code>--demo</code> prepares the demo project in <code>--dir</code> (default <code>nl2sql-demo</code>) and serves it; with <code>--hosted</code> the project is
+prepared on the <code>replay</code> provider, and the server refuses to start while a model key is in its environment (the
+message names the provider, never the key) or when the visitor role (<code>policies.default_role</code>, else <code>viewer</code>) is an
+admin role. <code>NL2SQL_MODE</code> (<code>demo</code>, <code>your_data</code> or <code>hosted</code>) sets the mode when no flag does, and beats the <code>mode:</code>
+key of <code>nl2sql.yaml</code>; <code>GET /api/v1/meta</code> reports it.</p>
+<p>In hosted mode every browser is an anonymous session: a random <code>nl2sql_demo_session</code> cookie (<code>HttpOnly</code>,
+<code>SameSite=Lax</code>) is its identity, it holds the one visitor role and is never an admin, so the admin routes answer
+<code>403</code>. Only the 32-character lowercase hex token this server mints is accepted as the cookie (anything else gets a
+new session), and the cookie is <code>Secure</code> when the request came over HTTPS (directly, or as <code>X-Forwarded-Proto</code>). Each
+session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
+at a time, besides the limits below; going over any of them
+is <code>429 LIMIT_REACHED</code> with a <code>Retry-After</code> header. <code>GET /api/v1/meta</code> tells a visitor the limits and how many
+questions the session has asked (<code>limits</code>). The old <code>nl2sql demo --hosted</code> flags below stay until the CLI moves
+onto the API.</p>
+<p><code>nl2sql-api serve</code> loads the <code>.env</code> beside the config (before it looks at the environment for a model key), except
+for a hosted server, which never loads one: it holds no model key, and a <code>.env</code> with one beside a hosted config is
+left alone. <code>uvicorn nl2sql_api.main:app</code> loads no <code>.env</code> at all, so export what it needs first, and it refuses to
+start over a config that says <code>mode: hosted</code>: the sessions and limits belong to <code>nl2sql-api serve</code>.</p>
 <h2 id="limits">Limits</h2>
 <p>Both live in this one process's memory. There are no accounts, no analytics and
 no storage.</p>
@@ -3206,14 +3246,23 @@ to wait a moment, the session cap says to run the demo locally for no limit at
 all. The retrieval inspector spends from the same rate bucket (it costs no
 tokens, but it does embed text) and does not count against the session's
 questions.</p>
+<p>These limits hold an honest browser to its share; they do not stop a script. The session cap counts a cookie the
+client keeps or drops, and the rate bucket is keyed by the first hop of <code>X-Forwarded-For</code>, which the client writes
+(the proxy appends to the right of it), so a script that sends no cookie and a made-up address is not limited by
+either. They never spend a model key (the server holds none), but they do not protect the shared job worker or the
+sample databases from one.</p>
+<p>A refused or invalid request still spends a question (the charge comes before the route runs, so a <code>403</code> or a <code>422</code>
+costs one). Writes that start no model work spend none and are uncapped: workspaces, conversations, knowledge
+choices, corrections, example proposals, a dashboard refresh and the retrieval inspector (it spends from the rate
+bucket only); the disk is ephemeral.</p>
 <p>A question is charged when it arrives, before it runs, so one the visitor
 stops still counts toward both limits. Stopping does end the work: the page
 aborts its request, the server sees the connection close and cancels the run
 before its next step or model call (the call already in flight finishes).</p>
 <p>The session cookie is a random token this process made up. It names no visitor,
 carries no key, and exists only so the session cap has something to count. A
-visitor who clears their cookies starts a new session; the rate limit, which is
-keyed by address, is what holds the pace down in the meantime.</p>
+visitor who clears their cookies starts a new session; the rate limit, keyed by the
+address the client reports, is what holds an honest browser's pace down in the meantime.</p>
 <h2 id="what-is-off-and-what-is-on">What is off, and what is on</h2>
 <p><strong>Off:</strong> Settings <em>persistence</em> (choosing a model is on; it is only the saving
 that is off), Rebuild, answer ratings, and <code>--record</code> (refused
@@ -3267,9 +3316,9 @@ version, in every mode; the release pipeline polls it on the live Space to
 know the new version is the one being served. Its <code>CMD</code> runs
 <code>nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30</code>;
 a public demo must never be started without <code>--hosted</code>.</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
-<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
-<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
 </code></pre></div>
 <p><code>docker compose up --build</code> in the same folder does it through
 <code>docker-compose.yml</code>, which builds the same image with the same settings.</p>
@@ -3288,7 +3337,7 @@ front-matter of the <code>README.md</code> at its root.</p>
 <p>The Space's public address is <a href="https://nl2sql.codewithnk.com">https://nl2sql.codewithnk.com</a>, its custom
 domain; <a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a> serves the same app too. Both
 hosts serve every path, so deep links and API calls work on either:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>curl<span class="w"> </span>https://nl2sql.codewithnk.com/api/health
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a>curl<span class="w"> </span>https://nl2sql.codewithnk.com/api/health
 </code></pre></div>
 <p>The custom domain is set up in two places, and redoing it is the same two
 steps:</p>
@@ -3401,7 +3450,7 @@ only when the Space ends <code>RUNNING</code>: a redeploy of <code>v0.2.0</code>
 in <code>BUILD_ERROR</code>, pushed nothing and still went green, which is what this
 closes. One deploy runs at a time; a run overtaken by a newer one is cancelled.</p>
 <p><strong>By hand.</strong> Actions → <strong>Publish Space</strong> → <em>Run workflow</em>, or:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
 </code></pre></div>
 <p>Four optional inputs: <code>tag</code>, the release to deploy; <code>space_id</code>, which defaults
 to <code>nadeem4nk/nl2sql-demo</code>; <code>token_secret</code>, the name of the secret holding
@@ -3485,8 +3534,8 @@ Space, so it works before the Space has built and while it is asleep.</p>
 <h3 id="regenerating-the-card">Regenerating the card</h3>
 <p>The card is rendered from <code>scripts/social_card.html</code>, which uses the
 playground's own colours and both of its typefaces. Edit that file, then:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>nl2sql-ui<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
-<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>python<span class="w"> </span>scripts/render_social_card.py
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="nb">cd</span><span class="w"> </span>nl2sql-ui<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
+<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>python<span class="w"> </span>scripts/render_social_card.py
 </code></pre></div>
 <p>Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
 both places that need them: <code>docs/assets/social-card.png</code>, which the Space's
@@ -3508,8 +3557,8 @@ See <a href="https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
-<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>nl2sql<span class="w"> </span>demo
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>
 </article>
