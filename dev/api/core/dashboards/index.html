@@ -5073,6 +5073,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#guided-builder-db1b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guided builder (DB1b)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#methods" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6283,6 +6294,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#guided-builder-db1b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guided builder (DB1b)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#methods" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6352,7 +6374,9 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 <li><strong><code>edit(dashboard_id, edits, conversation=None)</code></strong> applies a list of edits in order, each seeing the ones before,
   all or none. The named methods (<code>rename</code>, <code>rename_tile</code>, <code>set_tile_chart</code>, <code>remove_tile</code>, <code>arrange</code>,
   <code>set_filters</code>, <code>set_schedule</code>, <code>move</code>) each build one edit. None calls a model, and none takes a question or a
-  plan: what data a chart shows changes only in a conversation. <code>add_tile</code> and <code>replace_plan</code> read an <code>ask</code> step of
+  plan: what data a chart shows changes only through a conversation step (<code>add_tile</code>, <code>replace_plan</code>) or by naming
+  a reviewed query or the caller's own saved answer by id (<code>add_verified_tile</code>, <code>add_saved_tile</code>; a verified id
+  that <code>curated.list</code> does not show the caller is "no verified query"). <code>add_tile</code> and <code>replace_plan</code> read an <code>ask</code> step of
   the <code>conversation</code> passed (it must be the caller's, else <code>ValueError</code>; the chat tool passes the one it runs in)
   and are a <code>ValueError</code> without one. The step's whole decomposition and each sub-query's plan, or the verified
   query that answered, become the chart's plan; it is first checked by a run that executes nothing, as the caller
@@ -6361,7 +6385,13 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
   to the conversation's latest turn. <strong><code>conversation</code> is trusted:</strong> its steps are not re-read from the store, only
   its owner is checked against the caller, so it is for SDK code holding the caller's own <code>Conversation</code> and is
   not exposed over REST or MCP; the plan's access check still runs as the caller. The lock lasts as long as the
-  edit's checks (one time limit per <code>add_tile</code> or <code>replace_plan</code>).</li>
+  edit's checks (one time limit per <code>add_tile</code> or <code>replace_plan</code>).
+  Two more edits add a chart without a conversation step and call no model: <code>add_verified_tile</code>
+  (<code>datasource_id</code>, <code>verified_id</code>, <code>title</code>, <code>params</code>, <code>question</code>) from a verified query of the curated section (an
+  unknown id or parameter, or a missing parameter without a default, is <code>InvalidArgument</code>), and <code>add_saved_tile</code>
+  (<code>saved_id</code>, <code>title</code>) from the caller's own saved answer (another user's is <code>AnswerNotFound</code>); the saved plan is
+  copied, so later changes to the answer do not touch the chart. Both get the same access check as <code>add_tile</code>,
+  and the chat tool <code>dashboard_edit</code> accepts them.</li>
 <li><strong><code>set_tile_chart</code></strong> with a kind the chart's last result cannot be drawn as raises a <code>ValueError</code> naming the
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.</li>
@@ -6428,6 +6458,34 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 <li><strong>Retention.</strong> <code>engine.storage.purge()</code> deletes drafts last edited more than <code>conversations.max_age_days</code> ago;
   saved dashboards are never purged.</li>
 </ul>
+<h2 id="guided-builder-db1b">Guided builder (DB1b)</h2>
+<p><code>engine.dashboards.builder_options</code>, <code>propose_tiles</code> and <code>build</code> build a dashboard from choices, not from a
+description. Design: <a href="../../../architecture/wave_d/">Wave D, section 18</a>. All take <code>user_context</code>, and the ids
+they offer are limited to what the caller's scope reaches.</p>
+<ul>
+<li><strong><code>builder_options(datasource_id, *, user_context) -&gt; BuilderOptions</code></strong> returns <code>curated</code> (the datasource's
+  verified queries with no required parameter, <code>VerifiedQueryInfo</code>), <code>saved</code> (the caller's own saved answers),
+  <code>metrics</code> (glossary terms whose columns the caller may read; a term with any hidden column is left out whole),
+  <code>dimensions</code> and <code>time_columns</code> (from the column roles) and <code>ranges</code> (<code>last_7_days</code>, <code>last_30_days</code>,
+  <code>last_90_days</code>, <code>last_12_months</code>, <code>this_year</code>). It calls no model.</li>
+<li><strong><code>propose_tiles(datasource_id, *, user_context, sources, curated_ids=(), saved_ids=(), metrics=(),
+  dimensions=(), time_range=None, text=None, llm_override=None) -&gt; list[TileProposal]</code></strong> reads and writes
+  nothing. <code>sources</code> is any of <code>curated</code>, <code>saved</code>, <code>asked</code>. Curated and saved proposals use no model. <code>asked</code> makes
+  one model call for at most 3 new questions (from the chosen metrics and dimensions, the time range and the
+  free <code>text</code>). The list is capped at <code>dashboards.max_tiles</code>. Without a key, <code>asked</code> raises <code>MissingProviderKey</code>;
+  curated and saved still work. <code>llm_override</code> is the caller's own key, as for <code>ask</code>.</li>
+<li><strong><code>build(datasource_id, tiles, *, user_context, title=None, workspace_id=None, time_column=None, on_tile=None,
+  cancellation_token=None, llm_override=None) -&gt; BuildReport</code></strong> takes the ticked <code>TileProposal</code>s (more than
+  <code>max_tiles</code> is <code>InvalidArgument</code>) and makes a draft: curated and saved tiles through the two edits above, asked
+  tiles as <code>ask</code> steps of one builder conversation joined through <code>add_tile</code> (that conversation is deleted
+  afterwards). A question that cannot be answered is reported in <code>BuildReport.skipped</code> (<code>question</code>, <code>code</code>,
+  <code>message</code>) and the rest are kept; nothing built raises <code>NoTiles</code>; a cancel or failure leaves nothing behind.
+  With <code>time_column</code> a <code>between</code> filter on it is added. It then pins the draft, publishes <code>dashboard.generated</code>
+  and returns <code>BuildReport(dashboard, built, skipped)</code>. It does not run the tiles; opening refreshes them. <code>on_tile</code>
+  receives a <code>TileProgress</code> per tile.</li>
+<li><strong><code>engine.curated.list(*, user_context, datasource_id=None) -&gt; list[VerifiedQueryInfo]</code></strong> lists the verified
+  queries the caller's scope reaches, with their parameters.</li>
+</ul>
 <h2 id="methods">Methods</h2>
 <table>
 <thead>
@@ -6476,6 +6534,10 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 <tr>
 <td><code>dashboards.suggest_questions(datasource_id, *, user_context, n=5) -&gt; list[str]</code></td>
 <td>D3</td>
+</tr>
+<tr>
+<td><code>dashboards.builder_options(...)</code>, <code>propose_tiles(...)</code>, <code>build(...)</code>; edits <code>add_verified_tile</code>, <code>add_saved_tile</code>; <code>curated.list(...)</code></td>
+<td>DB1b</td>
 </tr>
 </tbody>
 </table>

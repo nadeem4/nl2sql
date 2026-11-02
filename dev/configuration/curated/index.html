@@ -6747,6 +6747,7 @@ query, and exits 1 on any error, so it can run in CI:</p>
 </tr>
 </tbody>
 </table>
+<p><code>engine.curated.list(user_context=...)</code> returns the verified queries a caller can reach (used by the dashboard builder).</p>
 <p>From Python, the same check is <code>engine.curated</code>, on the engine's own config:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>

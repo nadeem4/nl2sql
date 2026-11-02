@@ -2846,7 +2846,7 @@ sees result rows.</p>
   <code>turn.steps[i].result.approvals_needed</code> outside the conversation; the asker then calls
   <code>retry(conversation_id, user_context=..., approvals=[...])</code>, which re-runs the last <code>ask</code> step's question as
   a turn of kind <code>retry</code>, with no model call.</li>
-<li><code>ask_only(conversation_id, question, user_context=..., choice=None)</code> runs just the <code>ask</code> tool (a turn of
+<li><code>ask_only(conversation_id, question, user_context=..., choice=None, cancellation_token=None)</code> runs just the <code>ask</code> tool (a turn of
   kind <code>tool</code>, no model call) and returns the full <code>QueryResult</code> with its rows. MCP's <code>ask</code> will use it.</li>
 <li>A run that times out (<code>pipeline.timeout_s</code>) fails only its step, with <code>error.code</code> <code>PIPELINE_TIMEOUT</code>; the
   turn goes on and the model replies, for example by suggesting a narrower question. Each <code>ask</code> step runs on

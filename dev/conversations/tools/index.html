@@ -2873,7 +2873,8 @@ registry tool). <code>engine.chat_tools.list()</code> returns the enabled tools
 </ul>
 <h2 id="the-dashboard-tools">The dashboard tools</h2>
 <p><code>dashboard_edit</code> takes <code>edits</code>, the list of <a href="../../dashboards/#editing-by-hand">dashboard edits</a> a person can
-make by hand plus <code>add_tile</code> and <code>replace_plan</code>, and applies them with <code>engine.dashboards.edit</code>, all or none. Its
+make by hand plus <code>add_tile</code>, <code>replace_plan</code>, <code>add_verified_tile</code> and <code>add_saved_tile</code>, and applies them with
+<code>engine.dashboards.edit</code>, all or none. Its
 other arguments are <code>dashboard_id</code> (the conversation's dashboard when absent), and <code>title</code> and <code>workspace_id</code> for a
 new draft. The first call in a conversation makes a <strong>draft</strong> tied to it (<code>Conversation.dashboard_id</code>,
 <code>Dashboard.conversation_id</code>); later calls edit the same one, and a conversation started with
@@ -2881,7 +2882,10 @@ new draft. The first call in a conversation makes a <strong>draft</strong> tied 
 (<code>turn</code>, which defaults to the turn being answered, and which of that turn's <code>ask</code> calls with a result, counting
 from 1): the engine reads the whole plan from its own
 stored step, never from model text, and checks it with a run that executes nothing before saving, so a plan the
-validator rejects ends the step as <code>TOOL_NOT_APPLICABLE</code> with the validator's message and saves nothing. A draft
+validator rejects ends the step as <code>TOOL_NOT_APPLICABLE</code> with the validator's message and saves nothing. <code>add_verified_tile</code> (<code>datasource_id</code>, <code>verified_id</code>, <code>params</code>) and <code>add_saved_tile</code> (<code>saved_id</code>) name a
+reviewed query or one of the caller's own saved answers by id, with no question asked and no conversation step
+needed; they are checked the same way. A verified query the caller cannot see (<code>engine.curated.list</code> does not list it)
+is refused as "no verified query", exactly like an id that does not exist. A draft
 this call made is removed again, whatever the failure. If the conversation's dashboard was deleted, the next edit
 makes a new draft and the conversation is tied to that. <code>dashboard_pin</code> saves the whole draft (<code>engine.dashboards.pin</code>) and is called
 only when the user asks. A dashboard that is not the caller's is "not found". Neither tool calls a model or
