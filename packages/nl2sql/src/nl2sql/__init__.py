@@ -85,7 +85,9 @@ _EXPORTS = {
                                  "TileRun", "TileLayout", "ChartPlan", "StoredQuery", "DashboardFilter", "Schedule",
                                  "ScheduleIdentity", "SkippedTile", "StepRef", "TileArrangement", "DashboardEdit",
                                  "RenameDashboard", "RenameTile", "SetTileChart", "RemoveTile", "Arrange",
-                                 "SetFilters", "SetSchedule", "MoveDashboard", "AddTile", "ReplacePlan"),
+                                 "SetFilters", "SetSchedule", "MoveDashboard", "AddTile", "ReplacePlan", "AddVerifiedTile", "AddSavedTile"),
+    "nl2sql.dashboards.builder": ("TimeRange", "BuilderQuestion", "MetricOption", "ColumnOption", "BuilderOptions", "TileProposal", "SkippedQuestion", "BuildReport"),
+    "nl2sql.api.curated_api": ("VerifiedQueryInfo",),
     "nl2sql.chat_tools": ("ChatTool", "ToolContext", "ToolNotApplicable", "ChatToolInfo"),
     "nl2sql_sdk.discovery": ("Found", "DiscoverableAdapter"),
 }

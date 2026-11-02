@@ -195,7 +195,7 @@ class DashboardInfo(StrictModel):
 # Every edit is a typed model. The facade's named methods build one each, ``dashboards.edit`` takes a list,
 # and the ``dashboard_edit`` chat tool takes the same list, so a person and the model change a dashboard in
 # the same ways. No edit calls a model. ``add_tile`` and ``replace_plan`` change what data a chart shows,
-# so they exist only in chat.
+# so they exist only in chat; ``add_verified_tile`` and ``add_saved_tile`` take a reviewed or saved plan by id.
 
 class StepRef(StrictModel):
     """An ``ask`` step of the conversation, by turn and step number (both 1-based). Without ``turn``: the latest
@@ -263,10 +263,31 @@ class ReplacePlan(StrictModel):
     from_step: StepRef  # the fix for a needs_fixing chart
 
 
+class AddVerifiedTile(StrictModel):
+    """A chart from a verified query (curated answer). No model and no conversation: the plan is the reviewed query
+    itself, checked as the caller like any tile (D244). Verified ids are unique per datasource only."""
+
+    kind: Literal["add_verified_tile"] = "add_verified_tile"
+    datasource_id: str
+    verified_id: str
+    title: str
+    params: Dict[str, Any] = Field(default_factory=dict)  # a param left out takes its default
+    question: Optional[str] = None  # else the query's first question, its params filled in
+
+
+class AddSavedTile(StrictModel):
+    """A chart from one of the caller's saved answers. The tile copies the plan, so every viewer runs it in their
+    own scope and a shared dashboard never exposes the saved answer itself (D247)."""
+
+    kind: Literal["add_saved_tile"] = "add_saved_tile"
+    saved_id: str
+    title: str
+
+
 DashboardEdit = Annotated[
     Union[RenameDashboard, RenameTile, SetTileChart, RemoveTile, Arrange, SetFilters, SetSchedule, MoveDashboard,
-          AddTile, ReplacePlan],
+          AddTile, ReplacePlan, AddVerifiedTile, AddSavedTile],
     Field(discriminator="kind")]
 
 EDIT_KINDS = ("rename", "rename_tile", "set_tile_chart", "remove_tile", "arrange", "set_filters", "set_schedule",
-              "move", "add_tile", "replace_plan")
+              "move", "add_tile", "replace_plan", "add_verified_tile", "add_saved_tile")

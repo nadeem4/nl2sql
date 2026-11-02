@@ -22,7 +22,7 @@ class DashboardEditArgs(BaseModel):
     edits: List[DashboardEdit] = Field(min_length=1, description=(
         "The changes, applied in order, all or none. add_tile turns an answer you asked for into a chart: from_step "
         "is its turn number (this turn when absent) and the position of the ask call among that turn's ask calls, counting from 1. "
-        "replace_plan fixes a chart marked needs_fixing from a new answer to its question. You never give a plan or "
+        "replace_plan fixes a chart marked needs_fixing from a new answer to its question. add_verified_tile adds a chart from a verified query (datasource_id, verified_id, params) and add_saved_tile one from the user's saved answer (saved_id), with no question to ask. You never give a plan or "
         "SQL: the chart keeps the plan the engine made for that answer."))
     dashboard_id: Optional[str] = Field(default=None, description=(
         "The dashboard to change; this conversation's dashboard when absent, made as a draft on first use."))

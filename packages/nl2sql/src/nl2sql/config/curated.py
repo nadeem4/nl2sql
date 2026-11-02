@@ -18,7 +18,7 @@ import functools
 import re
 from dataclasses import dataclass, field
 from datetime import date
-from typing import TYPE_CHECKING, Dict, List, Literal, Mapping, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Mapping, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr, field_validator, model_validator
 
@@ -98,6 +98,19 @@ class ParamSpec(BaseModel):
             if self.choices is not None and value not in self.choices:
                 raise ValueError(f"{name} {value!r} is not one of choices {self.choices}")
         return self
+
+
+def fill_question(question: str, params: Dict[str, "ParamSpec"], values: Dict[str, Any]) -> str:
+    """``question`` with each ``{name}`` replaced by the value given, else the param's default; a placeholder with
+    neither stays as written."""
+    def fill(match: "re.Match[str]") -> str:
+        name = match.group(1)
+        value = values.get(name)
+        if value is None and name in params:
+            value = params[name].default
+        return match.group(0) if value is None else str(value)
+
+    return _QUESTION_PLACEHOLDER.sub(fill, question)
 
 
 class VerifiedQuery(BaseModel):

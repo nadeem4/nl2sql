@@ -17,7 +17,8 @@ from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql_sdk.contracts import AdapterRequest
 
 from nl2sql.config import Curated
-from nl2sql.config.curated import VerifiedQuery, check_curated_queries
+from nl2sql.config.curated import CuratedSqlError, VerifiedQuery, check_curated_queries, fill_question, inspect_verified_sql
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.execution.executor.sql_executor import _frames as adapter_frames
@@ -60,6 +61,19 @@ class CuratedTestReport:
     errors: List[str] = field(default_factory=list)
 
 
+@dataclass
+class VerifiedQueryInfo:
+    """A verified query a caller may offer or add to a dashboard: what it answers, not its SQL."""
+
+    datasource_id: str
+    id: str
+    description: str
+    question: str  # the first question, its params filled with their defaults; a param without one stays ``{name}``
+    questions: List[str] = field(default_factory=list)
+    params: List[str] = field(default_factory=list)
+    required_params: List[str] = field(default_factory=list)  # params with no default: a value is needed to run it
+
+
 class CuratedAPI:
     """
     API for checking the engine's curated answers.
@@ -71,6 +85,48 @@ class CuratedAPI:
     def _source(self) -> str:
         folder = self._ctx.config.folder
         return (folder / "nl2sql.yaml").as_posix() if folder is not None else "Config"
+
+    def list(self, *, user_context: UserContext, datasource_id: Optional[str] = None) -> List[VerifiedQueryInfo]:
+        """The verified queries the caller can reach, in config order.
+
+        A query is listed only when the caller's scope reaches its datasource and every table its SQL reads, so the
+        list says nothing about what the caller may not see. A query whose SQL no longer parses is left out
+        (``validate`` reports it). Nothing runs and no model is called.
+
+        Args:
+            user_context: The caller, required.
+            datasource_id: Only this datasource's queries; one the caller cannot reach gives an empty list.
+        """
+        if user_context is None:
+            raise TypeError("user_context is required")
+        cfg = self._ctx.config.curated
+        if cfg is None:
+            return []
+        registry = self._ctx.ds_registry
+        out: List[VerifiedQueryInfo] = []
+        for ds_id, ds in cfg.datasources.items():
+            if datasource_id is not None and ds_id != datasource_id:
+                continue
+            try:
+                dialect = registry.get_dialect(ds_id)
+            except ValueError:  # not available: nothing can be checked, so nothing is offered
+                continue
+            scope = self._ctx.policy_engine.scope(user_context, ds_id)
+            if not scope.reaches_datasource():
+                continue
+            for query in ds.verified_queries:
+                try:
+                    reads = inspect_verified_sql(query.sql, dialect).tables
+                except CuratedSqlError:
+                    continue
+                if not all(scope.allows(schema or None, table) for schema, table in reads):
+                    continue
+                out.append(VerifiedQueryInfo(
+                    datasource_id=ds_id, id=query.id, description=query.description,
+                    question=fill_question(query.questions[0], query.params, {}), questions=list(query.questions),
+                    params=list(query.params),
+                    required_params=[n for n, spec in query.params.items() if spec.default is None]))
+        return out
 
     def validate(self) -> CuratedValidationReport:
         """
