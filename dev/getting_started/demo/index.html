@@ -5399,14 +5399,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/llm/" class="md-nav__link">
+      <a href="../../api/rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6670,7 +6698,7 @@ When the engine was loaded from a <code>nl2sql.yaml</code> all of it is saved th
 there after a restart: each database under <code>datasources/</code>, the verified queries in
 <code>curated.yaml</code> (with a <code>curated:</code> line in <code>nl2sql.yaml</code> if the project had none), and
 the glossary as a second source in <code>knowledge.yaml</code>. A section written inline in
-<code>nl2sql.yaml</code> is left alone. An engine built in code has no file, so for it the
+<code>nl2sql.yaml</code> is left alone. The files are appended to, never rewritten, so your comments stay, and a file you edited since the engine loaded it is refused (<code>changed on disk</code>) with nothing added. An engine built in code has no file, so for it the
 verified queries and the glossary are added to that engine only and <code>add_demo</code> has to
 run again after a restart. An id such as <code>chinook</code> that is already a database of
 yours (another file, even one named <code>chinook.db</code>) is refused with a <code>DatasourceExists</code>

@@ -5121,14 +5121,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../llm/" class="md-nav__link">
+      <a href="../settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6201,8 +6229,10 @@ under the owner's data scope, so it is the owner's alone (in <code>GET /jobs</co
 </tr>
 </tbody>
 </table>
+<p>| <code>POST /api/v1/jobs/eval</code> | Run the configured eval suites (<code>suites</code>, <code>mode</code>, <code>cases</code>, <code>max_cost_usd</code>), on the server's model; admin. <code>mode: full</code> needs a cost cap. Progress is one step per case (<code>case &lt;id&gt;</code>); the result is an <code>EvalReport</code>. See <a href="../evals/">Evals</a>. |
+| <code>POST /api/v1/jobs/demo</code> | Add the sample databases, their verified queries and the demo glossary, then index them (<code>engine.add_demo()</code>), as the caller; admin. Progress is one step per datasource; the result is an <code>IndexResult</code>. No body. |</p>
 <p>Each <code>POST /api/v1/jobs/&lt;kind&gt;</code> answers <code>202</code> with the queued <code>Job</code> and a <code>409</code> when the caller already has a job
-queued or running. The other kinds arrive with the rows that own them.</p>
+queued or running.</p>
 <h2 id="events">Events</h2>
 <p><code>GET /jobs/{id}/events</code> sends one <code>job.progress</code> event (a <code>JobProgress</code> as <code>data</code>) for every step so far, then for each
 new one, then <code>job.finished</code> (the whole <code>Job</code>) and closes. A <code>: keep-alive</code> comment is sent every 15 seconds. The wire is

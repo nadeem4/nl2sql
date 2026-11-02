@@ -5389,14 +5389,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/llm/" class="md-nav__link">
+      <a href="../../api/rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -7044,14 +7072,16 @@ then connects to each datasource, checks that every agent's API key resolves
 <code>nl2sql demo</code> call <code>check()</code> at startup:</p>
 <ul>
 <li>A datasource with <code>required: true</code> that fails, or datasources configured and
-  none ready, raises <code>EngineNotReady</code>: the entry point prints the report and
-  refuses to start (the CLI exits 1).</li>
+  none ready, raises <code>EngineNotReady</code>: the CLI and <code>nl2sql demo</code> print the report
+  and refuse to start (the CLI exits 1). <code>nl2sql-api</code> logs the report and starts
+  anyway: <code>GET /api/v1/ready</code> answers 503 <code>not_ready</code>, and an admin reads each
+  failing datasource and its stage under <code>problems</code>.</li>
 <li>An optional datasource that fails is printed, left out of routing, and the
   entry point runs degraded.</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># datasources/sales.yaml</span>
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">           </span><span class="c1"># without it, nothing works: refuse to start</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">           </span><span class="c1"># without it, nothing works: the CLI refuses to start, /ready says not_ready</span>
 <a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> host</span><span class="p">:</span><span class="w"> </span><span class="nv">db.internal</span><span class="p p-Indicator">,</span><span class="nt"> database</span><span class="p">:</span><span class="w"> </span><span class="nv">sales</span><span class="p p-Indicator">,</span><span class="nt"> user</span><span class="p">:</span><span class="w"> </span><span class="nv">nl2sql</span><span class="p p-Indicator">,</span><span class="nt"> password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:SALES_DB_PASSWORD}"</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>A Python caller decides for itself. Without <code>check()</code>, a broken datasource

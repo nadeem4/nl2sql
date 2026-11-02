@@ -5223,14 +5223,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rest/llm/" class="md-nav__link">
+      <a href="../../rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6186,7 +6214,7 @@ forms, and a test of a datasource before it is added.</p>
 <tr>
 <td><code>add_demo(*, user_context=None, on_datasource=None)</code></td>
 <td><code>RebuildResult</code></td>
-<td>Try the demo: adds the three sample databases (read-only, from the installed package), their verified queries and the demo glossary (copied to <code>demo-glossary.yaml</code> in the project folder) as ordinary datasources and knowledge, skipping any already configured (a demo id that is another database raises <code>DatasourceExists</code> and adds nothing), saving it all in the project when the engine was loaded from a <code>nl2sql.yaml</code> (each added datasource under <code>datasources/</code>, the verified queries in the <code>curated</code> section's file, creating <code>curated.yaml</code> and its <code>curated:</code> line when the project has none, and the glossary as a source in the <code>knowledge</code> section's file), so it survives a restart; an inline section, or an engine built in code, keeps the verified queries and the glossary for that engine only. A demo id is the demo's own database only when it opens the packaged file or the project's <code>data/&lt;name&gt;</code>; another file of the same name raises <code>DatasourceExists</code>. Then runs <code>index.build</code> over them, passing <code>on_datasource</code> (an <code>IndexProgress</code> per datasource). With <code>user_context</code> the caller needs an admin role (<code>NotAuthorized</code>). Also <code>engine.add_demo(...)</code>.</td>
+<td>Try the demo: adds the three sample databases (read-only, from the installed package), their verified queries and the demo glossary (copied to <code>demo-glossary.yaml</code> in the project folder) as ordinary datasources and knowledge, skipping any already configured (a demo id that is another database raises <code>DatasourceExists</code> and adds nothing), saving it all in the project when the engine was loaded from a <code>nl2sql.yaml</code> (each added datasource under <code>datasources/</code>, the verified queries in the <code>curated</code> section's file, creating <code>curated.yaml</code> and its <code>curated:</code> line when the project has none, and the glossary as a source in the <code>knowledge</code> section's file), so it survives a restart; an inline section, or an engine built in code, keeps the verified queries and the glossary for that engine only. A demo id is the demo's own database only when it opens the packaged file or the project's <code>data/&lt;name&gt;</code>; another file of the same name raises <code>DatasourceExists</code>. Then runs <code>index.build</code> over them, passing <code>on_datasource</code> (an <code>IndexProgress</code> per datasource). With <code>user_context</code> the caller needs an admin role (<code>NotAuthorized</code>). The files it writes are checked first against the hashes read at load (a section file edited since is <code>ConfigError</code> "changed on disk", the REST <code>409 FILE_CHANGED</code>), the text is appended so the file's comments stay, and a second call on an engine that is out of date with the file adds nothing. Also <code>engine.add_demo(...)</code>.</td>
 </tr>
 <tr>
 <td><code>remove(datasource_id)</code></td>

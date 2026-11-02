@@ -5229,14 +5229,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../llm/" class="md-nav__link">
+      <a href="../settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6130,16 +6158,22 @@
 
 
 <h1 id="health-api">Health API</h1>
-<p>Source: <code>packages/api/src/nl2sql_api/routes/health.py</code>. None of these routes needs a caller except <code>/about</code>.</p>
+<p>Source: <code>packages/api/src/nl2sql_api/routes/health.py</code>. <code>/health</code> and <code>/ready</code> need no caller, nor does <code>/meta</code> (a caller adds fields), and <code>/about</code> needs one.</p>
 <h2 id="endpoints">Endpoints</h2>
 <h3 id="get-apiv1health"><code>GET /api/v1/health</code></h3>
 <p>Liveness. Returns <code>{"status": "ok", "version": {"engine": "&lt;nl2sql-engine&gt;", "api": "&lt;nl2sql-api&gt;"}}</code>.</p>
 <h3 id="get-apiv1ready"><code>GET /api/v1/ready</code></h3>
-<p>Readiness. Returns <code>{"success": true, "data": null, "message": "NL2SQL API is ready"}</code>. It does not yet check
-datasources, the LLM or the index.</p>
+<p>Readiness, from the engine's own <code>check()</code> (kept for 10 seconds, so a poll every few seconds does not connect to every
+datasource each time). Ready means every required datasource and at least one datasource is up, every agent's key
+resolves (unless <code>api.request_llm</code> is on, or every agent is on the <code>replay</code> provider) and the index is <code>ok</code> or <code>stale</code>.
+<code>200 {"status": "ready"}</code> or <code>503 {"status": "not_ready"}</code>, to everyone. A caller who is an admin also gets <code>problems</code>:
+each failing datasource and its stage, each agent whose key does not resolve and the index status, never a secret. The
+API starts even when a required datasource cannot connect; this route says so.</p>
 <h3 id="get-apiv1meta"><code>GET /api/v1/meta</code></h3>
-<p>What the web app needs before it has an identity: <code>{"mode": "demo" | "your_data" | "hosted", "auth": "api_keys" |
-"proxy" | "static" | "none", "request_llm": false}</code>. No caller is needed.</p>
+<p>Without a caller: <code>{"mode": "demo" | "your_data" | "hosted", "auth": "api_keys" | "proxy" | "static" | "none",
+"request_llm": false}</code>, what a page needs before it has an identity. With a caller, also <code>datasources</code>, each one the
+caller may reach as <code>{id, description, sample_questions, recorded}</code> (<code>recorded</code> is the sample questions the <code>replay</code>
+provider can answer with no key), and <code>recorded_with</code>, the provider and model those recordings came from, or <code>null</code>.</p>
 <h3 id="get-apiv1about"><code>GET /api/v1/about</code></h3>
 <p><code>engine.about()</code>: the engine version and its pipeline steps. Needs a caller.</p>
 

@@ -5394,14 +5394,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/llm/" class="md-nav__link">
+      <a href="../../api/rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -7269,7 +7297,7 @@ runs:</p>
 checked by the same rules as the file. A <code>${...}</code> reference is kept in a secret
 field (<code>api_key</code>, a <code>headers</code> value) and is an error anywhere else, so data that did not come
 from your files never reads the environment. <code>nl2sql-api</code> serves it as the
-admin-only <a href="../../api/rest/llm/"><code>PUT /api/v1/settings/llm</code></a>: the body is the
+admin-only <a href="../../api/rest/settings/"><code>PUT /api/v1/settings/llm</code></a>: the body is the
 section as JSON, and a bad one is HTTP 422 with the <code>ConfigError</code> text. The
 playground's model switch calls <code>replace</code> too. <code>engine.llm.list()</code> shows the
 model each agent runs on.</p>

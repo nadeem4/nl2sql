@@ -5250,14 +5250,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/llm/" class="md-nav__link">
+      <a href="../../api/rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6264,7 +6292,7 @@ datasource, so each team can own its own database's file:</p>
 <tr>
 <td><code>required</code></td>
 <td><code>false</code></td>
-<td><code>engine.check()</code> fails (<code>EngineNotReady</code>) when this datasource cannot connect, and the CLI, <code>nl2sql-api</code> and the demo refuse to start. See <a href="../system/#startup-check-and-required">Startup</a>.</td>
+<td><code>engine.check()</code> fails (<code>EngineNotReady</code>) when this datasource cannot connect, and the CLI and the demo refuse to start. <code>nl2sql-api</code> starts anyway and <code>/ready</code> answers 503 <code>not_ready</code>. See <a href="../system/#startup-check-and-required">Startup</a>.</td>
 </tr>
 </tbody>
 </table>

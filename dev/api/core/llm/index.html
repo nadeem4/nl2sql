@@ -4824,6 +4824,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmrecorded_with" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.recorded_with
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmproviders" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5328,14 +5339,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rest/llm/" class="md-nav__link">
+      <a href="../../rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6251,6 +6290,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmrecorded_with" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.recorded_with
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmproviders" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6398,6 +6448,11 @@ agent, listing the agents.</p>
 <code>recorded(questions: Sequence[str]) -&gt; list[str]</code></p>
 <p>The <code>questions</code> the <code>replay</code> provider can answer from its recordings, in the order asked. See
 <a href="../../../configuration/llm/#replay-recorded-answers-no-key">the <code>replay</code> provider</a>.</p>
+<h3 id="llmrecorded_with">llm.recorded_with</h3>
+<p>Signature:
+<code>recorded_with() -&gt; dict | None</code></p>
+<p><code>{"provider", "model"}</code> the <code>replay</code> provider's recordings were made with, or <code>None</code> when the recordings name no
+model. The start screen says which model its keyless answers came from.</p>
 <h3 id="llmproviders">llm.providers</h3>
 <p>Signature:
 <code>providers() -&gt; list[dict]</code></p>
@@ -6458,7 +6513,7 @@ no key.</p>
   registered or not installed, an agent whose API key does not resolve, or,
   with <code>settings.pipeline.max_cost_usd</code> set, a model with no price.
   Nothing changes. <code>nl2sql-api</code> answers it as HTTP 422 with the same text
-  (<a href="../../rest/llm/"><code>PUT /api/v1/settings/llm</code></a>).</p>
+  (<a href="../../rest/settings/"><code>PUT /api/v1/settings/llm</code></a>).</p>
 <p>Side Effects:
 - Builds the new clients (no model call), then swaps the engine's <code>LLMSet</code>
   and <code>engine.config.llm</code> together under the engine's lock. Runs already in

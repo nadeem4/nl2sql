@@ -5184,14 +5184,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rest/llm/" class="md-nav__link">
+      <a href="../../api/rest/settings/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLM
+    Settings and API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
   
 
     
@@ -6166,8 +6194,9 @@ admin roles. See <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
 <code>./nl2sql.yaml</code>), after loading the <code>.env</code> next to that file without overriding
 a variable already set. It calls <code>engine.check()</code> before it accepts requests: a
 <code>required</code> datasource that fails, or datasources configured and none ready,
-stops it with <code>EngineNotReady</code>; an optional one that fails leaves it serving
-the others. See <a href="../system/#startup-check-and-required">Startup</a>.</p>
+raises <code>EngineNotReady</code>: the API logs the report and starts anyway, and
+<code>GET /api/v1/ready</code> answers 503 <code>not_ready</code> (an admin sees <code>problems</code>); an
+optional one that fails leaves it serving the others. See <a href="../system/#startup-check-and-required">Startup</a>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql-api<span class="w"> </span>serve<span class="w"> </span>--config<span class="w"> </span>/etc/nl2sql/nl2sql.yaml<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># or: NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml uvicorn nl2sql_api.main:app</span>
 </code></pre></div>
