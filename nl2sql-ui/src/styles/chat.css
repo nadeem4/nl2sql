@@ -47,3 +47,5 @@
 @media (pointer: coarse) {
   .chat-new, .chat-list-item button, .rate-choice, .chat-tools button, .clarify-actions button { min-height: 44px; }
 }
+
+.rate-hint { font-size: var(--fs-1); color: var(--ink-3); max-width: 70ch; }

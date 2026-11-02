@@ -8,7 +8,7 @@ committed in the engine package.
 
 `src/lib/` pure helpers, `src/components/` pieces shared by pages (`JobProgress`, `SqlCard`, `IndexPanel`, ...),
 `src/outputs/` what a result or tool output renders as, `src/pages/` one file per route (the Wave D pages are stubs
-until their row), `src/connect/`, `src/chat/`, `src/api/` one client file per area, `src/styles/` the stylesheet in
+until their row), `src/connect/`, `src/chat/`, `src/answers/` (My answers), `src/api/` one client file per area, `src/styles/` the stylesheet in
 cascade order (`index.css`), `src/router.js` the hash routes.
 
 ## Pages
@@ -189,7 +189,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   conversations beside one transcript. A question goes to `POST /conversations/{id}/turns/stream` (`streamTurn`
   in `src/api/chat.js`); `spineOf` in `src/chat/spine.js` folds the events into the live run spine, and the
   last event, the stored turn, replaces it. A turn shows its answer and rows first, then the folds **Why this
-  answer**, **SQL**, **Plan** and **Trace and cost**, and the **Right** / **Wrong** rating (`src/chat/Feedback.jsx`).
+  answer**, **SQL**, **Plan** and **Trace and cost**, and **Did this answer it?** (`src/chat/Feedback.jsx`): **Yes** keeps the answer in My answers, **Not quite** opens a note.
   A clarification shows one **Use this reading** button per option, an approval wait shows **Run it now** once
   every request is granted, and the tool buttons (Chart, Diagram, Report, Pin to dashboard) call
   `POST /conversations/{id}/tools/{name}`. A 409 (a turn is still running) is told to the asker. `turns.js` reads

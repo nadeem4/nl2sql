@@ -10,6 +10,7 @@ import Spine from "./Spine.jsx";
 import TracePanel from "./TracePanel.jsx";
 import Warnings from "./Warnings.jsx";
 import WhyPanel from "./WhyPanel.jsx";
+import { stepRef } from "./answers.js";
 import {
   answerOf, askSteps, errorLine, offersFor, outputsOf, statusLine,
   toolArgs, toolButtons, toolLabel, waitsOf,
@@ -34,7 +35,7 @@ function Fold({ title, children }) {
 
 // One answered question: its rows, the warnings, how it was made, and the rating. The folds open on demand, so
 // the answer stays first.
-function Answer({ step, many }) {
+function Answer({ step, many, turn, conversationId }) {
   const result = step.result;
   if (!result) return step.error ? <p className="fault" role="alert">{step.error.message || String(step.error)}</p> : null;
   const sub = (result.sub_queries || [])[0];
@@ -59,7 +60,7 @@ function Answer({ step, many }) {
         </Fold>
       )}
       <Fold title="Trace and cost"><TracePanel result={result} /></Fold>
-      <Feedback key={result.trace_id} result={result} />
+      <Feedback key={result.trace_id} result={result} conversationId={conversationId} stepRef={stepRef(turn, step)} />
     </div>
   );
 }
@@ -79,7 +80,7 @@ export default function Turn({ turn, conversation, tools, busy, onPick, onRetry,
         {answerOf(turn) && <p className="answer-text">{answerOf(turn)}</p>}
         {status && !clarification && !approvals.length && <p className="notice">{status}</p>}
         {failed && <p className="fault" role="alert">{failed}</p>}
-        {steps.map((step, i) => <Answer key={i} step={step} many={steps.length > 1} />)}
+        {steps.map((step, i) => <Answer key={i} step={step} many={steps.length > 1} turn={turn} conversationId={conversation.id} />)}
         {outputs.map(({ index, output }) => <Output key={index} output={output} />)}
         {clarification && <Clarify clarification={clarification} disabled={busy} onPick={onPick} />}
         {approvals.length > 0 && <Approval needed={approvals} disabled={busy} onRetry={onRetry} />}

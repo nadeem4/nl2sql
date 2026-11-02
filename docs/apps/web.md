@@ -40,8 +40,14 @@ them, in this order:
   planner chose; the planner's note is marked as the model's own words);
 - **SQL** and **Plan**, the typed plan and the query it produced;
 - **Trace and cost**, the run's stations, timings and token use;
-- a rating (**Right** or **Wrong**, with a note), and a corrected SQL that
-  **Send for review** files (`POST /feedback`, `POST /feedback/correct`).
+- **Did this answer it?**, a light bar with **Yes** and **Not quite**. **Yes**
+  keeps the answer in **My answers** (`POST /answers`; the server also rates the
+  run up) and says so, adding "sent for review" only when a proposal was filed.
+  A full **My answers** (100), a save racing another ("try again") and an answer
+  that cannot be kept are shown in place. **Not quite** rates the run down and
+  opens a note and a corrected SQL that **Send for review** files
+  (`POST /feedback`, `POST /feedback/correct`). A one-line hint explains both
+  until the first click; that it was seen is a browser-local flag only.
 
 **Only the last turn is live.** A clarification pick answers the conversation's
 pending question, and **Run it now** re-runs the last question, so those buttons
@@ -119,6 +125,15 @@ routes](../api/rest/dashboards.md) and never a model.
   (or **pins** a draft into one; with no workspace yet, **Pin** makes "General"), removes a filter, and deletes the dashboard. The grid has four columns; charts are
   packed in order, so an arrangement never overlaps. What data a chart shows is changed in chat, not here.
 - **Generate a starter dashboard** (at the top of the page) builds one for a datasource from what the project already knows, with no model and no key. Pick the datasource, and optionally a title, the workspace to save into (the chosen one by default) and how many charts. Progress shows as "tile 3 of 8" and can be cancelled; when it is saved the new dashboard opens. Only one job per person runs at a time: the form locks while the start request is in flight, a job already running (after a reload, say) comes back with its progress and Cancel, and leaving the page stops following it without opening anything.
+
+
+**My answers.** A fold at the top of the Dashboards page lists the answers you kept
+with **Yes** in chat (`GET /answers`): the question, its datasource and the day it
+was kept. **Run** answers the saved plan again as you (`POST /answers/{id}/run`):
+your data scope, hooks and approvals apply, and no model is called; the rows show
+in the usual result table. An answer the schema has outgrown says it needs fixing,
+and one waiting for an approval offers **Run again** once it is granted.
+**Delete** forgets it (`DELETE /answers/{id}`). The list is yours alone.
 
 ## Connect and review
 
