@@ -82,6 +82,8 @@ def readiness_check(request: Request, engine: Engine, user: Visitor):
 def meta(request: Request, engine: Engine, user: Visitor):
     """Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and
     `request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key. With a caller, also
+    `caller` (`{"user_id", "admin"}`: who the caller is and whether it holds a role in `policies.admin_roles`, the
+    check the admin routes make; no `user_id` on the hosted demo, where it is the session's secret), and
     `datasources`: each one the caller may reach, with its `id`, `description`, `sample_questions` and `recorded`
     (the ones the `replay` provider can answer with no key), and `recorded_with`, the provider and model those
     recordings came from (or null). On the hosted demo, also `limits`: `questions_per_minute`,
@@ -90,13 +92,16 @@ def meta(request: Request, engine: Engine, user: Visitor):
     body: Dict[str, Any] = {"mode": config.mode, "auth": config.api.auth, "request_llm": config.api.request_llm}
     if user is None:
         return body
+    hosted = getattr(request.app.state, "hosted", None)
+    body["caller"] = {"admin": identity.is_admin(user, engine)}
+    if hosted is None and user.user_id is not None:  # a hosted visitor's id is its session cookie: a secret
+        body["caller"] = {"user_id": user.user_id, **body["caller"]}
     listed = engine.datasources.list(user_context=user)
     questions = [q for d in listed for q in d.sample_questions]
     recorded = set(engine.llm.recorded(questions))
     body["datasources"] = [{"id": d.id, "description": d.description, "sample_questions": list(d.sample_questions),
                             "recorded": [q for q in d.sample_questions if q in recorded]} for d in listed]
     body["recorded_with"] = engine.llm.recorded_with()
-    hosted = getattr(request.app.state, "hosted", None)
     if hosted is not None:
         body["limits"] = hosted.describe(user.user_id)
     return body

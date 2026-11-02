@@ -8,12 +8,15 @@ import JobProgress from "../components/JobProgress.jsx";
 import SchemaForm from "../connect/SchemaForm.jsx";
 import Steps from "../connect/Steps.jsx";
 import { buildConfig, describeAdd, describeTest, fieldErrors } from "../connect/flow.js";
+import { mayAdminister } from "../lib/caller.js";
 import { buildConnection, clearSecrets, fieldsOf, initialValues, validate } from "../connect/schemaForm.js";
 
 // Connect: add a datasource, test it, index it, profile it and file its starter questions for review. Everything
 // here is an admin call; on the hosted demo, and for anyone who is not an admin, the routes answer 403 and the page
-// says so instead of showing a form that cannot work (D212).
+// says so instead of showing a form that cannot work (D212). `caller` (from /meta) lets the page say so before asking;
+// a 403 from a route is still the server's final word.
 
+const OFF = "Adding a datasource needs an administrator, and the hosted demo does not allow it. Connect your own database from a local or self-hosted install.";
 const message = (err) => (err && err.message) || "Something went wrong.";
 
 function Off({ reason }) {
@@ -168,7 +171,7 @@ function Registered({ items, onRemove }) {
   );
 }
 
-export default function Connect() {
+export default function Connect({ caller = null }) {
   const [types, setTypes] = useState(null);
   const [off, setOff] = useState(null);
   const [fault, setFault] = useState(null);
@@ -184,14 +187,14 @@ export default function Connect() {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(() => listDatasources().then(setItems).catch(() => {}), []);
+  const offered = mayAdminister(caller);
   useEffect(() => {
+    if (!offered) { setOff(OFF); return; }
     listTypes()
       .then((r) => { setTypes(r.types); const first = r.types.find((t) => t.installed) || r.types[0]; if (first) setType(first.name); })
-      .catch((err) => (err.status === 403
-        ? setOff("Adding a datasource needs an administrator, and the hosted demo does not allow it. Connect your own database from a local or self-hosted install.")
-        : setFault(message(err))));
+      .catch((err) => (err.status === 403 ? setOff(OFF) : setFault(message(err))));
     refresh();
-  }, [refresh]);
+  }, [refresh, offered]);
 
   const current = types && types.find((t) => t.name === type);
   const fields = current ? fieldsOf(current.connection_schema) : [];

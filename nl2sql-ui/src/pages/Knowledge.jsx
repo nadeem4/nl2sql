@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getSchema, listDatasources } from "../api/connect.js";
 import { listProposals, showKnowledge } from "../api/knowledge.js";
+import { mayAdminister } from "../lib/caller.js";
 import Drift from "../knowledge/Drift.jsx";
 import Glossary from "../knowledge/Glossary.jsx";
 import Proposals from "../knowledge/Proposals.jsx";
 
 // Knowledge: what the engine knows about a datasource (anyone), the proposals waiting for review and the drift check
-// (admins; GET /proposals answers 403 to everyone else, and only that answer hides those sections). A response for a
+// (admins: /meta says whether the caller is one, so the sections are not asked for otherwise, and a 403 from
+// GET /proposals still hides them). A response for a
 // datasource that is no longer selected is dropped.
 const message = (err) => (err && err.message) || "Something went wrong.";
 
@@ -35,7 +37,7 @@ function Schema({ id }) {
   );
 }
 
-export default function Knowledge() {
+export default function Knowledge({ caller = null }) {
   const [sources, setSources] = useState(null);
   const [current, setCurrent] = useState("");
   const [view, setView] = useState(null);
@@ -62,14 +64,14 @@ export default function Knowledge() {
   }, [current]);
 
   useEffect(() => {
-    if (!current) return undefined;
+    if (!current || !mayAdminister(caller)) return undefined;
     let live = true;
     setProposalFault(null);
     listProposals(current)
       .then((list) => live && setProposals(list))
       .catch((err) => { if (live && err.status !== 403) setProposalFault(message(err)); });
     return () => { live = false; };
-  }, [current, reload]);
+  }, [current, reload, caller]);
 
   useEffect(() => { setProposals(null); }, [current]);
 

@@ -1,5 +1,9 @@
 {
   "auth": "static",
+  "caller": {
+    "admin": false,
+    "user_id": "static"
+  },
   "datasources": [
     {
       "description": "A music store",
