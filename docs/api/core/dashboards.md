@@ -42,7 +42,9 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **`edit(dashboard_id, edits, conversation=None)`** applies a list of edits in order, each seeing the ones before,
   all or none. The named methods (`rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`,
   `set_filters`, `set_schedule`, `move`) each build one edit. None calls a model, and none takes a question or a
-  plan: what data a chart shows changes only in a conversation. `add_tile` and `replace_plan` read an `ask` step of
+  plan: what data a chart shows changes only through a conversation step (`add_tile`, `replace_plan`) or by naming
+  a reviewed query or the caller's own saved answer by id (`add_verified_tile`, `add_saved_tile`; a verified id
+  that `curated.list` does not show the caller is "no verified query"). `add_tile` and `replace_plan` read an `ask` step of
   the `conversation` passed (it must be the caller's, else `ValueError`; the chat tool passes the one it runs in)
   and are a `ValueError` without one. The step's whole decomposition and each sub-query's plan, or the verified
   query that answered, become the chart's plan; it is first checked by a run that executes nothing, as the caller

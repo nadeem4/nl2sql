@@ -51,25 +51,36 @@ STATEMENTS = (
 FAKE_KEY = "sk-" + "fake-builder"  # built at runtime: no key-shaped literal in the source
 
 
-def _project(folder, server, *, key: bool = True, **dashboards):
+def _project(folder, server, *, key: bool = True, llm: Any = None, **dashboards):
     folder.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(folder / "shop.db") as connection:
         for statement in STATEMENTS:
             connection.execute(statement)
     connection.close()
     (folder / "glossary.yaml").write_text(yaml.safe_dump(GLOSSARY, sort_keys=False), encoding="utf-8")
-    llm = {"provider": "openai", "model": "gpt-builder-test", "base_url": server.base_url}
-    if key:
-        llm["api_key"] = FAKE_KEY
+    if llm is None:
+        llm = {"provider": "openai", "model": "gpt-builder-test", "base_url": server.base_url}
+        if key:
+            llm["api_key"] = FAKE_KEY
     return make_config(
         folder, datasources=[{"id": "shop", "type": "sqlite", "connection": {"database": "shop.db"}}],
         policies={"roles": ROLES}, curated=CURATED, knowledge=[{"type": "yaml", "path": "glossary.yaml"}], llm=llm,
         answers={"max_per_user": 5}, **({"dashboards": dashboards} if dashboards else {}))
 
 
-def _engine(config) -> NL2SQL:
+def _engine(config, registry=None) -> NL2SQL:
     return NL2SQL(config.model_copy(update={"embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8),
-                                                                       dimension=8)}))
+                                                                       dimension=8)}), registry=registry)
+
+
+def _replay_engine(folder, server):
+    """The keyless hosted demo's shape: the ``replay`` provider (no key), an empty store, no ``llm_override``."""
+    from nl2sql.llm.replay import ReplayProvider, ReplayStore
+    from nl2sql.registry import Registry
+
+    registry = Registry.default()
+    registry.add_llm("replay", ReplayProvider(ReplayStore()), replace=True)
+    return _engine(_project(folder, server, llm={"provider": "replay", "model": "recorded"}), registry)
 
 
 @pytest.fixture
@@ -149,6 +160,36 @@ def test_a_verified_tile_the_caller_may_not_read_is_refused_and_nothing_is_saved
                                                           title="Pay")], user_context=ANALYST)
 
     assert engine.dashboards.get(draft.id, user_context=ANALYST).tiles == []
+
+
+def _refusal(engine, verified_id: str) -> str:
+    draft = engine.dashboards.create_draft(user_context=ANALYST)
+    with pytest.raises(InvalidArgument) as refused:
+        engine.dashboards.edit(draft.id, [AddVerifiedTile(datasource_id="shop", verified_id=verified_id, title="X")],
+                               user_context=ANALYST)
+    return str(refused.value)
+
+
+def test_a_verified_query_outside_the_callers_scope_looks_like_one_that_does_not_exist(engine, runs):
+    hidden, missing = _refusal(engine, "pay_total"), _refusal(engine, "no_such")
+
+    assert hidden == missing.replace("no_such", "pay_total")
+    assert "salaries" not in hidden and "not allowed" not in hidden and "policy" not in hidden
+    assert runs.calls == [], "nothing was run to find out"
+
+
+def test_chat_cannot_probe_for_a_hidden_verified_query_either(engine, runs):
+    cid = engine.conversations.start(user_context=ANALYST, datasource_id="shop").id
+
+    def refusal(verified_id: str) -> str:
+        turn = engine.conversations.tool(cid, "dashboard_edit", {"edits": [{
+            "kind": "add_verified_tile", "datasource_id": "shop", "verified_id": verified_id, "title": "X"}]},
+            user_context=ANALYST)
+        assert turn.steps[0].error["code"] == "TOOL_NOT_APPLICABLE"
+        return turn.steps[0].error["message"]
+
+    assert refusal("pay_total").replace("pay_total", "no_such") == refusal("no_such")
+    assert "salaries" not in refusal("pay_total")
 
 
 def test_an_unknown_verified_query_is_a_refused_edit(engine):
@@ -271,6 +312,12 @@ def test_the_tile_cap_trims_the_proposal_and_the_question_count(tmp_path, server
         assert [p.source for p in proposals] == ["curated", "asked"]
 
 
+def test_asked_with_nothing_to_go_on_makes_no_model_call(engine, server):
+    assert propose(engine, sources=["asked"]) == []
+    assert propose(engine, sources=["asked"], time_range="last_7_days", text="   ") == []
+    assert server.calls == []
+
+
 def test_asked_without_a_key_is_the_missing_key_error_and_the_rest_still_works(tmp_path, server):
     with _engine(_project(tmp_path, server, key=False)) as keyless:
         assert keyless.index.build().ok
@@ -278,6 +325,32 @@ def test_asked_without_a_key_is_the_missing_key_error_and_the_rest_still_works(t
                                                curated_ids=["order_count"])
         with pytest.raises(MissingProviderKey):
             keyless.dashboards.propose_tiles("shop", user_context=ANALYST, sources=["asked"], metrics=["Revenue"])
+        assert server.calls == []
+
+
+def test_asked_on_the_replay_provider_is_the_missing_key_error_too(tmp_path, server):
+    """D248: the keyless hosted demo has a provider that needs no key, but still no model for new questions."""
+    with _replay_engine(tmp_path, server) as demo:
+        assert demo.index.build().ok
+        with pytest.raises(MissingProviderKey):
+            demo.dashboards.propose_tiles("shop", user_context=ANALYST, sources=["asked"], metrics=["Revenue"])
+        tiles = tiles_of(("asked", None, "What is the revenue per status?"))
+        with pytest.raises(MissingProviderKey):
+            demo.dashboards.build("shop", tiles, user_context=ANALYST)
+        assert demo.dashboards.list(user_context=ANALYST, status="draft") == []
+
+
+def test_curated_and_saved_build_with_the_real_run_query_and_no_model_call(tmp_path, server):
+    """No stub: the access check runs the real graph on a replay engine whose store is empty (any model call misses)."""
+    with _replay_engine(tmp_path, server) as demo:
+        assert demo.index.build().ok
+        answer = saved_answer(demo)
+        tiles = [TileProposal(source="curated", ref="order_count", question="How many orders are there?"),
+                 TileProposal(source="saved", ref=answer.id, question=answer.question)]
+
+        report = demo.dashboards.build("shop", tiles, user_context=ANALYST)
+
+        assert len(report.built) == 2 and report.skipped == []
         assert server.calls == []
 
 
@@ -357,6 +430,28 @@ def test_an_unanswerable_question_is_skipped_with_a_code_and_the_rest_is_kept(en
     assert len(report.built) == 1
     assert [s.question for s in report.skipped] == ["Something nonsense?", "A refused plan?"]
     assert all(s.code and s.message for s in report.skipped)
+    assert [s.code for s in report.skipped] == ["EXECUTION_ERROR", "EXECUTION_ERROR"]  # the run's own code
+
+
+def test_a_skipped_tile_carries_the_reason_code_of_the_refusal(engine, runs):
+    def respond(call):
+        if call["execute"]:
+            return answered("tr-x")
+        if call["question"] == "a":
+            return QueryResult(status="error", trace_id="chk", errors=[{
+                "node": "executor", "error_code": "REPLAY_MISS", "message": "No.", "severity": "ERROR"}])
+        if call["question"] == "b":
+            return QueryResult(status="error", trace_id="chk", errors=[{
+                "node": "logical_validator", "error_code": "VALIDATION_FAILED", "message": "Bad.", "severity": "ERROR"}])
+        return good()
+
+    runs.respond = respond
+    tiles = tiles_of(("curated", "order_count", "a"), ("curated", "orders_last_year", "b"),
+                     ("curated", "order_count", "c"))
+
+    report = engine.dashboards.build("shop", tiles, user_context=ANALYST)
+
+    assert [(s.question, s.code) for s in report.skipped] == [("a", "REPLAY_MISS"), ("b", "TILE_NEEDS_FIXING")]
 
 
 def test_build_reports_each_tile_as_it_is_added(engine, runs):
@@ -390,6 +485,31 @@ def test_a_cancel_saves_nothing(engine, runs):
     assert engine.dashboards.list(user_context=ANALYST, status="draft") == []
     assert engine.dashboards.list(user_context=ANALYST) == []
     assert engine.workspaces.list(user_context=ANALYST) == []
+
+
+def test_the_cancel_token_reaches_the_question(engine, monkeypatch):
+    seen = []
+
+    def ask_only(api, conversation_id, question, **kwargs):
+        seen.append(kwargs.get("cancellation_token"))
+        raise InvalidArgument("stop here")
+
+    monkeypatch.setattr("nl2sql.conversations.api.Conversations.ask_only", ask_only)
+    token = CancellationToken()
+
+    with pytest.raises(NoTiles):
+        engine.dashboards.build("shop", tiles_of(("asked", None, "Q?")), user_context=ANALYST,
+                                cancellation_token=token)
+
+    assert seen == [token]
+
+
+def test_importing_the_dashboards_module_does_not_load_the_builder():
+    import subprocess
+    import sys
+
+    code = "import sys, nl2sql.dashboards.api; sys.exit(1 if 'nl2sql.dashboards.builder' in sys.modules else 0)"
+    assert subprocess.run([sys.executable, "-c", code]).returncode == 0
 
 
 def test_build_refuses_more_tiles_than_the_cap_before_anything_runs(tmp_path, server):

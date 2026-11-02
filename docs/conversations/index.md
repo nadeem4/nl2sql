@@ -63,7 +63,7 @@ flowchart TD
   `turn.steps[i].result.approvals_needed` outside the conversation; the asker then calls
   `retry(conversation_id, user_context=..., approvals=[...])`, which re-runs the last `ask` step's question as
   a turn of kind `retry`, with no model call.
-- `ask_only(conversation_id, question, user_context=..., choice=None)` runs just the `ask` tool (a turn of
+- `ask_only(conversation_id, question, user_context=..., choice=None, cancellation_token=None)` runs just the `ask` tool (a turn of
   kind `tool`, no model call) and returns the full `QueryResult` with its rows. MCP's `ask` will use it.
 - A run that times out (`pipeline.timeout_s`) fails only its step, with `error.code` `PIPELINE_TIMEOUT`; the
   turn goes on and the model replies, for example by suggesting a narrower question. Each `ask` step runs on

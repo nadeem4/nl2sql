@@ -41,7 +41,8 @@ registry tool). `engine.chat_tools.list()` returns the enabled tools
 ## The dashboard tools
 
 `dashboard_edit` takes `edits`, the list of [dashboard edits](../dashboards/index.md#editing-by-hand) a person can
-make by hand plus `add_tile` and `replace_plan`, and applies them with `engine.dashboards.edit`, all or none. Its
+make by hand plus `add_tile`, `replace_plan`, `add_verified_tile` and `add_saved_tile`, and applies them with
+`engine.dashboards.edit`, all or none. Its
 other arguments are `dashboard_id` (the conversation's dashboard when absent), and `title` and `workspace_id` for a
 new draft. The first call in a conversation makes a **draft** tied to it (`Conversation.dashboard_id`,
 `Dashboard.conversation_id`); later calls edit the same one, and a conversation started with
@@ -49,7 +50,10 @@ new draft. The first call in a conversation makes a **draft** tied to it (`Conve
 (`turn`, which defaults to the turn being answered, and which of that turn's `ask` calls with a result, counting
 from 1): the engine reads the whole plan from its own
 stored step, never from model text, and checks it with a run that executes nothing before saving, so a plan the
-validator rejects ends the step as `TOOL_NOT_APPLICABLE` with the validator's message and saves nothing. A draft
+validator rejects ends the step as `TOOL_NOT_APPLICABLE` with the validator's message and saves nothing. `add_verified_tile` (`datasource_id`, `verified_id`, `params`) and `add_saved_tile` (`saved_id`) name a
+reviewed query or one of the caller's own saved answers by id, with no question asked and no conversation step
+needed; they are checked the same way. A verified query the caller cannot see (`engine.curated.list` does not list it)
+is refused as "no verified query", exactly like an id that does not exist. A draft
 this call made is removed again, whatever the failure. If the conversation's dashboard was deleted, the next edit
 makes a new draft and the conversation is tied to that. `dashboard_pin` saves the whole draft (`engine.dashboards.pin`) and is called
 only when the user asks. A dashboard that is not the caller's is "not found". Neither tool calls a model or

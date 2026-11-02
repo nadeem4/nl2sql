@@ -27,7 +27,7 @@ from nl2sql.dashboards.templates import _cap, _slug, _words
 from nl2sql.events.catalog import DashboardGenerated
 from nl2sql.knowledge.resolve import resolve_column
 from nl2sql.llm.override import LLMOverride
-from nl2sql.llm.request_key import MissingProviderKey, use_llm_override
+from nl2sql.llm.request_key import MissingProviderKey, current_request_llms, use_llm_override
 from nl2sql.policies import UserContext
 
 logger = logging.getLogger(__name__)
@@ -215,7 +215,8 @@ class Builder:
                                  title=short_title(mine[i].question)) for i in saved_ids if i in mine]
         out = out[:cap]
         room = min(MAX_ASKED, cap - len(out))
-        if "asked" in sources and room > 0:
+        said = [x for x in (*metrics, *dimensions, (text or "").strip()) if x]
+        if "asked" in sources and room > 0 and said:  # nothing to go on: no model call
             asked = self._ask_model(source, user, metrics, dimensions, label, text, room, llm_override)
             out += [TileProposal(source="asked", question=q, title=short_title(q)) for q in asked]
         return out
@@ -247,6 +248,10 @@ class Builder:
 
     def _model(self, registry: Any) -> Any:
         """The model for the one call, or the missing-key error (D248) when this caller has no key for it."""
+        config = registry.get_llm_config(AGENT)
+        if config.get("provider") == "replay" and current_request_llms() is None:
+            # The keyless hosted demo: replay needs no key, but it has recorded nothing for new questions.
+            raise MissingProviderKey(AGENT, "replay")
         try:
             return registry.get_llm(AGENT)
         except ValueError:
@@ -286,7 +291,7 @@ class Builder:
                     if tile.source == "asked" and conversation_id is None:
                         conversation_id = conversations.start(user_context=user,
                                                               datasource_id=source.datasource_id).id
-                    after = self._add(draft.id, tile, source, user, conversations, conversation_id, llm_override)
+                    after = self._add(draft.id, tile, source, user, conversations, conversation_id, llm_override, token)
                     built.append(after.tiles[-1].id)
                     answered = True
                 except (NL2SQLError, ValueError, LookupError) as error:
@@ -318,9 +323,11 @@ class Builder:
         return BuildReport(dashboard=saved, built=built, skipped=skipped)
 
     def _add(self, dashboard_id: str, tile: TileProposal, source: Source, user: UserContext, conversations: Any,
-             conversation_id: Optional[str], llm_override: Optional[LLMOverride]) -> Dashboard:
+             conversation_id: Optional[str], llm_override: Optional[LLMOverride],
+             token: Optional[CancellationToken] = None) -> Dashboard:
         title = tile.title.strip() or short_title(tile.question)
         dashboards = self._dashboards
+        failed: Optional[str] = None
         if tile.source == "curated":
             edits: List[Any] = [AddVerifiedTile(datasource_id=source.datasource_id, verified_id=tile.ref or "",
                                                 title=title, question=tile.question or None)]
@@ -329,10 +336,17 @@ class Builder:
             edits, conversation = [AddSavedTile(saved_id=tile.ref or "", title=title)], None
         else:
             with use_llm_override(llm_override, self._ctx.llm_registry):
-                conversations.ask_only(conversation_id, tile.question, user_context=user)
+                result = conversations.ask_only(conversation_id, tile.question, user_context=user,
+                                                cancellation_token=token)
             conversation = conversations.get(conversation_id, user_context=user)
+            failed = (result.errors or [{}])[0].get("error_code") if result.status not in ("success", "plan_only")                 else None
             edits = [AddTile(title=title, from_step=StepRef(turn=conversation.turns[-1].index, step=1))]
-        after = dashboards.edit(dashboard_id, edits, user_context=user, conversation=conversation)
+        try:
+            after = dashboards.edit(dashboard_id, edits, user_context=user, conversation=conversation)
+        except InvalidArgument as error:
+            if failed:  # the question's own reason, not the generic "did not answer"
+                raise InvalidArgument(str(error), code=failed) from None
+            raise
         if tile.chart != "auto":
             last = after.tiles[-1].id
             after = dashboards.edit(dashboard_id, [SetTileChart(tile_id=last, chart=tile.chart)], user_context=user)
