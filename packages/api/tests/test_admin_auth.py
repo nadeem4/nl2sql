@@ -28,6 +28,7 @@ ADMIN_ROUTES = [
     ("get", "/api/v1/datasource-types", None),
     ("delete", "/api/v1/datasources/ds", None),
     ("put", "/api/v1/settings/llm", {"provider": "openai", "model": "gpt-test"}),
+    ("patch", "/api/v1/settings/llm", {"default": {"provider": "openai", "model": "gpt-test"}}),
     ("post", "/api/v1/jobs/index", {}),
     ("post", "/api/v1/jobs/profile", {}),
     ("post", "/api/v1/jobs/eval", {"mode": "plans"}),
@@ -84,7 +85,7 @@ class AdminEngine:
         self.datasources = _Recorder(self, {
             "add": None, "remove": None, "list": list, "types": list, "save": Path("datasources/ds.yaml"),
             "test": DatasourceStatus(id="ds", status="ready")})
-        self.llm = _Recorder(self, {"replace": lambda: LLMChange()})
+        self.llm = _Recorder(self, {"replace": lambda: LLMChange(), "set_models": lambda: LLMChange()})
         self.evals = _Recorder(self, {"load": list, "scorers": list, "run": lambda: EvalReport(mode="plans")})
         self.api_keys = _Recorder(self, {"list": list, "revoke": None, "create": lambda: (ApiKey(
             id="ab12cd34", label="", user_id="ann", created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)), "t")})

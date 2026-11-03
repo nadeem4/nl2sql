@@ -7,7 +7,7 @@ import Home from "./pages/Home.jsx";
 import { sampleQuestion } from "./pages/home.js";
 import { listApprovals } from "./api/chat.js";
 import { getMeta } from "./api/meta.js";
-import { callerOf } from "./lib/caller.js";
+import { callerOf, isAdmin } from "./lib/caller.js";
 import { toDecide } from "./chat/approval.js";
 import { needsKey } from "./pages/firstRun.js";
 import { modeStatus } from "./pages/status.js";
@@ -132,8 +132,6 @@ export default function App() {
   const [meta, setMeta] = useState(null);
   const [role, setRole] = useState("admin");
   const [error, setError] = useState(null);
-  const [settings, setSettings] = useState(null);
-  const [settingsError, setSettingsError] = useState(null);
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
   const [pipeline, setPipeline] = useState(null);
@@ -141,8 +139,11 @@ export default function App() {
   // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
   const [starter, setStarter] = useState(null);
   const [waiting, setWaiting] = useState([]);
-  // Who the caller is, from GET /meta (A4c): Connect and Knowledge offer admin work only to an admin. Null until /meta answers, or when it names no caller.
+  // What this server is and who the caller is, from GET /meta (A4a, A4c): Connect, Knowledge, Evals and Settings offer
+  // admin work only to an admin, and Settings keeps browser-held keys only when the server takes them (`request_llm`).
+  // Null until /meta answers, or when it names no caller.
   const [caller, setCaller] = useState(null);
+  const [requestLlm, setRequestLlm] = useState(false);
   // The hosted demo keys and step choices: this tab, never the server.
   const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
   const [stepModels, setStepModels] = useState(() => readModels(window.sessionStorage));
@@ -156,8 +157,7 @@ export default function App() {
         if (m.roles.length) setRole(m.roles.includes("admin") ? "admin" : m.roles[0]);
       })
       .catch((e) => setError(e.message));
-    getMeta().then((m) => setCaller(callerOf(m))).catch(() => {});
-    getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
+    getMeta().then((m) => { setCaller(callerOf(m)); setRequestLlm(Boolean(m.request_llm)); }).catch(() => {});
     getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
     getJson("/api/pipeline").then(setPipeline).catch((e) => setPipelineError(e.message));
   }, []);
@@ -180,15 +180,6 @@ export default function App() {
     if (pageRef.current) pageRef.current.focus();
   }, [page]);
 
-  // A saved key can turn replay into live; the status pill follows the server.
-  const settingsSaved = (next) => {
-    setSettings(next);
-    setMeta((m) => (m ? { ...m, mode: next.mode } : m));
-    // A saved model changes what each step is set to run on, which the
-    // Pipeline page states.
-    getJson("/api/pipeline").then(setPipeline).catch(() => {});
-  };
-
   // Try a sample question on Home: open Chat and have it ask one, a recorded one when the server has some.
   const trySample = () => {
     const q = sampleQuestion(meta);
@@ -202,15 +193,15 @@ export default function App() {
 
   const replay = meta && meta.mode === "replay";
   const hosted = Boolean(meta && meta.hosted);
-  const canSet = settings && settings.available;
+  // Keys are set under Settings by an administrator, or by any visitor on a server that takes one with the question.
+  const canSet = Boolean(requestLlm || (caller && caller.admin));
   const noKey = needsKey(meta, apiKeys);
   const status = modeStatus(meta, apiKeys, { canSet });
   const current = pageFor(page);
+  // Evals is an admin page: not listed for a caller who is not one.
   const nav = navItems(page, {
-    // Hosted, Settings is not off: it is where the visitor puts their own key.
-    settings: settings && !settings.available && !settings.hosted,
     retrieval: retrieval && !retrieval.available,
-  }, { approvals: toDecide(waiting).length });
+  }, { approvals: toDecide(waiting).length }).filter((item) => item.id !== "evals" || isAdmin(caller));
 
   return (
     <div className="app">
@@ -286,8 +277,7 @@ export default function App() {
 
         {page === "settings" && (
           <div className="sheet" id="settings-panel">
-            <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
-              recorded={meta ? meta.recorded_questions : 0}
+            <Settings caller={caller} requestLlm={requestLlm}
               apiKeys={apiKeys} onKey={saveKey} limits={meta && meta.limits}
               stepModels={stepModels} onStepModel={saveStepModel} />
           </div>

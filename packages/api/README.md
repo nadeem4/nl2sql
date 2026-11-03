@@ -63,6 +63,7 @@ mount a config folder there, and a volume for `storage.path`.
 - `GET /api/v1/knowledge`, `GET /api/v1/knowledge/sources`, `POST /api/v1/knowledge/reload`, `POST /api/v1/knowledge/choices` - What the engine knows; reload (admin) and file a clarification choice
 - `GET /api/v1/proposals`, `GET /api/v1/proposals/{proposal_id}`, `POST /api/v1/proposals/accept|reject|examples` - Review proposed knowledge changes (admin only)
 - `PUT /api/v1/settings/llm` - Replace the whole `llm` section in the running process (admin only; 422 with the config error)
+- `PATCH /api/v1/settings/llm` - Change only the provider and model of named agents (admin only; every other `llm` setting stays; in memory, this process only)
 - `GET /api/v1/llm` - Each agent and the model it runs on
 - `GET /api/v1/llm/providers` - The LLM providers: key present, verified models, the shape a key must have
 - `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `DELETE /api/v1/api-keys/{key_id}` - List, create (the token is returned once) and revoke API keys (admin only)

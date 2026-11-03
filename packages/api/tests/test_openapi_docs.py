@@ -26,7 +26,7 @@ def test_the_schema_lists_every_route_with_a_summary_and_a_description(api_clien
     client, _ = api_client()
     paths = client.get("/openapi.json").json()["paths"]
     routes = _routes()
-    assert len(routes) == 94
+    assert len(routes) == 95
     assert sum(len(ops) for ops in paths.values()) == len(routes)
     for method, path in routes:
         operation = paths[path][method.lower()]

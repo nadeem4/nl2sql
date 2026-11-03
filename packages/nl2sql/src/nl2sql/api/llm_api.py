@@ -108,6 +108,48 @@ class LLMAPI:
         """
         return self._ctx.replace_llm(llm, by=by, via=via)
 
+    def set_models(self, changes: Mapping[str, Optional[Mapping[str, str]]], *, by: Optional["UserContext"] = None,
+                   via: str = "python") -> "LLMChange":
+        """Change the model of some agents and keep every other ``llm`` setting: the one-selector edit.
+
+        ``changes`` maps an agent's name (as in :meth:`list`, ``default``
+        included) to ``{"provider", "model"}``, or to None to drop that agent's
+        override so it inherits ``default`` again (``default`` itself cannot be
+        dropped). Only ``provider`` and ``model`` change: ``base_url``,
+        ``headers``, ``prices``, temperatures and the rest stay. Where an
+        entry's provider changes, its ``api_key`` and ``base_url`` are cleared,
+        since they belonged to the old provider; a cleared key is the new
+        provider's standard variable. An agent with no provider of its own follows a
+        new default provider and keeps its model name, key and ``base_url``. Then it is :meth:`replace`: validated,
+        atomic, logged, audited and in memory only.
+
+        Raises:
+            ValueError: an unknown agent, or ``default`` given None.
+            ConfigError: as :meth:`replace`. Nothing has changed.
+        """
+        from nl2sql.config import AgentLLM
+
+        names = set(self.list())
+        llm = self._ctx.config.llm.model_copy(deep=True)
+        was = llm.provider  # the default's provider before any change: the order of ``changes`` does not matter
+        for agent, choice in changes.items():
+            if agent not in names:
+                raise ValueError(f"Unknown agent '{agent}'. The agents are: {', '.join(sorted(names))}.")
+            if choice is None:
+                if agent == "default":
+                    raise ValueError("The default model cannot be removed; give it a provider and model.")
+                llm.agents.pop(agent, None)
+                continue
+            entry = llm if agent == "default" else llm.agents.get(agent) or AgentLLM()
+            update = {"provider": choice["provider"], "model": choice["model"]}
+            if choice["provider"] != (entry.provider or was):
+                update.update(api_key=None, base_url=None)
+            if agent == "default":
+                llm = llm.model_copy(update=update)
+            else:
+                llm.agents[agent] = entry.model_copy(update=update)
+        return self._ctx.replace_llm(llm, by=by, via=via)
+
 
 def _entry(listed: Dict[str, Any]) -> Dict[str, Any]:
     return {key: listed.get(key) for key in ("provider", "model", "temperature")}

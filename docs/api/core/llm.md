@@ -147,6 +147,25 @@ engine.llm.prices()["models"]["claude-opus-5"]
 #  'source': 'table', 'citation': 'Anthropic model table in the claude-api skill (cached 2026-06-24); ...'}
 ```
 
+### llm.set_models
+
+Source: `packages/nl2sql/src/nl2sql/api/llm_api.py`
+
+Signature:
+`set_models(changes: Mapping[str, Optional[Mapping[str, str]]], *, by: Optional[UserContext] = None, via: str = "python") -> LLMChange`
+
+Changes the model of some agents and keeps every other `llm` setting. `changes` maps an agent's name (as in
+`llm.list`, `default` included) to `{"provider", "model"}`, or to `None` to drop that agent's override so it
+inherits `default` (`default` itself cannot be dropped). Only `provider` and `model` change: `base_url`, `headers`,
+`prices`, temperatures and the rest stay. Where an entry's provider changes, its `api_key` and `base_url` are
+cleared (a cleared key is the new provider's standard variable). An agent with no provider of its own follows a new `default` provider and keeps its own model name, key and `base_url`; change that agent too if they belong to the old provider. Whether a provider changed is judged against the old `default`, whatever the order of `changes`. The result goes through `llm.replace`, so it is
+validated, atomic, logged, audited, in memory only and per process.
+
+Returns: `LLMChange`, as `llm.replace`.
+
+Raises: `ValueError` for an unknown agent or `default` given `None`; `ConfigError` as `llm.replace` (nothing changes).
+`nl2sql-api` answers `PATCH /api/v1/settings/llm` with it.
+
 ### llm.replace
 
 Source:

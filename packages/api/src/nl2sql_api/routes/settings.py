@@ -25,6 +25,15 @@ LLM_SECTION_EXAMPLE = {
 }
 
 
+class ModelChoice(BaseModel):
+    """One agent's model: the provider and the model name."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+
+
 class ApiKeyRequest(BaseModel):
     """``POST /api-keys``: the user the key's requests run as, with their roles."""
 
@@ -84,6 +93,37 @@ def replace_llm(
     except ConfigError as e:
         # A ConfigError is written for the operator: it names keys and rules, never a secret value.
         raise RequestRefused(422, "INVALID_CONFIG", str(e), fix="Fix the llm section and send it again.") from None
+
+
+@router.patch("/settings/llm", response_model=Dict[str, Any], summary="Change the agents' models",
+              responses={**identity.ADMIN_RESPONSES,
+                         422: {**ERROR_RESPONSE, "description": "A provider or model cannot be used, an agent is "
+                                                                "unknown, or `default` was removed."}})
+def set_llm_models(
+    request: Request,
+    engine: Engine,
+    changes: Annotated[Dict[str, Optional[ModelChoice]], Body(openapi_examples={
+        "planner": {"value": {"ast_planner": {"provider": "openai", "model": "gpt-5.5"}, "refiner": None}}})],
+    user: Admin,
+):
+    """Change only the provider and model of the named agents (`engine.llm.set_models`); every other `llm`
+    setting (`base_url`, `headers`, `prices`, temperatures) stays. The body maps an agent's name, as `GET /llm`
+    lists it, to `{provider, model}`, or to null to drop that agent's own model so it runs on `default`. Where an
+    agent's provider changes, its key and `base_url` are cleared and the provider's standard key variable is
+    used. A choice the server cannot use is a 422 and changes nothing. Like `PUT`, the change is in memory
+    and per process, logged and audited. Returns the same change as `PUT`. Admin only.
+    """
+    try:
+        changed = asdict(engine.llm.set_models(
+            {agent: choice.model_dump() if choice else None for agent, choice in changes.items()},
+            by=user, via="api"))
+        forget_ready(request.app)
+        return changed
+    except (ConfigError, ValueError):
+        # A fixed message: the choice is the admin's own, and the detail may name key variables.
+        raise RequestRefused(422, "INVALID_CONFIG", "That provider and model cannot be used on this server.",
+                             fix="Pick a provider and model from GET /llm/providers, for an agent GET /llm lists."
+                             ) from None
 
 
 @router.get("/api-keys", response_model=List[ApiKey], summary="List API keys", responses=identity.ADMIN_RESPONSES)

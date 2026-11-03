@@ -83,7 +83,7 @@ export const PAGES = [
     description: "What the engine knows about each datasource, and the proposals waiting for review.",
   },
   page("approvals", "/approvals", "Approvals", "Questions waiting for someone to grant or deny them."),
-  stub("evals", "/evals", "Evals", "Run a suite against the server and read the report."),
+  page("evals", "/evals", "Evals", "Run the configured suites on the server and read the report."),
   stub("trace", "/trace", "Trace", "One run, node by node.", "required"),
 ];
 

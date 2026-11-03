@@ -1,35 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { PROVIDER_NAMES, changedModels, choicesFrom, modelGroups, variableModels } from "../lib/settings.js";
+import { createApiKey, getLlm, getProviders, listApiKeys, revokeApiKey, setModels } from "../api/settings.js";
+import { PROVIDER_NAMES, modelChanges, modelGroups, parseRoles, serverRows, stepRows } from "../lib/settings.js";
 import { keyMismatch, keyTail, looksLikeKey, providerCards, providerForKey } from "../lib/hostedKey.js";
 import { providersNeeded } from "../lib/hostedModels.js";
+import { isAdmin } from "../lib/caller.js";
 
-// Settings: the key and the model each step runs on, as two raised cards side
-// by side on a wide window. Each card says what it holds in one line, and how
-// a key is handled in three facts; the full sentence on that sits behind a
-// disclosure, because it is a promise to be able to check, not to read first.
+// Settings. Two kinds of thing live here. When the server lets a request bring its own model (api.request_llm, D210)
+// the page keeps the visitor's keys and the model for each step in this tab and sends them with each question. For an
+// administrator it also shows the server's own LLM (changed in memory, not in llm.yaml) and the API keys it issues.
+// Admin parts are not offered to anyone else: /meta says who the caller is, and a 403 stays the server's final word.
 
 // Wide enough for the two cards to sit side by side, so the models card can
 // start open without pushing the key card off the screen.
 const WIDE = "(min-width: 1060px)";
 const wide = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia(WIDE).matches;
+const message = (err) => (err && err.message) || "Something went wrong.";
 
 const PLACEHOLDERS = { openai: "sk-…", anthropic: "sk-ant-…", openrouter: "sk-or-…" };
-
-// Sends JSON and returns the parsed reply; a refusal carries the server's own
-// sentence in `detail`, which is what the panel shows.
-async function send(url, body) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const reply = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = typeof reply.detail === "string" ? reply.detail : `The server answered ${response.status}.`;
-    throw new Error(detail);
-  }
-  return reply;
-}
 
 // Stored / Sent / Never: the three things to know about a key, as the code
 // keeps them.
@@ -57,183 +44,6 @@ function ModelSelect({ id, value, groups, disabled, invalid, describedBy, onChan
         ),
       )}
     </select>
-  );
-}
-
-function KeyForm({ settings, onSaved, recorded }) {
-  const [key, setKey] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(null);
-  const [fault, setFault] = useState(null);
-  const current = settings.key && settings.key.masked;
-  // One key per provider; the default's may be one without a model list.
-  const saved = (settings.providers || []).filter((p) => p.masked);
-  if (current && !saved.some((p) => p.env_var === settings.key.env_var)) {
-    saved.unshift({ id: settings.provider, label: PROVIDER_NAMES[settings.provider] || settings.provider,
-                    masked: current, env_var: settings.key.env_var });
-  }
-
-  const save = async (e) => {
-    e.preventDefault();
-    if (!key.trim() || busy) return;
-    setBusy(true);
-    setFault(null);
-    setStatus(null);
-    try {
-      const next = await send("/api/settings/key", { api_key: key });
-      setKey("");
-      setStatus(`Saved. Questions now go to ${PROVIDER_NAMES[next.provider] || "OpenAI"}.`);
-      onSaved(next);
-    } catch (err) {
-      setFault(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form className="set-card" onSubmit={save} aria-labelledby="settings-key-heading">
-      <h2 id="settings-key-heading">API keys</h2>
-      {saved.length ? (
-        <ul className="saved-keys" id="settings-key-current">
-          {saved.map((p) => (
-            <li className="saved" key={p.env_var}>
-              <span className="pulse" aria-hidden="true" />
-              <span>
-                {p.label} key ending <span className="mono">…{String(p.masked).slice(-4)}</span>, from{" "}
-                <code>{p.env_var}</code>.
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="settings-current" id="settings-key-current">
-          {recorded
-            ? `No key in use. ${recorded} guided ${recorded === 1 ? "question answers" : "questions answer"} from recordings.`
-            : "No key in use, and there are no recorded answers. Paste a key to ask questions."}
-        </p>
-      )}
-      <div className="key-field">
-        <label className="settings-label" htmlFor="settings-key">
-          {saved.length ? "Add or replace a key" : "Paste a key"}
-        </label>
-        <div className="key-row">
-          <input
-            id="settings-key"
-            className="key-input"
-            type="password"
-            value={key}
-            placeholder="sk-…"
-            autoComplete="off"
-            spellCheck={false}
-            aria-describedby="settings-key-facts settings-key-help"
-            onChange={(e) => setKey(e.target.value)}
-          />
-          <button id="settings-save-key" className="settings-save" type="submit" disabled={busy || !key.trim()}>
-            {busy ? "Saving" : "Save key"}
-          </button>
-        </div>
-      </div>
-      <p className="settings-status" role="status">{status}</p>
-      {fault && <p className="fault">{fault}</p>}
-      <Facts id="settings-key-facts" facts={[
-        ["Stored", <>In <code>{settings.files.env}</code> on this machine.</>],
-        ["Sent", "To that provider, with each model call."],
-        ["Never", "Shown again, past its last four characters."],
-      ]} />
-      <details className="key-more">
-        <summary>How your key is handled</summary>
-        <p className="settings-help" id="settings-key-help">
-          A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
-          other is OpenAI. Each provider keeps one key, written to{" "}
-          <code>{settings.files.env}</code>, and the default moves to the provider of the key you
-          save, without a restart. Steps put on another provider stay there. On a later start,{" "}
-          <code>--api-key</code> or a key exported in your shell still wins. A key is never shown
-          again, only its last four characters.
-        </p>
-      </details>
-    </form>
-  );
-}
-
-function ModelsForm({ settings, onSaved }) {
-  const providers = settings.providers || [];
-  const [choices, setChoices] = useState(() => choicesFrom(settings.nodes, settings.provider));
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(null);
-  const [fault, setFault] = useState(null);
-  const hasList = providers.some((p) => p.usable && p.models.length > 0);
-  const groups = modelGroups(providers, settings.default_model);
-  const changes = changedModels(settings.nodes, choices, settings.provider);
-  const loose = variableModels(providers, choices);
-
-  useEffect(() => setChoices(choicesFrom(settings.nodes, settings.provider)), [settings.nodes, settings.provider]);
-
-  const save = async (e) => {
-    e.preventDefault();
-    if (!Object.keys(changes).length || busy) return;
-    setBusy(true);
-    setFault(null);
-    setStatus(null);
-    try {
-      const next = await send("/api/settings/models", { models: changes });
-      setStatus("Saved. The next question uses these models.");
-      onSaved(next);
-    } catch (err) {
-      setFault(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form className="set-card" onSubmit={save} aria-labelledby="settings-models-heading">
-      <div className="set-card-head">
-        <h2 id="settings-models-heading">Provider and model for each step</h2>
-        <span className="set-meta">{settings.nodes.length} steps ask a model</span>
-      </div>
-      {settings.models_note && <p className="notice">{settings.models_note}</p>}
-      <ul className="model-rows">
-        {settings.nodes.map((node) => (
-          <li key={node.agent}>
-            <label htmlFor={`model-${node.agent}`}>
-              <span className="model-step">{node.label}</span>
-              <span className="model-does">{node.does}</span>
-            </label>
-            <ModelSelect id={`model-${node.agent}`} value={choices[node.agent] || ""} groups={groups}
-              disabled={!hasList} invalid={node.unavailable}
-              describedBy={node.unavailable ? `model-${node.agent}-unavailable` : undefined}
-              onChange={(v) => setChoices({ ...choices, [node.agent]: v })} />
-            {node.unavailable && (
-              <p className="model-unavailable" id={`model-${node.agent}-unavailable`}>{node.unavailable}</p>
-            )}
-          </li>
-        ))}
-      </ul>
-      {loose.length > 0 && (
-        <p className="settings-warn" id="settings-temperature-note">
-          <code>{loose.join(", ")}</code> {loose.length === 1 ? "does" : "do"} not accept temperature 0,
-          so {loose.length === 1 ? "it runs" : "they run"} at the model's default temperature. A step on{" "}
-          {loose.length === 1 ? "it" : "one of them"} gives answers that vary more from run to run.
-        </p>
-      )}
-      {hasList && (
-        <div className="set-foot">
-          <p className="settings-help">
-            Written to <code>{settings.files.llm}</code>, the file the CLI reads. The OpenAI models
-            worked with the engine's parameters in a check on 2026-09-20; the Claude ones follow
-            Anthropic's documented parameter rules. Whether a model plans well is for the evaluation
-            to show.
-          </p>
-          <button id="settings-save-models" className="settings-save" type="submit"
-                  disabled={busy || !Object.keys(changes).length}>
-            {busy ? "Saving" : "Save models"}
-          </button>
-        </div>
-      )}
-      <p className="settings-status" role="status">{status}</p>
-      {fault && <p className="fault">{fault}</p>}
-    </form>
   );
 }
 
@@ -363,17 +173,16 @@ function HostedKeyForm({ apiKeys, onKey, limits, reason }) {
 // server: the choice goes into this tab's storage and travels with each
 // question. Open from the start on a wide window, where it sits beside the key
 // card; shut on a narrow one, where the one key is the whole of the simple path.
-function HostedModelsForm({ settings, apiKeys, models, onModel }) {
+function HostedModelsForm({ llms, providers, apiKeys, models, onModel }) {
   const [open] = useState(wide);
-  const nodes = settings.nodes || [];
-  const providers = settings.providers || [];
-  const groups = modelGroups(providers, settings.default_model);
+  const nodes = stepRows(llms);
+  const defaultModel = llms.default ? llms.default.model : "";
+  const groups = modelGroups(providers, defaultModel);
   const missing = providersNeeded(models).filter((p) => !apiKeys[p]);
   const chosen = nodes.filter((n) => models[n.agent]);
-  const loose = variableModels(providers, models);
   const summary = chosen.length
     ? `${chosen.length} of ${nodes.length} steps on a model you chose`
-    : `all ${nodes.length} steps on ${settings.default_model || "the default model"}`;
+    : `all ${nodes.length} steps on ${defaultModel || "the default model"}`;
 
   return (
     <details className="set-card step-models" id="hosted-models" open={open}>
@@ -415,17 +224,185 @@ function HostedModelsForm({ settings, apiKeys, models, onModel }) {
           question will be refused, naming the step, until one is added.
         </p>
       )}
-      {loose.length > 0 && (
-        <p className="settings-warn" id="hosted-temperature-note">
-          <code>{loose.join(", ")}</code> does not accept temperature 0,
-          so a step on it runs at the model's default temperature and varies more from run to run.
-        </p>
-      )}
     </details>
   );
 }
 
-// Two cards in their final shape while GET /api/settings is on its way.
+// The server's own LLM, for an administrator: the default and the agents that do not inherit it. Saving changes only
+// the models chosen (every other llm setting stays), in memory and in this process; llm.yaml is read again on a restart.
+function ServerLlm({ llms, providers, onSaved }) {
+  const rows = serverRows(llms);
+  const names = Object.fromEntries(stepRows(llms).map((r) => [r.agent, r]));
+  const [edits, setEdits] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [fault, setFault] = useState(null);
+  const groups = modelGroups(providers, llms.default.model, { markMissingKeys: true });
+  const dirty = Object.keys(edits).length > 0;
+  // The default has no "inherit" choice: its selector lists the models, not "Default (...)".
+  const defaultGroups = groups.slice(1);
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!dirty || busy) return;
+    setBusy(true);
+    setFault(null);
+    setStatus(null);
+    try {
+      await setModels(modelChanges(llms, edits));
+      setEdits({});
+      setStatus("Saved in memory, in this server process only. A restart reads llm.yaml again.");
+      await onSaved();
+    } catch (err) {
+      setFault(message(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="set-card" onSubmit={save} aria-labelledby="server-llm-heading" id="server-llm">
+      <div className="set-card-head">
+        <h2 id="server-llm-heading">The server's model</h2>
+        <span className="set-meta">{rows.length - 1} steps ask a model</span>
+      </div>
+      <ul className="model-rows">
+        {rows.map((row) => {
+          const info = names[row.agent];
+          const value = row.agent in edits ? edits[row.agent] : (row.agent === "default" || !row.inherited ? row.value : "");
+          return (
+            <li key={row.agent}>
+              <label htmlFor={`server-model-${row.agent}`}>
+                <span className="model-step">{row.agent === "default" ? "Default" : info.label}</span>
+                <span className="model-does">
+                  {row.agent === "default" ? "Every step that has no model of its own." : info.does}
+                </span>
+              </label>
+              <ModelSelect id={`server-model-${row.agent}`} value={value}
+                groups={row.agent === "default" ? defaultGroups : groups}
+                onChange={(v) => setEdits({ ...edits, [row.agent]: v })} />
+            </li>
+          );
+        })}
+      </ul>
+      <div className="set-foot">
+        <p className="settings-help">
+          This replaces the server's whole <code>llm</code> section, in memory only. Each provider's key is read from its
+          environment variable, as before. Runs already going finish on the old model.
+        </p>
+        <button id="server-llm-save" className="settings-save" type="submit" disabled={busy || !dirty}>
+          {busy ? "Saving" : "Save models"}
+        </button>
+      </div>
+      <p className="settings-status" role="status">{status}</p>
+      {fault && <p className="fault" role="alert">{fault}</p>}
+    </form>
+  );
+}
+
+// The API keys the server issues, for an administrator. A new key's token is shown once, here, and never again.
+function ApiKeys() {
+  const [keys, setKeys] = useState(null);
+  const [fault, setFault] = useState(null);
+  const [userId, setUserId] = useState("");
+  const [roles, setRoles] = useState("");
+  const [tenant, setTenant] = useState("");
+  const [label, setLabel] = useState("");
+  const [token, setToken] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => listApiKeys().then(setKeys).catch((err) => setFault(message(err)));
+  useEffect(() => { load(); }, []);
+
+  const create = async (e) => {
+    e.preventDefault();
+    if (!userId.trim() || busy) return;
+    setBusy(true);
+    setFault(null);
+    try {
+      const made = await createApiKey({
+        userId: userId.trim(), roles: parseRoles(roles), tenantId: tenant.trim(), label: label.trim(),
+      });
+      setToken(made.token);
+      setUserId(""); setRoles(""); setTenant(""); setLabel("");
+      await load();
+    } catch (err) {
+      setFault(message(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const revoke = async (id) => {
+    setFault(null);
+    try {
+      await revokeApiKey(id);
+      await load();
+    } catch (err) {
+      setFault(message(err));
+    }
+  };
+
+  return (
+    <section className="set-card" aria-labelledby="api-keys-heading" id="api-keys">
+      <h2 id="api-keys-heading">API keys for this server</h2>
+      <p className="settings-help">A key lets a program call this server as a user, with the roles you give it.</p>
+      {keys && !keys.length && <p className="settings-current">No keys issued yet.</p>}
+      {keys && keys.length > 0 && (
+        <ul className="saved-keys">
+          {keys.map((k) => (
+            <li className="saved" key={k.id}>
+              <span>
+                <span className="mono">{k.user_id}</span>{k.label ? `, ${k.label}` : ""}
+                <span className="art-meta">
+                  {" "}{k.roles.length ? k.roles.join(", ") : "no roles"}{k.tenant_id ? `, tenant ${k.tenant_id}` : ""}
+                  {k.revoked_at ? ", revoked" : ""}
+                </span>
+              </span>
+              {!k.revoked_at && (
+                <button type="button" className="key-clear" onClick={() => revoke(k.id)}>
+                  Revoke<span className="visually-hidden"> the key for {k.user_id}</span>
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {token && (
+        <div className="notice" role="status">
+          <p>Copy this key now. It is not shown again.</p>
+          <p className="mono" id="api-key-token">{token}</p>
+          <button type="button" className="key-clear" onClick={() => setToken(null)}>Done</button>
+        </div>
+      )}
+      <form className="conn-fields" onSubmit={create}>
+        <div className="conn-field">
+          <label htmlFor="api-key-user">User id</label>
+          <input id="api-key-user" value={userId} onChange={(e) => setUserId(e.target.value)} autoComplete="off" />
+        </div>
+        <div className="conn-field">
+          <label htmlFor="api-key-roles">Roles</label>
+          <input id="api-key-roles" value={roles} onChange={(e) => setRoles(e.target.value)} autoComplete="off" />
+          <p className="conn-help">Separate roles with commas or spaces.</p>
+        </div>
+        <div className="conn-field">
+          <label htmlFor="api-key-tenant">Tenant (optional)</label>
+          <input id="api-key-tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} autoComplete="off" />
+        </div>
+        <div className="conn-field">
+          <label htmlFor="api-key-label">Label (optional)</label>
+          <input id="api-key-label" value={label} onChange={(e) => setLabel(e.target.value)} autoComplete="off" />
+        </div>
+        <div className="conn-actions">
+          <button className="settings-save" id="api-key-create" type="submit" disabled={busy || !userId.trim()}>
+            {busy ? "Creating" : "Create key"}
+          </button>
+        </div>
+      </form>
+      {fault && <p className="fault" role="alert">{fault}</p>}
+    </section>
+  );
+}
+
+// Two cards in their final shape while GET /llm is on its way.
 export function SettingsSkeleton() {
   return (
     <div className="settings-grid" aria-busy="true" aria-label="Loading settings">
@@ -440,45 +417,46 @@ export function SettingsSkeleton() {
               <span className="sk" style={{ height: 32 }} />
             </div>
           ))}
-          {i === 0 && <span className="sk" style={{ width: "80%" }} />}
         </div>
       ))}
     </div>
   );
 }
 
-// The settings page. When the server has settings off it says why instead of
-// offering a form that fails.
-export default function Settings({ settings, error, onSaved, recorded, apiKeys, onKey, limits,
-                                   stepModels, onStepModel }) {
-  if (error) {
-    return <p className="fault">Settings could not be loaded: {error}</p>;
-  }
-  if (!settings) return <SettingsSkeleton />;
-  if (settings.hosted) {
-    // Not "off": there is nothing for the server to save, and the two things
-    // the visitor does set -- their keys and the model each step runs on --
-    // live in their own browser and travel with each question.
-    return (
-      <div className="settings-grid">
-        <HostedKeyForm apiKeys={apiKeys} onKey={onKey} limits={limits} reason={settings.reason} />
-        <HostedModelsForm settings={settings} apiKeys={apiKeys} models={stepModels}
-          onModel={onStepModel} />
-      </div>
-    );
-  }
-  if (!settings.available) {
+const KEY_REASON = "This server lets a request bring its own model key.";
+
+// `caller` and `requestLlm` come from GET /meta; the rest is this tab's keys and step choices.
+export default function Settings({ caller = null, requestLlm = false, apiKeys, onKey, limits, stepModels, onStepModel }) {
+  const admin = isAdmin(caller);
+  const [llms, setLlms] = useState(null);
+  const [providers, setProviders] = useState(null);
+  const [error, setError] = useState(null);
+  const load = () => Promise.all([getLlm(), getProviders()])
+    .then(([l, p]) => { setLlms(l); setProviders(p); })
+    .catch((err) => setError(message(err)));
+  useEffect(() => { load(); }, []);
+
+  if (!requestLlm && !admin) {
     return (
       <div className="settings-off" id="settings-unavailable">
-        <h3>Settings are off</h3>
-        <p>{settings.reason}</p>
+        <h3>Nothing to set here</h3>
+        <p>
+          The server's model and API keys are changed by an administrator, and this server does not take a model key
+          with a question.
+        </p>
       </div>
     );
   }
+  if (error) return <p className="fault">Settings could not be loaded: {error}</p>;
+  if (!llms || !providers) return <SettingsSkeleton />;
   return (
     <div className="settings-grid">
-      <KeyForm settings={settings} onSaved={onSaved} recorded={recorded} />
-      <ModelsForm settings={settings} onSaved={onSaved} />
+      {requestLlm && <HostedKeyForm apiKeys={apiKeys} onKey={onKey} limits={limits} reason={KEY_REASON} />}
+      {requestLlm && (
+        <HostedModelsForm llms={llms} providers={providers} apiKeys={apiKeys} models={stepModels} onModel={onStepModel} />
+      )}
+      {admin && <ServerLlm llms={llms} providers={providers} onSaved={load} />}
+      {admin && <ApiKeys />}
     </div>
   );
 }

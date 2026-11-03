@@ -1,0 +1,14 @@
+/* ---------- evals: the run form and the report ----------
+   The run form is Connect's card; these are only the figures, the small tables and the failing cases. */
+
+.ev-report { display: grid; gap: var(--sp-4); }
+.ev-figures { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); margin: 0; }
+.ev-figures dt { font-size: var(--fs-1); color: var(--ink-2); }
+.ev-figures dd { margin: 0; font-size: var(--fs-4, var(--fs-3)); font-weight: var(--fw-bold); }
+.ev-table { border-collapse: collapse; font-size: var(--fs-2); max-width: 520px; }
+.ev-table caption { text-align: left; font-size: var(--fs-1); color: var(--ink-2); padding-bottom: var(--sp-1); }
+.ev-table th, .ev-table td { padding: 4px var(--sp-3) 4px 0; text-align: left; border-bottom: 1px solid var(--rule); font-weight: var(--fw-regular, 400); }
+.ev-table thead th { color: var(--ink-2); }
+.ev-failing { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.ev-failing li { display: grid; gap: 2px; padding-top: var(--sp-2); border-top: 1px solid var(--rule); font-size: var(--fs-2); }
+.ev-sql { overflow-x: auto; margin: var(--sp-1) 0 0; padding: var(--sp-2); background: var(--well); border-radius: var(--r-control); font-size: var(--fs-1); }

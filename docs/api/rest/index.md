@@ -73,7 +73,7 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Approvals](approvals.md) | `routes/approvals.py` | List, grant and deny the approvals a hook asked for. |
 | [Conversations](conversations.md) | `routes/conversations.py` | Conversations: start, list, read, delete, send a turn (whole or streamed), retry, run a chat tool, report. |
 | [Datasources](datasources.md) | `routes/datasources.py` | Connect a database, list datasources, read a schema or its diagram. |
-| [Settings and API keys](settings.md) | `routes/settings.py` | The agents' models (`/llm`, `/llm/providers`), replace the LLM (`PUT /settings/llm`), API keys (`/api-keys`) and the event catalog. |
+| [Settings and API keys](settings.md) | `routes/settings.py` | The agents' models (`/llm`, `/llm/providers`), replace the LLM (`PUT /settings/llm`), change models only (`PATCH /settings/llm`), API keys (`/api-keys`) and the event catalog. |
 | [Evals](evals.md) | `routes/evals.py`, `routes/jobs.py` | The configured suites and the scorers; the eval job. |
 | [Indexing](indexing.md) | `routes/index.py`, `routes/jobs.py` | Index status, drift check, retrieval inspector, the index job. |
 | [Knowledge](knowledge.md) | `routes/knowledge.py`, `routes/jobs.py` | The merged knowledge, proposals, the profile job. |
@@ -162,7 +162,7 @@ The routes that change the running process need an admin role, checked by the
 
 - `POST /api/v1/datasources` and `DELETE /api/v1/datasources/{datasource_id}`
 - The Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasources/test`
-- `PUT /api/v1/settings/llm` and the `/api/v1/api-keys` routes
+- `PUT` and `PATCH /api/v1/settings/llm` and the `/api/v1/api-keys` routes
 - Every `/api/v1/evals` route, `POST /api/v1/jobs/eval` and `POST /api/v1/jobs/demo`
 - `POST /api/v1/jobs/index`, `POST /api/v1/jobs/profile`, `DELETE /api/v1/index` and `GET /api/v1/index/check`
 - `POST /api/v1/knowledge/reload` and every `/api/v1/proposals` route
