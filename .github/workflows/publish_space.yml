@@ -5,7 +5,7 @@
 # tag once that version is on PyPI and a fresh install of it from PyPI has
 # booted (`pypi-smoke`), and afterwards polls the live Space until it reports
 # that version (`space-smoke`). A push to main does not deploy: the public demo
-# runs released code only. See docs/development/releasing.md.
+# runs released code only. See docs/contribute/releasing.md.
 #
 # `deploy/huggingface/` is a Space root: a Dockerfile that needs no build
 # context and a README whose front-matter is the Space configuration. This

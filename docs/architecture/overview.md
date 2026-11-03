@@ -2,6 +2,50 @@
 
 NL2SQL is a **multi-stage orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by `Runtime`, which instantiates registries, stores, and policy enforcement.
 
+## In brief
+
+- The question is checked for answerability and routed to one of the registered
+  databases, then split into sub-queries; the decomposer also builds the
+  execution DAG that says which sub-queries can run together and how their
+  results combine.
+- Each sub-query gets the part of the schema it needs (vector search over an
+  index of tables, columns and relationships, or the whole schema when it is
+  small).
+- The model returns a **typed plan** (a Pydantic `PlanModel`: tables, joins,
+  select items, filters), never a SQL string. It may only name a function from
+  an allow-list, and it writes date work portably, which each adapter renders
+  in its own dialect.
+- The **logical validator** resolves every table and column against the schema,
+  checks joins against the declared foreign keys, checks every table against
+  the caller's role, and builds the query tree the generator would build, so a
+  plan whose tables cannot be joined is caught here, where the planner can still
+  be asked to fix it. A refused plan never becomes SQL.
+- Only a plan that passes reaches the **generator**, which renders SQL
+  deterministically with `sqlglot`. The executor runs it and the answer writer
+  summarises the rows.
+- A retryable validation failure goes back to the planner through a refiner, up
+  to `settings.pipeline.retries.max` (default 3). A security refusal is final
+  and is never retried.
+
+```mermaid
+flowchart LR
+    Q([Question]) --> R[Resolve datasource<br/>and decompose]
+    R --> S[Schema retrieval]
+    S --> P[LLM planner<br/>typed plan, no SQL]
+    P --> V{Validator<br/>schema, joins, RBAC}
+    V -->|retryable| F[Refiner] --> P
+    V -->|refused| X([Refusal with reason])
+    V -->|passed| G[SQL generator<br/>sqlglot]
+    G --> E[Executor] --> A([Answer])
+```
+
+The full pipeline lists 17 steps (`PIPELINE_STEPS`), seven of them decided by a
+model; the web app's Pipeline page shows them all. The first, the curated
+matcher, which matches the question to a verified query a data team wrote
+([curated answers](../configuration/curated.md)), runs only when curated answers
+are configured and hold a verified query. The second, the pinned entry, runs
+only when a run is given its plan.
+
 ## Key runtime components
 
 - `Runtime` initializes registries, stores, and policy enforcement.

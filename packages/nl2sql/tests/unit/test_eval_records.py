@@ -609,3 +609,13 @@ def test_a_record_keeps_only_what_the_gate_and_the_pages_read(tmp_path):
                                                     code=CODE)["metrics"]
     from nl2sql.evaluation import gate
     assert gate.gate(full, record).ok
+
+
+def test_the_history_page_links_only_to_docs_pages_that_exist():
+    """docs/benchmarks.md is generated, so a page that moves must be followed here."""
+    import re
+
+    docs = pathlib.Path(__file__).resolve().parents[4] / "docs"
+    links = re.findall(r"\]\(([^)#]+\.md)", records.render_history([]))
+    assert links, "the history page's head names no docs page"
+    assert [link for link in links if not (docs / link).is_file()] == []

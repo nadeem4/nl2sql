@@ -10,7 +10,7 @@ how many cases flipped each way with McNemar's exact p-value on them: with a sui
 size a few points either way is noise, so read the flips and the p-value, not the headline.
 Runs on another suite (`@digest`), another schema or, for mode full, other roles or curated
 answers on are not comparable and start a new series. See
-[the Chinook suite](testing/evaluation-dataset.md) and
+[the Chinook suite](evals/chinook-suite.md) and
 [the routing suite](evals/cases.md#the-routing-suite).
 
 ## Mode full: chinook (sqlite, 11 tables / 64 columns)

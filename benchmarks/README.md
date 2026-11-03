@@ -2,7 +2,7 @@
 
 One JSON file per recorded eval run and config. `nl2sql eval publish` builds
 [docs/benchmarks.md](../docs/benchmarks.md) and the README's results block from
-them. Full detail: [the Chinook suite](../docs/testing/evaluation-dataset.md#results-over-time).
+them. Full detail: [the Chinook suite](../docs/evals/chinook-suite.md#results-over-time).
 
 ## Layout
 

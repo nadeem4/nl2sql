@@ -9,7 +9,7 @@
 #
 # Loading happens once per data volume, so a second `up` is quick, and it
 # keeps the passwords the volume was created with.
-# docs/testing/test-bed.md has the details.
+# docs/contribute/test-bed.md has the details.
 #
 # There is no default password, so none is written in the repository: the
 # three TESTBED_*_PASSWORD variables are required. CI generates new ones for

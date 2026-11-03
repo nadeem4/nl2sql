@@ -16,7 +16,7 @@ environment; they are never written to a file, put on a command line or
 printed, and this process's environment is never changed.
 
 The VM, its firewall rule and the nightly stop job are created once, by hand:
-docs/testing/test-bed.md, "The GCP VM".
+docs/contribute/test-bed.md, "The GCP VM".
 """
 from __future__ import annotations
 

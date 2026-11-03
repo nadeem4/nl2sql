@@ -72,7 +72,7 @@ The control graph can resolve multiple datasources for a single user query. `Dec
 To add a new adapter:
 
 1. Implement `DatasourceAdapter` (or extend a base adapter), with a `connection_model`.
-2. Publish the adapter class as an `nl2sql.adapters` entry point, or register it in code (see [Adding a New Adapter](../extensions/add-adapter.md)).
+2. Publish the adapter class as an `nl2sql.adapters` entry point, or register it in code (see [Adding a New Adapter](../extend/add-adapter.md)).
 3. Configure the datasource in the `datasources` section of `nl2sql.yaml`, with `type:` set to the adapter's name.
 
 ## Source references

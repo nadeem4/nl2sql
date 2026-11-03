@@ -1,5 +1,37 @@
 # Evals
 
+## At a glance
+
+- **`engine.evals`:** suites of cases in `evals.yaml`, scored by registered
+  scorers (`result_match`, `outcome`, `retrieval_recall`, `faithfulness`,
+  `routing`), in three modes.
+- **The Chinook suite:** 47 cases (43 answerable, 4 deliberately not) with
+  expected results per role, including refusals. A case may carry reviewed
+  `alt_sql` alternatives, so a second correct way to answer it scores as
+  correct; gold data is never edited to make a run pass.
+- **Mode plans** (no key, runs in CI): the hand-written plans through the
+  validator, generator and executor with a fake LLM, so a failure is a bug in
+  code, not the model.
+- **Mode full** (real model, costs money): end to end per config, with accuracy,
+  answerability precision and recall, cost, latency, determinism and answer
+  faithfulness (a deterministic check, no second model, that every number and
+  name in the written answer comes from the rows). Accuracy is scored twice:
+  **strict**, where the rows must match the gold answer exactly, and
+  **lenient**, which allows extra and reordered columns and date labels. Each
+  is published with a 95% Wilson interval, because 47 questions cannot separate
+  small differences. Stops before spend could pass `max_cost_usd`. With curated
+  answers on, a case a verified query answered also runs on the generated
+  path, so `accuracy_generated` measures the model alone.
+- **Mode retrieval** (no key): the share of each case's needed tables and
+  columns that schema retrieval sends the planner, and where routing sends it.
+- **Feedback:** playground ratings and guardrail rates via `nl2sql feedback stats`;
+  `feedback export --good` drafts new eval cases for review.
+
+Recorded runs are published with `nl2sql eval publish` to the
+README and [Benchmarks](../benchmarks.md). Details:
+[the Chinook suite](chinook-suite.md),
+[Feedback and Signals](../observability/feedback.md).
+
 `engine.evals` measures how well the engine answers your questions. You
 write **cases** (a question, what each role should get, and the SQL a person
 reviewed) in **suite** files. A run asks every case once per role and scores it
@@ -190,7 +222,7 @@ A board holds:
 
 Accuracy over 47 cases has an interval about 14 points wide, so two runs are
 compared case by case, not headline to headline. The statistics are in
-[the Chinook suite](../testing/evaluation-dataset.md#reading-a-run-intervals-flips-and-passk).
+[the Chinook suite](chinook-suite.md#reading-a-run-intervals-flips-and-passk).
 
 ## Events
 
@@ -247,7 +279,7 @@ same roles and curated answers. Both runs must also have run the same roles,
 so a role left out cannot quietly shrink the comparison.
 
 The statistics are in
-[the Chinook suite](../testing/evaluation-dataset.md#reading-a-run-intervals-flips-and-passk).
+[the Chinook suite](chinook-suite.md#reading-a-run-intervals-flips-and-passk).
 
 ## The CLI
 
@@ -332,4 +364,4 @@ the baselines it moves this way, in the PR that makes the change.
 
 Mode `full` spends a key: `nl2sql eval run --mode full` refuses to start when
 `CI` is set. The owner runs it before a release
-([Releasing](../development/releasing.md#the-pre-release-eval)).
+([Releasing](../contribute/releasing.md#the-pre-release-eval)).

@@ -93,7 +93,7 @@ engine's life. Building the engine never calls the model. Writing
 
 A plugin implements `nl2sql.embeddings.EmbeddingsProvider`, interface
 version 2, and registers it under the `nl2sql.embeddings` entry point group or
-with `registry.add_embeddings` (see [the registry](../development/index.md#the-registry)):
+with `registry.add_embeddings` (see [the registry](../extend/index.md#the-registry)):
 
 ```python
 from nl2sql.embeddings import EmbeddingInfo

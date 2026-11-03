@@ -456,7 +456,7 @@ flowchart LR
    reach the release; a fork sets its own domain there, or empties it to skip
    the check.
 
-The whole release flow is in [Releasing](../development/releasing.md).
+The whole release flow is in [Releasing](../contribute/releasing.md).
 
 **A push to `main` does not deploy the Space.** It used to: every merge that
 touched the engine, the playground or this folder rebuilt the public demo from

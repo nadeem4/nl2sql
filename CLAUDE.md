@@ -32,7 +32,7 @@ name the rule.
 - **Update the docs in the same PR as the code.** A doc that lags is worse than no doc — see `CONTRIBUTING.md`.
 - **Design and planning documents never go in the repo.** Docs describe what is built, in the present tense. Code, tests and comments never cite doc sections, decision ids or plan rows; state the reason in a few words instead. `test_no_tracked_file_cites_a_design_doc_or_a_plan_id` (`packages/nl2sql/tests/architecture/test_boundaries.py`) fails on a design-doc name or a parenthesised id such as `(D15)` or `(K1)`.
 - **Never read or edit `nl2sql-demo*/` or any `.env` file.** A folder made by `nl2sql demo` holds a real API key in the `.env` next to its `nl2sql.yaml`; `.gitignore` keeps it out of the repo and you keep it out of the transcript.
-- **Never merge the release-please PR (#85).** Merging it releases all three packages; releasing is a deliberate act, described in `docs/development/releasing.md`.
+- **Never merge the release-please PR (#85).** Merging it releases all three packages; releasing is a deliberate act, described in `docs/contribute/releasing.md`.
 - **Where we control the background, Mermaid diagrams are black and white** — an artifact, a Notion page, paper — and open with exactly this line, so the diagram reads the same in all three:
 
     ```
@@ -41,7 +41,7 @@ name the rule.
 
 - **Where the reader picks the theme, force no colours at all** — the README and anything else GitHub renders, and the docs site, which has a dark palette. That line paints black lines and black label text onto a near-black canvas; the default theme follows the reader instead. Carry emphasis in shape and layout.
 
-- **Never change gold data to make an eval run pass.** Add a reviewed `alt_sql` alternative instead: [`docs/testing/evaluation-dataset.md`](docs/testing/evaluation-dataset.md).
+- **Never change gold data to make an eval run pass.** Add a reviewed `alt_sql` alternative instead: [`docs/evals/chinook-suite.md`](docs/evals/chinook-suite.md).
 
 ## Checks
 

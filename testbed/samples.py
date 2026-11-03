@@ -7,7 +7,7 @@ downloaded from a pinned URL and its SHA-256 checked before it is kept, so a
 changed or truncated file is refused rather than loaded. Whatever is already
 in the folder is skipped, so a second run downloads nothing. Nothing here is
 committed to the repository: we never redistribute the samples. Their
-licences are listed in docs/testing/test-bed.md.
+licences are listed in docs/contribute/test-bed.md.
 """
 from __future__ import annotations
 

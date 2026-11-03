@@ -55,7 +55,7 @@ It also keeps the lenient reading in `detail["lenient"]`, which accepts
 period labels against dates and extra columns beyond the cap besides. The
 report gives the strict and lenient accuracy side by side. The rules, and
 `faithfulness`'s, are in [the Chinook
-suite](../testing/evaluation-dataset.md#strict-and-lenient-accuracy).
+suite](chinook-suite.md#strict-and-lenient-accuracy).
 
 In mode full, `retrieval_recall` reads what the run's schema retriever sent.
 In mode retrieval, the runner runs the retriever itself, with the question as

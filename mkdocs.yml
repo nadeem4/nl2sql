@@ -29,6 +29,19 @@ theme:
 plugins:
   - search
   - mermaid2
+  - redirects:
+      redirect_maps:
+        extensions/add-adapter.md: extend/add-adapter.md
+        extensions/add-chunk-types.md: extend/add-chunk-types.md
+        extensions/extend-planner.md: extend/extend-planner.md
+        extensions/add-execution-backend.md: extend/add-execution-backend.md
+        development/index.md: extend/index.md
+        development/releasing.md: contribute/releasing.md
+        testing/architecture.md: contribute/testing.md
+        testing/test-bed.md: contribute/test-bed.md
+        testing/evaluation-dataset.md: evals/chinook-suite.md
+        glossary.md: reference/glossary.md
+        execution/isolation.md: architecture/isolation.md
   - mkdocstrings:
       handlers:
         python:
@@ -56,7 +69,119 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Architecture:
+  - Get started:
+    - Overview: getting_started/index.md
+    - PyPI (Python API): getting_started/pypi.md
+    - Docker (REST API): getting_started/docker.md
+    - From Source (Development): getting_started/source.md
+    - Demo Data (CLI-first): getting_started/demo.md
+    - MCP Server: getting_started/mcp.md
+    - Launch: getting_started/launch.md
+  - Use it:
+    - Web app: apps/web.md
+    - Terminal app: apps/terminal.md
+    - Conversations:
+      - Conversations: conversations/index.md
+      - Chat tools: conversations/tools.md
+    - Charts:
+      - Charts: charts/index.md
+      - Diagrams: charts/diagrams.md
+    - Dashboards: dashboards/index.md
+    - Evals:
+      - Overview: evals/index.md
+      - Cases and Suites: evals/cases.md
+      - Scorers: evals/scorers.md
+      - Benchmark Your Own Database: evals/seeding.md
+      - The Chinook Suite: evals/chinook-suite.md
+  - Configure:
+    - Configuration System: configuration/system.md
+    - Datasources: configuration/datasources.md
+    - Databases:
+      - DuckDB: adapters/duckdb.md
+      - Microsoft SQL Server: adapters/mssql.md
+      - MySQL: adapters/mysql.md
+      - PostgreSQL: adapters/postgres.md
+      - SQLite: adapters/sqlite.md
+    - LLMs: configuration/llm.md
+    - Policies: configuration/policies.md
+    - Hooks: configuration/hooks.md
+    - Embeddings: configuration/embeddings.md
+    - Storage: configuration/storage.md
+    - Secrets: configuration/secrets.md
+    - Curated Answers: configuration/curated.md
+    - Knowledge: configuration/knowledge.md
+    - Review Queue: configuration/review.md
+    - Settings: configuration/settings.md
+    - Observers: configuration/observers.md
+    - REST API settings: configuration/api.md
+    - API keys: security/api-keys.md
+    - Schema:
+      - Schema Store + Metadata: schema/store.md
+      - Schema Drift: schema/drift.md
+      - Schema Profiler: schema/profiler.md
+  - Deploy and operate:
+    - Deployment Architecture: deployment/architecture.md
+    - Docker: deployment/docker.md
+    - Docker Compose: deployment/compose.md
+    - Kubernetes: deployment/kubernetes.md
+    - Hosted demo: deployment/hosted-demo.md
+    - Artifact Store: storage/artifact-store.md
+    - Security Model: security/model.md
+    - Multi-Tenant Isolation: security/multi-tenant.md
+    - Observability:
+      - Observability Stack: observability/stack.md
+      - Events: observability/events.md
+      - Debugging a Run (Traces): observability/debugging.md
+      - Feedback and Signals: observability/feedback.md
+      - Error Handling + Circuit Breaker: observability/error-handling.md
+  - Extend:
+    - Extending NL2SQL: extend/index.md
+    - Add Adapter: extend/add-adapter.md
+    - Add Chunk Types: extend/add-chunk-types.md
+    - Extend Planner: extend/extend-planner.md
+    - Add Execution Backend: extend/add-execution-backend.md
+    - Adapters:
+      - Overview: adapters/index.md
+      - Architecture: adapters/architecture.md
+      - SDK Reference: adapters/sdk.md
+      - SQLAlchemy Reference: adapters/sqlalchemy.md
+      - Building Adapters: adapters/development.md
+  - Reference:
+    - CLI: reference/cli.md
+    - API:
+      - Overview: api/index.md
+      - Core API (Python):
+        - Public Facade: api/core/public-facade.md
+        - Datasource: api/core/datasource.md
+        - LLM: api/core/llm.md
+        - Indexing: api/core/indexing.md
+        - Policies: api/core/policies.md
+        - Query: api/core/query.md
+        - Results: api/core/results.md
+        - Conversations: api/core/conversations.md
+        - Dashboards: api/core/dashboards.md
+        - Saved answers: api/core/answers.md
+      - REST API (FastAPI):
+        - Overview: api/rest/index.md
+        - All routes: api/rest/routes.md
+        - Health: api/rest/health.md
+        - Query: api/rest/query.md
+        - Results: api/rest/results.md
+        - Traces and feedback: api/rest/feedback.md
+        - Approvals: api/rest/approvals.md
+        - Datasources: api/rest/datasources.md
+        - Settings and API keys: api/rest/settings.md
+        - Evals: api/rest/evals.md
+        - Indexing: api/rest/indexing.md
+        - Knowledge: api/rest/knowledge.md
+        - Saved answers: api/rest/answers.md
+        - Dashboards: api/rest/dashboards.md
+        - Jobs: api/rest/jobs.md
+        - Conversations: api/rest/conversations.md
+        - Errors: api/rest/errors.md
+    - Status and limitations: reference/limitations.md
+    - Glossary: reference/glossary.md
+  - How it works:
     - Overview: architecture/overview.md
     - Pipeline: architecture/pipeline.md
     - Graph State: architecture/graph_state.md
@@ -65,6 +190,7 @@ nav:
     - Failure + Recovery: architecture/failure_recovery.md
     - Indexing + Retrieval: architecture/indexing.md
     - Curated Answers: architecture/curated_answers.md
+    - Execution Isolation + Concurrency: architecture/isolation.md
     - Subgraphs:
       - Main Pipeline Graph: architecture/subgraphs/main_pipeline_graph.md
       - SQL Agent Subgraph: architecture/subgraphs/sql_agent.md
@@ -82,122 +208,11 @@ nav:
       - Logical Validator: architecture/nodes/logical_validator_node.md
       - Refiner: architecture/nodes/refiner_node.md
       - Schema Retriever: architecture/nodes/schema_retriever_node.md
-  - Getting Started:
-    - Overview: getting_started/index.md
-    - PyPI (Python API): getting_started/pypi.md
-    - Docker (REST API): getting_started/docker.md
-    - From Source (Development): getting_started/source.md
-    - Demo Data (CLI-first): getting_started/demo.md
-    - MCP Server: getting_started/mcp.md
-    - Launch: getting_started/launch.md
-  - Apps:
-    - Web app: apps/web.md
-    - Terminal app: apps/terminal.md
-  - Conversations:
-    - Conversations: conversations/index.md
-    - Chat tools: conversations/tools.md
-  - Charts:
-    - Charts: charts/index.md
-    - Diagrams: charts/diagrams.md
-  - Dashboards:
-    - Dashboards: dashboards/index.md
-  - Configuration:
-    - Configuration System: configuration/system.md
-    - Datasources: configuration/datasources.md
-    - LLMs: configuration/llm.md
-    - Policies: configuration/policies.md
-    - Hooks: configuration/hooks.md
-    - Embeddings: configuration/embeddings.md
-    - Storage: configuration/storage.md
-    - Secrets: configuration/secrets.md
-    - Curated Answers: configuration/curated.md
-    - Knowledge: configuration/knowledge.md
-    - Review Queue: configuration/review.md
-    - Settings: configuration/settings.md
-    - Observers: configuration/observers.md
-    - REST API settings: configuration/api.md
-  - Adapters:
-    - Overview: adapters/index.md
-    - Architecture: adapters/architecture.md
-    - SDK Reference: adapters/sdk.md
-    - SQLAlchemy Reference: adapters/sqlalchemy.md
-    - Building Adapters: adapters/development.md
-    - DuckDB: adapters/duckdb.md
-    - Microsoft SQL Server: adapters/mssql.md
-    - MySQL: adapters/mysql.md
-    - PostgreSQL: adapters/postgres.md
-    - SQLite: adapters/sqlite.md
-  - Schema:
-    - Schema Store + Metadata: schema/store.md
-    - Schema Drift: schema/drift.md
-    - Schema Profiler: schema/profiler.md
-  - Execution:
-    - Execution Isolation + Concurrency: execution/isolation.md
-  - Storage:
-    - Artifact Store: storage/artifact-store.md
-  - Observability:
-    - Observability Stack: observability/stack.md
-    - Events: observability/events.md
-    - Debugging a Run (Traces): observability/debugging.md
-    - Feedback and Signals: observability/feedback.md
-    - Error Handling + Circuit Breaker: observability/error-handling.md
-  - Security:
-    - Security Model: security/model.md
-    - Multi-Tenant Isolation: security/multi-tenant.md
-    - API keys: security/api-keys.md
-  - Deployment:
-    - Deployment Architecture: deployment/architecture.md
-    - Docker: deployment/docker.md
-    - Docker Compose: deployment/compose.md
-    - Kubernetes: deployment/kubernetes.md
-    - Hosted demo: deployment/hosted-demo.md
-  - Development:
-    - Extending NL2SQL: development/index.md
-    - Releasing: development/releasing.md
-    - Add Adapter: extensions/add-adapter.md
-    - Add Chunk Types: extensions/add-chunk-types.md
-    - Extend Planner: extensions/extend-planner.md
-    - Add Execution Backend: extensions/add-execution-backend.md
-  - Evals:
-    - Overview: evals/index.md
-    - Cases and Suites: evals/cases.md
-    - Scorers: evals/scorers.md
-    - Benchmark Your Own Database: evals/seeding.md
-    - The Chinook Suite: testing/evaluation-dataset.md
-    - Benchmark Results: benchmarks.md
-  - Testing:
-    - Testing Architecture: testing/architecture.md
-    - Real-Database Test Bed: testing/test-bed.md
-  - API:
-    - Overview: api/index.md
-    - Core API (Python):
-      - Public Facade: api/core/public-facade.md
-      - Datasource: api/core/datasource.md
-      - LLM: api/core/llm.md
-      - Indexing: api/core/indexing.md
-      - Policies: api/core/policies.md
-      - Query: api/core/query.md
-      - Results: api/core/results.md
-      - Conversations: api/core/conversations.md
-      - Dashboards: api/core/dashboards.md
-      - Saved answers: api/core/answers.md
-    - REST API (FastAPI):
-      - Overview: api/rest/index.md
-      - Health: api/rest/health.md
-      - Query: api/rest/query.md
-      - Results: api/rest/results.md
-      - Traces and feedback: api/rest/feedback.md
-      - Approvals: api/rest/approvals.md
-      - Datasources: api/rest/datasources.md
-      - Settings and API keys: api/rest/settings.md
-      - Evals: api/rest/evals.md
-      - Indexing: api/rest/indexing.md
-      - Knowledge: api/rest/knowledge.md
-      - Saved answers: api/rest/answers.md
-      - Dashboards: api/rest/dashboards.md
-      - Jobs: api/rest/jobs.md
-      - Conversations: api/rest/conversations.md
-      - Errors: api/rest/errors.md
+  - Contribute:
+    - Contributing: contribute/index.md
+    - Testing Architecture: contribute/testing.md
+    - Real-Database Test Bed: contribute/test-bed.md
+    - Releasing: contribute/releasing.md
   - Releases:
     - Overview: releases/index.md
     - "0.9.1": releases/0.9.1.md
@@ -217,4 +232,4 @@ nav:
     - "0.1.2": releases/0.1.2.md
     - "0.1.1": releases/0.1.1.md
     - "0.1.0": releases/0.1.0.md
-  - Glossary: glossary.md
+  - Benchmarks: benchmarks.md

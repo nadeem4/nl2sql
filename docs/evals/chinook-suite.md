@@ -3,8 +3,8 @@
 The Chinook suite holds 47 cases about the vendored Chinook database
 (`nl2sql/datasets/chinook.sqlite`). Each case has hand-written SQL, the rows
 that SQL returns, and a hand-written plan. Evaluations compare the engine's
-answers against it. It is a suite in the [eval case format](../evals/cases.md)
-and runs through [`engine.evals`](../evals/index.md).
+answers against it. It is a suite in the [eval case format](cases.md)
+and runs through [`engine.evals`](index.md).
 
 | File | What it holds |
 | --- | --- |
@@ -26,7 +26,7 @@ and runs through [`engine.evals`](../evals/index.md).
 
 ## The cases
 
-The fields are described in [Cases and suites](../evals/cases.md). For this
+The fields are described in [Cases and suites](cases.md). For this
 suite:
 
 - **The tags.** `tags` come from a fixed list: `single-table`, `filter`,
@@ -55,7 +55,7 @@ suite:
 `test_chinook_suite_holds_the_gold_data_unchanged` pins a SHA-256 of every
 case's question, SQL, rows, alternatives, outcomes, tables, columns and plan.
 A new accepted answer is a reviewed [alternative](#alternative-answers),
-followed by [`regenerate`](../evals/cases.md#regenerating-rows); never an edit
+followed by [`regenerate`](cases.md#regenerating-rows); never an edit
 to the gold data.
 
 ## What the tests check
@@ -84,7 +84,7 @@ adapter and checks that the committed file is byte for byte what it writes.
 ## How a run is scored
 
 Each case runs once per role in its `outcome` map, and each run is scored by
-the [scorers](../evals/scorers.md). For `result_match` and `outcome`:
+the [scorers](scorers.md). For `result_match` and `outcome`:
 
 | Outcome | Passes when |
 | --- | --- |
@@ -306,7 +306,7 @@ requires every case to pass -- allowed, refused and unanswerable, for every
 role -- with none skipped. The same job runs
 `nl2sql eval run --mode plans --baseline benchmarks`, which gates the run
 against the newest mode plans record in `benchmarks/`
-([In CI](../evals/index.md#in-ci)).
+([In CI](index.md#in-ci)).
 
 When a gold plan fails, the fault is in the engine or in the plan. Fix an
 engine bug with a regression test. Never change the gold data to make a plan
@@ -397,7 +397,7 @@ The run turns the plan cache off, so a second pass asks the planner again
 instead of replaying the first. Curated answers are on unless `curated` says
 otherwise: a case a verified query answered also runs with them off, and the
 report's `accuracy_generated` scores every case on the generated path
-([Curated answers in mode full](../evals/index.md#curated-answers-in-mode-full)).
+([Curated answers in mode full](index.md#curated-answers-in-mode-full)).
 
 ### Answer faithfulness
 

@@ -97,7 +97,7 @@ Your own database: `nl2sql launch my-project` finds it, asks for what is missing
 to `.env`), indexes, profiles and files five starter questions for review; or `nl2sql init` writes `nl2sql.yaml`
 and one file per section (edit `datasources/example.yaml`), then `nl2sql index`.
 
-Every command: [CLI reference](https://github.com/nadeem4/nl2sql#cli-reference).
+Every command: [CLI reference](https://nadeem4.github.io/nl2sql/reference/cli/).
 
 ## Python
 
@@ -147,5 +147,5 @@ SQLite needs no extra.
 
 0.1.x. `nl2sql-sdk`, `nl2sql-engine` and `nl2sql-api` share one version
 and are released together. Known limitations, benchmark results and the
-roadmap: <https://github.com/nadeem4/nl2sql#project-status-limitations-and-roadmap>.
+roadmap: <https://nadeem4.github.io/nl2sql/reference/limitations/>.
 MIT licensed.

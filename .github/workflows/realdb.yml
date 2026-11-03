@@ -5,7 +5,7 @@ name: Real databases
 # change database-facing code, nightly on main, and on demand, which is done
 # before every release. `realdb-gate` always runs and is the required check,
 # so a run skipped because nothing database-facing changed is an honest pass.
-# docs/testing/test-bed.md has the details.
+# docs/contribute/test-bed.md has the details.
 
 on:
   pull_request:

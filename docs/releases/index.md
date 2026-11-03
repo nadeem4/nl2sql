@@ -2,7 +2,7 @@
 
 What each release is for, in plain words. The full list of commits is in
 [`CHANGELOG.md`](https://github.com/nadeem4/nl2sql/blob/main/CHANGELOG.md).
-How a release is cut is in [Releasing](../development/releasing.md).
+How a release is cut is in [Releasing](../contribute/releasing.md).
 
 - [0.9.1](0.9.1.md): better answers on large schemas: model-picked tables, joins across partitioned tables, date differences, split questions in the shape asked, and a fairer eval scorer.
 - [0.9.0](0.9.0.md): Wave C: model-led conversations with chat tools, automatic charts and diagrams, dashboards in workspaces with token-free refresh, `nl2sql launch`, and MCP over HTTP with API keys.

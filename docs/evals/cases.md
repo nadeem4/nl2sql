@@ -47,7 +47,7 @@ cases:
 | `order_matters` | Whether row order counts when rows are compared |
 | `sql` | The reviewed SQL, in the datasource's dialect; `null` for an unanswerable case and for a `kind: routing` case |
 | `rows` | The rows `sql` returns, as `{column: value}` maps. Written by `regenerate`, never typed by hand |
-| `alt_sql`, `alt_rows` | [Reviewed alternative answers](../testing/evaluation-dataset.md#alternative-answers) and their rows |
+| `alt_sql`, `alt_rows` | [Reviewed alternative answers](chinook-suite.md#alternative-answers) and their rows |
 | `plan` | Optional. A `PlanModel` written as data, which mode `plans` serves through its fake LLM. Mode plans needs one for every answerable case |
 
 The outcomes:
@@ -84,7 +84,7 @@ nothing else changed:
 `test_chinook_suite_holds_the_gold_data_unchanged` pins a SHA-256 of every
 case's question, SQL, rows, alternatives, outcomes, tables, columns and plan,
 taken from the old files with the old loader. [The Chinook
-suite](../testing/evaluation-dataset.md) describes it.
+suite](chinook-suite.md) describes it.
 
 ## The routing suite
 

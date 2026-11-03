@@ -119,7 +119,7 @@ For the browser playground instead of the CLI, `nl2sql demo` does both steps in
 `./nl2sql-demo` the first time (and adds a `nl2sql-demo.json` stamp recording
 which engine version wrote the folder; see [Old demo folders](#old-demo-folders)),
 then serves a page over it. See the
-[README](https://github.com/nadeem4/nl2sql#quickstart-run-it-locally) for its flags, and
+[CLI reference](../reference/cli.md) for its flags, and
 [the Settings page](#the-settings-page) for entering a key and choosing
 models from the page.
 
@@ -750,7 +750,7 @@ the resolver tells the three apart (see
 (`nl2sql index`) after editing them.
 
 Whether a given question is answered correctly depends on the model; see
-[Known limitations](https://github.com/nadeem4/nl2sql#known-limitations).
+[Known limitations](../reference/limitations.md).
 
 ## Regenerating the demo
 

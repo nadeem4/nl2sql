@@ -100,7 +100,7 @@ Three more jobs test the package rather than the source tree:
   `--url https://nadeem4nk-nl2sql-demo.hf.space --expect-version X.Y.Z` to
   wait for the live Space to serve it, then once more with its custom domain
   as `--url` (see
-  [Releasing](../development/releasing.md)).
+  [Releasing](releasing.md)).
 
 Nothing selects `llm`. Those tests are run by hand with a key:
 

@@ -1,5 +1,32 @@
 # Security Model
 
+## At a glance
+
+- **What reaches the LLM provider:** the question; the schema the planner needs
+  (table and column names, types, keys, relationships, descriptions); **sample
+  column values** for tables the role may read; and the **result rows**, which
+  the answer writer summarises. With `settings.traces.mode` on, run traces store prompts,
+  responses and sample rows on disk.
+- **RBAC is strict.** A plan that touches a table the role may not read is
+  refused before any SQL exists, never answered from the tables the role can
+  see. Sample values and statistics of forbidden tables are stripped from the
+  prompt and the trace. An unknown role grants nothing. There is no column
+  masking and no row-level security.
+- **Read-only is a database setting, not something the executor checks.** The
+  plan type only allows `SELECT` and the generator only builds one, but the
+  executor does not inspect the SQL. A SQLite datasource is always opened
+  read-only at the driver level (SQLite's `mode=ro` URI), so a write is refused
+  by SQLite itself. No other dialect opens read-only yet, so on PostgreSQL, MySQL, SQL Server
+  or DuckDB, **give the engine a read-only database user.**
+- **No authentication** in the CLI or REST API. The CLI
+  takes the role from the caller. The REST API takes it from a trusted
+  proxy header or a static setting, never from the body unless a dev flag is
+  on; put your own auth in the proxy and derive the role from it.
+- `settings.pipeline.timeout_s` bounds how long the caller waits, not how long the work
+  runs; the graph runs in-process with no sandbox.
+
+Details are below and in [Execution Isolation](../architecture/isolation.md).
+
 Authorization is enforced at **planning time**, by the logical validator, before
 any SQL exists. That is the one security property this engine provides. It is
 not authentication, it is not containment, and it is not row- or column-level
