@@ -143,7 +143,7 @@ example `nl2sql__local-all-minilm-l6-v2__384`), filters them, and records
 each datasource's live build as a `BuildPointer` (its `build_id` and the
 `schema_version` it was made from). Switching a pointer is the commit, and a
 run reads the pointers once when it starts. See
-[Indexing](../architecture/indexing.md#the-build-pointer-is-the-commit).
+[Indexing](../how-it-works/indexing.md#the-build-pointer-is-the-commit).
 
 - **Changing the embedding model** opens a new, empty namespace: `check()`
   reports the index `missing`, and `nl2sql index` builds it. Switching back

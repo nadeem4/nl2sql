@@ -24,7 +24,7 @@ holds what is the same for every question (instructions, `PLANNER_EXAMPLES`,
 the schema) and `PLANNER_HUMAN_PROMPT` holds what changes per call (expected
 schema, feedback, the question). Keep per-question text out of the system
 message, or the provider's prompt cache stops hitting. See
-[AST Planner: prompt layout](../architecture/nodes/ast_planner_node.md#prompt-layout-and-caching).
+[AST Planner: prompt layout](../how-it-works/nodes/ast_planner_node.md#prompt-layout-and-caching).
 
 Ensure structured output still matches `PlanModel`.
 

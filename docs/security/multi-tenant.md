@@ -21,7 +21,7 @@ Artifacts are persisted under a tenant-partitioned path on every backend, driven
 
 This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.
 
-Tenant isolation is **not** applied to indexing; the vector store and schema store are global in the current implementation (see `../architecture/indexing.md`).
+Tenant isolation is **not** applied to indexing; the vector store and schema store are global in the current implementation (see `../how-it-works/indexing.md`).
 
 ## Authorization model
 

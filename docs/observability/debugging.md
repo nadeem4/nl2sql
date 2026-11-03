@@ -149,14 +149,14 @@ named a column that does not exist; long values shortened here):
   and `llm_calls: []` (zero planner tokens), and the validator, generator and
   executor entries follow as usual. The result shows the same thing as
   `result.sub_queries[].plan_source` and `result.usage.plan_cache_hits`. See
-  [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+  [Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 ### Retrieval
 
 The `datasource_resolver` and `schema_retriever` entries carry a `retrieval`
 object in `outputs`: what the vector search retrieved and how MMR chose among it
 (the engine has no re-ranking model; see
-[Indexing](../architecture/indexing.md#retrieval-mmr-not-a-re-ranking-model)).
+[Indexing](../how-it-works/indexing.md#retrieval-mmr-not-a-re-ranking-model)).
 
 ```json
 "retrieval": {
@@ -182,7 +182,7 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
 On a schema past `settings.retrieval.full_snapshot_max_tables`, each sent table
 carries `steps`: which of `vector`, `glossary`, `selector` and `join_path` added
 it, so a missed table can be traced to its cause (see
-[the schema retriever](../architecture/nodes/schema_retriever_node.md#table-recall-on-large-schemas)).
+[the schema retriever](../how-it-works/nodes/schema_retriever_node.md#table-recall-on-large-schemas)).
 
 - **`query`** is the text actually embedded: the question for the resolver's routing, and
   for the schema retriever the sub-query's intent, filters, group-by, expected
@@ -202,7 +202,7 @@ it, so a missed table can be traced to its cause (see
   fused reciprocal-rank scores with each datasource's ranks (`fused`), the
   datasources kept (`picks`) and those dropped (`dropped`, with `floor` or
   `limit`), and the `rrf_k`, `vote_k`, `candidates` and `floor_ratio` used. See
-  [Routing](../architecture/indexing.md#routing-five-signals-fused).
+  [Routing](../how-it-works/indexing.md#routing-five-signals-fused).
 - **`tables`** (schema retriever) is what survived: the tables and columns sent
   to the planner.
 - **`skipped: true`** with a `reason` means no search ran: the schema is small
@@ -355,7 +355,7 @@ record as a table: the pool nearest first, picks marked with their MMR order,
 dropped entries greyed, the picks in order as a row of chips, and a second row
 naming the entries MMR passed over because they repeat an earlier pick. The **Retrieval** inspector at the top of the page
 runs the same search for any text (see the
-[demo guide](../getting_started/demo.md#the-retrieval-inspector)). The page
+[demo guide](../get-started/demo.md#the-retrieval-inspector)). The page
 fetches the trace from `GET /api/trace/{trace_id}`, which reads it with
 `engine.traces.get`: any id that is not a plain token is rejected before the
 trace store sees it, and the `files` store reads only files directly inside its

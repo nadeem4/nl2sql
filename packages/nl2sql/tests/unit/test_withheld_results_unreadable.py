@@ -1,5 +1,4 @@
-"""A run's results are unreadable by its trace id until the hooks have ruled
-(docs/configuration/hooks.md, "What withholding guarantees").
+"""A run's results are unreadable by its trace id until the hooks have ruled.
 
 Every read (``manifest``, ``page``, ``csv``, ``chart``, ``head``, the REST routes) goes through the run's
 manifest. While a hook is attached at ``answer.after`` the aggregator saves the results but not the manifest;

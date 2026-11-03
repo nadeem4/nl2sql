@@ -1,0 +1,165 @@
+# Pipeline Architecture
+
+The LangGraph control graph, its routing and how results are combined, for contributors changing the pipeline. It describes the control graph, logical DAG, routing, and execution/aggregation flow. Node and subgraph details live in their respective sections.
+
+## End-to-end flow
+
+```mermaid
+flowchart TD
+    Resolver[DatasourceResolverNode] --> Decomposer[DecomposerNode]
+    Decomposer --> Router[layer_router]
+    Router --> SqlAgent[SQL Agent Subgraph]
+    SqlAgent --> Router
+    Router --> Aggregator[EngineAggregatorNode]
+    Aggregator --> Synthesizer[AnswerSynthesizerNode]
+```
+
+### Control graph nodes
+
+- [CuratedMatcherNode](nodes/curated_matcher_node.md): the entry point when [curated answers](../configuration/curated.md) are configured; a verified answer goes straight to the aggregator
+- `pinned_entry` (`PinnedEntryNode` in `nl2sql.pipeline.pinned`): the entry point of a pinned run's graph (`build_graph(ctx, pinned=True)`: a plan passed as `run_query(plan=...)`, or an approval's); it checks each datasource against the caller's scope and goes to the layer router, so no curated matcher, resolver or decomposer runs
+- [DatasourceResolverNode](nodes/datasource_resolver_node.md)
+- [DecomposerNode](nodes/decomposer_node.md)
+- `layer_router` (routing function, not a node class)
+- [EngineAggregatorNode](nodes/engine_aggregator_node.md)
+- [AnswerSynthesizerNode](nodes/answer_synthesizer_node.md)
+
+### Entry points
+
+- `build_graph(ctx)` builds the control graph in `nl2sql.pipeline.graph`.
+- `run_with_graph(ctx, user_query, ...)` executes the graph with timeouts and cancellation in `nl2sql.pipeline.runtime`.
+
+## Control graph and logical DAG
+
+The system uses two orchestration layers:
+
+- **Control graph (LangGraph `StateGraph`)**: runtime nodes and routing.
+- **Logical DAG (`ExecutionDAG`)**: deterministic compute plan, built by the
+  decomposer (`nodes/decomposer/dag.py::build_execution_dag`) from the
+  sub-queries it just wrote, not by a node of its own.
+
+```mermaid
+graph TD
+    Scan1[scan:subquery_1] --> Combine[combine:group_1]
+    Scan2[scan:subquery_2] --> Combine
+    Combine --> PostAgg[post_aggregate]
+    PostAgg --> PostSort[post_sort]
+```
+
+`ExecutionDAG.layers` are computed deterministically by `_layered_toposort()` and consumed by the router to dispatch scan nodes.
+
+### ExecutionDAG node kinds (actual)
+
+`ExecutionDAG` nodes are `LogicalNode` instances with:
+
+- `kind`: `scan`, `combine`, `post_filter`, `post_aggregate`, `post_project`, `post_sort`, `post_limit`
+- `inputs`: upstream node IDs
+- `attributes`: operation-specific metadata for a combine or post-combine node (join keys, filters, metrics). A `scan` node carries none: its ID is its sub-query's ID, so everything about it is one lookup away in `decomposer_response`.
+
+## Routing and subgraph selection
+
+`build_scan_layer_router()` selects the next scan layer with missing artifacts and dispatches subgraphs in parallel using `Send()`. A scan node's ID is its sub-query's ID, so the datasource comes from that `SubQuery`.
+
+Subgraph selection is capability-based via `resolve_subgraph()`:
+
+```mermaid
+flowchart TD
+    DatasourceId[DatasourceId] --> Capabilities[DatasourceCapability set]
+    Capabilities --> SubgraphRegistry[SubgraphRegistry]
+    SubgraphRegistry --> Match{RequiredSubset}
+    Match -->|yes| Subgraph[SelectedSubgraph]
+    Match -->|no| Error[PipelineExecutionError]
+```
+
+If no compatible subgraph is found, routing raises `PipelineExecutionError` (an `NL2SQLError` carrying the `PipelineError` payload on `.error`) and terminates the pipeline. A router may only return routing decisions, so it cannot report the failure as a `PipelineError` value in state the way a node does.
+
+## SQL agent subgraph lifecycle
+
+The only registered subgraph today is `sql_agent` (`build_sql_agent_graph()`).
+
+See `subgraphs/sql_agent.md` for full lifecycle, retry semantics, and node wiring.
+
+## Execution, artifacts, and aggregation
+
+Executors produce `ResultFrame` objects, which are persisted via `ArtifactStore` and referenced by `ArtifactRef`. Aggregation reads artifacts and applies the logical DAG.
+
+```mermaid
+sequenceDiagram
+    participant Adapter as DatasourceAdapter
+    participant Exec as SqlExecutorService
+    participant Store as ArtifactStore
+    participant Agg as AggregationService
+
+    Adapter->>Exec: ResultFrame
+    Exec->>Store: create_artifact_ref(ResultFrame)
+    Store-->>Exec: ArtifactRef
+    Exec-->>Agg: ArtifactRef
+    Agg->>Agg: load_scan / combine / post_op
+    Agg-->>Exec: aggregated rows
+```
+
+Aggregation uses `AggregationService(PolarsDuckdbEngine())` and executes layers sequentially.
+
+
+
+## State model
+
+Shared and subgraph state models are defined in `graph_state.md`. The pipeline uses:
+
+- `GraphState` for control graph execution and aggregation.
+- `SubgraphExecutionState` for subgraph-local execution.
+- `wrap_subgraph()` to merge subgraph outputs back into `GraphState`.
+
+## Determinism
+
+Determinism guarantees and non-determinism sources are centralized in `determinism.md`.
+
+## Known limitations (current)
+
+- There is no execution sandbox; the SQL executor runs in-process on the pipeline thread pool (see `../execution/isolation.md`).
+- `VECTOR_BREAKER` is the only circuit breaker. LLM calls and SQL execution are not breaker-guarded.
+
+## Hooks
+
+The engine's `HookRunner` (`ctx.hooks`, built by the runtime from the
+`hooks` section) is called at six points of every run; see
+[Hooks](../configuration/hooks.md).
+
+| Point | Called from |
+| --- | --- |
+| `run.before` | `run_with_graph`'s worker, before `graph.invoke`; a `Modify` rewrites `user_query`, a deny returns before the graph runs |
+| `datasources.after` | `DatasourceResolverNode`, on the datasources it forwards |
+| `plan.after` | `ASTPlannerNode.after_plan()`, on the planner's or the cache's plan, before the validator |
+| `execute.before`, `execute.after` | `ExecutorNode`, and `CuratedMatcherNode` for a verified query |
+| `answer.after` | `AnswerSynthesizerNode`, once the answer is written |
+
+A hook that stops the run (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`, or the cost rule's `COST_LIMIT_EXCEEDED`)
+ends it at the layer router once the layer in flight is done. A sub-query a
+hook dropped (`scope="sub_query"`) reports `status: "dropped"` from
+`wrap_subgraph()`, with its reason as a `HOOK_DENIED` warning; the router
+still sends the run to the aggregator, which drops a `join` or `compare`
+group that needs it. `SubgraphExecutionState.user_query` carries the run's
+question (after `run.before`) into each sub-query for the hooks there.
+
+A `NEEDS_APPROVAL` ending also puts an `ApprovalRequest` in the state's
+`approvals_needed` (built by `wrap_subgraph()`, or by the curated matcher on
+the verified path), so the result's `status` is `needs_approval`. The
+approved re-run pins the request's decomposition and plan through the pinned
+entry (`plan_source="approved"`); the hooks at `execute.before` see the run's
+approvals and the runner checks them. See
+[Query API → Approval](../api/core/query.md#approval).
+
+## Observability hooks (current)
+
+Observability stack and callback behavior are documented in `../observability/stack.md`.
+
+## Source references
+
+- Graph builder: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- Runtime: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- Routing: `packages/nl2sql/src/nl2sql/pipeline/routes.py`
+- Subgraph wrapper: `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- SQL agent graph: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- Execution DAG models: `packages/nl2sql/src/nl2sql/execution/dag.py`
+- Aggregation service: `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
+- Hooks: `packages/nl2sql/src/nl2sql/hooks/`

@@ -1,7 +1,7 @@
 """Hooks modify only before the validator, and only deny after it.
 
 The invariant *Hooks Modify Before the Validator, Deny After*
-(docs/architecture/invariants.md) is held three ways:
+(docs/how-it-works/invariants.md) is held three ways:
 
 1. ``HOOK_POINTS`` allows ``Modify`` at ``run.before``, ``datasources.after``
    and ``plan.after`` only.

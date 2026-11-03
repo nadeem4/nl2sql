@@ -143,7 +143,7 @@ export default function Pipeline({ pipeline, error, result, asked, replaying, re
         {models} of these {rows.length} steps put the question to a model. The rest is ordinary
         code: it finds the schema, writes the SQL from the plan, checks it against the real tables
         and this role's policy, runs it and combines the results.{" "}
-        <a href={`${DOCS}architecture/pipeline/`} target="_blank" rel="noreferrer">
+        <a href={`${DOCS}how-it-works/pipeline/`} target="_blank" rel="noreferrer">
           The architecture docs have the long version.
         </a>
       </p>

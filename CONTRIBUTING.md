@@ -6,7 +6,7 @@ tests, documentation, and adapter development.
 The rules a change has to keep -- the package boundaries, where dialect
 knowledge lives, and what the model is allowed to emit -- are in `CLAUDE.md` at
 the repo root, one line each, with the reasoning in
-`docs/architecture/invariants.md`. Most are enforced by
+`docs/how-it-works/invariants.md`. Most are enforced by
 `packages/nl2sql/tests/architecture/test_boundaries.py`, so a broken boundary
 fails the suite rather than review.
 
@@ -235,6 +235,7 @@ class MyApiAdapter(DatasourceAdapter):
 
 ## Where to look
 
-- Architecture and system behavior: `docs/architecture/`
+- Architecture and system behavior: `docs/how-it-works/`
+- How to write docs, in seven rules: `docs/contribute/docs-style.md`
 - Core API reference: `docs/api/core/`
 - REST API reference: `docs/api/rest/`

@@ -645,7 +645,7 @@ pip install "nl2sql-cli[web]"
 nl2sql demo
 ```
 
-See [Demo](../getting_started/demo.md).
+See [Demo](../get-started/demo.md).
 
 [key-module]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py
 [preview]: https://github.com/nadeem4/nl2sql/blob/main/packages/api/src/nl2sql_api/preview.py

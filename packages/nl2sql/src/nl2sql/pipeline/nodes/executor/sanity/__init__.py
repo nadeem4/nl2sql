@@ -10,7 +10,7 @@ after ``execute.after``; ``settings.pipeline.sanity_checks: false`` turns them
 off. A probe is SQL the hooks never see (it runs outside ``execute.before``
 and ``execute.after``), so with ``probes`` false (a hook is attached at
 ``execute.before``) the probing checks are skipped and only the null check,
-which reads the saved result, runs. See docs/architecture/nodes/executor_node.md.
+which reads the saved result, runs. See docs/how-it-works/nodes/executor_node.md.
 """
 from __future__ import annotations
 

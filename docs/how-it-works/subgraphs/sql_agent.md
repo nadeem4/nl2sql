@@ -1,0 +1,205 @@
+# SQL Agent Subgraph
+
+How one sub-query is planned, validated, generated and executed, for contributors.
+
+## Overview
+- Purpose: plan, validate, generate, and execute SQL for a single sub-query.
+- Why it exists architecturally: isolates SQL-capable execution into a reusable subgraph that can be scheduled per scan node in the global execution DAG.
+- When it is invoked: when `layer_router` resolves a datasource with `SUPPORTS_SQL` capability and sends a scan-layer payload.
+
+Defining function: `build_sql_agent_graph()`  
+Source file path: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+
+---
+
+## Boundary Definition
+
+This subgraph encapsulates the SQL planning and execution loop for a single `SubQuery`. It does NOT perform cross-subquery aggregation, answer synthesis, or datasource resolution; those responsibilities are owned by the main pipeline graph and upstream nodes.
+
+---
+
+## Entry Conditions
+
+Required state:
+- `SubgraphExecutionState.trace_id`
+- `SubgraphExecutionState.sub_query` (must include `id`, `datasource_id`, and `intent`)
+
+Preconditions:
+- `sub_query.datasource_id` must map to a registered adapter/executor.
+- Schema store and vector store may be used if configured; otherwise schema retrieval falls back to full schema snapshot.
+
+Triggering parent graph:
+- `layer_router` in the main pipeline graph sends `build_scan_payload()` to the subgraph via `wrap_subgraph()`.
+
+---
+
+## Exit Conditions
+
+Successful completion criteria:
+- Reaches `END` after `executor` and produces `executor_response`.
+- Or reaches `END` after `clarifier`, which asked which reading of the question was meant (`NEEDS_CLARIFICATION`, `INFO`): no SQL is generated or run, and the wrapper reports the sub-query with status `needs_clarification`.
+
+Failure exits:
+- `check_retriever` returns `end` when `schema_retriever` returned a non-retryable error: retrieval failed and there was no snapshot to fall back to (`SCHEMA_RETRIEVAL_FAILED`, `CRITICAL`). The planner is never called.
+- `check_planner` returns `end` when planner output is missing and retries are exhausted or errors are non-retryable.
+- `check_logical_validation` returns `end` when validation errors are non-retryable or retries are exhausted.
+- `check_execution` returns `end` after `executor` unless the database rejected the query as wrong (`EXECUTION_FAILED`) and retries remain: a success, a refusal (`DB_EXECUTION_ERROR`: permission, timeout, connection) and any other executor error all end the subgraph.
+- Cancellation forces `end` in router checks and in the retry handler. The run's `CancellationToken` is read from the `RunnableConfig` (`configurable.cancellation_token`); when no token is present the subgraph behaves as not cancelled.
+
+Partial completion behavior:
+- If planner or logical validation errors are retryable and retry budget remains, execution loops via `retry_handler` → `refiner` → `ast_planner`.
+- So does a query the database rejected as wrong (an unknown column or table, a type mismatch, bad syntax): the adapter marks the error `retryable` and the executor reports it as `EXECUTION_FAILED`, with the database's own first line as the message.
+
+---
+
+## Internal Node Composition
+
+Execution order (nominal path):
+- `schema_retriever` — `SchemaRetrieverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py` — retrieve relevant schema tables/columns.
+- `ast_planner` — `ASTPlannerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py` — create SQL AST plan.
+- `logical_validator` — `LogicalValidatorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py` — validate plan correctness and policy constraints.
+- `clarifier` — `ClarifierNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py` — validate the planner's alternative readings and, when two or three remain, end the sub-query by asking which was meant. See [ClarifierNode](../nodes/clarifier_node.md).
+- `generator` — `GeneratorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py` — generate SQL text from AST.
+- `executor` — `ExecutorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py` — execute SQL and produce artifacts.
+- `retry_handler` — `retry_node()` — `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py` — apply exponential backoff and increment retry count.
+- `refiner` — `RefinerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py` — generate feedback for the planner.
+
+Mermaid diagram (sql_agent only):
+```mermaid
+flowchart TD
+    schema_retriever -->|ok| ast_planner
+    schema_retriever -->|end| END
+    ast_planner -->|ok| logical_validator
+    ast_planner -->|retry| retry_handler
+    ast_planner -->|end| END
+    logical_validator -->|ok| clarifier
+    clarifier -->|ok| generator
+    clarifier -->|end| END
+    logical_validator -->|retry| retry_handler
+    logical_validator -->|end| END
+    retry_handler --> refiner --> ast_planner
+    generator --> executor
+    executor -->|retry| retry_handler
+    executor -->|end| END
+```
+
+---
+
+## State Contract
+
+State model: `SubgraphExecutionState` (`packages/nl2sql/src/nl2sql/pipeline/state.py`).
+
+Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
+
+---
+
+## Step-by-Step Execution Flow
+
+1. `schema_retriever` builds a semantic query from `sub_query` and retrieves relevant schema context; if none found, or the search fails, it falls back to full schema snapshot. A table cut to the searched columns keeps its keys, join columns and label. `check_retriever` routes `end` when retrieval failed with no snapshot (a non-retryable `SCHEMA_RETRIEVAL_FAILED`), else `ok`.
+2. `ast_planner` runs an LLM planning chain to produce `PlanModel`.
+3. `check_planner` routes:
+   - `ok` if a plan exists.
+   - `retry` if errors are retryable and retry budget remains.
+   - `end` if errors are non-retryable or retries exhausted.
+4. `logical_validator` validates the plan for structural and policy compliance.
+5. `check_logical_validation` routes:
+   - `ok` when no blocking errors exist.
+   - `retry` when retryable errors exist and retry budget remains.
+   - `end` when errors are non-retryable or retries exhausted.
+6. `clarifier` passes straight through when the planner gave no alternative readings. Otherwise it runs each alternative through `LogicalValidatorNode.check` (the static checks and the caller's scope), drops those that fail, merges those that render to SQL another option has, and keeps the rest on `ast_planner_response.alternatives`. `check_clarifier` routes `end` when it asked (two or three options, a named phrase, `state.clarify` and `settings.clarify.enabled` on), else `ok`. Every path from the planner to the generator still passes the validator.
+7. `generator` converts the plan to SQL for the target datasource dialect.
+8. `executor` runs SQL via the datasource adapter and returns artifacts/errors.
+   `check_execution` routes `retry` when every executor error is a retryable `EXECUTION_FAILED` and retry budget remains, otherwise `end`. It also routes `retry` when the query returned no rows on a filter value the column does not have but a close one exists (`VALUE_NOT_FOUND` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#an-empty-results-filter-values)), and when a `COUNT` counted rows a join repeated (`JOIN_FAN_OUT` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#join-fan-out)). Only a finding of this attempt (its `details.attempt`) routes `retry`.
+9. If routed to retry: `retry_handler` waits with exponential backoff and jitter, then increments `retry_count`.
+10. `refiner` uses LLM feedback to enrich error context, then loops back to `ast_planner`. Both are told about the latest attempt only, as `{node, error_code, message}` (`nl2sql.pipeline.retry_feedback`): never an earlier attempt's errors again, never a stack trace or `details`.
+11. Subgraph terminates at `END`.
+
+---
+
+## Determinism Guarantees
+
+Determinism guarantees and non-determinism sources are documented in `../determinism.md`.
+
+---
+
+## Error Propagation
+
+Failure domains, retry scope, and recovery limitations are centralized in `../failure_recovery.md`.
+
+---
+
+## Retry + Recovery
+
+See `../failure_recovery.md` for retry scope and recovery behavior.
+
+---
+
+## Performance Characteristics
+
+- Blocking LLM calls: `ASTPlannerNode` and `RefinerNode`.
+- External I/O: vector store retrieval and schema store access in `SchemaRetrieverNode`; datasource execution in `ExecutorNode`.
+- CPU-bound steps: SQL generation via sqlglot in `GeneratorNode`.
+- Retry loop introduces sleep-based delays on failures.
+
+---
+
+## Observability
+
+- Node-specific loggers are used (`schema_retriever`, `planner`, `logical_validator`, `generator`, `executor`, `refiner`).
+- `trace_id` is stored in state and forwarded to executor requests; logging context is not explicitly set.
+- No explicit metrics or tracing spans are emitted by the subgraph code.
+
+---
+
+## Configuration
+
+Read from the runtime's `settings.pipeline.retries` when the subgraph is built:
+
+- `max` (default `3`)
+- `base_delay_s` (default `1.0`)
+- `max_delay_s` (default `10.0`)
+- `jitter_s` (default `0.5`)
+
+---
+
+## Extension Points
+
+- Modify `build_sql_agent_graph()` to insert, remove, or rewire nodes and edges.
+- Add new subgraphs by constructing them in `build_graph()` and extending `resolve_subgraph()` with their required capabilities.
+- Replace node implementations via dependency injection in `Runtime`.
+
+---
+
+## Known Limitations
+
+- Generator errors are not routed into the retry loop; a failure proceeds to `executor`, which reports `MISSING_SQL`, and terminates at `END`.
+- No subgraph-specific metrics or trace spans are emitted.
+- The executor retries only what the adapter marks `retryable`. An adapter that raises instead of returning a failed `ResultFrame` ends the sub-query with `EXECUTOR_CRASH`.
+
+Because the generator has no retry edge, the invariant the loop depends on is
+that **`logical_validator` rejects every plan `generator` would refuse to
+build**. `LogicalValidatorNode._validate_buildable()` enforces it by running the
+generator's own `_build_query()` — see
+[Buildability](../nodes/logical_validator_node.md#buildability-the-validator-runs-the-generator).
+Without it, a plan whose tables are not joined reached `generator` and ended the
+sub-query with a terminal `SQL_GEN_FAILED`.
+
+---
+
+## Related Code
+
+- Subgraph definition: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- Subgraph selection: `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- State model: `packages/nl2sql/src/nl2sql/pipeline/state.py`
+- Node implementations:
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py`
+- Tests:
+  - `packages/nl2sql/tests/unit/test_sql_agent_subgraph.py`
+  - `packages/nl2sql/tests/unit/test_subgraph_resolution.py`
+  - `packages/nl2sql/tests/unit/test_clarifier.py`

@@ -1,0 +1,334 @@
+# LogicalValidatorNode
+
+Reference for the node that checks a plan against the schema and policies before any SQL exists, for contributors and operators.
+
+## Overview
+
+- Validates the AST plan (`PlanModel`) against schema and policies.
+- Exists to enforce correctness and security before SQL generation.
+- Sits between `ASTPlannerNode` and `GeneratorNode` in the SQL agent subgraph.
+- Class: `LogicalValidatorNode`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+
+---
+
+## Responsibilities
+
+- Validate aliases, joins, and column references.
+- Reject any plan the generator could not build (see *Buildability* below).
+- Enforce table access through the caller's `Scope`, with strict datasource namespacing.
+
+Literal filter values are **not** validated against a column's sampled values.
+The adapter records every value of a text column with at most 50 distinct
+values, but only the five most frequent of a larger one: a retrieval hint, not
+the column's domain. Treating it as an allowlist rejected correct filters on
+any higher-cardinality column. Safety comes from the policy
+table allowlist and from schema resolution, neither of which depends on stats.
+A value that turns out not to exist is caught after execution instead, and
+only when the result is empty (see
+[ExecutorNode](executor_node.md#an-empty-results-filter-values)).
+
+### Buildability: the validator runs the generator
+
+`_validate_columns()` resolves columns against a query in which every plan table
+is **CROSS JOINed** (`_build_validation_query()`). That is correct for column
+resolution — alias-to-column visibility does not depend on join structure — and
+it is exactly why the validator is blind to join *topology*.
+
+The generator builds the real FROM clause and walks the join graph, so four
+structural mistakes used to pass validation CLEAN and fail one node later as a
+terminal `SQL_GEN_FAILED`: a declared table never joined to the FROM table, a
+plan with several tables and no joins at all, a join island that does not
+connect to the FROM table, and the same pair joined twice. `GeneratorNode` has
+no retry edge after it, so each of those ended the sub-query with no chance for
+the planner to fix it.
+
+Rather than restate those four rules here and let the two drift apart,
+`_validate_buildable()` calls `GeneratorNode._build_query()` with the
+sub-query's own datasource dialect and discards the tree. Any `ValueError`
+becomes a retryable `INVALID_PLAN_STRUCTURE`, and the message is extended with
+the plan's tables and the foreign keys declared between them, written with the
+plan's own aliases — the same move `_describe_column_failure()` makes for
+columns:
+
+```
+Table alias(es) t3 are declared in the plan but never joined to the FROM table.
+Plan tables: t1 = Artist, t2 = Album, t3 = Track.
+Foreign keys between them: t2 (Album).ArtistId = t1 (Artist).ArtistId;
+t3 (Track).AlbumId = t2 (Album).AlbumId.
+```
+
+It runs **last**, after every other static check, so each of those keeps its own
+error code and the generator's wording never replaces a more specific one. The
+cost is a second tree build, measured at ~2.4 ms against a ~3.4 s planner call.
+
+`test_logical_validator_generator_parity.py` asserts the invariant directly: for
+each broken plan shape, the generator rejects it **and** so does the validator.
+The same route rejects an `offset` with no `order_by`, or a negative one
+(`test_plan_offset.py`): a page only means something in an order.
+
+Column resolution is delegated to `sqlglot`'s optimizer. The node converts the
+plan into a throw‑away `sqlglot` expression tree (reusing the generator's
+`SqlVisitor`) and runs `sqlglot.optimizer.qualify.qualify()` against a schema
+built from `relevant_tables`. The LLM contract is unchanged: the planner still
+emits a `PlanModel`, never SQL.
+
+---
+
+## Position in Execution Graph
+
+Upstream:
+- `ASTPlannerNode`
+
+Downstream:
+- [`ClarifierNode`](clarifier_node.md) on success, which goes on to `GeneratorNode` unless it asks which reading was meant
+- `retry_handler` on retryable errors
+
+Trigger conditions:
+- Executed when an AST plan is present.
+
+```mermaid
+flowchart LR
+    Planner[ASTPlannerNode] --> Validator[LogicalValidatorNode] --> Clarifier[ClarifierNode] --> Generator[GeneratorNode]
+    Validator --> RetryHandler[retry_handler]
+```
+
+---
+
+## Inputs
+
+From `SubgraphExecutionState`:
+
+- `ast_planner_response.plan` (required)
+- `relevant_tables` (required)
+- `user_context` (required for the policy check)
+- `sub_query.datasource_id` (required for namespacing)
+- `sub_query.expected_schema` (optional validation)
+
+Validation performed:
+
+- Aliases must be unique.
+- Joins must match known relationships. An equality reads the same either way round, so `b.x = a.y` matches a relationship declared as `a.y = b.x`. A join that matches none is rejected with the joins that are allowed: the declared joins between its two tables, or, when there are none, the shortest declared path through the tables the planner was sent (or, if none runs only through those, that no path exists in the schema it was given) ("No relationship is declared between inventory and film_category. Shortest declared path: inventory.film_id = film.film_id; film.film_id = film_category.film_id."). The text is in the error's `message`, which is what the refiner and the planner are sent on a retry.
+- Column references must exist and be unambiguous.
+- Every binary operator must be one the generator can render.
+- A `*` column appears only as a bare select item or as `COUNT(*)`.
+- The plan must build into a query at all.
+
+---
+
+## Outputs
+
+Mutations to `SubgraphExecutionState`:
+
+- `logical_validator_response` (`LogicalValidatorResponse`, carrying `errors`,
+  `reasoning` and `checks`)
+- `errors` and `reasoning`
+
+`checks` is a `List[ValidationCheck]` (`name`, `passed`, `message`) recording what
+was validated, not only what failed. The names are fixed and always in this order:
+
+| name | meaning |
+| --- | --- |
+| `plan_present` | A plan reached the validator. The only check emitted when it did not. |
+| `structure_and_schema` | Tables, columns and joins resolve against the retrieved schema. |
+| `policy` | Every table in the plan is allowed for the caller's role. |
+
+On failure the check's `message` is the first corresponding error's message.
+
+Side effects:
+
+- None beyond in‑memory validation.
+
+---
+
+## Internal Flow (Step-by-Step)
+
+1. If plan is missing, emit `MISSING_PLAN` and stop.
+2. Run `_validate_static()` for structural checks:
+   - `_resolve_plan_tables()` maps each plan alias to its schema columns and
+     emits `TABLE_NOT_FOUND` for unknown tables. This stays hand-written
+     because `qualify()` silently ignores relations absent from its schema.
+   - `_distinct_function()` rejects a `func` expr named `DISTINCT` with
+     `INVALID_PLAN_STRUCTURE`: `COUNT(DISTINCT x)` is `distinct: true` on the
+     COUNT expr, and `SELECT DISTINCT` is `PlanModel.distinct`.
+   - `_unsupported_functions()` rejects every other `func` name that is not a
+     plain identifier (`^[A-Za-z_][A-Za-z0-9_]*$`) naming a function in
+     `ast_planner.functions.ALLOWED_FUNCTIONS` (read-only aggregates and
+     scalar functions, any case), with `UNSUPPORTED_FUNCTION` at `ERROR`
+     severity, so the refiner retries with the list in the message. The list
+     leaves out `LEGACY_FUNCTIONS` (`STRFTIME`), which older plans may still
+     call but which the planner prompt never offers.
+     `func_name` becomes the function's name in the SQL, so this is what keeps
+     model text such as `SELECT 1); DELETE FROM T; --` out of it.
+   - `_date_operations()` rejects a date function whose unit is not `year`,
+     `quarter`, `month` or `day`, or whose shape is not `(unit literal, date)`,
+     with `INVALID_PLAN_STRUCTURE`; the message states the portable forms.
+   - `_label_without_key()` rejects a group-by item that joins text (`||` or
+     `CONCAT`) from two or more distinct columns of one table (a concatenated
+     name, say) when a primary-key column of that table is not also grouped as
+     a plain column: two rows sharing the label would merge into one group. The
+     retryable `INVALID_PLAN_STRUCTURE` message names the missing key. One
+     column, a date part, arithmetic, `COALESCE`, `DATE_DIFF`, a label grouped
+     with its key, and a table with no known primary key are not rejected.
+     Plain `GROUP BY first_name, last_name` without the key passes (an accepted
+     limit).
+   - `_unsupported_operators()` rejects a binary `op` the generator's
+     `SqlVisitor` cannot render, with `INVALID_PLAN_STRUCTURE`. The schema's
+     `op` Literal admits `NOT`, which belongs on a unary expression; every
+     other member is in `generator.node.SUPPORTED_BINARY_OPS`. This runs before
+     any check that walks the plan through the visitor, because an operator it
+     cannot render makes all of them raise — which is how `op: "NOT"` used to
+     surface as a `VALIDATOR_CRASH`.
+   - `_misplaced_star()` walks the plan through `SqlVisitor` and rejects a
+     `*` column anywhere but a whole select item with no alias (`*`, or `t.*`
+     for a declared alias) or `COUNT(*)`, with `INVALID_PLAN_STRUCTURE`. The
+     rule is the visitor's (`MisplacedStar`); the message asks for `COUNT(*)` or
+     a count of a non-null key column, since `COUNT(t.*)` counts differently
+     under an outer join. It runs early for the same reason as the operator
+     check.
+   - `_validate_columns()` builds the plan's `sqlglot` tree and runs
+     `qualify(..., validate_qualify_columns=True)`. On failure each distinct
+     column reference is re-probed so every bad reference is reported, and
+     `_describe_column_failure()` rewrites the optimizer's SQL-oriented text
+     into plan-oriented feedback the refiner can act on. ORDER BY terms are
+     wrapped in `exp.Ordered` first (`generator.node.ordered()`): sqlglot only
+     wraps an argument it has to *parse*, and a bare function node in
+     `Order.expressions` makes `qualify()` raise.
+   - `join_key_type_errors()` (`validator/join_keys.py`) checks each select
+     item that is a join key (its alias names an `expected_schema` column the
+     decomposer marked `join_key`) and a plain column reference: the column's
+     type from the schema snapshot is parsed by `sqlglot.exp.DataType.build`
+     in the datasource's dialect (the adapter's `get_dialect()`) and put in a
+     category (number, text, temporal, boolean or other). A temporal column
+     declared a number or a boolean, or a number or boolean column declared a
+     date, is a retryable `JOIN_KEY_TYPE_MISMATCH` that asks for another
+     column, never a cast (the plan has none): "The join key order_key is
+     declared a date, but Orders.OrderKey is a number. Select a column that
+     holds a date for this key." Every other pair is coerced by the
+     aggregator; a type sqlglot cannot place, a column with no type and a
+     computed select item are not checked.
+   - `_validate_buildable()` runs last and is the **buildability** check: it
+     calls the generator's own `_build_query()` and throws the tree away. See
+     below.
+3. Run `_validate_policy()` for policy enforcement. This always runs, even when
+   static validation failed or raised — the security check is never skipped.
+   It asks the caller's `Scope` (`ctx.policy_engine.scope(user_context,
+   datasource_id)`, the same one the schema retriever hid tables with) about
+   every table in the plan. The schema retriever never showed the planner a
+   denied table, so a plan that names one anyway is a model naming a table it
+   was not given, and is refused here. The policy errors come first in the
+   node's `errors`, before the static ones: such a table is also missing from
+   the planner's schema (`TABLE_NOT_FOUND`), and the denial is the reason.
+   Each forbidden table yields a `CRITICAL` `SECURITY_VIOLATION` whose message
+   is "You do not have permission to see the data this question requires."
+   (it names nothing), with `details` = `{datasource_id, table, roles, rule}`
+   for the trace (`rule` is `Scope.rule_for`: the deny pattern, or the missing
+   allow), and a warning log line. `policies.refusal_names_tables: true` puts the role
+   and table in the message instead. An unknown role, or no role, allows no
+   table and is refused the same way. The decision reads only the policy and
+   the plan's table list, never the model's reasoning.
+4. If any errors are `ERROR`/`CRITICAL`, return with errors.
+5. Otherwise return success reasoning.
+6. On exception, emit `VALIDATOR_CRASH`.
+
+---
+
+## Contracts & Interfaces
+
+Implements a LangGraph node callable:
+
+```
+def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]
+```
+
+and its checks as a function, which the clarifier runs on each of the
+planner's alternative readings:
+
+```
+def check(self, plan: PlanModel, state: SubgraphExecutionState, *, audit: bool = True) -> List[PipelineError]
+```
+
+`check` checks `plan` as a plan of `state`'s sub-query, with its retrieved
+schema and its caller's scope, exactly as the node checks the state's own
+plan (the policy findings first, then the static ones), and leaves the state
+unchanged. An `ERROR` or `CRITICAL` finding means the node would not pass it.
+`audit=False` (the clarifier's) publishes no `policy.decision` and logs no
+denial warning, since a reading that is only checked reaches no caller.
+
+Key contracts:
+
+- `LogicalValidatorResponse`
+- `ValidationCheck`
+- `PipelineError`
+
+---
+
+## Determinism Guarantees
+
+- Deterministic for a fixed plan and schema snapshot.
+- No randomness in validation logic.
+
+---
+
+## Error Handling
+
+Emits `PipelineError` with:
+
+- `MISSING_PLAN`
+- `INVALID_PLAN_STRUCTURE`
+- `UNSUPPORTED_FUNCTION`
+- `SECURITY_VIOLATION`
+- `TABLE_NOT_FOUND`, `COLUMN_NOT_FOUND`
+- `JOIN_TABLE_NOT_IN_PLAN`
+- `JOIN_KEY_TYPE_MISMATCH`, retried
+- `VALIDATOR_CRASH`
+
+---
+
+## Retry + Idempotency
+
+- No internal retry logic.
+- Retry decisions are made by the subgraph router based on error severity.
+
+---
+
+## Performance Characteristics
+
+- In‑memory validation over AST and schema context.
+- Complexity grows with AST size and number of tables/joins.
+
+---
+
+## Observability
+
+- Logger: `logical_validator`
+- Emits reasoning entries and logs debug traces.
+
+---
+
+## Configuration
+
+- `settings.pipeline.strict_columns` (default `true`) controls severity of missing column errors: `ERROR` (blocking, retried) when on, `WARNING` when off.
+
+---
+
+## Extension Points
+
+- Extend validation rules by modifying `_validate_static()` or `_validate_policy()`.
+- Column-resolution semantics follow `sqlglot`'s optimizer; changing them means
+  changing the schema handed to `qualify()`, not walking the AST by hand.
+- Replace node in `build_sql_agent_graph()` for custom validation.
+
+---
+
+## Known Limitations
+
+- Validation relies on retrieved schema context; missing tables can cause false negatives.
+- No cross‑schema disambiguation beyond plan inputs.
+
+---
+
+## Related Code
+
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py` (`SqlVisitor`, reused to build the validation tree)

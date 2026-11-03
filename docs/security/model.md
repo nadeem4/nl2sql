@@ -25,7 +25,7 @@
 - `settings.pipeline.timeout_s` bounds how long the caller waits, not how long the work
   runs; the graph runs in-process with no sandbox.
 
-Details are below and in [Execution Isolation](../architecture/isolation.md).
+Details are below and in [Execution Isolation](../how-it-works/isolation.md).
 
 Authorization is enforced at **planning time**, by the logical validator, before
 any SQL exists. That is the one security property this engine provides. It is
@@ -65,7 +65,7 @@ depends on the client:
   transport to use it, and the other clients above still do not. Every
   request there needs a valid key, and runs as that key's user, tenant and
   roles. See [API keys](api-keys.md) and
-  [MCP over HTTP](../getting_started/mcp.md#over-http).
+  [MCP over HTTP](../get-started/mcp.md#over-http).
 
 - Playground: the page sends the role chosen in "Ask as" with each request
   (`/api/ask`, and `/api/retrieval` for the Retrieval inspector), and the
@@ -134,7 +134,7 @@ guarantee rests on: a plan written under any glossary is validated with the
 caller's scope like every other, so hostile knowledge cannot widen access. A
 paraphrase of a hidden table's name is not caught by the filter; the validator
 still refuses a plan on the table. See
-[Knowledge Is Data](../architecture/invariants.md#knowledge-is-data-the-validator-and-scope-decide).
+[Knowledge Is Data](../how-it-works/invariants.md#knowledge-is-data-the-validator-and-scope-decide).
 
 This is **table-level** access control. It is not column masking and not
 row-level security: a role that may read a table reads every column and every
@@ -290,7 +290,7 @@ flowchart TD
 
 ## Validation gates
 
-Validation rules are enforced by `LogicalValidatorNode` and documented in `../architecture/invariants.md` and `../architecture/nodes/logical_validator_node.md`.
+Validation rules are enforced by `LogicalValidatorNode` and documented in `../how-it-works/invariants.md` and `../how-it-works/nodes/logical_validator_node.md`.
 
 ## Source references
 

@@ -86,7 +86,7 @@ sub-query intent, run date, planner model and knowledge digest, datasource_id,
 schema_version)`
 (`get_plan`, `put_plan`). Deleting a snapshot deletes its cached plans;
 `nl2sql cache clear` (`engine.clear_plan_cache()`) deletes them all and keeps
-the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+the snapshots. See [Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 The playground's **answer ratings** are kept too (`add_feedback`,
 `list_feedback`, `clear_feedback`): one row per rated run, questions and SQL,
@@ -168,19 +168,19 @@ also records the `curated_hash` and the `knowledge_hash` the build was made
 with, so health can tell that `curated.yaml` or the glossary has changed
 since. A snapshot holds only what the database said: model-drafted
 descriptions are proposals, and a person's words live in the glossary
-(see [Indexing](../architecture/indexing.md#knowledge-in-the-index)). Every reader
+(see [Indexing](../how-it-works/indexing.md#knowledge-in-the-index)). Every reader
 (the resolver, the schema retriever, the curated matcher,
 `engine.datasources.schema()`, `engine.curated.validate()`) resolves the
 version through the pointer and reads `get_snapshot(datasource_id,
 schema_version)`. A run reads the pointers once, when it starts. A snapshot
 stored by a build that then failed is named by no pointer, so nothing reads
-it. See [Indexing → The build pointer is the commit](../architecture/indexing.md#the-build-pointer-is-the-commit).
+it. See [Indexing → The build pointer is the commit](../how-it-works/indexing.md#the-build-pointer-is-the-commit).
 
 ## Retrieval and authority
 
 Schema retrieval resolves **authoritative** tables/columns from the state store, not from the index. Index entries are only used to identify candidates; final schema is resolved via the snapshot the live pointer names. If retrieval yields no candidates, the retriever falls back to the full snapshot. The entries and the snapshot come from the same build, so their versions cannot disagree.
 
-See `../architecture/indexing.md` for retrieval stages, chunk types, and vector store behavior.
+See `../how-it-works/indexing.md` for retrieval stages, chunk types, and vector store behavior.
 
 ## Source references
 

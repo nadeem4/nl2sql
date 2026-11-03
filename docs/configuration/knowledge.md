@@ -14,7 +14,7 @@ and example questions. It is written in `glossary.yaml` and read by a
     chosen descriptions, the terms, the joins and the examples are index entries,
     and `nl2sql index --refresh` brings them up to date after an edit without
     reading the schema, and
-    [the schema retriever](../architecture/nodes/schema_retriever_node.md#knowledge).
+    [the schema retriever](../how-it-works/nodes/schema_retriever_node.md#knowledge).
 
 ## The section
 
@@ -163,7 +163,7 @@ datasource that is not indexed yet shows nothing but that problem.
 Knowledge is data, never instructions: it is validated as data when it
 loads, `export` writes it with a safe YAML dumper, and it reaches a model
 only as JSON values, filtered by the caller's scope (see
-[Knowledge Is Data](../architecture/invariants.md#knowledge-is-data-the-validator-and-scope-decide)).
+[Knowledge Is Data](../how-it-works/invariants.md#knowledge-is-data-the-validator-and-scope-decide)).
 A glossary join between two tables the caller may read is a relationship the
 validator accepts, so a database without declared keys can be joined. A
 changed glossary changes the datasource's knowledge digest, which keys the

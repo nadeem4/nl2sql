@@ -1,7 +1,7 @@
 """The values the facade's namespaces return: plain dataclasses, and two pydantic models.
 
 They import nothing heavy, so ``from nl2sql import DatasourceInfo`` costs
-nothing at import (docs/architecture/invariants.md, the import rule).
+nothing at import (docs/how-it-works/invariants.md, the import rule).
 ``Candidate`` and ``ApiKey`` are pydantic models: both are also JSON on the wire.
 """
 from __future__ import annotations

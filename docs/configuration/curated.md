@@ -36,7 +36,7 @@ The matching knobs are in the [`settings` section](settings.md):
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `settings.curated.match_top_k` | `5` | Verified query candidates a question's search returns and the model is shown, one per query. |
-| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if there were no curated section, with no model call. Calibrated on the local embedding model; see [Curated answers](../architecture/curated_answers.md#settings). |
+| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if there were no curated section, with no model call. Calibrated on the local embedding model; see [Curated answers](../how-it-works/curated_answers.md#settings). |
 
 ## Writing the file
 
@@ -231,7 +231,7 @@ entries still name queries that exist.
 
 With the file loaded and at least one verified query in it, every question
 that executes starts at the curated matcher
-([node reference](../architecture/nodes/curated_matcher_node.md)):
+([node reference](../how-it-works/nodes/curated_matcher_node.md)):
 
 1. It searches the indexed phrasings of the verified queries of the
    datasources the caller's role may read (only the pinned datasource when a

@@ -41,7 +41,38 @@ plugins:
         testing/test-bed.md: contribute/test-bed.md
         testing/evaluation-dataset.md: evals/chinook-suite.md
         glossary.md: reference/glossary.md
-        execution/isolation.md: architecture/isolation.md
+        architecture/curated_answers.md: how-it-works/curated_answers.md
+        architecture/determinism.md: how-it-works/determinism.md
+        architecture/failure_recovery.md: how-it-works/failure_recovery.md
+        architecture/graph_state.md: how-it-works/graph_state.md
+        architecture/indexing.md: how-it-works/indexing.md
+        architecture/invariants.md: how-it-works/invariants.md
+        architecture/isolation.md: how-it-works/isolation.md
+        architecture/nodes/answer_synthesizer_node.md: how-it-works/nodes/answer_synthesizer_node.md
+        architecture/nodes/ast_planner_node.md: how-it-works/nodes/ast_planner_node.md
+        architecture/nodes/clarifier_node.md: how-it-works/nodes/clarifier_node.md
+        architecture/nodes/curated_matcher_node.md: how-it-works/nodes/curated_matcher_node.md
+        architecture/nodes/datasource_resolver_node.md: how-it-works/nodes/datasource_resolver_node.md
+        architecture/nodes/decomposer_node.md: how-it-works/nodes/decomposer_node.md
+        architecture/nodes/engine_aggregator_node.md: how-it-works/nodes/engine_aggregator_node.md
+        architecture/nodes/executor_node.md: how-it-works/nodes/executor_node.md
+        architecture/nodes/generator_node.md: how-it-works/nodes/generator_node.md
+        architecture/nodes/index.md: how-it-works/nodes/index.md
+        architecture/nodes/logical_validator_node.md: how-it-works/nodes/logical_validator_node.md
+        architecture/nodes/refiner_node.md: how-it-works/nodes/refiner_node.md
+        architecture/nodes/schema_retriever_node.md: how-it-works/nodes/schema_retriever_node.md
+        architecture/overview.md: how-it-works/overview.md
+        architecture/pipeline.md: how-it-works/pipeline.md
+        architecture/subgraphs/main_pipeline_graph.md: how-it-works/subgraphs/main_pipeline_graph.md
+        architecture/subgraphs/sql_agent.md: how-it-works/subgraphs/sql_agent.md
+        getting_started/demo.md: get-started/demo.md
+        getting_started/docker.md: get-started/docker.md
+        getting_started/index.md: get-started/index.md
+        getting_started/launch.md: get-started/launch.md
+        getting_started/mcp.md: get-started/mcp.md
+        getting_started/pypi.md: get-started/pypi.md
+        getting_started/source.md: get-started/source.md
+        execution/isolation.md: how-it-works/isolation.md
   - mkdocstrings:
       handlers:
         python:
@@ -70,13 +101,13 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
-    - Overview: getting_started/index.md
-    - PyPI (Python API): getting_started/pypi.md
-    - Docker (REST API): getting_started/docker.md
-    - From Source (Development): getting_started/source.md
-    - Demo Data (CLI-first): getting_started/demo.md
-    - MCP Server: getting_started/mcp.md
-    - Launch: getting_started/launch.md
+    - Overview: get-started/index.md
+    - PyPI (Python API): get-started/pypi.md
+    - Docker (REST API): get-started/docker.md
+    - From Source (Development): get-started/source.md
+    - Demo Data (CLI-first): get-started/demo.md
+    - MCP Server: get-started/mcp.md
+    - Launch: get-started/launch.md
   - Use it:
     - Web app: apps/web.md
     - Terminal app: apps/terminal.md
@@ -182,37 +213,46 @@ nav:
     - Status and limitations: reference/limitations.md
     - Glossary: reference/glossary.md
   - How it works:
-    - Overview: architecture/overview.md
-    - Pipeline: architecture/pipeline.md
-    - Graph State: architecture/graph_state.md
-    - Determinism: architecture/determinism.md
-    - Invariants: architecture/invariants.md
-    - Failure + Recovery: architecture/failure_recovery.md
-    - Indexing + Retrieval: architecture/indexing.md
-    - Curated Answers: architecture/curated_answers.md
-    - Execution Isolation + Concurrency: architecture/isolation.md
+    - Overview: how-it-works/overview.md
+    - Packages and Boundaries: how-it-works/packages-and-boundaries.md
+    - Pipeline: how-it-works/pipeline.md
+    - Plans and SQL: how-it-works/plans-and-sql.md
+    - Indexing + Retrieval: how-it-works/indexing.md
+    - Curated Answers: how-it-works/curated_answers.md
+    - Conversations: how-it-works/conversations.md
+    - Dashboards and Saved Answers: how-it-works/dashboards-and-saved-answers.md
+    - Access and Security: how-it-works/access-and-security.md
+    - Jobs and Storage: how-it-works/jobs-and-storage.md
+    - Configuration Loading: how-it-works/configuration-loading.md
+    - Graph State: how-it-works/graph_state.md
+    - Determinism: how-it-works/determinism.md
+    - Failure + Recovery: how-it-works/failure_recovery.md
+    - Execution Isolation + Concurrency: how-it-works/isolation.md
+    - Invariants: how-it-works/invariants.md
+    - Key Design Decisions: how-it-works/key-design-decisions.md
     - Subgraphs:
-      - Main Pipeline Graph: architecture/subgraphs/main_pipeline_graph.md
-      - SQL Agent Subgraph: architecture/subgraphs/sql_agent.md
+      - Main Pipeline Graph: how-it-works/subgraphs/main_pipeline_graph.md
+      - SQL Agent Subgraph: how-it-works/subgraphs/sql_agent.md
     - Nodes:
-      - Node Catalog: architecture/nodes/index.md
-      - Answer Synthesizer: architecture/nodes/answer_synthesizer_node.md
-      - AST Planner: architecture/nodes/ast_planner_node.md
-      - Clarifier: architecture/nodes/clarifier_node.md
-      - Curated Matcher: architecture/nodes/curated_matcher_node.md
-      - Datasource Resolver: architecture/nodes/datasource_resolver_node.md
-      - Decomposer: architecture/nodes/decomposer_node.md
-      - Engine Aggregator: architecture/nodes/engine_aggregator_node.md
-      - Executor: architecture/nodes/executor_node.md
-      - Generator: architecture/nodes/generator_node.md
-      - Logical Validator: architecture/nodes/logical_validator_node.md
-      - Refiner: architecture/nodes/refiner_node.md
-      - Schema Retriever: architecture/nodes/schema_retriever_node.md
+      - Node Catalog: how-it-works/nodes/index.md
+      - Answer Synthesizer: how-it-works/nodes/answer_synthesizer_node.md
+      - AST Planner: how-it-works/nodes/ast_planner_node.md
+      - Clarifier: how-it-works/nodes/clarifier_node.md
+      - Curated Matcher: how-it-works/nodes/curated_matcher_node.md
+      - Datasource Resolver: how-it-works/nodes/datasource_resolver_node.md
+      - Decomposer: how-it-works/nodes/decomposer_node.md
+      - Engine Aggregator: how-it-works/nodes/engine_aggregator_node.md
+      - Executor: how-it-works/nodes/executor_node.md
+      - Generator: how-it-works/nodes/generator_node.md
+      - Logical Validator: how-it-works/nodes/logical_validator_node.md
+      - Refiner: how-it-works/nodes/refiner_node.md
+      - Schema Retriever: how-it-works/nodes/schema_retriever_node.md
   - Contribute:
     - Contributing: contribute/index.md
     - Testing Architecture: contribute/testing.md
     - Real-Database Test Bed: contribute/test-bed.md
     - Releasing: contribute/releasing.md
+    - Docs Style Guide: contribute/docs-style.md
   - Releases:
     - Overview: releases/index.md
     - "0.9.1": releases/0.9.1.md

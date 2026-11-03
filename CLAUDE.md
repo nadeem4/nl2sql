@@ -1,7 +1,7 @@
 # Working in this repo
 
 Hard rules, with the reason in one line each. The reasoning, the examples and the
-enforcement points are in [`docs/architecture/invariants.md`](docs/architecture/invariants.md);
+enforcement points are in [`docs/how-it-works/invariants.md`](docs/how-it-works/invariants.md);
 don't restate them here. Most of what follows is enforced by
 `packages/nl2sql/tests/architecture/test_boundaries.py`, whose failure messages
 name the rule.
@@ -29,7 +29,7 @@ name the rule.
 ## How to change things
 
 - **TDD.** Write the failing test first; it is how a rule stops being a memo.
-- **Update the docs in the same PR as the code.** A doc that lags is worse than no doc — see `CONTRIBUTING.md`.
+- **Update the docs in the same PR as the code.** A doc that lags is worse than no doc — see `CONTRIBUTING.md` and the seven rules in [`docs/contribute/docs-style.md`](docs/contribute/docs-style.md).
 - **Design and planning documents never go in the repo.** Docs describe what is built, in the present tense. Code, tests and comments never cite doc sections, decision ids or plan rows; state the reason in a few words instead. `test_no_tracked_file_cites_a_design_doc_or_a_plan_id` (`packages/nl2sql/tests/architecture/test_boundaries.py`) fails on a design-doc name or a parenthesised id such as `(D15)` or `(K1)`.
 - **Never read or edit `nl2sql-demo*/` or any `.env` file.** A folder made by `nl2sql demo` holds a real API key in the `.env` next to its `nl2sql.yaml`; `.gitignore` keeps it out of the repo and you keep it out of the transcript.
 - **Never merge the release-please PR (#85).** Merging it releases all three packages; releasing is a deliberate act, described in `docs/contribute/releasing.md`.

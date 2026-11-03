@@ -95,8 +95,8 @@ The tenant id for requests that name none. Result files are kept per tenant.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `timeout_s` | `60` | Timeout in seconds for one question. The caller is answered within about a second of the limit; the run's worker thread winds down in the background (see [isolation](../architecture/isolation.md)). |
-| `plan_cache` | `true` | Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version on the same run date, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in `<storage.path>/state.db`; `nl2sql cache clear` empties it. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
+| `timeout_s` | `60` | Timeout in seconds for one question. The caller is answered within about a second of the limit; the run's worker thread winds down in the background (see [isolation](../how-it-works/isolation.md)). |
+| `plan_cache` | `true` | Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version on the same run date, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in `<storage.path>/state.db`; `nl2sql cache clear` empties it. See [Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `strict_columns` | `true` | Treat a column the plan names but the retrieved schema does not have as a blocking, retryable `COLUMN_NOT_FOUND` error, so the planner is asked again instead of the plan reaching the database. `false` downgrades it to a warning that lets the plan through once retries are spent. |
 | `today` | none | The date the planner and refiner are told it is, as an ISO date (`2013-12-31`). Unset, it is the real date in UTC. Pin it for tests and gold runs whose questions say "this year" or "the last 30 days". A trace records the date its run used, and `nl2sql trace replay` pins it. It is part of the plan cache key, so a plan made on another date is not reused. |
 | `retries.max` | `3` | Retry attempts for the SQL agent's refinement loop. |
@@ -145,13 +145,13 @@ schema retriever and the resolver had before 0.7 (`TABLE_K`, `PLANNING_K`,
 `MAX_DECOMPOSER_TABLES`).
 
 How the tables are chosen past the threshold is in the
-[schema retriever's reference](../architecture/nodes/schema_retriever_node.md).
+[schema retriever's reference](../how-it-works/nodes/schema_retriever_node.md).
 
 ## `routing`
 
 Cross-database routing: which datasources a question goes to, and how far it
 may spread. The resolver reads `candidates`, `max_datasources` and
-`floor_ratio` ([Routing](../architecture/indexing.md#routing-five-signals-fused));
+`floor_ratio` ([Routing](../how-it-works/indexing.md#routing-five-signals-fused));
 the decomposer reads `max_sub_queries`.
 
 | Key | Default | Description |
@@ -167,7 +167,7 @@ the decomposer reads `max_sub_queries`.
 | --- | --- | --- |
 | `row_limit` | `100000` | The most rows one sub-query returns: a resource ceiling baked into the SQL as a `LIMIT`. A datasource's own `limits.row_limit` applies when it is lower (the demo datasources set `10000`). A result that reaches it is flagged as truncated (`QueryResult.truncated`, `sub_queries[].truncated`) and the answer says it was cut. |
 | `fetch_batch_size` | `10000` | Rows fetched from the database and written to the sub-query's result file at a time, for an adapter that streams (every built-in SQL adapter does). At most one batch is held in memory. See [Artifact Store](../storage/artifact-store.md#batched-writes). |
-| `preview_rows` | `20` | Result rows the answer model sees, with the total row count and the column names. The model writes about the result; it never copies it. See [AnswerSynthesizerNode](../architecture/nodes/answer_synthesizer_node.md). |
+| `preview_rows` | `20` | Result rows the answer model sees, with the total row count and the column names. The model writes about the result; it never copies it. See [AnswerSynthesizerNode](../how-it-works/nodes/answer_synthesizer_node.md). |
 
 ## `traces`
 

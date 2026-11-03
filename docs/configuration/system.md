@@ -258,7 +258,7 @@ auth: api_keys            # api_keys | none (none: loopback only)
 | `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built (`chat_tools[i]` in the report), with the closest registered name; `ask` and a plugin whose `args_model` does not forbid extra keys are errors too. Absent means the default tools (`chart`, `diagram` and `report`) that the registry has, so an engine on `Registry.empty()` starts with none and needs no `chat_tools: []`; a name you list must be registered. `[]` means none; `ask` is the conversation's own tool and is always on. Read by `engine.conversations` and `engine.chat_tools`; see [Chat tools](../conversations/tools.md). |
 | `dashboards` | `Dashboards`: strict keys; every value is at least 1. Read by `engine.dashboards`. |
 | `answers` | `Answers`: strict keys; `max_per_user` is at least 1. Read by `engine.answers`: the save past the cap is refused with `AnswerLimitReached`, never by dropping an older answer. |
-| `mcp` | `Mcp`: strict keys. `http.port` is 1 to 65535 and `http.path` starts with `/`. `auth: none` is for loopback only: the server refuses to start on any other host, or when `allowed_hosts` lists a name that is not loopback. `allowed_hosts` and `allowed_origins` feed the MCP SDK's DNS-rebinding protection: a request whose `Host` or `Origin` is not listed is refused, so a deployment behind a proxy lists its public host name. Read by `nl2sql mcp --http`; see [MCP over HTTP](../getting_started/mcp.md#over-http). |
+| `mcp` | `Mcp`: strict keys. `http.port` is 1 to 65535 and `http.path` starts with `/`. `auth: none` is for loopback only: the server refuses to start on any other host, or when `allowed_hosts` lists a name that is not loopback. `allowed_hosts` and `allowed_origins` feed the MCP SDK's DNS-rebinding protection: a request whose `Host` or `Origin` is not listed is refused, so a deployment behind a proxy lists its public host name. Read by `nl2sql mcp --http`; see [MCP over HTTP](../get-started/mcp.md#over-http). |
 
 ```python
 from nl2sql import Config
@@ -314,7 +314,7 @@ libraries (the OpenTelemetry SDK) still read their own standard variables, the
 trace redactor scans the environment for values to mask. Nothing in nl2sql writes the environment: a key the
 demo is given travels in the engine's LLM config, and only the `.env` loading
 below adds variables. The architecture tests enforce both
-([invariants](../architecture/invariants.md#an-engine-owns-its-config-no-process-globals)).
+([invariants](../how-it-works/invariants.md#an-engine-owns-its-config-no-process-globals)).
 
 ### `.env` files
 

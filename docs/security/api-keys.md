@@ -1,6 +1,6 @@
 # API keys
 
-An API key authenticates a client of [MCP over HTTP](../getting_started/mcp.md#over-http). It carries the user,
+An API key authenticates a client of [MCP over HTTP](../get-started/mcp.md#over-http). It carries the user,
 tenant and roles its holder runs as, so a key per person or per app is the unit of revocation. Nothing
 is inferred from the client. 
 
@@ -68,7 +68,7 @@ line or an error. See [Events](../observability/events.md).
 `nl2sql mcp --http` takes the key from `Authorization: Bearer <token>`. A missing header, another scheme,
 a malformed token, an unknown key or a revoked key is a `401` with `WWW-Authenticate: Bearer` and an
 `mcp.denied` event; a good key runs the request as the key's user, tenant and roles. See
-[MCP over HTTP](../getting_started/mcp.md#over-http).
+[MCP over HTTP](../get-started/mcp.md#over-http).
 
 ## What a key does and does not give
 

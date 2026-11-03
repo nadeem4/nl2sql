@@ -1,0 +1,686 @@
+# Architectural Invariants
+
+The rules the codebase holds and where each is enforced, for contributors and anyone reviewing a change.
+
+## Overview
+These invariants capture rules that are enforced by the code paths responsible for planning, validation, and execution. They exist to keep the system deterministic, secure, and stable under malformed input or misconfiguration.
+
+---
+
+## Semantic-Only Subqueries and Post-Combine Ops
+
+### Definition
+Sub-query intents and post-combine operations must not contain SQL. Each text field (intent, metric names, filter, group-by and order-by attributes, expected-schema names) is checked on its own and rejected if it opens with a `SELECT ... FROM` statement, or contains a statement terminator (`;`) or a comment marker (`--`, `/*`, `*/`). English words that happen to be SQL keywords are allowed: "customers from Brazil" and "tracks where the genre is Rock" are valid intents.
+
+### Enforcement Points
+- `SubQuery.validate_semantic_only()` in `nl2sql.pipeline.nodes.decomposer.schemas`
+- `PostCombineOp.validate_semantic_only()` in `nl2sql.pipeline.nodes.decomposer.schemas`
+
+### Failure Behavior
+Raises `ValueError` ("contains SQL syntax") when a field matches; the decomposer response fails validation.
+
+### Why It Exists
+Prevents physical SQL leakage into semantic planning stages and keeps decomposer output safe to interpret downstream.
+
+---
+
+## Combine Groups Require Roles and Typed Join Keys
+
+### Definition
+Combine groups with `compare` or `join` operations must include a role for every input, at most one left-hand input (`left`, `base` or `primary`) and one right-hand input (`right`, `compare` or `secondary`), and at least one join key pair; a group with only one side is refused by the decomposer node. Each key names a column in the `expected_schema` of its side's sub-query, that column declares a `dtype`, and the two sides' dtypes can be coerced to each other: a number or a boolean never joins a date. The aggregator casts both sides of each key to one type before the join, in polars; a value that does not convert joins nothing and is a `JOIN_KEY_UNCONVERTED` warning.
+
+### Enforcement Points
+- `CombineGroup.validate_roles()` and `DecomposerResponse.validate_join_key_types()` in `nl2sql.pipeline.nodes.decomposer.schemas`
+- `LogicalValidatorNode` (`validator/join_keys.py`): a join-key column whose database type cannot be coerced to its declared `dtype` is a retryable `JOIN_KEY_TYPE_MISMATCH`. The check lives in the validator, not the aggregator, because the validator has the retry edge.
+
+### Failure Behavior
+Raises `ValueError` when roles, join keys or their types are missing or cannot meet; parse-and-retry sends it back to the model.
+
+### Why It Exists
+Ensures combine operations are well-defined and deterministic for aggregation. A text key from one database joined to an integer from another used to fail in the aggregator, terminally, or match nothing.
+
+---
+
+## Decomposer References Must Resolve
+
+### Definition
+Combine-group inputs must reference existing subqueries, and post-combine ops must reference existing combine groups.
+
+### Enforcement Points
+- `DecomposerResponse.validate_references()` in `nl2sql.pipeline.nodes.decomposer.schemas`
+
+### Failure Behavior
+Raises `ValueError` for unknown subquery or group references.
+
+### Why It Exists
+Prevents invalid execution graphs and dangling references.
+
+---
+
+## Expression AST Must Match Its Kind
+
+### Definition
+Expression nodes must satisfy kind-specific required fields (e.g., binary ops require left/right and an operator).
+
+### Enforcement Points
+- `Expr.model_post_init()` in `nl2sql.pipeline.nodes.ast_planner.schemas`
+
+### Failure Behavior
+Raises `ValueError` when required fields are missing or operators are invalid.
+
+### Why It Exists
+Guarantees the AST is structurally complete before SQL generation.
+
+---
+
+## Plan Model Is Strict and Read-Only
+
+### Definition
+Plan fields are schema-validated with no unknown fields, and query type must be `READ`.
+
+### Enforcement Points
+- `ConfigDict(extra="forbid")` on plan models in `nl2sql.pipeline.nodes.ast_planner.schemas`
+- `PlanModel.query_type: Literal["READ"]` in `nl2sql.pipeline.nodes.ast_planner.schemas`, which pydantic enforces before any node sees the plan (the plan cache re-validates on read, so a cached plan is covered too)
+
+### Failure Behavior
+Pydantic validation errors for extra/invalid fields and for any `query_type` other than `READ`; the plan never reaches the validator. `LogicalValidatorNode` does not re-check it, because the branch cannot be reached.
+
+### Why It Exists
+Prevents mutation or unknown plan constructs from entering execution.
+
+---
+
+## Table Aliases Are Unique
+
+### Definition
+Each table alias in the plan must be unique.
+
+### Enforcement Points
+- `LogicalValidatorNode._alias_collision()` in `nl2sql.pipeline.nodes.validator.node`
+
+### Failure Behavior
+Returns `PipelineError` with `INVALID_PLAN_STRUCTURE`.
+
+### Why It Exists
+Prevents ambiguous column resolution.
+
+---
+
+## Plan Functions Are Known Functions
+
+### Definition
+Every `func` expression names a function from `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions`, written as a plain identifier (any case).
+
+The only date functions on the list are the ones the planner prompt offers: `DATE_PART` and `DATE_TRUNC`, plus `DATE_DIFF('day', start, end)` for the time between two dates, and `YEAR`, `QUARTER`, `MONTH`, `DAY` and `EXTRACT`, which are read as `DATE_PART`. `STRFTIME` is still accepted as a legacy name (`LEGACY_FUNCTIONS`): a recorded demo answer and three of the Chinook suite's hand-written plans call it. Nothing offers it to the model, and the validator's rejection message leaves it out of the functions it lists.
+
+### Enforcement Points
+- `LogicalValidatorNode._unsupported_functions()` in `nl2sql.pipeline.nodes.validator.node`
+- `packages/nl2sql/tests/unit/test_date_functions_agree_with_prompt.py` reads the allow-list and the planner prompt together, so a date function cannot be allowed by one and forbidden by the other
+
+### Failure Behavior
+Returns `PipelineError` with `UNSUPPORTED_FUNCTION` (severity `ERROR`, so the refiner can retry).
+
+### Why It Exists
+`func_name` is model text that becomes the function's name in the SQL. Without the check, any text, including a second statement, reached the query.
+
+---
+
+## Expected Schema Must Match Select List
+
+### Definition
+When `expected_schema` is provided, the plan’s `select_items` count and aliases must match it.
+
+### Enforcement Points
+- `LogicalValidatorNode._validate_static()` in `nl2sql.pipeline.nodes.validator.node`
+
+### Failure Behavior
+Returns `PipelineError` with `INVALID_PLAN_STRUCTURE`.
+
+### Why It Exists
+Keeps multi-stage subqueries contractually aligned.
+
+---
+
+## Column References Must Resolve
+
+### Definition
+All column references must map to declared table aliases and be unambiguous.
+
+### Enforcement Points
+- `LogicalValidatorNode._validate_columns()` in `nl2sql.pipeline.nodes.validator.node`, which resolves the plan with `sqlglot.optimizer.qualify.qualify()` against the schema retrieved for the query
+- `LogicalValidatorNode._validate_static()` converts resolution failures to `PipelineError`
+
+### Failure Behavior
+Returns `PipelineError` with `COLUMN_NOT_FOUND`: a retryable `ERROR` by default, a `WARNING` that does not block when `logical_validator_strict_columns` is turned off.
+
+### Why It Exists
+Prevents queries from referencing non-existent or ambiguous columns.
+
+---
+
+## Joins Must Be Valid and Schema-Backed
+
+### Definition
+Join aliases must exist, join conditions must reference both sides, must include an equality pair, and must match allowed schema relationships.
+
+### Enforcement Points
+- `LogicalValidatorNode._validate_static()` join checks in `nl2sql.pipeline.nodes.validator.node`
+
+### Failure Behavior
+Returns `PipelineError` with `INVALID_PLAN_STRUCTURE` or `JOIN_TABLE_NOT_IN_PLAN`.
+
+### Why It Exists
+Prevents invalid joins and enforces schema-authorized relationships.
+
+---
+
+## Knowledge Is Data: the Validator and Scope Decide
+
+### Definition
+The glossary reaches a model only as JSON values: inside
+the schema block, and inside `[BUSINESS_CONTEXT]`, one JSON object on one line
+in the planner's and refiner's human messages, so a newline or a block marker
+in a definition stays inside one JSON string. Every item and the whole block
+are capped (`settings.knowledge.item_max_chars`, `block_max_chars`), and
+`notes` never reach a model. Knowledge is filtered by the caller's `Scope`
+before it reaches a prompt, `knowledge_used`, `knowledge.used` or the
+explanation: an item naming a table the caller cannot read, or whose text
+mentions one as a whole word, is left out, and so is a database comment that
+mentions one. The prompt says it is data. Encoding does not stop a model from
+obeying a sentence it reads; the guarantee is that whatever the model plans
+under any knowledge is a typed plan, validated with the caller's scope. A
+glossary join only adds a relationship between two tables the caller may
+read, which the validator's existing join check matches.
+
+### Enforcement Points
+- `visible()` and `caller_knowledge()` in `nl2sql.knowledge.scope`; `schema_knowledge()` in `nl2sql.pipeline.nodes.schema_retriever.node`
+- `render_business_context()` and `fit_business_context()` in `nl2sql.knowledge.render`
+- Planner instruction 15 (`ast_planner/prompts.py`) and refiner instruction 5 (`refiner/prompts.py`)
+- `LogicalValidatorNode` with the caller's `Scope`, as for every plan
+- `packages/nl2sql/tests/unit/knowledge/test_injection.py`
+
+### Failure Behavior
+An item over the cap is a load error naming it. A plan on a denied table,
+written under any glossary, is refused with `SECURITY_VIOLATION` exactly as
+without one.
+
+### Why It Exists
+A glossary is written by people other than the caller, and may be wrong or
+hostile. It may inform a plan; it may never widen what the caller can read.
+
+### Residual Risk
+A paraphrase ("the pay table"), a plural or singular ("salary" for
+`salaries`) and a name inside a longer identifier cannot be caught by the
+mention check. The validator still refuses any plan on the table.
+
+---
+
+## Policy Enforcement Is Namespaced and Fail-Closed
+
+### Definition
+A role allows and denies tables with patterns that are `*`, `datasource` or `datasource.schema.table` (each part a glob, matched regardless of case); a two-part pattern is rejected when the config loads. Policy checks fail if the datasource ID is missing. Access is decided on datasource, schema and table: a table the plan names without a schema is in the adapter's default schema. Deny beats allow within a role; across roles a table is readable when some role allows it and that same role does not deny it. Every place that decides table access asks one `Scope` (`PolicyEngine.scope(user, datasource_id)` in `nl2sql.policies`), `engine.datasources.schema(..., user_context=)` included, and nothing outside `nl2sql/policies/` matches a policy pattern. A run builds each datasource's scope once and keeps it. An optional policy check (`nl2sql_sdk.policy.PolicyCheck`) is asked once per caller and datasource per run; its grant is intersected with the roles, so neither widens the other, and any exception from it denies the datasource for the run: it never fails open.
+
+### Enforcement Points
+- `Role` in `nl2sql.config.models` (the pattern shape, through `nl2sql.policies.patterns.parse_pattern`)
+- `LogicalValidatorNode._validate_policy()` in `nl2sql.pipeline.nodes.validator.node`
+- `Scope` and `PolicyEngine` in `nl2sql.policies.scope`, asked with the same datasource, schema and table by the datasource resolver, the curated matcher, the schema retriever (which hides denied tables from the planner), the validator, the executor's value check and `engine.policies.allows()`
+- `test_every_access_decision_goes_through_scope` in `packages/nl2sql/tests/architecture/test_boundaries.py`
+
+### Failure Behavior
+`ValueError` for an invalid pattern; `PipelineError` with `SECURITY_VIOLATION` if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with `VALIDATOR_CRASH`. The user-facing refusal names no table unless `policies.refusal_names_tables` is set; the table, the roles and the rule are in the error's `details`.
+
+### Why It Exists
+Ensures access control boundaries are explicit and enforced.
+
+---
+
+## Datasource Access Is Policy-Gated
+
+### Definition
+Only datasources the caller's scope reaches (`Scope.reaches_datasource()`) may be selected or resolved.
+
+### Enforcement Points
+- `DatasourceResolverNode._get_allowed_datasource_ids()` and `__call__()` in `nl2sql.pipeline.nodes.datasource_resolver.node`
+- `CuratedMatcherNode._searchable()` and `_check_access()` in `nl2sql.pipeline.nodes.curated_matcher.node`: the verified-query search covers only datasources the role may read, and every table a verified query's SQL reads must pass `Scope.allows()`
+
+### Failure Behavior
+Returns `PipelineError` with `SECURITY_VIOLATION` if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search. The curated matcher refuses nothing itself: a verified query on a datasource or table the role may not read is never offered or never run, and the run falls back (`policy_denied`) to the resolver, which refuses as above.
+
+### Why It Exists
+Prevents execution against unauthorized datasources.
+
+---
+
+## Events Carry No Rows, and the Stream Carries No Operator Data
+
+### Definition
+No event on the engine's bus carries result rows, sample values, keys or header values; the question and the answer text are carried and may hold values from the data. Every published name is in the event catalog, whose model for it forbids extra keys. A caller's own stream (`stream_query`) yields only its run's events on the caller-safe allow-list (`STREAM_EVENTS`, the catalog entries marked `stream`); the full `QueryResult` is only on the stream's copy of `run.finished`, never on the bus.
+
+### Enforcement Points
+- `EventBus.publish` and the catalog in `nl2sql.events` (`CATALOG`, `STREAM_EVENTS`)
+- `QueryAPI.stream_query` in `nl2sql.api.query_api` (subscribes to its scope with the allow-list only)
+- `test_no_bus_event_carries_rows` in `packages/nl2sql/tests/e2e/test_run_events_fake_llm.py`, `test_stream_never_yields_policy_or_hook_or_llm_call_events` in `packages/nl2sql/tests/unit/test_stream_query.py`, and `test_every_published_event_is_in_the_catalog` in `packages/nl2sql/tests/architecture/test_event_catalog.py`
+
+### Failure Behavior
+An uncatalogued name, or data its model refuses, is a `ValueError` or a validation error from `publish`: an engine bug a test sees. An event off the allow-list never reaches the stream; an operator reads it with `engine.events.subscribe`.
+
+### Why It Exists
+Observers write events to logs, files and collectors outside the engine's access control, so rows must never reach them; and a stream is the caller's, so a policy denial (which would tell a denied user that a table exists), a hook's reasons or a model's cost must not reach it.
+
+---
+
+## Observers Fail Open and Never Block
+
+### Definition
+An observer (the `observers` section, or `engine.events.subscribe`) can never fail a run or an engine call: what it raises is logged once per observer and event name and skipped. It never blocks either: the bus delivers a run's events one at a time under the run's lock, so an observer that writes to disk or the network hands that work to a thread of its own (the `audit` observer queues its lines on a bounded queue, dropping and counting what does not fit; the `otel` observer records in memory and its SDK exports in the background). Hooks are the opposite: they fail closed (*Hooks Modify Before the Validator, Deny After*).
+
+### Enforcement Points
+- `EventBus.publish` in `nl2sql.events.bus` (subscribers made with `fail="open"`, the default for observers)
+- `AuditObserver` in `nl2sql.observers.audit` (a queue and a writer thread; a failed write is logged)
+- `test_observer_exception_is_logged_once_and_skipped` and `test_audit_never_blocks_the_publisher` in `packages/nl2sql/tests/unit/test_observers.py`, and `test_a_raising_subscriber_never_fails_the_run` in `packages/nl2sql/tests/unit/test_events_api.py`
+
+### Failure Behavior
+A WARNING on logger `nl2sql.events`, once per observer and event name, and `EventBus.failures` counts it. The run goes on.
+
+### Why It Exists
+Observing must not change the answer. A full disk, a collector that is down or a plugin bug would otherwise fail every question, and a slow write would hold every run's lock.
+
+---
+
+## SQL Execution Requires SQL, Datasource, and Capability
+
+### Definition
+Execution only proceeds when SQL text exists, a datasource ID is present, and the datasource supports SQL.
+
+### Enforcement Points
+- `ExecutorNode.__call__()` in `nl2sql.pipeline.nodes.executor.node`
+- `SqlExecutorService.validate_request()` in `nl2sql.execution.executor.sql_executor`
+
+### Failure Behavior
+Returns `PipelineError` with `MISSING_SQL`, `MISSING_DATASOURCE_ID`, or `INVALID_STATE`.
+
+### Why It Exists
+Prevents invalid execution requests and ensures capability compatibility.
+
+---
+
+## Execution DAG Must Be Valid and Acyclic
+
+### Definition
+Post-combine ops must target known combine groups, all edges must reference existing nodes, and the DAG must be acyclic.
+
+### Enforcement Points
+- `build_execution_dag()` in `nl2sql.pipeline.nodes.decomposer.dag`, called by `DecomposerNode.__call__()`
+- `ExecutionDAG._layered_toposort()` in `nl2sql.execution.dag`
+
+### Failure Behavior
+Raises `ValueError`, leading to `PipelineError` with `PLANNER_FAILED`.
+
+### Why It Exists
+Ensures deterministic and well-ordered aggregation execution.
+
+---
+
+## Aggregation Requires Scan Artifacts and Single-Input Post Nodes
+
+### Definition
+Scan nodes must have corresponding artifacts, and post-combine nodes must have exactly one input. The one exception is a scan a hook dropped (a deny scoped to its sub-query): it has no artifact, a `join` or `compare` group it feeds is dropped whole with its post-combine nodes, and another group goes on without it.
+
+### Enforcement Points
+- `AggregationService.execute()` in `nl2sql.aggregation.aggregator` (its `dropped` argument)
+- `EngineAggregatorNode` in `nl2sql.pipeline.nodes.aggregator.node`, which passes the sub-queries whose output is `dropped`
+
+### Failure Behavior
+Raises `ValueError` when artifacts are missing or post nodes have invalid inputs. A dropped group is a `HOOK_DENIED` warning; when hooks dropped every part of the question, the aggregator ends the run with `HOOK_DENIED`.
+
+### Why It Exists
+Guarantees aggregation operates on complete, correctly wired inputs.
+
+---
+
+## An Engine Keeps Its Data Under `storage.path`
+
+### Definition
+`storage` is a required section of the config. An engine keeps its vector
+index in `<storage.path>/index/`, its schema snapshots, plan cache and
+feedback in `<storage.path>/state.db`, its traces in `<storage.path>/traces/`,
+its result files in `<storage.path>/results/` and, with the `audit` observer,
+its audit log in `<storage.path>/audit/`. The index collection name
+is an internal constant.
+
+### Enforcement Points
+- `Config` in `nl2sql.config` (the section is required)
+- `Runtime.from_config()` in `nl2sql.runtime` (each slot's store, built with `folder=storage.path`)
+
+### Failure Behavior
+A config without `storage` is a `ConfigError` from `load_config`, or a
+validation error building `Config` in code.
+
+### Why It Exists
+There is no hidden default for where data lives, and two engines with
+different `storage.path` values never share a store.
+
+---
+
+## SQL Generation Enforces a Row Limit Cap
+
+### Definition
+Generated SQL must not exceed the row limit: the datasource adapter’s `row_limit`, bounded by the `RESULT_ROW_LIMIT` ceiling (100,000), which is also the limit when the datasource sets none. A result that reaches the limit is flagged as truncated. Verified SQL is held to the same limit, but a person's SQL is never rewritten: the executor stops reading its result at the limit (`ExecutorRequest.max_rows`).
+
+### Enforcement Points
+- `GeneratorNode.__call__()` in `nl2sql.pipeline.nodes.generator.node`
+- `wrap_subgraph()` in `nl2sql.pipeline.graph_utils` sets `SubgraphOutput.truncated`, which `QueryResult` and the answer carry
+- `CuratedMatcherNode._run()` sets `max_rows` and `truncated` for a verified query; `_Stream` in `nl2sql.execution.executor.sql_executor` stops at `max_rows` and closes the adapter's stream
+
+### Failure Behavior
+No error; the limit is clamped to the smaller of the two. A cut result is flagged (`truncated`), and the answer says it was cut at N rows.
+
+### Why It Exists
+Protects execution resources and prevents runaway result sizes, without passing off a cut result as complete.
+
+---
+
+## The Answer Model Sees a Preview, Never the Whole Result
+
+### Definition
+The answer synthesizer's prompt carries at most `ANSWER_PREVIEW_ROWS` (20) rows of each result, with its total row count, its column names and a `partial` flag. The model is told to state only numbers from the preview or the count, and not to reproduce the result.
+
+### Enforcement Points
+- `result_preview()` and `AnswerSynthesizerNode._serialize_result()` in `nl2sql.pipeline.nodes.answer_synthesizer.node`
+
+### Failure Behavior
+None; rows past the preview are left out of the prompt.
+
+### Why It Exists
+The prompt's size must not grow with the result: that is what kept the row limit at 1,000. The user sees the full result as a table, so the model has no need to copy it.
+
+---
+
+## Pipeline Execution Is Time-Bounded
+
+### Definition
+Pipeline execution must complete within `settings.global_timeout_sec`.
+
+### Enforcement Points
+- `run_with_graph()` in `nl2sql.pipeline.runtime`
+
+### Failure Behavior
+Returns `PipelineError` with `PIPELINE_TIMEOUT` and a timeout response message.
+
+### Why It Exists
+Ensures latency bounds and prevents hung requests.
+
+---
+
+## Package Boundaries Are One-Way
+
+### Definition
+Dependencies point in one direction: `nl2sql-sdk` → nothing, `nl2sql.adapters.*` → the SDK, `nl2sql` (the engine) → the SDK, and every caller — the REST API, the CLI, the MCP server — → the top-level `nl2sql` facade.
+
+Concretely:
+
+- The SDK's core imports only pydantic and the standard library. `nl2sql_sdk.sqlalchemy`, the SQLAlchemy base installed with `nl2sql-sdk[sqlalchemy]`, may also import SQLAlchemy and sqlglot, and the core never imports it. `nl2sql_sdk.testing`, the conformance kit installed with `nl2sql-sdk[testing]`, may import pytest and sqlglot, but not SQLAlchemy: it checks an adapter through `DatasourceAdapter` alone.
+- An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
+- Nothing outside `nl2sql/adapters/` (and the SDK's SQLAlchemy base) imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapter`.
+- Only `nl2sql/storage/` imports `chromadb` (or `langchain_chroma`). The engine embeds, ranks and filters through the `IndexStore` interface (`nl2sql_sdk.stores`), so a plugin index store works the same way as the built-in `chroma` one. The one exception is the local embedder, `nl2sql/embeddings/local.py`, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.
+- Only `nl2sql/storage/` imports `sqlite3`. Schema snapshots, the plan cache, feedback and the index lock are reached through the `StateStore` interface, so a plugin state store works the same way as the built-in `sqlite` one. The SQLite adapter (its driver) reads a datasource, not the engine's state, and is exempt. An eval suite's expected rows come through the datasource's adapter, so nothing in `nl2sql/evaluation/` imports `sqlite3` (`test_gold_does_not_import_sqlite3`).
+- The engine and the API never import the CLI (`nl2sql_cli`, the `nl2sql-cli` distribution in the repo's root `nl2sql-cli/`), and the engine has no `cli` package (`test_the_engine_has_no_cli_package`, `test_the_engine_and_the_api_never_import_nl2sql_cli`).
+- The CLI imports only the top-level `nl2sql` and its own `nl2sql_cli` package, never `nl2sql_sdk` or `nl2sql_api` (`test_the_cli_and_the_api_import_only_the_public_nl2sql`, `test_nl2sql_cli_imports_only_the_engine`); its distribution depends on `nl2sql-engine` and `textual` only, and `nl2sql-api` is its `web` extra. `config check`, `init`, `doctor`, `--config` and the app callback are on the facade already (`check_config`, `init_project`, `load_config`, `load_env_file`, `configure_logging`, `KEYED_PROVIDERS`, `env_var_for_provider`, `api_key_from_env`, `ANTHROPIC_EXTRA_HINT`); the other commands are on it too, so the rule has no exception list.
+- `nl2sql_api` imports only the top-level `nl2sql` namespace, with no exception list (`STILL_IMPORTED_FROM_INSIDE` went with the old playground; `test_still_imported_from_inside_is_gone`). In particular it never imports `nl2sql.feedback`, `nl2sql.tracing`, `nl2sql.pipeline`, `nl2sql.indexing` or `PROVIDER_PRESETS`: `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.index.inspect_defaults()` and `engine.llm.providers()` serve them. The CLI, the MCP server and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`). The MCP server (`nl2sql/mcp/`) imports only the top-level `nl2sql` and, under the same rule, never the runtime; it is the only code that imports `mcp`, the `mcp` extra (`test_mcp_uses_only_the_public_api`). The chat tools (`nl2sql/chat_tools/`) are held to the same rule: each tool module imports only the top-level `nl2sql` and its own interface module, and its `__init__` also the strict model base and the conversation shapes (`CHAT_TOOLS_INIT_MAY_IMPORT`; `test_chat_tools_use_only_the_public_api`). Only `nl2sql/mcp/` imports Starlette or Uvicorn (`test_only_mcp_imports_starlette_or_uvicorn`). Every app passes the caller to a result or trace read (`test_apps_always_pass_the_caller`; the CLI passes `user_context=None`, the operator at a terminal), and neither the REST API nor the MCP server ever acts `as_operator` (`test_the_rest_api_and_mcp_never_act_as_the_operator`). `nl2sql demo` (`cli/commands/demo.py`) is an ordinary CLI module: it starts `nl2sql-api serve --demo` as a child process and imports neither the API nor a web framework, and nothing in the engine or the SDK imports `nl2sql_api` (`test_engine_never_imports_the_api`). The SDK's `FastMCP` settings are pydantic-settings that read `FASTMCP_*` variables and the working directory's `.env`; the server passes every setting explicitly, so neither changes it, and nothing is written.
+- The runtime (`pipeline`, `execution`, `indexing`, `datasources`, `llm`, `policies`, `aggregation`, `schema`, `services`, `context`, `public_api`) never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope. A deferred import inside a function is fine.
+- A provider's API-key environment variable is read in `nl2sql/llm/` only. `PROVIDER_PRESETS` (`llm/registry.py`) is the one table of keyed providers (the keyless `replay` provider is declared as an entry point and is not in it, since it has no key variable); everything the CLI, the web app, evaluation and the REST API know about providers derives from it through `llm/providers.py`.
+
+### Enforcement Points
+- `packages/nl2sql/tests/architecture/test_boundaries.py` — an AST import scan of `packages/*/src`, one test per rule
+- `packages/api/tests/test_architecture.py` — the REST API's own imports, and that its response model *is* `nl2sql.QueryResult`
+
+### Failure Behavior
+A failing test naming the rule and the file, line and import that broke it. Each documented exception is a named constant in the test module with the reason beside it.
+
+### Why It Exists
+Each rule keeps one thing replaceable. The SDK is what a third-party adapter compiles against, so a dependency there is a dependency every adapter author inherits; an adapter that imported the engine would close the circle and make the split meaningless. Engine code that imports an adapter, or SQLAlchemy, is a second way to reach a database that no new adapter can plug into. And `import nl2sql` loading `nl2sql.evaluation` cost every SDK user the YAML loaders, the eval suites and the fake LLM before anyone asked a question.
+
+### Example
+The playground once read `engine.context.ds_registry`, `engine.context.schema_store` and `engine.context.vector_store` through `getattr`, so the schema view, the retrieval inspector and index health existed only in the playground; `nl2sql-api` had a placeholder where index status should be. The fix was facade methods that both callers use. Later the CLI's `run`, `index` and `trace replay` built on the runtime too; they now use `stream_query`'s events, `engine.index.build`'s `IndexProgress` callback and `engine.traces.replay`. The playground then still imported the feedback store, the trace reader, the pipeline's step list and the provider presets; those are `engine.feedback`, `engine.traces.get`, `engine.about()` and `engine.llm.providers()` now, which `nl2sql feedback` uses too. The rule stops the shortcut being taken again, which is what keeps a second client cheap.
+
+---
+
+## Importing nl2sql Is Light
+
+### Definition
+`import nl2sql` loads none of `chromadb`, `onnxruntime`, `sqlalchemy`, `psycopg2`, `psycopg`, `pymysql`, `pyodbc`, `pymssql`, `duckdb`, `duckdb_engine`, `textual`, `opentelemetry` or `mcp`, and its imports stay under 500 ms.
+
+Concretely:
+
+- `nl2sql/__init__.py` imports only the `NL2SQL` class. Every other public name (`QueryResult`, `Event`, `CancellationToken`, the API classes, the eval shapes) is imported the first time it is asked for, through the module's `__getattr__`. `from nl2sql import QueryResult` works as it always did.
+- `nl2sql/public_api.py` imports the runtime (`Runtime` and the API classes) inside `NL2SQL.__init__`, not at the top of the module.
+- Runtime modules import their heavy libraries where they are used, as the adapters already do.
+- Only `nl2sql/observers/otel.py` imports `opentelemetry`, and only inside the observer: OpenTelemetry is the `otel` extra, and an engine without an `otel` observer never loads that module.
+
+### Enforcement Points
+- `test_only_the_otel_observer_imports_opentelemetry`, `test_the_otel_observer_imports_opentelemetry_only_when_it_is_built` and `test_building_an_engine_loads_no_otel_observer` in `packages/nl2sql/tests/architecture/test_boundaries.py`. A built engine may still have `opentelemetry` in `sys.modules`: chromadb, a core dependency, installs its SDK, and langsmith imports it whenever it is installed. The rule holds the engine's own code.
+- `test_importing_nl2sql_loads_no_heavy_library` in `packages/nl2sql/tests/architecture/test_boundaries.py` — imports `nl2sql` in a fresh interpreter and checks `sys.modules`
+- `test_import_nl2sql_stays_within_its_time_budget` in the same module — the cumulative figure `python -X importtime` reports for `nl2sql`, best of five, under 500 ms. It measures imports only, not wall-clock time, so a busy runner does not fail it.
+
+### Failure Behavior
+A failing test naming the heavy libraries that were loaded, or the import time against the budget.
+
+### Why It Exists
+Code that only needs a name — a type hint, `nl2sql --help`, a config check in CI, a REST client building a request — should not pay for a vector store, a database driver and a tracing stack. `import nl2sql` used to load chromadb, duckdb, opentelemetry, langgraph, langchain_openai and polars and took about 2.2 seconds; it now takes about 15 ms. The cost moves to `NL2SQL(...)`, which needs the runtime anyway.
+
+---
+
+## An Engine Owns Its Config: No Process Globals
+
+### Definition
+Everything an engine reads comes from its own `Config`, handed down through the runtime (`ctx.settings`, `ctx.config`) or passed as a parameter. Nothing is process-global, so two engines in one process share nothing.
+
+Concretely:
+
+- There is no `settings` singleton. A module with no runtime takes the value it needs as a parameter (`run_date(today)`, `PlanCache(store, enabled=..., today=...)`).
+- No module writes the process environment: no `os.environ` assignment, `pop` or `update`, no `os.putenv`. Keys and options travel in the `Config`. A key pasted into Settings and a key saved in the playground's settings panel are written to the demo's `.env` and given to the engine as a value in its LLM config, never put in `os.environ`; `nl2sql-api serve --hosted` refuses to start when a provider key variable is set rather than drop it.
+- The environment is read from an allow-list only: `NL2SQL_CONFIG` (`nl2sql/config/`), `NL2SQL_MODE` (`nl2sql-api serve` alone), `NL2SQL_LOG_LEVEL` and `NL2SQL_LOG_FORMAT` (`configure_logging`), the provider key variables (`nl2sql/llm/`, through `PROVIDER_PRESETS`), `${env:VAR}` references (`nl2sql/config/` and the `env` secret provider), the trace redactor, which masks every value the environment holds, and, `DATABASE_URL`, read by `nl2sql-cli/src/nl2sql_cli/commands/launch.py` alone (`nl2sql launch` offers it as a candidate; it is also an entry point that loads the `.env` it has just written). Anything else is configuration and is written in `nl2sql.yaml`, as `${env:VAR}` where it should come from the environment.
+- Only `nl2sql_cli/chat/` imports `textual` (`test_only_the_chat_package_imports_textual`), and no module scope outside it imports that package, so `import nl2sql` and every other command load no terminal toolkit.
+- Only the entry points load a `.env` file: the CLI (`nl2sql chat --demo` among its commands), `nl2sql demo` and `nl2sql-api serve` (never for a hosted server, which holds no model key) call `nl2sql.config.load_env_file()`, which loads the `.env` next to `nl2sql.yaml` and never overrides a variable already set. It is the one place that calls `load_dotenv`. The library never reads a `.env`; a Python caller who wants one loads it before `NL2SQL.from_config()`.
+- Runs that need different settings (evaluation, trace replay) take a run-scoped runtime with a derived config (`ctx.derive(...)`) instead of editing shared state.
+
+### Enforcement Points
+- `test_no_module_writes_the_environment`, `test_environment_reads_only_from_the_allow_list` and `test_only_entry_points_load_dotenv` in `packages/nl2sql/tests/architecture/test_boundaries.py`, an AST scan of `packages/*/src` (`READS_THE_ENVIRONMENT` names each allowed reader and why); the first also scans `scripts/`, so a maintenance script passes keys as arguments instead of writing the environment
+- `packages/nl2sql/tests/e2e/test_two_engines_fake_llm.py` — two engines in one process, each with its own row limit, plan cache, LLM, embedder and storage, and `os.environ` unchanged afterwards
+
+### Failure Behavior
+A failing test naming the file, line and the write or read that broke the rule.
+
+### Why It Exists
+0.4 kept its settings in a process-global object that every module imported, and carried keys and options through `os.environ`. Two engines in one process (a test, a server with two configs, an evaluation run beside live traffic) then read each other's values, an evaluation that pinned a setting raced every other query, and a key set for one engine leaked into every other engine and child process.
+
+---
+
+## Dialect Knowledge Lives in the Adapter
+
+### Definition
+No engine module names a database dialect or writes one database's SQL. The plan says *what*; the adapter says *how*. An adapter declares its dialect with `get_dialect()`, which must return a name `sqlglot.Dialect.get_or_raise` accepts, and may override `render_sql()` for what sqlglot cannot express.
+
+### Enforcement Points
+- `test_no_dialect_name_outside_the_adapters` and `test_no_dialect_specific_sql_outside_the_adapters` in `packages/nl2sql/tests/architecture/test_boundaries.py` — a scan of every non-docstring string literal, f-string chunks included
+- `test_get_dialect_is_a_sqlglot_dialect`, over every `nl2sql.adapters` entry point
+- The plan's one function vocabulary: `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions` (see *Plan Functions Are Known Functions*)
+
+### Failure Behavior
+A failing test naming the literal and where it was written. The documented exceptions are the engine's own state store, a SQLite file by default (`storage/sqlite.py`), the in-process polars/DuckDB compute engine (`aggregation/engines/polars_duckdb.py`), and the plan's function allow-list.
+
+### Why It Exists
+SQL that only one database understands, written in the engine, is wrong for every other database — and it is wrong silently, because it parses. A dialect name in engine code is worse: it is a switch statement that every future adapter has to be added to, in a repo whose point is that adapters are pluggable.
+
+### Example
+The planner prompt asked for `STRFTIME('%Y', o.order_date)` to get a year. On SQLite that works; on Postgres and SQL Server it is a call to a function that does not exist, and on MySQL it means something else. The fix was not to teach the prompt about dialects but to move the decision: the plan asks for `DATE_PART('year', x)`, the generator builds a typed sqlglot node, and `SQLiteAdapter.render_sql()` rewrites it to `STRFTIME` for SQLite only. Related: `get_dialect()` returned SQLAlchemy's `postgresql` and `mssql`, which sqlglot rejects, so *no* SQL could be generated for either datasource — a one-word bug that the entry-point contract test now catches.
+
+---
+
+## The Validator Rejects Everything the Generator Can
+
+### Definition
+Anything the generator can refuse, the logical validator must refuse first. The validator is the last node with a retry edge back to the planner; the generator runs after it.
+
+### Enforcement Points
+- `packages/nl2sql/tests/unit/test_logical_validator_generator_parity.py` — each case asserts both halves: the generator rejects the plan, and so does the validator, with a retryable code
+- `LogicalValidatorNode._validate_static()` in `nl2sql.pipeline.nodes.validator.node`
+
+### Failure Behavior
+A structural mistake is returned as a retryable `PipelineError` from the validator, so `check_logical_validation` sends the plan back to the refiner and the planner sees the message. The same mistake reaching the generator is a terminal `SQL_GEN_FAILED`.
+
+### Why It Exists
+A check that lives only in the generator is a dead end rather than a retry. The model produced a fixable plan and got a hard failure, one node past the only gate that could have asked it to try again.
+
+### Example
+The validator resolves columns against a throw-away query in which every table is `CROSS JOIN`ed — correct for column resolution, and deliberately blind to join topology. So a plan declaring three tables and joining only two validated CLEAN, then failed in the generator with *"Table alias(es) t3 are declared in the plan but never joined to the FROM table."* Three more join-shape mistakes behaved the same way. Every one is a pure function of `plan.tables` and `plan.joins` — no schema, no dialect — so each belongs in the validator, where the message reaches the planner.
+
+---
+
+## Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
+
+### Definition
+A verified query's SQL is written by a person in `curated.yaml`, or proposed (from a thumbs-up or a correction) and reviewed and accepted by a person through the review queue. The model picks a verified query by id and supplies parameter values; it never writes or edits the SQL. The SQL must be exactly one read-only query whose `:name` placeholders are exactly its declared params. Values are typed and checked by code (type, `min`/`max`, `choices`, required) and bound by the adapter's driver, never interpolated into the SQL text. A query with params runs only on an adapter that declares `SUPPORTS_BOUND_PARAMETERS`.
+
+### Enforcement Points
+- `VerifiedQuery` and `ParamSpec` in `nl2sql.config.curated`, and `inspect_verified_sql()` and `check_curated_queries()` in `nl2sql.configs.curated`, at startup, in `nl2sql curated validate`, and in `nl2sql curated test` (`CuratedAPI.test()`), which runs only queries that pass them, with their values bound
+- `resolve_params()` in `nl2sql.pipeline.nodes.curated_matcher.params`
+- `CuratedMatcherNode._match()` in `nl2sql.pipeline.nodes.curated_matcher.node`: parses the SQL read-only again before running, and checks the capability
+- `SQLAlchemyAdapter._run()` in `nl2sql_sdk.sqlalchemy.adapter`: `conn.execute(text(sql), parameters)`; without parameters the call is exactly `conn.execute(text(sql))`
+- `packages/nl2sql/tests/sqlalchemy_base/test_bound_parameters.py`: a value `1; DROP TABLE x` is compared as a value and the table survives
+
+### Failure Behavior
+A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run. A hook's deny at `execute.before` or `execute.after` is different: it ends the run with `HOOK_DENIED` and does not fall back, because a deny means no.
+
+### Why It Exists
+*The model emits a typed plan, never SQL* holds on this path too: no model wrote the SQL, and a value cannot change what the query does.
+
+---
+
+## Hooks Modify Before the Validator, Deny After
+
+### Definition
+A hook may change what a run carries only through a `Modify`, and only at the three points before the logical validator: the question at `run.before`, the datasources at `datasources.after` (a subset only, checked against the caller's scope again) and the plan at `plan.after`. A plan a hook changed is validated like any other. At `execute.before`, `execute.after` and `answer.after` a hook may only allow or stop the run (or, at `execute.before`, ask for approval). Hooks fail closed: an exception, a value that is not a decision, or a decision the point does not allow denies with `HOOK_FAILED`; `on_error: open` lets an exception through as an allow, never a disallowed decision. The plan cache stores the planner's plan, never a hook's change of it.
+
+### Enforcement Points
+- `HOOK_POINTS` in `nl2sql.hooks.points` (what each point allows) and `HookRunner.call()` in `nl2sql.hooks.runner`
+- `ASTPlannerNode.after_plan()` in `nl2sql.pipeline.nodes.ast_planner.node`: every plan the validator gets (the planner's, a cached one, a supplied one) passes `plan.after` there
+- `wrap_subgraph()` in `nl2sql.pipeline.graph_utils` caches `ASTPlannerResponse.planner_plan`
+- `HookRunner.call()` hands hooks deep copies of the plan, the caller, the sub-query and the values, so a hook that changes one in place changes nothing: `test_a_hook_changing_the_callers_roles_in_place_changes_nothing`, `test_a_hook_changing_the_plan_in_place_changes_nothing`, `test_a_shallow_copy_modify_leaves_the_planners_plan_alone` and `test_a_hook_changing_the_params_in_place_changes_nothing` in `packages/nl2sql/tests/unit/test_hook_points.py`
+- `test_hooks_modify_only_before_the_validator` in `packages/nl2sql/tests/architecture/test_hooks_boundary.py`: the point table, an AST scan of every runner call (each names its point as a literal, and no other call passes a point name along), and the SQL agent graph, in which every path from the planner to the generator passes the validator
+
+### Failure Behavior
+A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook and the point only; the exception goes to the log and `hook.decision`), an approval request `NEEDS_APPROVAL`; the built-in cost hook's deny is `COST_LIMIT_EXCEEDED`; none is retried. A run-scoped one ends the run once the step in flight is done, and its result carries no rows, artifact references or result manifest. A deny scoped to a sub-query drops it (and a `join` or `compare` group it feeds), and the answer says what went unanswered.
+
+### Why It Exists
+*The validator rejects everything the generator can* would mean nothing if code could change the plan or the SQL after the validator: a hook could otherwise route around the policies, including a table the role may not read.
+
+---
+
+## Only an Accept Writes a Person's File
+
+### Definition
+The engine rewrites two files a person owns, and only from the review queue's accept: the first `yaml` knowledge source's `glossary.yaml` and the `curated` section's own file. An accept needs `by` with one of `policies.admin_roles` (any caller under `allow_all`). For each file it takes the state store's lock `accept:<real path>`, refuses when the file's SHA-256 is no longer the one the engine loaded, applies every accepted item, runs the item's checks (the glossary's validation; the curated checks for a verified query), and rewrites the file once, canonically and atomically (a temporary file renamed over the real path, through a symlink). An inline `curated` section, a config built in code, or a project without a `yaml` knowledge source is never written. Nothing a model or a thumbs-up produced reaches either file, or a prompt, before an accept.
+
+Three more writers exist, none of which rewrites a person's work without the same checks. `write_project` writes a new project's files, and never overwrites one: a file that exists is an error and nothing is written. `engine.datasources.save` writes one `datasources/<id>.yaml`: it needs an admin `by`, records each datasource file's SHA-256 when the config is loaded and refuses (`FILE_CHANGED`) one that changed since, and a new file must not exist yet. `write_env_values` writes the `.env` beside `nl2sql.yaml` (replacing a line with the same name, keeping every other line, never `os.environ`). Neither a model nor a thumbs-up reaches any of them. **A secret is never written into YAML:** every secret field is written as a reference, and a literal only where the caller allows a `.env`.
+
+### Enforcement Points
+- `accept()` in `nl2sql.review.accept`, through `engine.proposals.accept` and `apply`; the admin check is `require_admin()` in `nl2sql.review.queue`
+- `write_glossary()` in `nl2sql.knowledge.yaml_source` and `write_curated()` in `nl2sql.review.curated_file`: the hash check, the atomic rewrite
+- `test_only_accept_writes_a_persons_file` in `packages/nl2sql/tests/architecture/test_boundaries.py`: an AST scan allowing calls of the two writers only in `nl2sql/review/accept.py` (`write_curated` is also called by `add_demo` in `api/datasource_api.py`, which adds the demo's verified queries the file lacks, under the same hash check). The amended list (`PERSONS_FILE_WRITERS`) also names `write_project` (only `config/project.py`, that is `init_project`, and `nl2sql launch`) and `write_env_values` (only `config/project.py`, `api/datasource_api.py`, that is `datasources.save`, and `nl2sql launch`); `test_the_writers_of_a_persons_file_are_still_called_where_the_list_says` keeps the list from going stale. `datasources.save` is a method name too common to scan for, so its guards are its `by` (`test_owned_and_privileged_methods_require_a_caller`) and its hash check (`test_datasources_save.py`)
+- `write_project`, `write_env_values` and `datasource_data` in `nl2sql.config.writer` and `config/project.py`: the secret written as a reference, the name `NL2SQL_<PATH>` and its collision check, the refusal of a literal (`SecretValueInConfig`) without an env file. `packages/nl2sql/tests/unit/test_config_writer.py` and `test_datasources_save.py`: every secret literal (connection, LLM, agent and embeddings keys, a secret provider) goes to `.env` as a reference and never to YAML, the other `.env` lines are kept, a changed file is refused
+- `packages/nl2sql/tests/unit/test_review_queue.py`: the admin role, the hash check, the lock, an inline section, the curated checks
+
+### Failure Behavior
+`ReviewError` with `NOT_AUTHORIZED`, `NOT_WRITABLE` or `FILE_CHANGED`, and nothing written: every file is locked and checked before the first write. Each file's items are recorded as accepted under its lock right after its write, so the queue always matches the files: if a later write fails, the items already written stay accepted and the rest stay proposed. An item whose change fails its checks stays proposed and is named in `AcceptReport.refused`; the others are written.
+
+### Why It Exists
+The glossary and the curated answers are what people know and vouch for. An engine that edited them on its own would turn a model's guess into a fact without anyone deciding so, and two writers that did not check the file would lose a person's edit.
+
+---
+
+## Saved Answers Run as the Caller
+
+### Definition
+A conversation stores what a turn said and found, never a permission. Every method of `engine.conversations` takes the caller, and each turn's questions run through `run_query` with the `user_context` passed to that call, not the one the conversation was started with: a role taken away applies at the next turn. A conversation belongs to the `(tenant_id, user_id)` that started it; any other caller is told it does not exist. A caller with no `user_id` is refused (`TypeError`), never mapped to a shared owner. A stored step keeps its plan, SQL and explanation but never the rows of its sub-queries, and a stored tool output never holds rows either: a chart output has an empty `data.rows` and the `report` tool's body has no row tables or takeaways, so reading a result again goes through `engine.results` (and `conversations.report`, which reads it). `engine.results` checks the caller: a run's manifest records its asker's `(tenant_id, user_id)` (and an anonymous asker's roles, so only the same roles read it), every read takes the caller as a required `user_context` (none is a `TypeError`), and another caller's run, or a manifest that records no asker, is `ResultNotFound`, as a missing run is. So the conversation's report and `chart` tool read as the conversation's caller, a dashboard's charts as the caller who refreshed them, and a trace id alone reads nothing. The model sees summaries and column names, never rows. (Dashboards extend this rule below.)
+
+A dashboard follows the same rule. A chart keeps the typed plan that produced it, never a role or a grant; `open`, `refresh` and `filter_values` run it with the `user_context` passed to that call, and `open` checks every stored plan under the caller's current roles before it serves any stored row, so a role taken away removes the rows at the next `open`. The one stored identity is a schedule's: `set_schedule` saves the owner's user, tenant and roles on the schedule, each scheduled run resolves that snapshot against the current policies (it can only narrow what is allowed), and the schedule stops, visibly, when a role is gone, a chart is denied, or the snapshot is older than `dashboards.schedule_identity_max_age_days`. A refresh makes no model call, a scheduled or `open` refresh never approves, and every entry point (a conversation step, a refresh, an `open`, a schedule) reaches data through `run_query` with the caller's context.
+
+### Enforcement Points
+- `ConversationStore.get` in `nl2sql.conversations.store`: the owner check behind every method
+- `Conversations._ask` in `nl2sql.conversations.api`: each step calls `run_query` with the turn's caller; `strip_rows` removes the rows before a step is stored
+- `Dashboards.open` and `TileRunner.run` in `nl2sql.dashboards`: the access check before stored rows, and each chart's `run_query(plan=..., answer=False, user_context=...)`; `identity_problem` in `nl2sql.dashboards.schedule`: the snapshot's checks and expiry
+- `test_other_users_conversation_is_not_found`, `test_turn_runs_with_the_callers_roles_not_the_starters`, `test_stored_turn_has_no_rows`, `test_model_never_sees_rows` in `packages/nl2sql/tests/unit/test_conversations.py`; `test_stored_dashboard_results_are_denied_after_access_is_lost`, `test_refresh_runs_as_the_caller`, `test_open_never_approves`, `test_scheduled_refresh_never_approves`, `test_schedule_stops_with_a_visible_error_when_a_check_fails` and `test_schedule_stops_when_the_identity_snapshot_expires` in `packages/nl2sql/tests/unit/test_dashboards_d2.py`; `test_owned_and_privileged_methods_require_a_caller`, `test_every_entry_point_reaches_data_through_run_query` and `test_dashboards_make_no_model_call` in the boundary test
+
+### Failure Behavior
+`ConversationNotFound` for an id that is missing or another owner's, with the same message for both; `DashboardNotFound` likewise. `engine.answers` is owner-only too: another caller's saved answer, an admin's included, is `AnswerNotFound`, with no admin read. A chart the caller can no longer read is `denied`, with no rows; a schedule that fails a check is `stopped`, with its code and message on the schedule.
+
+### Why It Exists
+A conversation outlives the request that began it. If it carried the starter's roles, a person who lost access, or anyone who learned its id, would keep reading what the roles allowed.
+
+---
+
+## Results Belong to Their Asker
+
+### Definition
+A run records who asked it, `(tenant_id, user_id)` plus the sorted roles of an anonymous asker (`ResultOwner`), in its result manifest and in its trace (`owner`). Every read of the run's rows takes the caller as a required `user_context` and answers only that asker: `engine.results.manifest`, `page`, `csv` and `chart`. `engine.traces.get(trace_id, *, user_context=None)` answers only that asker too, with `None` for another caller's run (and for a trace that records no asker); `engine.feedback.record(trace_id, rating, *, user_context)` reads the trace as the caller and raises `TraceNotFound` for another caller's run. No `user_context` on `traces.get` is the trusted in-process operator, as `nl2sql trace` and `nl2sql run` need and as approvals trust the context an in-process caller passes; the REST API, MCP and the terminal app always pass the caller. `engine.feedback.correct(..., user_context)` follows the same rule: it reads the run's trace as the caller, so another caller's run is `no_run` and is never rated down; only the in-process operator (`as_operator=True`, as `nl2sql feedback correct` passes) reads any run. A trace id appears in events, traces and logs, so it is never the access check.
+
+### Enforcement Points
+- `ResultOwner.of` in `nl2sql.execution.artifacts.results`: the one rule for who an owner is, used by the manifest writer, the results reader, the trace writer (`write_run_trace`) and `TracesAPI.get`
+- `ResultReader` (manifest check on every read) and `TracesAPI.get` (owner check) behind `engine.results` and `engine.traces`
+- `FeedbackAPI.record` and `feedback.corrections._find_run`: read the run through `TracesAPI.get` with the caller
+- `test_trace_records_the_asker`, `test_another_users_trace_is_not_found`, `test_cli_trace_reads_any_run`, `test_ownerless_trace_is_read_only_by_the_operator`, `test_record_of_another_users_run_is_not_found` and `test_record_requires_a_caller` in `packages/nl2sql/tests/unit/test_trace_owner.py`; `test_another_users_run_cannot_be_corrected_or_rated_down` in `packages/nl2sql/tests/unit/test_corrections.py`; `test_another_callers_trace_id_is_not_found` and `test_a_manifest_with_no_asker_recorded_is_refused` in `packages/nl2sql/tests/unit/test_results_owner.py`
+
+### Failure Behavior
+`ResultNotFound` for results, `None` from `traces.get` and `TraceNotFound` from `feedback.record`, the same as for a missing run, so nothing says the run exists. A trace written before the trace recorded its asker has none: only the operator reads it, and it cannot be rated through `record`.
+
+### Why It Exists
+Anyone who saw a trace id (it is in every event, log line and audit row) could otherwise read the rows, the SQL and the question of a run another user asked, or rate it.
+
+---
+
+## Categories
+
+- **State**: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration
+- **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
+- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller; Results Belong to Their Asker
+- **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
+- **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
+- **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter
+- **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions
+- **Observability**: Events Carry No Rows, and the Stream Carries No Operator Data; Observers Fail Open and Never Block
+
+---
+
+## Gaps
+
+- Column existence enforcement degrades to warnings when `settings.pipeline.strict_columns` is turned off (it is on by default), so missing columns then do not always block execution.
+- Semantic-only checks are pattern based: they block a field that opens with `SELECT ... FROM`, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.
+
+---
+
+## Related Code
+
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py`
+- `packages/nl2sql/src/nl2sql/config/curated.py`
+- `packages/nl2sql/src/nl2sql/review/`
+- `packages/nl2sql/src/nl2sql/hooks/`
+- `packages/nl2sql/src/nl2sql/observers/`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+- `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py`
+- `packages/nl2sql/src/nl2sql/execution/dag.py`
+- `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
+- `packages/nl2sql/src/nl2sql/runtime.py`
+- `packages/nl2sql/src/nl2sql/storage/sqlite.py`
+- `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- `packages/nl2sql/src/nl2sql/policies/scope.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/functions.py`
+- `packages/nl2sql/src/nl2sql/llm/registry.py`
+- `packages/sdk/src/nl2sql_sdk/protocols.py`
+- `packages/nl2sql/tests/architecture/test_boundaries.py`

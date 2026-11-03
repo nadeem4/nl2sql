@@ -1,0 +1,191 @@
+# GeneratorNode
+
+Reference for the node that turns a validated plan into SQL, for contributors and adapter authors.
+
+## Overview
+
+- Converts the AST plan into SQL using `sqlglot`.
+- Enforces adapter row limits and dialect selection.
+- Sits between `LogicalValidatorNode` and `ExecutorNode`.
+- Class: `GeneratorNode`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
+
+---
+
+## Responsibilities
+
+- Convert `PlanModel` expressions into `sqlglot` expressions.
+- Build a SQL query with ordered selects, joins, filters, groupings, and limits.
+- Apply adapter dialect and row limit.
+
+---
+
+## Position in Execution Graph
+
+Upstream:
+- [`ClarifierNode`](clarifier_node.md), after `LogicalValidatorNode` passed the plan
+
+Downstream:
+- `ExecutorNode`
+
+Trigger conditions:
+- Executed when logical validation passes and the clarifier did not ask which reading was meant.
+
+```mermaid
+flowchart LR
+    Validator[LogicalValidatorNode] --> Clarifier[ClarifierNode] --> Generator[GeneratorNode] --> Executor[ExecutorNode]
+```
+
+---
+
+## Inputs
+
+From `SubgraphExecutionState`:
+
+- `ast_planner_response.plan` (required)
+- `sub_query.datasource_id` (required)
+
+From `Runtime`:
+
+- `ds_registry` (adapter dialect and row limits)
+
+Validation performed:
+
+- Raises if datasource ID or plan is missing.
+
+---
+
+## Outputs
+
+Mutations to `SubgraphExecutionState`:
+
+- `generator_response` (`GeneratorResponse` with `sql_draft`, and `row_cap`: the adapter's `row_limit` when it, not the plan's own `LIMIT`, bounds the query; `None` when the plan asked for that many rows or fewer). The aggregator uses it to tell a sub-query cut short by the cap from a complete one (see [EngineAggregatorNode](engine_aggregator_node.md#row-cap-before-a-combine)).
+- `reasoning`
+- `errors` on failure
+
+Side effects:
+
+- Adapter registry access for dialect/limits.
+
+---
+
+## Internal Flow (Step-by-Step)
+
+1. Validate presence of datasource ID and plan.
+2. Resolve adapter and dialect.
+3. Compute effective limit from plan/adapter row limit: `row_limit` is the datasource's `row_limit` bounded by the `settings.results.row_limit` ceiling (100,000), or the ceiling when the datasource sets none; the limit is `min(plan.limit or row_limit, row_limit)`. When the cap is what bounds the query, record it as `row_cap`.
+4. Traverse AST with `SqlVisitor` to build `sqlglot` expression tree.
+   - Every operator becomes the node sqlglot's parser would build (`+` -> `exp.Add`, `*` -> `exp.Mul`, `IS NOT` -> `NOT ... IS ...`, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.
+   - An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (`(a + b) * c` would otherwise print as `a + b * c`).
+   - `/` is sqlglot's true division, so on SQLite it renders as `CAST(a AS REAL) / b` rather than integer division.
+   - `||` is string concatenation, rendered as the dialect's own: `a || b` on SQLite and Postgres, `CONCAT(a, b)` on MySQL, `a + b` on T-SQL. A `+` with a string operand (a non-numeric string literal, or another concatenation) renders the same way, because on SQLite `'Jane' + ' '` is numeric addition and returns `0`. A `+` between two columns stays addition: their types are not known here.
+   - A column named `*` is the wildcard, never an identifier, and it is allowed in two places only: a whole select item with no alias (`*`, or `t1.*` for a declared alias) and `COUNT(*)` (the single, non-DISTINCT argument, unqualified). Both render with a bare star on every dialect. Anywhere else `SqlVisitor` raises `MisplacedStar` (a `ValueError`), and the logical validator, which builds its tree through the same visitor, reports it as a retryable `INVALID_PLAN_STRUCTURE` asking for `COUNT(*)` or a count of a non-null column such as the key. `COUNT(t1.*)` is refused rather than rewritten to `COUNT(*)`: SQLite and T-SQL reject it, and on Postgres under an outer join it counts the NULL-extended rows of `t1` as 0 where `COUNT(*)` counts them as 1.
+   - Select aliases and column names are quoted, the dialect's way, only when they are not bare identifiers. The decomposer names result columns in plain words and the planner must use those names as aliases, so an alias such as `sales support agent` renders as `AS "sales support agent"` (and ``AS `sales support agent` `` on MySQL), in the select list and in the `ORDER BY` tie-breakers.
+   - A `func` expr with `distinct: true` wraps its arguments in `exp.Distinct`, so `{"kind": "func", "func_name": "COUNT", "is_aggregate": true, "distinct": true, "args": [x]}` renders as `COUNT(DISTINCT x)`. `PlanModel.distinct: true` renders `SELECT DISTINCT`.
+   - A `func` expr is built with `sqlglot.exp.func(name, *args)`, so a function sqlglot knows becomes its typed node and each dialect renders it its own way (`LENGTH` is `LEN` on T-SQL, `COUNT` is `COUNT_BIG` on T-SQL). A name sqlglot does not know (such as `STRFTIME`) stays as written; the logical validator has already limited names to `ast_planner.functions.ALLOWED_FUNCTIONS`. A function sqlglot builds as an operator (`MOD(a, b)` is `a % b`) keeps its operands' grouping.
+   - Dates are portable: `DATE_PART(unit, x)` becomes `CAST(EXTRACT(unit FROM x) AS INT)`, an integer, and `DATE_TRUNC(unit, x)` becomes `exp.TimeToStr(exp.TimestampTrunc(x, unit), '%Y-%m-%d')`, a `YYYY-MM-DD` string, with unit `year`, `quarter`, `month` or `day`. `YEAR(x)`, `QUARTER(x)`, `MONTH(x)`, `DAY(x)`, `EXTRACT(unit, x)` and `DATE_TRUNC(x, unit)` written by a model are read the same way. `DATE_DIFF('day', start, end)` becomes `exp.DateDiff(end, start, SECOND) / 86400.0`, the elapsed days with the fraction kept; the logical validator rejects another unit and a subtraction of two date columns. The generator writes no dialect SQL for them: the adapter renders the tree (next step).
+5. Attach joins. The first table in `plan.tables` is the `FROM` table. `left_alias`/`right_alias` do not say which table is new: each join attaches whichever side is not yet in scope, taking the first listed join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, `left`/`right` outer joins are mirrored so the same table is preserved. Joined tables keep their `schema_name`/`database` qualifiers.
+6. Order the rows completely. The plan's `ORDER BY` terms come first, with their direction. Every other selected column follows as an ascending tie-breaker, in select order. With no `ORDER BY` in the plan, the query is ordered by every selected column. This does not change what the query means, but without it the `LIMIT` below could keep a different subset of rows on each run.
+   - An aliased item is ordered by its alias (`ORDER BY genre, track_sales`), which stays valid for aggregates under `GROUP BY`. Terms are never positions.
+   - A select item already used as an `ORDER BY` term, by expression or by alias, is not repeated.
+   - Constant items are skipped: they order nothing, and a bare number would be read as a position.
+   - Every term, the plan's own and the tie-breakers, keeps the dialect's default NULL placement for its direction, so no `NULLS FIRST`/`NULLS LAST` clause is rendered (nor, on T-SQL and MySQL, a `CASE WHEN ... IS NULL` emulation, which is invalid when the term is an alias). For example, a plan ordering by `city` ascending and `c.Country` descending renders `ORDER BY city ASC, c.Country DESC, c.LastName` on SQLite, Postgres, T-SQL and MySQL alike.
+   - The logical validator runs on the plan before this step and never sees the tie-breakers.
+7. Apply the effective limit, then the plan's `offset` when it is above zero: rows 11 to 20 are `limit: 10, offset: 10`. The limit is already capped, so a page is never longer than the row cap, and `row_cap` is reported exactly as without an offset. sqlglot renders the pair in each dialect's own form (`LIMIT 10 OFFSET 10`; `OFFSET 10 ROWS FETCH FIRST 10 ROWS ONLY` on T-SQL). An offset only means something in an order, so a plan with an `offset` and no `order_by`, or a negative `offset`, is refused here with a `ValueError`; the logical validator runs this builder, so the planner is asked to fix it before generation (see [Buildability](logical_validator_node.md#buildability-the-validator-runs-the-generator)). The tie-breakers of step 6 then make the page the same on every run.
+8. Hand the finished tree to the adapter's `render_sql(expression)` (see [the SDK](../../adapters/sdk.md)). An adapter without the hook is rendered with `query.sql(dialect=adapter.get_dialect())`. The SQLite adapter rewrites the date nodes with `STRFTIME`/`DATE(x, 'start of ...')`; the others use sqlglot's rendering.
+9. Return `GeneratorResponse` with SQL and reasoning.
+10. On exception, emit `SQL_GEN_FAILED`.
+
+---
+
+## Contracts & Interfaces
+
+Implements a LangGraph node callable:
+
+```
+def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]
+```
+
+Key contracts:
+
+- `GeneratorResponse`
+- `PlanModel` / `Expr`
+
+---
+
+## Determinism Guarantees
+
+- Deterministic for a fixed AST and adapter dialect.
+- Ordering is the plan's own list order: the first select item is the first column, the first table is the `FROM` table.
+- Row order is total: every selected column is an `ORDER BY` term (see step 6), so the same plan run against the same data returns the same rows in the same order, even when `LIMIT` truncates the result.
+
+---
+
+## Error Handling
+
+Emits `PipelineError` with:
+
+- `SQL_GEN_FAILED`
+
+A malformed join graph is a planning error, not something to guess around. `SQL_GEN_FAILED` is raised when a join names an undeclared alias, when a join connects two tables that are both already in scope, when a join cannot be reached from the `FROM` table, or when a declared table is never joined.
+
+In practice the planner should never see this. There is no retry edge after the
+generator, so a `SQL_GEN_FAILED` ends the sub-query. `LogicalValidatorNode`
+therefore runs `_build_query()` itself and reports the same `ValueError` as a
+**retryable** `INVALID_PLAN_STRUCTURE` one node earlier — see
+[Buildability](logical_validator_node.md#buildability-the-validator-runs-the-generator).
+The checks below stay where they are: they are the single definition of the
+rules, and the validator calling this code is what keeps the two in step.
+`SUPPORTED_BINARY_OPS` is exported for the same reason — it is the set
+`SqlVisitor._visit_binary` renders, and the validator rejects anything outside
+it before the plan gets here.
+
+Logs exceptions via `logger.exception`.
+
+---
+
+## Retry + Idempotency
+
+- No internal retry logic.
+- Idempotent for a fixed plan.
+
+---
+
+## Performance Characteristics
+
+- In‑memory AST traversal and SQL rendering.
+- Cost grows with AST size.
+
+---
+
+## Observability
+
+- Logger: `generator`
+- Adds reasoning entries with the generated SQL.
+
+---
+
+## Configuration
+
+- Adapter `row_limit` and `dialect` from datasource config.
+
+---
+
+## Extension Points
+
+- Extend `SqlVisitor` for new expression kinds.
+- Replace node in `build_sql_agent_graph()` for alternate generation strategies.
+
+---
+
+## Known Limitations
+
+- No SQL optimization beyond AST structure.
+- The plan language has no subqueries or window functions.
+- No dialect fallback if adapter misconfigured.
+
+---
+
+## Related Code
+
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`

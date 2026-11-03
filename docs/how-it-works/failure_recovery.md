@@ -1,0 +1,196 @@
+# Failure + Recovery Architecture
+
+How failures are represented, retried and reported across the pipeline, for operators debugging a run and contributors adding a node.
+
+## Overview
+Failure in this system is represented as structured `PipelineError` objects accumulated in graph state, explicit exceptions that short-circuit a node/subgraph, or runtime timeouts/cancellations handled by the orchestrator. Most node failures are captured and returned in state rather than raising, so the graph can continue unless routing logic or wrappers explicitly stop or crash. Recovery is limited to a local retry loop inside the SQL agent subgraph, and to parse-and-retry inside each structured LLM call (an answer that does not parse is asked for again, up to the agent's `parse_retries`, then `MODEL_OUTPUT_INVALID`; see [Parse-and-retry](../configuration/llm.md#parse-and-retry)); there is no graph-level replay or global retry.
+
+---
+
+## Failure Domains
+
+### Input
+- Missing or invalid configuration raises during context construction (e.g., missing vector store path or collection name), preventing pipeline startup.
+- Explicit datasource overrides fail if the datasource is unknown or not allowed, returning `SECURITY_VIOLATION` or `INVALID_STATE`.
+- Missing LLMs for specific nodes (e.g., refiner) return `MISSING_LLM` errors.
+- A model provider refusing or failing a call (rejected key, rate limit, quota, timeout, outage, unknown model) returns a fatal `PROVIDER_*` error from whichever LLM node made the call, in place of that node's own failure code below. See [provider failures](../observability/error-handling.md#provider-failures).
+
+### Retrieval
+- Vector store calls are wrapped by `VECTOR_BREAKER`; breaker open or retrieval errors propagate into resolver or schema retriever.
+- Resolver returns `SCHEMA_RETRIEVAL_FAILED` if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.
+- Resolver returns `QUESTION_NOT_ANSWERABLE` when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns `SCHEMA_RETRIEVAL_FAILED` with the model's error, or a `PROVIDER_*` error when the provider refused it.
+- Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns `None`, it silently returns an empty table list.
+- A schema retrieval that raises (an embedding model that cannot load, a broken index) falls back the same way when there is a snapshot: every table the caller may read, with a `SCHEMA_RETRIEVAL_FAILED` warning. With no snapshot it returns a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` error and the SQL agent ends the sub-query before the planner, instead of planning against no tables until the run times out.
+
+### Planning
+- Decomposer LLM failures return `ORCHESTRATOR_CRASH` (critical) and empty responses; a provider's refusal returns a `PROVIDER_*` error instead.
+- AST planner LLM failures return `PLANNING_FAILURE` and a `None` plan.
+- A decomposition that cannot be turned into an execution DAG returns `PLANNER_FAILED` and no `execution_dag`; the layer router ends the run.
+- A `join` or `compare` combine group left with fewer than two inputs (a sub-query dropped as restricted, unresolved or unsupported) returns `PLANNER_FAILED` the same way, before any scan runs, rather than answering from the side that remains.
+
+### Validation
+- Logical validation returns structured errors for missing tables, columns, invalid plan structure, or security violations.
+- Logical validation is the only validation gate; there is no physical/dry-run validation node in the graph.
+
+### Execution
+- SQL generation failures return `SQL_GEN_FAILED`.
+- Executor returns errors for missing SQL, missing datasource, missing executor, or executor crashes.
+- A query the database rejected as wrong (the adapter's `ResultError.retryable`) returns `EXECUTION_FAILED`, which is retried through the refiner; a refusal (permission, timeout, connection, read-only) returns `DB_EXECUTION_ERROR`, which is fatal. The message is the adapter's `safe_message`: one short line, no SQL, no stack trace (see [the SDK](../adapters/sdk.md)).
+- Execution is in-process on the pipeline thread pool. A driver-level crash is not contained and terminates the process; only Python-level exceptions become `PipelineError` values (see `../execution/isolation.md`).
+
+### Storage
+- Schema store uses SQLite or in-memory storage; failures manifest as exceptions on read/write (not caught in callers).
+- Artifact store is invoked by the SQL executor; aggregation loads artifacts via `PolarsDuckdbEngine.load_scan()` using `ArtifactRef` URIs. A single store serves the local, S3, and ADLS backends; only local is verified against real storage (see `../storage/artifact-store.md`).
+- Result store and execution store are in-memory only and not used for recovery.
+
+---
+
+## Node-Level Failures
+
+### How nodes fail
+- Most nodes use try/except and return a `PipelineError` (with severity + error code) in their response.
+- Some routing logic raises `PipelineExecutionError` directly (e.g., no compatible subgraph found) — an `NL2SQLError` carrying the `PipelineError` payload on `.error`, since a router may only return routing decisions and cannot report the failure as a state value the way a node does.
+- Nodes often return partial state plus errors (e.g., resolver returns a response plus errors).
+
+### Propagation
+- `GraphState.errors` and `SubgraphExecutionState.errors` accumulate errors via list reducers.
+- Downstream nodes generally do not halt unless routing logic explicitly stops (SQL agent checks) or a wrapper crashes.
+
+### Local handling
+- SQL agent uses retry routing based on `PipelineError.is_retryable`.
+- Other nodes do not retry; they return errors and allow the graph to proceed unless missing required inputs causes downstream failures.
+
+---
+
+## Subgraph Failures
+
+### Containment
+- Each subgraph runs with its own `SubgraphExecutionState`. Errors inside the subgraph are merged back into the main graph state.
+
+### Abort vs continue
+- SQL agent subgraph routes to `END` when:
+  - The planner fails to produce a plan and errors are non-retryable.
+  - Logical validation returns non-retryable errors.
+  - The executor returns anything but a retryable `EXECUTION_FAILED` (including success).
+  - Retry count reaches `sql_agent_max_retries` with a blocking (`ERROR`/`CRITICAL`) finding.
+  - Cancellation is detected.
+- If errors are retryable and retry budget remains, the subgraph loops through `retry_handler -> refiner -> planner`.
+- Validation findings that are only `WARNING` (`COLUMN_NOT_FOUND` with `LOGICAL_VALIDATOR_STRICT_COLUMNS=false`; it is on by default) also loop while
+  retry budget remains, but never end the sub-query: once the budget is spent the plan proceeds to generation.
+
+### Sub-query status
+- `wrap_subgraph` derives `SubgraphOutput.status` from the final attempt, not from the accumulated errors:
+  `success` when the sub-query ended with SQL and, when executing, a result artifact; otherwise `error`.
+- `SubgraphExecutionState.errors` is an additive reducer, so it keeps every attempt's errors (the planner
+  reads them as retry feedback). `SubgraphOutput.errors` keeps them too.
+- A successful sub-query sends those errors to the run's `warnings` as `RunWarning`s with its `sub_query_id` (a recovered `ERROR` marked `detail.recovered`)
+  rather than its `errors`. A failed one sends them to `errors`, adding a `MISSING_SQL` error if none of them
+  was blocking.
+
+### Partial recovery
+- Recovery is limited to re-planning and refining within the SQL agent. There is no partial recovery at the aggregator or graph layer.
+- A sub-query that ends early (no plan, a refused plan, no SQL) is reported as `status: error` by the wrapper; it does not crash the run.
+
+---
+
+## Graph-Level Failures
+
+### Request termination
+- `run_with_graph` terminates early on cancellation (`CANCELLED`) or global timeout (`PIPELINE_TIMEOUT`).
+- Once the run's token is cancelled, a callback refuses to start the next node or send the next model call, so a cancelled run stops at the next step instead of running to the end; the step in flight finishes.
+- `PipelineExecutionError` (raised where a router cannot return a `PipelineError` as a value)
+  is unwrapped and its structured payload returned unchanged, keeping its own `error_code`,
+  `severity`, `node` and `is_retryable`.
+- Other unhandled exceptions in graph execution return `UNKNOWN_ERROR` with stack trace.
+
+### Cleanup
+- Signal handlers are restored after execution. There is no explicit cleanup of artifacts or partial state.
+
+### User-facing errors
+- Errors are returned in the final state, and `QueryResult.errors` carries them; a run that finished with an ERROR or CRITICAL error has `status: "error"`. `nl2sql run` exits 1 on it.
+
+---
+
+## Retry Architecture
+
+### Retry scope
+- Only the SQL agent subgraph retries: planner failures, validation errors, queries the database rejected as wrong (`EXECUTION_FAILED`), and, once each, an empty result filtered on a value that does not exist when a close one does (`VALUE_NOT_FOUND`) and a `COUNT` over rows a join repeated (`JOIN_FAN_OUT`) go back through the refiner.
+- Other nodes (resolver, decomposer, generator, aggregator, answer synthesizer) do not retry.
+- A retry tells the planner and refiner about the latest attempt only, as `{node, error_code, message}`.
+
+### Backoff
+- Exponential backoff with jitter in `retry_handler` using:
+  - `SQL_AGENT_RETRY_BASE_DELAY_SEC`
+  - `SQL_AGENT_RETRY_MAX_DELAY_SEC`
+  - `SQL_AGENT_RETRY_JITTER_SEC`
+
+### Idempotency
+- Subquery IDs are stable hashes, so retries regenerate the same subquery IDs.
+- Executor writes artifacts keyed by subquery IDs; overwrite semantics depend on the artifact store implementation (not present in this repo).
+
+---
+
+## Artifact Consistency
+
+### Partial writes
+- Executor returns an `ArtifactRef` only on successful adapter execution.
+- Aggregator expects an artifact for each scan node; missing artifacts raise and are surfaced as `AGGREGATOR_FAILED`.
+
+### Overwrites
+- `RESULT_ARTIFACT_PATH_TEMPLATE` renders the artifact path for every backend from the metadata the executor supplies (`tenant_id`, `request_id`, `sub_query_id`, `dag_node_id`, `subgraph_name`, `schema_version`); an unfillable placeholder raises rather than writing a bad path (see `../storage/artifact-store.md`).
+- With the default template, paths are `<backend root>/<tenant_id>/<request_id>/<sub_query_id>.parquet`: the sub-queries of one run never share a file, and repeat execution of the same sub-query with the same trace ID targets the same object. A custom template with no sub-query placeholder gets `-<sub_query_id>` added to its file name, so it cannot collide either.
+- A failed aggregation ends the run with its `AGGREGATOR_FAILED` error; the answer synthesizer is not called on an empty result.
+- A `join`/`compare` input that reached its datasource's row cap ends the run with `RESULT_TRUNCATED` before combining, since its missing rows could make the answer wrong; a capped `union` input runs and adds a `RESULT_TRUNCATED` warning (see `nodes/engine_aggregator_node.md#row-cap-before-a-combine`).
+
+### Cleanup
+- No cleanup or rollback is implemented for artifacts or partial aggregation results.
+
+---
+
+## Recovery Paths
+
+### What can be retried
+- SQL agent planner/validation loop for retryable errors (non-fatal error codes and non-critical severity).
+
+### What must restart
+- Any graph-level failure (timeout, cancellation, unknown exception) requires a new run.
+- Resolver failures, decomposer failures, generator failures, executor failures, and aggregator failures have no local recovery and require a new run.
+
+### What is unrecoverable
+- `FATAL_ERRORS` or `CRITICAL` severity errors (security violations, missing datasource ID, missing LLM, invalid state, and every `PROVIDER_*` error, since a retry would make the same call to the same provider) terminate the subgraph or graph without retry.
+
+---
+
+## Replay Support
+
+Replay is not supported. There is no persisted graph state or execution log to re-run nodes; state is kept in memory and discarded after completion. Artifact references are stored in state only and are not used for graph replay.
+
+---
+
+## Known Gaps
+
+- No dry-run or cost-estimate gate runs before execution. The `SUPPORTS_DRY_RUN` / `SUPPORTS_COST_ESTIMATE` capability flags are gone with it: nothing queried them.
+- `VECTOR_BREAKER` is the only circuit breaker; LLM calls and SQL execution have no breaker and no fast-fail path.
+- There is no process isolation around SQL execution, so a driver crash is unrecoverable at the engine level.
+- Subgraph wrapper assumes executor output is present; earlier failures can cause wrapper-level errors.
+- Pipeline completion does not imply success: read `QueryResult.status` and `errors`, not whether the run returned.
+- No graph-level retries or replay; only subgraph local retries.
+
+---
+
+## Related Code
+
+- `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- `packages/nl2sql/src/nl2sql/pipeline/routes.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- `packages/nl2sql/src/nl2sql/pipeline/state.py`
+- `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- `packages/nl2sql/src/nl2sql/common/errors.py`
+- `packages/nl2sql/src/nl2sql/common/resilience.py`
+- `packages/nl2sql/src/nl2sql/common/cancellation.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/*/node.py`
+- `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
+- `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
+- `packages/nl2sql/src/nl2sql/indexing/retrieval.py`
+- `packages/nl2sql/src/nl2sql/schema/*.py`

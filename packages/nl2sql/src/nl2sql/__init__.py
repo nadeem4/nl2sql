@@ -4,7 +4,7 @@
 # runtime. Every other public name is imported the first time it is asked for,
 # through the module's ``__getattr__``, so ``from nl2sql import QueryResult``
 # works as before while ``import nl2sql`` loads no vector store, database
-# driver or tracing library. The rule is in docs/architecture/invariants.md.
+# driver or tracing library. The rule is in docs/how-it-works/invariants.md.
 
 import importlib
 

@@ -174,4 +174,4 @@ corp_siem = "corp_siem:SiemObserver"
 
 `engine.events.catalog()` lists every event with its data's JSON Schema; an
 event never carries result rows (see the invariant
-[Events Carry No Rows](../architecture/invariants.md)).
+[Events Carry No Rows](../how-it-works/invariants.md)).
