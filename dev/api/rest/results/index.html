@@ -6495,8 +6495,8 @@ and streams each slice out, so the result is never built in memory on the server
   token (letters, digits, <code>_</code> and <code>-</code>, so no <code>/</code>, <code>.</code> or <code>..</code>) are all
   <code>HTTP 404</code>, so a caller cannot tell one from the other or reach a path outside
   the run's folder.</li>
-<li>A caller with a <code>user_id</code> (an API key, or a proxy that sets the user header) reads only its own runs. A
-  <code>static</code> caller has roles and no <code>user_id</code>, so its runs are anonymous: readable by any caller of the same tenant with the same
+<li>A caller with a <code>user_id</code> reads only its own runs. Every REST caller has one (an API key's user, the proxy's user header, <code>static</code> for all callers under <code>auth: static</code>, <code>local</code> under <code>auth: none</code>), so under <code>auth: static</code> all callers are one user and share their runs.</li>
+<li>A run asked with no <code>user_id</code> (in process) is anonymous: readable by any caller of the same tenant with the same
   roles, and by no caller with other roles: a <code>viewer</code> holding an <code>admin</code> run's trace id
   gets <code>HTTP 404</code>. See <a href="../../core/results/#who-can-read-a-run">Who can read a run</a>.</li>
 <li>The request body never names the caller: <code>user_context</code> is not a field of <code>POST /query</code>.</li>

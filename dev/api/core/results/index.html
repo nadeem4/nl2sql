@@ -3509,17 +3509,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#key-modules" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6163,17 +6152,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#key-modules" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6224,7 +6202,6 @@
 
 
 <h1 id="results-api">Results API</h1>
-<h2 id="purpose">Purpose</h2>
 <p><code>engine.results</code>: the results a run saved, read back by its <code>trace_id</code>, and the chart their data is drawn as.
 Readable only by the caller who asked the run.</p>
 <h2 id="key-modules">Key Modules</h2>
@@ -6279,7 +6256,7 @@ caller's <code>tenant_id</code> (else the engine's <code>settings.tenant_id</cod
   other roles. A trace id appears in events, traces and the audit log, so it is never the access check.</li>
 <li>No caller is a <code>TypeError</code> (<code>user_context</code> missing, <code>None</code>, or not a <code>UserContext</code>). There is no default caller,
   as for conversations and dashboards: failing open would let anyone read a run whose trace id they saw.</li>
-<li>A manifest that records no asker (one written before 0.9) is <code>ResultNotFound</code> for every caller. There is no
+<li>A manifest that records no asker is <code>ResultNotFound</code> for every caller. There is no
   legacy path; run the question again.</li>
 </ul>
 <p><strong>Anonymous callers.</strong> A run asked with no <code>user_id</code> (a <code>UserContext</code> with only roles, or <code>run_query</code> with no
@@ -6287,10 +6264,9 @@ caller's <code>tenant_id</code> (else the engine's <code>settings.tenant_id</cod
 has no <code>user_id</code> and has the same roles, and by no named user. So a <code>viewer</code> holding an <code>admin</code> run's trace id
 reads nothing, while anonymous callers with the same roles share each other's results, because nothing else tells
 them apart.</p>
-<p>The REST API has no per-user identity yet: its static or header role (and the playground's role picker) build a
-<code>UserContext</code> with roles only. So every REST run is anonymous, and readable by any REST caller of the same tenant
-with the same roles. API keys carry a <code>user_id</code>, but only to the MCP server; REST does not take them. To keep
-callers' results apart, call the engine in process with a <code>user_id</code> from your own auth.</p>
+<p>Every REST request carries a <code>user_id</code> (see <a href="../../rest/#identity">REST identity</a>): the API key's user, the
+trusted proxy's user header, <code>static</code> for every caller under <code>auth: static</code>, <code>local</code> under <code>auth: none</code>, and a
+per-visitor id on the hosted demo. So under <code>auth: static</code> all callers are one user and share their results.</p>
 <p><strong>Operator tools.</strong> <code>nl2sql run</code>, <code>nl2sql trace</code>, <code>nl2sql eval</code>, the replay provider and the feedback tools read
 the result they were just given, traces and recordings, never <code>engine.results</code>, so they are unchanged. In-process
 code is trusted with the <code>UserContext</code> it passes: an operator who needs a past run's rows reads them

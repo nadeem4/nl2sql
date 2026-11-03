@@ -2439,20 +2439,20 @@
 </nav>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#pinning-a-version-and-the-first-release">
+<a class="md-nav__link" href="#pinning-a-version">
 <span class="md-ellipsis">
       
-        Pinning a version, and the first release
+        Pinning a version
       
     </span>
 </a>
-<nav aria-label="Pinning a version, and the first release" class="md-nav">
+<nav aria-label="Pinning a version" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#bootstrap-sha-where-the-changelog-starts">
+<a class="md-nav__link" href="#bootstrap-sha">
 <span class="md-ellipsis">
       
-        bootstrap-sha — where the changelog starts
+        bootstrap-sha
       
     </span>
 </a>
@@ -2530,10 +2530,10 @@
 <nav aria-label="PyPI pending publishers" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#checklist-before-the-first-05-release-nl2sql-sdk">
+<a class="md-nav__link" href="#checklist-before-a-new-projects-first-release">
 <span class="md-ellipsis">
       
-        Checklist before the first 0.5 release: nl2sql-sdk
+        Checklist before a new project's first release
       
     </span>
 </a>
@@ -2952,20 +2952,20 @@
 </nav>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#pinning-a-version-and-the-first-release">
+<a class="md-nav__link" href="#pinning-a-version">
 <span class="md-ellipsis">
       
-        Pinning a version, and the first release
+        Pinning a version
       
     </span>
 </a>
-<nav aria-label="Pinning a version, and the first release" class="md-nav">
+<nav aria-label="Pinning a version" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#bootstrap-sha-where-the-changelog-starts">
+<a class="md-nav__link" href="#bootstrap-sha">
 <span class="md-ellipsis">
       
-        bootstrap-sha — where the changelog starts
+        bootstrap-sha
       
     </span>
 </a>
@@ -3043,10 +3043,10 @@
 <nav aria-label="PyPI pending publishers" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#checklist-before-the-first-05-release-nl2sql-sdk">
+<a class="md-nav__link" href="#checklist-before-a-new-projects-first-release">
 <span class="md-ellipsis">
       
-        Checklist before the first 0.5 release: nl2sql-sdk
+        Checklist before a new project's first release
       
     </span>
 </a>
@@ -3101,7 +3101,7 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="releasing">Releasing</h1>
-<p>The monorepo publishes four distributions to PyPI under <strong>unified versioning</strong>:
+<p>This page is for maintainers cutting a release. The monorepo publishes four distributions to PyPI under <strong>unified versioning</strong>:
 they all carry the same version and are released together. Internal
 dependencies use compatible-release constraints (<code>~=0.1</code>), so a release only
 resolves for users if every package declares the same version.</p>
@@ -3187,10 +3187,8 @@ which the schema describes as <em>"Breaking changes only bump semver minor if
 version &lt; 1.0.0"</em>. While the version is below <code>1.0.0</code>, a <code>feat!:</code> or a
 <code>BREAKING CHANGE:</code> footer therefore moves <code>0.1.0</code> to <code>0.2.0</code> rather than to
 <code>1.0.0</code> — semver's rule for an unstable public API.</p>
-<p>Without this setting the <em>first</em> breaking commit silently declares the
-project stable. That is exactly what happened before it was added: the
-<code>refactor!:</code> that collapsed the distributions made release-please propose
-<code>1.0.0</code>.</p>
+<p>Without this setting the first breaking commit would silently declare the
+project stable.</p>
 <p>Going to <code>1.0.0</code> is then a deliberate act: set the version explicitly with a
 <code>Release-As: 1.0.0</code> commit (below). The flag stays <code>true</code> afterwards and
 becomes a no-op once the version is <code>&gt;= 1.0.0</code>.</p>
@@ -3346,28 +3344,22 @@ the release decision.</p>
    with the Dockerfile named explicitly (<code>file: Dockerfile</code>),
    because the Dockerfile installs the SDK, engine, API and CLI from their local sources
    and its <code>COPY ./packages/...</code> paths resolve against the build context. A
-   context of <code>packages/api</code> makes them resolve to
-   <code>packages/api/packages/sdk</code>, which does not exist — that is what
-   failed on <code>v0.1.0</code>. A root <code>.dockerignore</code> keeps that context small.
+   context of <code>packages/api</code> would make them resolve to
+   <code>packages/api/packages/sdk</code>, which does not exist. A root <code>.dockerignore</code>
+   keeps that context small.
    <code>needs: pypi</code> is retained so the image is only published for a release that
    reached PyPI, not because the image build needs PyPI. The image's
    <code>FROM python:X.Y</code> has to satisfy every package's <code>requires-python</code>
-   (<code>&gt;=3.12</code>): on <code>v0.2.0</code> it was still <code>python:3.11-slim</code>, pip refused to
-   install the SDK into it, and this job failed after PyPI and
-   the docs had published. <code>tests/unit/test_docker_images.py</code> now checks every
+   (<code>&gt;=3.12</code>), or pip refuses to install the SDK and this job fails after PyPI
+   and the docs have published. <code>tests/unit/test_docker_images.py</code> checks every
    Dockerfile's base against every <code>pyproject.toml</code>, and the <code>api-image</code> job
    in <code>test.yml</code> builds this image on every pull request.</p>
-<div class="admonition note">
-<p class="admonition-title">There is no <code>nl2sql-api:0.2.0</code> image</p>
-<p>The job builds from the tagged commit, and <code>v0.2.0</code>'s Dockerfile cannot
-build, so re-running it would fail the same way. The first image built
-with the fix is published by the next release, <code>0.2.1</code>, which moves
-<code>ghcr.io/nadeem4/nl2sql-api:latest</code> onto it.</p>
-</div>
-<ol>
-<li><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all four uploads.
+</li>
+<li>
+<p><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all four uploads.
    <code>mike deploy --push --update-aliases $TAG latest</code> adds a versioned copy of
-   the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
+   the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</p>
+</li>
 <li><strong><code>pypi-smoke</code></strong> — <code>needs: pypi</code>. On a fresh runner, installs the release
    from PyPI itself, <code>pip install "nl2sql-cli[web]==X.Y.Z"</code>, into an empty
    virtualenv, boots <code>nl2sql-api serve --demo --hosted</code> with no API key and
@@ -3388,8 +3380,8 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
    with the tag, which pins the Space's image to
    <code>nl2sql-cli[web]==X.Y.Z</code>, pushes it and waits for the build. That
    <code>pypi-smoke</code> installed the version is not proof that the Hub's builder
-   will: on <code>v0.2.0</code> the Space build ran minutes later and its pip still saw
-   only <code>0.1.x</code>. So the workflow first waits, up to 20 times 30 seconds, until
+   will: the Space build runs minutes later and its pip can still see only the
+   previous version. So the workflow first waits, up to 20 times 30 seconds, until
    <code>https://pypi.org/simple/nl2sql-engine/</code> lists <code>X.Y.Z</code>, and the Space's
    Dockerfile retries its install up to 10 times, 30 seconds apart, with
    pip's cache off.
@@ -3400,11 +3392,9 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
    report <code>RUNNING</code> on its new build while the router still sends visitors
    to the old one, so this checks where visitors are: it polls
    <code>https://nadeem4nk-nl2sql-demo.hf.space/api/health</code> until it reports
-   <code>X.Y.Z</code> (up to 15 minutes), then checks the page and <code>/api/meta</code>; then
+   <code>X.Y.Z</code> (up to 15 minutes), then checks the page and <code>/api/v1/meta</code>; then
    the same on the Space's custom domain, <code>SPACE_CUSTOM_DOMAIN</code> in the
    workflow (<code>https://nl2sql.codewithnk.com</code>; empty skips it).</li>
-</ol>
-</li>
 </ol>
 <p>One more job, <strong><code>release-notes</code></strong>, runs on its own, next to the chain. It reads
 the summary block of <code>docs/releases/X.Y.Z.md</code> at the tag
@@ -3431,20 +3421,20 @@ the <em>entry-point</em> identity, putting <code>release_please.yml</code> in th
 certificate's Build Config URI. PyPI verifies the attestation against the
 one publisher that authenticated the request, so the two can never both
 match and the upload fails with <code>400 Invalid attestations supplied during
-upload</code>. This is what broke <code>v0.1.1</code>. Trusted publishing is unaffected; the
+upload</code>. Trusted publishing is unaffected; the
 cost is that released artifacts carry no PEP 740 provenance. See
 <a href="https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github">PyPI's note on reusable workflows</a>.</p>
 </div>
-<p>The four <code>pypi</code> legs run with <code>fail-fast: false</code>, so one package failing no
-longer cancels the others and skips <code>ghcr</code> and <code>docs</code>.</p>
+<p>The four <code>pypi</code> legs run with <code>fail-fast: false</code>, so one package failing does
+not cancel the others; <code>ghcr</code> and <code>docs</code> wait for every leg.</p>
 <h3 id="why-the-publish-is-chained-to-release-please-not-to-the-tag">Why the publish is chained to release-please, not to the tag</h3>
 <p><strong>GitHub does not trigger workflows from events created with the default
 <code>GITHUB_TOKEN</code>.</strong> This is a deliberate recursion guard, and it has no opt-out
 short of pushing the tag with a personal access token instead. release-please
 tags with <code>GITHUB_TOKEN</code>, so a <code>v*</code> tag it pushes never fires
-<code>publish_pypi.yaml</code>'s <code>push: tags</code> trigger. This is exactly what happened to
-<code>v0.1.0</code>: the tag and the GitHub Release exist, both authored by
-<code>github-actions[bot]</code>, and <em>Publish Release</em> has no run for them.</p>
+<code>publish_pypi.yaml</code>'s <code>push: tags</code> trigger. The tag and the GitHub Release
+release-please creates are authored by <code>github-actions[bot]</code>, and <em>Publish
+Release</em> has no run for them.</p>
 <p>Introducing a PAT would defeat the point of trusted publishing, so the publish
 is chained to release-please's own outputs instead. <code>release_please.yml</code> gives
 the action step an <code>id</code>, re-exports <code>releases_created</code> and <code>tag_name</code> as job
@@ -3469,18 +3459,16 @@ OIDC token is checked on — so no publisher entry changes.</p>
 nothing and still covers a tag a human pushes by hand.</p>
 <h3 id="publishing-a-release-manually">Publishing a release manually</h3>
 <p><code>publish_pypi.yaml</code> also accepts <code>workflow_dispatch</code> with a required <code>tag</code>
-input. Use it when a release was tagged but never published — <code>v0.1.0</code>, or any
-tag pushed before the chaining above existed:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.0
+input. Use it when a release was tagged but never published:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>vX.Y.Z
 </code></pre></div>
 <p>or <strong>Actions → Publish Release → Run workflow</strong> and type the tag.</p>
 <p>The same dispatch is how you recover a release that <strong>tagged but never
 uploaded</strong> — the <code>vX.Y.Z</code> tag and the GitHub Release exist, but PyPI still shows
-the previous version and no image reached GHCR. That is what happened to
-<code>v0.1.1</code>: the <code>pypi</code> matrix failed and took <code>ghcr</code> and <code>docs</code> down with it.
-Nothing needs to be re-tagged; fix the cause on <code>main</code>, then dispatch the same
+the previous version and no image reached GHCR, because the <code>pypi</code> matrix
+failed and took <code>ghcr</code> and <code>docs</code> down with it. Nothing needs to be re-tagged; fix the cause on <code>main</code>, then dispatch the same
 tag:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.1
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>vX.Y.Z
 </code></pre></div>
 <p>The dispatch checks out the tag, so it publishes the tagged commit, not <code>main</code>.
 Only legs that never uploaded can be re-run — PyPI rejects a re-upload of a
@@ -3489,7 +3477,7 @@ or a manual publish of just the missing packages, in the
 <a href="#package-order">dependency order below</a>.</p>
 <p>To redeploy only the hosted demo at a release that is already on PyPI, without
 touching PyPI, GHCR or the docs, dispatch the Space workflow with the tag:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>vX.Y.Z
 </code></pre></div>
 <p>When the Space root for that tag is already on the Space there is nothing to
 push, so a run by hand asks the Hub for a factory rebuild instead and waits for
@@ -3501,46 +3489,24 @@ dispatched from, so the fallback would silently build <code>main</code> instead 
 release; the input is what makes every checkout, the GHCR image tag and
 <code>mike deploy</code> land on the tagged commit. Dispatching is safe to repeat only up
 to the PyPI upload — PyPI rejects a re-upload of a version that already exists.</p>
-<h2 id="pinning-a-version-and-the-first-release">Pinning a version, and the first release</h2>
-<p>Two settings exist only because release-please was adopted <strong>mid-project</strong>,
-long after the first commit. Both concern the very first release and neither is
-permanent.</p>
-<h3 id="bootstrap-sha-where-the-changelog-starts"><code>bootstrap-sha</code> — where the changelog starts</h3>
-<p>With no tag in the repository, release-please has no marker for "the last
-release" and walks the whole history, so the first changelog it generated
-listed every <code>feat:</code> ever committed — 228 entries reaching back to before this
-phase of work.</p>
-<p>The top-level <code>bootstrap-sha</code> in <code>release-please-config.json</code> is the fix. The
-manifest-releaser documentation describes it as a key that <em>"will cause
-release-please to stop there for collecting changelog commits (so choose one
-commit earlier than the first commit you want to include)"</em>. Ours is:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="nt">"bootstrap-sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"39d488ae9f9943ea5d9879bf2dd503c34370b24a"</span>
-</code></pre></div>
-<p>That is the <strong>parent</strong> of <code>28687fe</code>, the merge of the first pull request in
-this phase of work, so the changelog begins at that pull request and covers
-this phase rather than the entire project.</p>
-<p>It is top-level on purpose: the schema does not accept it inside a <code>packages</code>
-entry, and the documentation notes it is <em>"only applicable at top-level
-config"</em>.</p>
-<div class="admonition note">
-<p class="admonition-title">It expires on its own</p>
-<p>Per the documentation, <em>"once a release-please generated PR has been
-merged, this config value will be ignored for all subsequent runs and can
-be removed."</em> Once a real <code>vX.Y.Z</code> tag exists, that tag is the baseline and
-<code>bootstrap-sha</code> does nothing. Deleting it then is tidy-up, not a behaviour
-change.</p>
-</div>
+<h2 id="pinning-a-version">Pinning a version</h2>
+<h3 id="bootstrap-sha"><code>bootstrap-sha</code></h3>
+<p>The top-level <code>bootstrap-sha</code> in <code>release-please-config.json</code> tells
+release-please where a changelog starts when the repository has no release tag
+to mark it. Once a release-please pull request has merged, release-please
+ignores it and the latest <code>vX.Y.Z</code> tag is the baseline. It is top-level on
+purpose: the schema does not accept it inside a <code>packages</code> entry.</p>
 <h3 id="release-as-choosing-an-exact-version"><code>Release-As:</code> — choosing an exact version</h3>
 <p>To publish a specific version rather than the one conventional commits imply,
 put a <code>Release-As:</code> footer in the <strong>body</strong> of a commit that lands on <code>main</code>:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>ci: pin the first release to 0.1.0 and scope its changelog
-<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>
-<a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a>Release-As: 0.1.0
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a>ci: release 1.0.0
+<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>
+<a href="#__codelineno-7-3" id="__codelineno-7-3" name="__codelineno-7-3"></a>Release-As: 1.0.0
 </code></pre></div>
 <p>Release-please reads <code>Release-As: x.x.x</code> (case insensitive) from the commit
-body and opens its next release pull request for exactly that version. This is
-how the first release was pinned to <code>0.1.0</code> instead of the <code>1.0.0</code> that the
-<code>refactor!:</code> commit would otherwise have produced.</p>
+body and opens its next release pull request for exactly that version. A <code>!</code> or
+<code>BREAKING CHANGE:</code> commit would otherwise move the version by a major step; the
+footer overrides that.</p>
 <p>The footer applies to <strong>one</strong> commit and expires with it — nothing has to be
 cleaned up afterwards.</p>
 <div class="admonition danger">
@@ -3557,7 +3523,8 @@ last release.</p>
 </blockquote>
 <p>A <code>release-as</code> left in the config does not pin one release — it pins
 <strong>every</strong> release, forever, to that version. The repository would stay at
-<code>0.1.0</code> while commits accumulated, and nobody would get an error saying so.</p>
+one version while commits accumulated, and nobody would get an error
+saying so.</p>
 <p>This repository therefore has <strong>no <code>release-as</code> key at all</strong>, and should not
 gain one. Use the commit footer, which cannot be forgotten because it does
 not persist.</p>
@@ -3566,13 +3533,13 @@ not persist.</p>
 <p>Both traps below fail the same way. <code>release_please.yml</code> reports success, no tag
 appears, and the merged release pull request keeps its <code>autorelease: pending</code>
 label — so every later run refuses to open a new release PR:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a>There are untagged, merged release PRs outstanding - aborting
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>There are untagged, merged release PRs outstanding - aborting
 </code></pre></div>
 <p>That line is a <em>consequence</em>, not a diagnosis. The cause is earlier in the same
 run, in the <code>Building releases</code> phase.</p>
 <h3 id="the-component-mismatch">The component mismatch</h3>
 <p>Symptom, in the <code>Building releases</code> phase of the run log:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-10-1" id="__codelineno-10-1" name="__codelineno-10-1"></a>PR component: undefined does not match configured component: nl2sql-engine
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a>PR component: undefined does not match configured component: nl2sql-engine
 </code></pre></div>
 <p>With <code>separate-pull-requests: false</code> the Merge plugin names the grouped release
 branch <code>release-please--branches--main</code>, with no component in it. When the
@@ -3580,8 +3547,8 @@ release is built back out of that merged PR, release-please compares the
 branch's component against <code>getBranchComponent()</code> — which returns the configured
 component <strong>regardless of <code>include-component-in-tag</code></strong>, unlike <code>getComponent()</code>,
 which honours it:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getComponent</span><span class="p">()</span><span class="w">       </span><span class="p">{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="p">.</span><span class="nx">includeComponentInTag</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// ""</span>
-<a href="#__codelineno-11-2" id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="k">async</span><span class="w"> </span><span class="nx">getBranchComponent</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">component</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="p">}</span><span class="w">                    </span><span class="c1">// "nl2sql-engine"</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-10-1" id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getComponent</span><span class="p">()</span><span class="w">       </span><span class="p">{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="p">.</span><span class="nx">includeComponentInTag</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// ""</span>
+<a href="#__codelineno-10-2" id="__codelineno-10-2" name="__codelineno-10-2"></a><span class="k">async</span><span class="w"> </span><span class="nx">getBranchComponent</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">component</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="p">}</span><span class="w">                    </span><span class="c1">// "nl2sql-engine"</span>
 </code></pre></div>
 <p>A <code>package-name</code> on the <code>packages</code> entry is what supplies that component. The
 two disagree, the release is skipped, and no tag is created.</p>
@@ -3592,9 +3559,9 @@ of files release-please updates is unchanged.</p>
 <div class="admonition danger">
 <p class="admonition-title">The <code>pullRequestTitlePattern</code> warnings are noise, not the cause</p>
 <p>The same run also logs, repeatedly:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-12-1" id="__codelineno-12-1" name="__codelineno-12-1"></a>pullRequestTitlePattern miss the part of '${scope}'
-<a href="#__codelineno-12-2" id="__codelineno-12-2" name="__codelineno-12-2"></a>pullRequestTitlePattern miss the part of '${component}'
-<a href="#__codelineno-12-3" id="__codelineno-12-3" name="__codelineno-12-3"></a>pullRequestTitlePattern miss the part of '${version}'
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a>pullRequestTitlePattern miss the part of '${scope}'
+<a href="#__codelineno-11-2" id="__codelineno-11-2" name="__codelineno-11-2"></a>pullRequestTitlePattern miss the part of '${component}'
+<a href="#__codelineno-11-3" id="__codelineno-11-3" name="__codelineno-11-3"></a>pullRequestTitlePattern miss the part of '${version}'
 </code></pre></div>
 <p>These fire unconditionally whenever a title pattern omits a placeholder, and
 the built-in grouped-PR default — <code>chore: release ${branch}</code>, which renders
@@ -3606,18 +3573,15 @@ title or body format"</em>.</p>
 <p>Setting <code>group-pull-request-title-pattern</code> to add <code>${version}</code> does not fix
 the mismatch above, and it breaks that body fallback for any release PR
 already merged under the old title (<code>Bad pull request title: 'chore: release
-main'</code>), stranding that version permanently. Reading these warnings as the
-cause cost a release cycle.</p>
+main'</code>), stranding that version permanently. Treat these warnings as noise.</p>
 </div>
 <h3 id="manifest-seeding">Manifest seeding</h3>
 <p><code>.release-please-manifest.json</code> records the <strong>last released</strong> version, not the
-next one, so it must be seeded <em>below</em> the first version to be shipped:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-13-1" id="__codelineno-13-1" name="__codelineno-13-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"."</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.0.0"</span><span class="w"> </span><span class="p">}</span>
-</code></pre></div>
-<p>Seeding it at the target instead — <code>{".": "0.1.0"}</code> while a <code>Release-As: 0.1.0</code>
-footer pins the same value — makes the first release a no-op: release-please
-treats the version it would propose as already released, so the pull request it
-opens rewrites <code>CHANGELOG.md</code> and bumps nothing. This also cost a cycle.</p>
+next one, and release-please updates it in the release pull request. A project
+that has never released is seeded <em>below</em> its first version (<code>{ ".": "0.0.0" }</code>):
+seeded at the target, release-please treats the version it would propose as
+already released, so the pull request rewrites <code>CHANGELOG.md</code> and bumps
+nothing.</p>
 <h2 id="documentation-versions">Documentation versions</h2>
 <p><code>gh-pages</code> is managed by <code>mike</code>, which keeps one built site per version:</p>
 <table>
@@ -3641,10 +3605,9 @@ opens rewrites <code>CHANGELOG.md</code> and bumps nothing. This also cost a cyc
 </tr>
 </tbody>
 </table>
-<p><code>publish_docs.yml</code> previously ran <code>mkdocs gh-deploy --force</code>, which replaces the
-entire <code>gh-pages</code> root and would have wiped every released version on the next
-push to <code>main</code>. It now deploys to the <code>dev</code> version instead, so the two
-workflows write different directories. Both declare <code>concurrency: group:
+<p><code>publish_docs.yml</code> deploys to the <code>dev</code> version, never with
+<code>mkdocs gh-deploy --force</code>, which would replace the entire <code>gh-pages</code> root and
+wipe every released version. The two workflows write different directories. Both declare <code>concurrency: group:
 gh-pages</code> so they never push to that branch at the same time. Only the release
 workflow moves <code>latest</code> and sets the site default.</p>
 <h2 id="one-time-human-setup">One-time human setup</h2>
@@ -3737,21 +3700,19 @@ not add a <code>password</code> to the publish step</strong> — the workflow au
 OIDC and adding a token secret would only widen the blast radius.</p>
 <p>Renaming <code>publish_pypi.yaml</code>, or renaming an environment in it, breaks
 publishing until the publisher entries are updated to match.</p>
-<h4 id="checklist-before-the-first-05-release-nl2sql-sdk">Checklist before the first 0.5 release: <code>nl2sql-sdk</code></h4>
-<p>Until 0.4 the SDK published as <code>nl2sql-adapter-sdk</code>. From 0.5 it publishes as
-<code>nl2sql-sdk</code>, a project PyPI has never seen, so it needs its own pending
-publisher. Do both before merging the 0.5 release PR:</p>
+<h4 id="checklist-before-a-new-projects-first-release">Checklist before a new project's first release</h4>
+<p>The CLI publishes as <code>nl2sql-cli</code>. A project name PyPI has not seen needs its
+own pending publisher. Do both before merging the first release PR that
+publishes the project (shown here for <code>nl2sql-cli</code>):</p>
 <ul>
-<li>[ ] On PyPI, add a pending trusted publisher for project <code>nl2sql-sdk</code>:
+<li>[ ] On PyPI, add a pending trusted publisher for the project:
       owner <code>nadeem4</code>, repository <code>nl2sql</code>, workflow <code>publish_pypi.yaml</code>,
-      environment <code>pypi-nl2sql-sdk</code>.</li>
-<li>[ ] On GitHub, create the environment <code>pypi-nl2sql-sdk</code> under
+      environment <code>pypi-nl2sql-cli</code>.</li>
+<li>[ ] On GitHub, create the environment <code>pypi-nl2sql-cli</code> under
       <strong>Settings → Environments</strong>.</li>
 </ul>
-<p>Without them the SDK leg of the release fails. The <code>pypi</code> matrix is
-<code>fail-fast: false</code>, so the engine and API legs would still publish, and
-<code>nl2sql-engine</code> would land on PyPI depending on an <code>nl2sql-sdk</code> that is not
-there. <code>nl2sql-adapter-sdk</code> is not published again.</p>
+<p>Without them that project's leg of the release fails. The <code>pypi</code> matrix is
+<code>fail-fast: false</code>, so the other legs would still publish.</p>
 <h3 id="ghcr-package-visibility">GHCR package visibility</h3>
 <p>The first push creates <code>ghcr.io/nadeem4/nl2sql-api</code> as a <strong>private</strong> package.
 Make it public under the repository's <em>Packages</em> settings if the image is meant

@@ -6285,29 +6285,24 @@ and adds <code>.nl2sql/</code> to <code>.gitignore</code>.</p>
 <tr>
 <th>Under <code>path</code></th>
 <th>What</th>
-<th>Was (0.4)</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>index/</code></td>
 <td>The vector index (Chroma), one collection per embedding model: <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code>.</td>
-<td><code>VECTOR_STORE</code>, <code>VECTOR_STORE_COLLECTION</code></td>
 </tr>
 <tr>
 <td><code>state.db</code></td>
-<td>SQLite: schema snapshots, the plan cache and playground feedback.</td>
-<td><code>SCHEMA_STORE_PATH</code></td>
+<td>SQLite: schema snapshots, the plan cache and web app feedback.</td>
 </tr>
 <tr>
 <td><code>traces/</code></td>
 <td>Run traces (<code>settings.traces.mode</code>), kept 14 days by default.</td>
-<td><code>TRACE_DIR</code></td>
 </tr>
 <tr>
 <td><code>results/</code></td>
 <td>Result files, <code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code>. Kept 7 days by default. See <a href="../../storage/artifact-store/">Artifact Store</a>.</td>
-<td><code>RESULT_ARTIFACT_BASE_URI</code></td>
 </tr>
 </tbody>
 </table>
@@ -6418,10 +6413,9 @@ read any more are deleted (see <a href="#the-state">The state</a>).</p>
 is its folder or file, or <code>None</code> for a store that does not have one.</p>
 <h2 id="the-state">The state</h2>
 <p>The state store keeps the schema snapshots (immutable, one row per version),
-the plan cache, the playground's feedback, and the lock that lets one index
+the plan cache, the web app's feedback, and the lock that lets one index
 build run at a time. The engine applies the store's pending migrations when it
-starts; the built-in <code>sqlite</code> store adopts a 0.5 <code>state.db</code> as it is, and
-applies them in one <code>BEGIN IMMEDIATE</code> transaction, so engines or CLI runs
+starts; the built-in <code>sqlite</code> store applies them in one <code>BEGIN IMMEDIATE</code> transaction, so engines or CLI runs
 opening a new <code>state.db</code> at the same moment apply each one exactly once. A
 store with nothing pending takes no lock, so a read-only <code>state.db</code> opens. See
 <a href="../../schema/store/#the-state-store">The state store</a>.</p>
@@ -6438,8 +6432,7 @@ run reads the pointers once when it starts. See
   reports the index <code>missing</code>, and <code>nl2sql index</code> builds it. Switching back
   finds the old namespace still built.</li>
 <li><strong><code>nl2sql index prune</code></strong> (<code>engine.index.prune()</code>) drops every namespace but
-  the current model's, including 0.5's <code>nl2sql_store</code> collection, which 0.6
-  never reads. Run it once after upgrading, and after settling on a new model.</li>
+  the current model's, including a leftover <code>nl2sql_store</code> collection. Run it after settling on a new model.</li>
 <li>The <code>chroma</code> store opens <code>index/</code> on the first build; reading a missing
   folder or namespace creates nothing.</li>
 </ul>

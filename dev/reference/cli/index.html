@@ -6138,7 +6138,7 @@ command has <code>--help</code>.</p>
 </tr>
 <tr>
 <td><code>nl2sql index prune</code></td>
-<td>Drop the index of every other embedding model (and 0.5's collection); the current one is kept</td>
+<td>Drop the index of every other embedding model; the current one is kept</td>
 <td></td>
 </tr>
 <tr>
@@ -6223,12 +6223,12 @@ command has <code>--help</code>.</p>
 </tr>
 <tr>
 <td><code>nl2sql profile</code></td>
-<td>Profile the indexed schema and file what it finds for review, and with <code>--draft</code> have the model draft missing descriptions; arrives in 0.8</td>
+<td>Profile the indexed schema and file what it finds for review, and with <code>--draft</code> have the model draft missing descriptions</td>
 <td><code>--datasource ID</code>, <code>--draft</code>, <code>--max-cost USD</code>, <code>--as ROLE</code>, <code>--user</code></td>
 </tr>
 <tr>
 <td><code>nl2sql launch</code></td>
-<td>Find a database (a file, <code>DATABASE_URL</code> or a local port), test it, write the project with secrets in <code>.env</code>, index, profile, file five starter questions and review what it found, in one sitting; also <code>uvx --from nl2sql-engine nl2sql launch</code>; arrives in 0.9</td>
+<td>Find a database (a file, <code>DATABASE_URL</code> or a local port), test it, write the project with secrets in <code>.env</code>, index, profile, file five starter questions and review what it found, in one sitting; also <code>uvx --from nl2sql-engine nl2sql launch</code></td>
 <td><code>DIR</code>, <code>--provider</code>, <code>--as ROLE</code>, <code>--draft</code>, <code>--yes</code> (accept nothing; write <code>review.yaml</code>), <code>--no-ports</code></td>
 </tr>
 <tr>
@@ -6248,7 +6248,7 @@ command has <code>--help</code>.</p>
 </tr>
 <tr>
 <td><code>nl2sql dashboards refresh</code></td>
-<td>Re-run the stored plans of a dashboard, or of every dashboard that is due, with no model call; arrives in 0.9</td>
+<td>Re-run the stored plans of a dashboard, or of every dashboard that is due, with no model call</td>
 <td><code>--dashboard ID</code>, <code>--due</code>, <code>--as ROLE</code></td>
 </tr>
 <tr>
@@ -6273,7 +6273,7 @@ command has <code>--help</code>.</p>
 </tr>
 <tr>
 <td><code>nl2sql feedback list</code></td>
-<td>Playground ratings, newest first</td>
+<td>Web app ratings, newest first</td>
 <td><code>--limit</code> (default 50)</td>
 </tr>
 <tr>

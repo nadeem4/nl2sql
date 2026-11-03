@@ -1072,15 +1072,6 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#at-a-glance">
-<span class="md-ellipsis">
-      
-        At a glance
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="#the-role-is-supplied-by-the-caller">
 <span class="md-ellipsis">
       
@@ -2712,15 +2703,6 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#at-a-glance">
-<span class="md-ellipsis">
-      
-        At a glance
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="#the-role-is-supplied-by-the-caller">
 <span class="md-ellipsis">
       
@@ -2791,36 +2773,32 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="security-model">Security Model</h1>
-<h2 id="at-a-glance">At a glance</h2>
-<ul>
-<li><strong>What reaches the LLM provider:</strong> the question; the schema the planner needs
-  (table and column names, types, keys, relationships, descriptions); <strong>sample
-  column values</strong> for tables the role may read; and the <strong>result rows</strong>, which
-  the answer writer summarises. With <code>settings.traces.mode</code> on, run traces store prompts,
-  responses and sample rows on disk.</li>
-<li><strong>RBAC is strict.</strong> A plan that touches a table the role may not read is
-  refused before any SQL exists, never answered from the tables the role can
-  see. Sample values and statistics of forbidden tables are stripped from the
-  prompt and the trace. An unknown role grants nothing. There is no column
-  masking and no row-level security.</li>
-<li><strong>Read-only is a database setting, not something the executor checks.</strong> The
-  plan type only allows <code>SELECT</code> and the generator only builds one, but the
-  executor does not inspect the SQL. A SQLite datasource is always opened
-  read-only at the driver level (SQLite's <code>mode=ro</code> URI), so a write is refused
-  by SQLite itself. No other dialect opens read-only yet, so on PostgreSQL, MySQL, SQL Server
-  or DuckDB, <strong>give the engine a read-only database user.</strong></li>
-<li><strong>No authentication</strong> in the CLI or REST API. The CLI
-  takes the role from the caller. The REST API takes it from a trusted
-  proxy header or a static setting, never from the body unless a dev flag is
-  on; put your own auth in the proxy and derive the role from it.</li>
-<li><code>settings.pipeline.timeout_s</code> bounds how long the caller waits, not how long the work
-  runs; the graph runs in-process with no sandbox.</li>
-</ul>
-<p>Details are below and in <a href="../../how-it-works/isolation/">Execution Isolation</a>.</p>
+<p>What the engine protects, what it does not, and what you must add before exposing it, for operators and security reviewers.</p>
 <p>Authorization is enforced at <strong>planning time</strong>, by the logical validator, before
 any SQL exists. That is the one security property this engine provides. It is
 not authentication, it is not containment, and it is not row- or column-level
 security.</p>
+<p><strong>What reaches the LLM provider:</strong> the question; the schema the planner needs
+(table and column names, types, keys, relationships, descriptions); <strong>sample
+column values</strong> for tables the role may read; and the <strong>result rows</strong>, which
+the answer writer summarises. With <code>settings.traces.mode</code> on, run traces store
+prompts, responses and sample rows on disk.</p>
+<p><strong>RBAC is strict.</strong> A plan that touches a table the role may not read is
+refused before any SQL exists, never answered from the tables the role can see.
+Sample values and statistics of forbidden tables are stripped from the prompt
+and the trace. An unknown role grants nothing. There is no column masking and
+no row-level security.</p>
+<p><strong>Read-only is a database setting.</strong> The plan type only allows <code>SELECT</code> and the
+generator only builds one, but the executor does not inspect the SQL. Each
+built-in adapter that can makes its session read-only (see
+<a href="#what-keeps-the-sql-read-only">What keeps the SQL read-only</a>); on the others,
+<strong>give the engine a read-only database user.</strong></p>
+<p><strong>The engine does not authenticate callers in the query path.</strong> The REST API
+resolves the caller from an API key, a trusted proxy's headers, a static role
+or the local operator; the CLI takes the role from the command line.</p>
+<p><code>settings.pipeline.timeout_s</code> bounds how long the caller waits, not how long the
+work runs; the graph runs in-process with no sandbox
+(<a href="../../how-it-works/isolation/">Execution Isolation</a>).</p>
 <h2 id="the-role-is-supplied-by-the-caller">The role is supplied by the caller</h2>
 <p>There is <strong>no authentication in the query path</strong>; the engine believes the
 <code>UserContext</code> it is given. The one exception is an <a href="../api-keys/">API key</a>,
@@ -2829,47 +2807,21 @@ depends on the client:</p>
 <ul>
 <li>CLI: <code>nl2sql run --role &lt;id&gt;</code>, defaulting to <code>admin</code>.</li>
 <li>Python API: <code>UserContext(roles=[...])</code>, whatever the calling code passes.</li>
-<li>
-<p>REST API: the <code>identity.caller</code> dependency
-  (<code>packages/api/src/nl2sql_api/identity.py</code>) resolves one <code>UserContext</code> from the
-  source <code>api.auth</code> names: an API key (<code>api_keys</code>), the user, tenant and roles
-  headers of a proxy that connects from <code>api.proxy.trusted_from</code> (<code>proxy</code>), one
-  role for everyone (<code>static</code>) or the local operator (<code>none</code>, the default). It
-  answers <code>HTTP 401</code> when there is no identity, and never reads the request
-  body. Headers from a peer outside <code>trusted_from</code> are ignored. With
-  <code>auth: none</code> the request must be made straight to localhost (a connecting peer
-  that is not loopback, such as a published container port, a <code>Host</code> that is
-  not loopback, or an <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code> header, is a
-  <code>403</code>, so a same-host proxy or a DNS-rebinding page is not the operator), and
-  <code>nl2sql-api serve</code> refuses to bind a non-loopback host. The routes that change
-  datasources, LLMs or the index also need one of the roles in
-  <code>policies.admin_roles</code> (default <code>[admin]</code>), else <code>HTTP 403</code>. See
+<li>REST API and the web app: one <code>UserContext</code> per request from the source
+  <code>api.auth</code> names (an API key, a trusted proxy's headers, a static role or the
+  local operator), never from the request body. The routes, the <code>401</code> and
+  <code>403</code> cases and the admin check are in
   <a href="../../api/rest/#identity">Identity</a> and
-  <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
-</li>
-<li>
-<p>API keys: <code>engine.api_keys</code> makes bearer tokens that each carry the user,
-  tenant and roles their holder runs as, and <code>verify(token)</code> turns a token
-  back into that <code>UserContext</code>. This is the one place the engine itself
-  checks who is asking; MCP over HTTP (<code>nl2sql mcp --http</code>) is the first
-  transport to use it, and the other clients above still do not. Every
-  request there needs a valid key, and runs as that key's user, tenant and
-  roles. See <a href="../api-keys/">API keys</a> and
-  <a href="../../get-started/mcp/#over-http">MCP over HTTP</a>.</p>
-</li>
-<li>
-<p>Playground: the page sends the role chosen in "Ask as" with each request
-  (<code>/api/ask</code>, and <code>/api/retrieval</code> for the Retrieval inspector), and the
-  server believes it. The inspector shows a role only the entries that role may
-  read, but anyone who can reach the playground can ask as any role; it is a
-  local demo, off beyond loopback unless <code>--allow-settings</code>.</p>
-</li>
+  <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
+<li>MCP over HTTP (<code>nl2sql mcp --http</code>): every request needs a valid
+  <a href="../api-keys/">API key</a> and runs as that key's user, tenant and roles
+  (<a href="../../get-started/mcp/#over-http">MCP over HTTP</a>).</li>
 </ul>
-<p>The REST API still does not verify who the caller is. <strong>If you expose this
-service, put your own authentication in a proxy in front of it, derive the role
-from that, and have the proxy overwrite the role header on every request</strong>;
-otherwise any client can send the header itself. An empty <code>roles</code> list
-denies everything, which is the correct default for an unauthenticated caller.</p>
+<p><strong>If you expose this service behind a proxy, derive the role from your own
+authentication and have the proxy overwrite the role header on every
+request</strong>; otherwise any client can send the header itself. An empty <code>roles</code>
+list denies everything, which is the correct default for an unauthenticated
+caller.</p>
 <p>A role name that is not present in the policy file grants nothing, exactly like
 an empty <code>roles</code> list. It grants nothing, so the caller is refused with a normal
 <code>SECURITY_VIOLATION</code>, not a crash: through the pipeline the datasource resolver
@@ -2926,9 +2878,8 @@ still refuses a plan on the table. See
 <a href="../../how-it-works/invariants/#knowledge-is-data-the-validator-and-scope-decide">Knowledge Is Data</a>.</p>
 <p>This is <strong>table-level</strong> access control. It is not column masking and not
 row-level security: a role that may read a table reads every column and every
-row of it. A downloaded trace of a <em>permitted</em> run holds real rows, and the
-playground serves any trace by id with no login, so restricting a trace to the
-user who produced it is left to a multi-user deployment.</p>
+row of it. A trace of a <em>permitted</em> run holds real rows; it is readable
+only by the caller who asked the run.</p>
 <h2 id="security-controls">Security controls</h2>
 <ul>
 <li><strong>Policies</strong>: the <code>policies</code> section of <code>nl2sql.yaml</code>, evaluated by
@@ -2978,7 +2929,7 @@ user who produced it is left to a multi-user deployment.</p>
   <a href="../../api/core/query/#approval">Query API → Approval</a>.</li>
 <li><strong>Results belong to their asker</strong>: a run's manifest and its trace record who asked,
   <code>(tenant_id, user_id)</code>, plus the sorted roles of an anonymous asker, and every read of its rows (<code>engine.results</code>, the
-  REST and playground results routes, a conversation's report and <code>chart</code>
+  REST and web app results routes, a conversation's report and <code>chart</code>
   tool, a dashboard's charts) needs the caller and answers only that asker.
   <code>engine.traces.get</code> and <code>engine.feedback.record</code> take the caller too: another user's trace is <code>None</code> (and
   rating it is <code>TraceNotFound</code>); only the in-process operator (<code>user_context=None</code>, as <code>nl2sql trace</code>) reads any run.
@@ -2987,10 +2938,9 @@ user who produced it is left to a multi-user deployment.</p>
   reads nothing; no caller is a <code>TypeError</code>, and a manifest that records no
   asker is refused. Callers with no <code>user_id</code> are anonymous: their runs are
   bound to the tenant and the same set of roles, so a <code>viewer</code> cannot read an
-  <code>admin</code> run, but anonymous callers with the same roles share results. The
-  REST API has no per-user identity yet (its role settings carry roles only,
-  and API keys are MCP-only), so REST runs are readable by REST callers of the
-  same tenant with the same roles. See
+  <code>admin</code> run, but anonymous callers with the same roles share results. Every
+  REST caller has a <code>user_id</code>, and under <code>auth: static</code> it is <code>static</code> for all of
+  them, so they share results. See
   <a href="../../api/core/results/#who-can-read-a-run">Who can read a run</a>.</li>
 <li><strong>A supplied plan</strong> (<code>run_query(plan=...)</code>) skips planning, not checking:
   its datasource is scope-checked, and the plan passes <code>plan.after</code> and the
@@ -3010,11 +2960,11 @@ user who produced it is left to a multi-user deployment.</p>
   address with it. The server speaks plain HTTP: put a reverse proxy or a
   tunnel in front for TLS, since a bearer token sent in the clear is readable.
   See <a href="../api-keys/">API keys</a>.</li>
-<li><strong>Audit logging</strong> records <code>llm.changed</code> events only: each <code>engine.llm.replace</code>
-  (the Python API, <code>PUT /api/v1/settings/llm</code>, the playground's model switch),
-  with who made it and each agent's old and new model, never a key. Queries
-  are not audited. See <code>../observability/stack.md</code>.</li>
-<li><strong>Bounded execution</strong>: a global timeout and a per-run cancellation token cap each run. There is <strong>no process sandbox</strong> — the engine runs in-process (see <code>../execution/isolation.md</code>).</li>
+<li><strong>Audit logging</strong> writes the events the catalog marks for audit (a run's
+  outcome, policy and hook decisions, cost refusals, index swaps and each
+  <code>engine.llm.replace</code> with who made it and each agent's old and new model,
+  never a key). See <a href="../../configuration/observers/#audit">Observers</a>.</li>
+<li><strong>Bounded execution</strong>: a global timeout and a per-run cancellation token cap each run. There is <strong>no process sandbox</strong>: the engine runs in-process (<a href="../../how-it-works/isolation/">Execution Isolation</a>).</li>
 </ul>
 <h2 id="what-keeps-the-sql-read-only">What keeps the SQL read-only</h2>
 <p>The model never writes SQL. It emits a typed plan whose <code>query_type</code> is
@@ -3096,7 +3046,7 @@ not reads of tables you did not mean to expose.</p>
   roles and the rule.</li>
 </ul>
 <h2 id="validation-gates">Validation gates</h2>
-<p>Validation rules are enforced by <code>LogicalValidatorNode</code> and documented in <code>../how-it-works/invariants.md</code> and <code>../how-it-works/nodes/logical_validator_node.md</code>.</p>
+<p><code>LogicalValidatorNode</code> enforces the validation rules; they are in <a href="../../how-it-works/invariants/">Invariants</a> and <a href="../../how-it-works/nodes/logical_validator_node/">the validator node</a>.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Policies: <code>packages/nl2sql/src/nl2sql/policies/</code> (<code>scope.py</code>, <code>patterns.py</code>, <code>check.py</code>)</li>

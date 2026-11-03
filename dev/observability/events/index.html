@@ -6275,7 +6275,7 @@ index builds, purges and LLM swaps. Two readers see them:</p>
 <ul>
 <li><strong>The caller who asked the question</strong> sees their own run's events on
   <code>engine.stream_query</code>, from a caller-safe allow-list. <code>nl2sql-api</code>'s
-  <code>POST /query/stream</code>, the playground and <code>nl2sql run</code> all read this stream.</li>
+  <code>POST /query/stream</code>, the web app and <code>nl2sql run</code> all read this stream.</li>
 <li><strong>An operator</strong> sees every event of every run, and the engine's own, through
   <code>engine.events.subscribe</code>.</li>
 </ul>
@@ -6386,7 +6386,7 @@ that is not in it cannot be published.</p>
 <tr>
 <td><code>knowledge.used</code></td>
 <td><code>sub_query_id</code>, <code>datasource_id</code>, <code>terms</code> (name to match score), <code>rules</code> (ids), <code>dropped</code>, <code>digest</code></td>
-<td>no; not yet published</td>
+<td>no; published by the planner on a sub-query's first prompt (a plan-cache hit sends none)</td>
 </tr>
 <tr>
 <td><code>clarification.requested</code></td>
@@ -6478,8 +6478,7 @@ on the engine's bus directly.</p>
 </tr>
 </tbody>
 </table>
-<p>Release 0.9 adds the events below. They are catalogued now; the change named
-with each publishes it. None is on <code>stream_query</code>'s allow-list: <code>conversations.stream</code> adds the two conversation
+<p>The events below belong to conversations, dashboards, workspaces, datasources, API keys and MCP. None is on <code>stream_query</code>'s allow-list: <code>conversations.stream</code> adds the two conversation
 events to its own. The three marked <em>turn</em> belong to a conversation turn, which opens a scope of its own and so has a
 <code>trace_id</code>; none carries rows, a value of an argument, or a token.</p>
 <table>
@@ -6570,9 +6569,7 @@ datasource it was asked about). The validator publishes a refused table
 once per check, even when the plan names it twice. A scope asked only to filter (routing that
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
-nobody asked for. Every catalogued event is published today except
-<code>run.limit_reached</code>, whose
-PR is named in its description. While a
+nobody asked for. While a
 <a href="../../configuration/hooks/">hook</a> is attached at <code>answer.after</code>, a run
 publishes no <code>answer.delta</code> and sends <code>result.manifest</code> only after the hooks
 allowed the answer (never, on a deny).</p>
@@ -6616,10 +6613,10 @@ then exactly one of <code>run.finished</code> or <code>run.failed</code>.</p>
 </ul>
 <p>As Server-Sent Events, each event is <code>event: &lt;name&gt;</code> and one <code>data:</code> line
 holding the whole event as JSON. That is what <code>nl2sql-api</code>'s
-<code>POST /api/v1/query/stream</code> (<a href="../../api/rest/query/">REST</a>) and the
-playground's <code>/api/ask/stream</code> send.</p>
+<code>POST /api/v1/query/stream</code> (<a href="../../api/rest/query/">REST</a>) and
+<code>POST /api/v1/conversations/{id}/turns/stream</code> send.</p>
 <p>The allow-list is one definition: the catalog entries marked <code>stream</code>
-(<code>nl2sql.events.STREAM_EVENTS</code>). An event a later release adds joins the
+(<code>nl2sql.events.STREAM_EVENTS</code>). An event added to the catalog joins the
 stream by its catalog entry alone.</p>
 <h2 id="subscribing-the-operators-view">Subscribing: the operator's view</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>

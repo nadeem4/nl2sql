@@ -3481,17 +3481,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#responsibilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6380,17 +6369,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#responsibilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6658,7 +6636,6 @@
 
 
 <h1 id="query-api">Query API</h1>
-<h2 id="purpose">Purpose</h2>
 <p>Answer a question with the NL2SQL pipeline: <code>engine.run_query</code>,
 <code>engine.stream_query</code>, and <code>engine.results</code> to read back what a run saved.</p>
 <h2 id="responsibilities">Responsibilities</h2>
@@ -6691,7 +6668,7 @@ sub-query carries a capped row sample alongside its artifact reference.</p>
 | <code>datasource_id</code> | <code>Optional[str]</code> | no | Datasource override; otherwise resolved. |
 | <code>execute</code> | <code>bool</code> | no | Whether to execute SQL against datasource. |
 | <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Omitted (or <code>None</code>), the run starts with an empty <code>UserContext</code>, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
-| <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. The playground cancels it when the browser drops the request. |
+| <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. The web app cancels it when the browser drops the request. |
 | <code>plan</code> | <code>Optional[SuppliedPlan]</code> | no | A plan the caller holds (<code>from nl2sql import SuppliedPlan</code>): a whole run (<code>decomposition</code> and <code>plans</code>), or a verified query (<code>verified</code> and <code>verified_datasource_id</code>). See <a href="#running-a-plan-you-hold">Running a plan you hold</a>. A <code>datasource_id</code> passed with it must be the datasource of every sub-query of the plan, or the call raises <code>ValueError</code> before anything runs. |
 | <code>approvals</code> | <code>Optional[Sequence[Union[Approval, str]]]</code> | no | Approvals for an earlier run's <code>approvals_needed</code>: <code>Approval</code> objects, or request ids granted through <code>engine.approvals</code>. See <a href="#approval">Approval</a>. |
 | <code>clarify</code> | <code>bool</code> | no | Default <code>True</code>: a question the planner reads two or three ways ends <code>needs_clarification</code> with the options instead of running the most likely one. <code>False</code> runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See <a href="#clarification">Clarification</a>. |
@@ -6859,9 +6836,8 @@ on warnings alone) adds a <code>MISSING_SQL</code> error, so the run reports <co
 (<code>clarification</code>), otherwise <code>"error"</code> when any blocking error is present, otherwise
 <code>"plan_only"</code> when no sub-query produced rows or an artifact (an
 <code>execute=False</code> run), otherwise <code>"success"</code>. A state with no sub-queries and no
-errors leaves it <code>None</code>. Hooks, approval and the caps
-that produce <code>"needs_approval"</code> and <code>"stopped"</code> arrive with release 0.7.</p>
-<p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
+errors leaves it <code>None</code>. 
+Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
 result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
 combined result is listed in <code>result_manifest</code> and read back by the run's
 <code>trace_id</code> with the methods below.</p>
@@ -6997,11 +6973,8 @@ an aggregate counted, a column with no value) add theirs, and the answer
 synthesizer says them; see the
 <a href="../../../how-it-works/nodes/executor_node/#answer-sanity-checks">executor's sanity checks</a>.
 <code>settings.pipeline.sanity_checks: false</code> turns those checks off.</p>
-<p>0.7 changed this shape: a warning was a dict with <code>error_code</code> and <code>severity</code>,
-and is now a <code>RunWarning</code> with <code>code</code>, and <code>detail.recovered</code> where <code>severity</code>
-said <code>ERROR</code>. A run's state is never kept across an upgrade (a run that ended
-<code>needs_approval</code> is asked again, not resumed), so no older warning is
-ever read back.</p>
+<p>A warning is a <code>RunWarning</code> with a <code>code</code>; <code>detail.recovered</code> marks an earlier
+attempt's error that a retry replaced.</p>
 <h3 id="explanation">Explanation</h3>
 <p><code>QueryResult.explanation</code> answers "why this answer" for a business reader. It
 is rendered by <code>nl2sql/explain/</code> when the result is assembled
@@ -7151,8 +7124,7 @@ from the caller-safe allow-list. <code>nl2sql run</code> shows its live progress
 <p>An <code>Event</code> (<code>nl2sql.Event</code>, from <code>nl2sql_sdk.events</code>) has a <code>name</code>, <code>at</code> (UTC),
 the run's <code>trace_id</code>, its <code>tenant_id</code> and a JSON-ready <code>data</code> dict;
 <code>event.sse()</code> is the event as one Server-Sent Event (<code>event: &lt;name&gt;</code>, and the
-whole event as JSON on the <code>data</code> line), which is how <code>nl2sql-api</code> and the
-playground send it.</p>
+whole event as JSON on the <code>data</code> line), which is how <code>nl2sql-api</code> sends it.</p>
 <table>
 <thead>
 <tr>
@@ -7300,7 +7272,7 @@ run's folder.</p>
 </code></pre></div>
 <p><code>nl2sql-api</code> serves these as
 <a href="../../rest/results/#get-apiv1resultstrace_idresult_id"><code>GET /api/v1/results/{trace_id}/{result_id}</code></a>
-and <code>.../{result_id}.csv</code>; the playground serves the same two under <code>/api/query/...</code>.</p>
+and <code>.../{result_id}.csv</code>.</p>
 <h3 id="subqueryresult">SubQueryResult</h3>
 <table>
 <thead>
@@ -7494,7 +7466,7 @@ where LangGraph provides it, so the keys are node names such as <code>ast_planne
 <p><code>usage</code> is collected by <code>TokenUsageCallback</code>
 (<code>packages/nl2sql/src/nl2sql/services/callbacks/token_handler.py</code>), which
 <code>run_with_graph</code> attaches to every run, so the Python API, the REST API, the CLI
-and the demo playground all report it. It is also filled in, with whatever had
+and the demo web app all report it. It is also filled in, with whatever had
 been recorded, on a timed-out or cancelled run.</p>
 <p><code>QuestionUsage</code>:</p>
 <table>

@@ -6516,8 +6516,7 @@ server on a config:</p>
 </tr>
 </tbody>
 </table>
-<p>The router <code>web</code> is empty
-for now: a later row fills it. The committed contract is <code>packages/api/openapi.json</code>; <code>test_openapi_snapshot_is_current</code>
+<p>The built web app is served at <code>/</code> and is not an API route. The committed contract is <code>packages/api/openapi.json</code>; <code>test_openapi_snapshot_is_current</code>
 fails when a route changes without it (rewrite it with <code>python packages/api/tests/test_openapi_snapshot.py</code>).</p>
 <h2 id="error-handling">Error Handling</h2>
 <p>Every non-2xx response is the <a href="errors/">error envelope</a>,
@@ -6576,7 +6575,7 @@ are unaffected by it; use authentication and network controls to restrict those.
 </tr>
 <tr>
 <td><code>static</code></td>
-<td>One role, <code>api.static_role</code>, for every request, with no user id.</td>
+<td>One role, <code>api.static_role</code>, for every request, as the one user <code>static</code>.</td>
 <td><code>401</code> when <code>static_role</code> is unset</td>
 </tr>
 <tr>

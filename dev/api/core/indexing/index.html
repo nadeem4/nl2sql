@@ -3425,17 +3425,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#responsibilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6290,17 +6279,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#responsibilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6478,7 +6456,6 @@
 
 
 <h1 id="indexing-api">Indexing API</h1>
-<h2 id="purpose">Purpose</h2>
 <p><code>engine.index</code>: build the vector index that retrieval and grounding read,
 report its health, clear it, prune other embedding models' indexes,
 inspect one search of it, and measure schema drift.</p>
@@ -6621,9 +6598,8 @@ refresh an index, build it instead, which never leaves it empty.</p>
 <h3 id="indexprune">index.prune</h3>
 <p>Signature:
 <code>prune() -&gt; list[str]</code></p>
-<p>Drops the index namespace of every other embedding model, including 0.5's
-<code>nl2sql_store</code> collection, which this version never reads, and returns their
-names. The current model's namespace is kept. <code>nl2sql index prune</code> calls it.</p>
+<p>Drops the index namespace of every other embedding model, including a
+leftover <code>nl2sql_store</code> collection, and returns their names. The current model's namespace is kept. <code>nl2sql index prune</code> calls it.</p>
 <h3 id="indexinspect">index.inspect</h3>
 <p>Signature:
 <code>inspect(query, k=8, lambda_mult=None, types=None, datasource_id=None, *, user_context) -&gt; dict</code></p>
@@ -6637,9 +6613,8 @@ glossary term <code>knowledge.show</code> would hide from the caller, an entry w
 names a denied table, and every entry of a datasource the caller cannot reach
 or that is not indexed are left out; verified-query entries are never shown.
 The hiding happens after the search, from a pool four times larger than
-usual, so a caller for whom most matches are hidden can get a short pool. The
-playground and REST API take the role from the request without verifying it;
-see <a href="../../../security/model/">the security model</a>.</p>
+usual, so a caller for whom most matches are hidden can get a short pool. See <a href="../../../security/model/">the security model</a> for how the REST API
+identifies a caller.</p>
 <h3 id="indexcheck">index.check</h3>
 <p>Signature:
 <code>check(datasource_ids=None, *, user_context) -&gt; list[DriftReport]</code></p>
@@ -6676,11 +6651,11 @@ pipeline's own retrieval uses: <code>k</code> (8 picks), <code>lambda_mult</code
 only, 0 is difference only), <code>fetch_multiplier</code> (the candidate pool is <code>k</code>
 times it) and <code>types</code>, every entry type the index holds
 (<code>schema.datasource</code>, <code>schema.datasource_example</code>, <code>schema.table</code>,
-<code>schema.column</code>, <code>schema.relationship</code>, <code>schema.metric</code>, <code>knowledge.term</code>). The playground's Retrieval inspector starts from it.</p>
+<code>schema.column</code>, <code>schema.relationship</code>, <code>schema.metric</code>, <code>knowledge.term</code>). The web app's Retrieval inspector starts from it.</p>
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
 <li>Fetch schema via adapter.</li>
-<li>Store the schema snapshot and its version (nothing reads it yet).</li>
+<li>Store the schema snapshot and its version.</li>
 <li>Build the chunks (the schema's, the knowledge's and the verified queries'),
   embed them, write them as a new build, and switch the datasource's build
   pointer to it, recording the <code>knowledge_hash</code> and <code>curated_hash</code>.</li>

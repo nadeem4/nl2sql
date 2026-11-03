@@ -2746,7 +2746,7 @@ telemetry</strong> on every run, and <strong>events</strong> that observers turn
   <code>QueryResult.timings</code>) and <code>TokenUsageCallback</code> (LLM calls, input / cached /
   output / reasoning tokens and model seconds per node and per question, into
   <code>QueryResult.usage</code>). That covers the Python API, the REST API, the CLI and
-  the demo playground. Every call is priced from the dated price table and
+  the demo web app. Every call is priced from the dated price table and
   <code>llm.prices</code> (<a href="../../configuration/llm/#prices">Prices</a>), so <code>usage.cost</code> is
   the question's cost whenever every model it called has a price. See
   <a href="../../api/core/query/#usage-tokens-calls-and-model-time">the query API</a>.</li>
@@ -2797,9 +2797,8 @@ telemetry</strong> on every run, and <strong>events</strong> that observers turn
 <li><code>nl2sql.run.cost</code> (histogram, USD), attribute <code>status</code>, from
   <code>run.finished</code> when the run was priced.</li>
 </ul>
-<p>The 0.6 <code>datasource_id</code> attribute on <code>nl2sql.token.usage</code> is gone: <code>llm.call</code>
-does not carry it. Token usage is not kept in a process-wide list; read it
-from <code>QueryResult.usage</code>.</p>
+<p>Token usage is not kept in a process-wide list; read it from
+<code>QueryResult.usage</code>.</p>
 <h2 id="audit-logging">Audit logging</h2>
 <p>The <code>audit</code> observer writes <code>&lt;storage.path&gt;/audit/&lt;date&gt;.jsonl</code>, one JSON line
 per audited event: one summary per run (<code>run.finished</code> or <code>run.failed</code>: the

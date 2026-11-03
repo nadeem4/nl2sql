@@ -2029,10 +2029,10 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#v1-limitation-one-question-one-query">
+<a class="md-nav__link" href="#one-question-one-query">
 <span class="md-ellipsis">
       
-        v1 limitation: one question, one query
+        One question, one query
       
     </span>
 </a>
@@ -2102,37 +2102,6 @@
       
     </span>
 </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#not-built-yet">
-<span class="md-ellipsis">
-      
-        Not built yet
-      
-    </span>
-</a>
-<nav aria-label="Not built yet" class="md-nav">
-<ul class="md-nav__list">
-<li class="md-nav__item">
-<a class="md-nav__link" href="#business-metrics-deferred">
-<span class="md-ellipsis">
-      
-        Business metrics (deferred)
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#also-out-of-scope">
-<span class="md-ellipsis">
-      
-        Also out of scope
-      
-    </span>
-</a>
-</li>
-</ul>
-</nav>
 </li>
 </ul>
 </nav>
@@ -2972,10 +2941,10 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#v1-limitation-one-question-one-query">
+<a class="md-nav__link" href="#one-question-one-query">
 <span class="md-ellipsis">
       
-        v1 limitation: one question, one query
+        One question, one query
       
     </span>
 </a>
@@ -3046,37 +3015,6 @@
     </span>
 </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#not-built-yet">
-<span class="md-ellipsis">
-      
-        Not built yet
-      
-    </span>
-</a>
-<nav aria-label="Not built yet" class="md-nav">
-<ul class="md-nav__list">
-<li class="md-nav__item">
-<a class="md-nav__link" href="#business-metrics-deferred">
-<span class="md-ellipsis">
-      
-        Business metrics (deferred)
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#also-out-of-scope">
-<span class="md-ellipsis">
-      
-        Also out of scope
-      
-    </span>
-</a>
-</li>
-</ul>
-</nav>
-</li>
 </ul>
 </nav>
 </div>
@@ -3117,7 +3055,7 @@ so. If it has not, run today's pipeline unchanged.</p>
 <td><strong>Business metrics</strong></td>
 <td>A named expression (<code>revenue = SUM(...)</code>) the planner refers to by name</td>
 <td>the <code>curated</code> section, <code>metrics:</code></td>
-<td>Not yet, see <a href="#business-metrics-deferred">Business metrics</a></td>
+<td>Parsed and validated; not used to answer questions</td>
 </tr>
 </tbody>
 </table>
@@ -3169,7 +3107,7 @@ keyed by datasource id.</p>
 <a href="#__codelineno-0-21" id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="w">          </span><span class="no">GROUP BY c.CustomerId, customer, c.Country</span>
 <a href="#__codelineno-0-22" id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="w">          </span><span class="no">ORDER BY revenue DESC, c.CustomerId</span>
 <a href="#__codelineno-0-23" id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="w">          </span><span class="no">LIMIT :n</span>
-<a href="#__codelineno-0-24" id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="w">    </span><span class="nt">metrics</span><span class="p">:</span><span class="w">            </span><span class="c1"># designed only; deferred</span>
+<a href="#__codelineno-0-24" id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="w">    </span><span class="nt">metrics</span><span class="p">:</span><span class="w">            </span><span class="c1"># parsed and validated; not used to answer questions</span>
 <a href="#__codelineno-0-25" id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
 <a href="#__codelineno-0-26" id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Invoiced</span><span class="nv"> </span><span class="s">revenue,</span><span class="nv"> </span><span class="s">before</span><span class="nv"> </span><span class="s">refunds"</span>
 <a href="#__codelineno-0-27" id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="w">        </span><span class="nt">expression</span><span class="p">:</span><span class="w"> </span><span class="s">"SUM(InvoiceLine.UnitPrice</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">InvoiceLine.Quantity)"</span>
@@ -3180,7 +3118,7 @@ silently ignored one:</p>
 <ul>
 <li><code>CuratedFileConfig</code>: <code>version: int = 1</code>, <code>datasources: Dict[str, CuratedDatasource]</code>.</li>
 <li><code>CuratedDatasource</code>: <code>verified_queries: List[VerifiedQuery]</code>, <code>metrics: List[MetricDefinition]</code>
-  (parsed and validated so the format is fixed, but not used yet).</li>
+  (parsed and validated so the format is fixed, but not used to answer questions).</li>
 <li><code>VerifiedQuery</code>: <code>id</code> (a slug, unique within its datasource), <code>description</code>,
   <code>questions</code> (at least one), <code>params: Dict[str, ParamSpec]</code>, <code>sql</code>.</li>
 <li><code>ParamSpec</code>: <code>type</code> (<code>int</code>, <code>float</code>, <code>string</code>, <code>date</code>), optional <code>default</code>,
@@ -3304,7 +3242,7 @@ datasource's section of <code>curated.yaml</code>, as canonical JSON. <code>Inde
 reports "curated.yaml changed for 'chinook' since it was indexed; run
 <code>nl2sql index --refresh --datasource chinook</code>". <code>nl2sql doctor</code> and the
 facade's <code>engine.index.health()</code> show it. Only the verified queries are hashed:
-metrics are not indexed yet, so editing one asks for nothing.
+metrics are not indexed, so editing one asks for nothing.
 It is a warning, not a failure: the stale entries still point at queries that
 exist, and the matcher re-reads every query from the loaded file, never from
 the index. A query id that is in the index but no longer in the file is
@@ -3373,7 +3311,7 @@ reply from the preview, as today.</p>
    fetched at <code>k × phrasings</code>, de-duplicated by <code>(datasource_id, query_id)</code>
    keeping each query's best cosine similarity, and cut to
    <code>CURATED_MATCH_TOP_K</code> (5). The search is recorded with the same record
-   <code>mmr_search()</code> writes, so the trace and the playground's retrieval view can
+   <code>mmr_search()</code> writes, so the trace and the Retrieval page can
    show it. If no allowed datasource has a verified query, there is no search
    and no embedding call.</li>
 <li><strong>Floor.</strong> If the best similarity is below <code>CURATED_MATCH_FLOOR</code> (0.6), the
@@ -3465,12 +3403,12 @@ chosen, the access check refuses <code>Invoice</code>, the run falls back
 (<code>policy_denied</code>), and the logical validator refuses the generated plan with
 the usual <code>SECURITY_VIOLATION</code>. The refusal is the same one <code>viewer</code> gets
 today.</p>
-<h3 id="v1-limitation-one-question-one-query">v1 limitation: one question, one query</h3>
+<h3 id="one-question-one-query">One question, one query</h3>
 <p>Matching runs once, on the whole question. A question with two parts ("top
 customers in 2012 and how many tickets did they open") is either not matched
 or matched to <code>none_of_these</code>, because the prompt asks for a query that
 answers the whole question, so it falls back to the generated pipeline.
-Matching each decomposed sub-query against verified queries is a later step.</p>
+A decomposed sub-query is not matched against verified queries.</p>
 <h2 id="the-same-guards-as-generated-sql">The same guards as generated SQL</h2>
 <p>Verified SQL runs through the guards generated SQL runs through, plus one
 generated SQL does not need:</p>
@@ -3546,18 +3484,15 @@ from.</p>
 <li>The trace records the matcher as a node: the candidates with their
   similarities, the floor, the model's choice and reason, the params after
   checking, and the fallback reason code if it fell back.</li>
-<li>The playground shows a badge on the answer, "Verified · top_customers_by_revenue",
-  with the params on hover. A generated answer shows no badge. Shown
-  beside the question, in the shape of the <em>Recorded run</em> label rather than
-  next to the plan-cache line, which only Debug shows: whether an answer was
-  verified matters to every reader. The Plan station, which has no plan to
-  show, names the query and its values instead.</li>
+<li><strong>Why this answer</strong> in the web app names the verified query used and its
+  values; a generated answer names the tables and the planner's choices
+  instead.</li>
 </ul>
 <h2 id="feedback-proposals">Feedback proposals</h2>
 <p>A thumbs-up on a generated answer files a <code>verified_query</code> proposal in the
 review queue. Nothing writes <code>curated.yaml</code> but an admin's accept (see
 <a href="../../configuration/review/">The review queue</a>), so <code>curated.yaml</code> stays the
-single source of truth, in git. Neither the REST API nor the playground writes
+single source of truth, in git. Neither the REST API nor the web app writes
 it any other way.</p>
 <h2 id="demo">Demo</h2>
 <p><code>nl2sql init --demo</code> (which <code>nl2sql demo</code> runs the first time) writes
@@ -3573,9 +3508,9 @@ revenue per year?", "Which genre sells the most tracks?") are phrasings of
 verified queries, and a new guided question would have no recording.</p>
 <p>The keyless demo replays recorded model answers, keyed on the structured-output
 name and the question. The matcher's call is a new name
-(<code>VerifiedQueryChoice</code>), recorded for every guided question since the
-recordings in <code>cli/demo/recordings/chinook.json</code> were made again for 0.4.0
-(<code>python scripts/record_demo_answers.py</code>, which needs the owner's key). A
+(<code>VerifiedQueryChoice</code>), recorded for every guided question from the
+recordings in <code>cli/demo/recordings/chinook.json</code>
+(<code>python scripts/record_demo_answers.py</code> makes them and needs a model key). A
 guided question that matches a verified query replays verified, badge and all;
 the others replay the model's <code>none_of_these</code> and then their generated answer.
 A verified run never reaches the decomposer, so <code>ReplayStore.covered()</code> counts
@@ -3593,17 +3528,17 @@ a question whose recorded choice picked a query as covered too.</p>
 <tr>
 <td>the <code>curated</code> section</td>
 <td>absent</td>
-<td>Present: curated answers are on. Absent: off. (0.4's <code>CURATED_CONFIG</code> and <code>CURATED_ENABLED</code>.)</td>
+<td>Present: curated answers are on. Absent: off.</td>
 </tr>
 <tr>
 <td><code>settings.curated.match_floor</code></td>
 <td><code>0.6</code></td>
-<td>Cosine similarity the best candidate must reach before the model is asked (0.4's <code>CURATED_MATCH_FLOOR</code>).</td>
+<td>Cosine similarity the best candidate must reach before the model is asked.</td>
 </tr>
 <tr>
 <td><code>settings.curated.match_top_k</code></td>
 <td><code>5</code></td>
-<td>Candidates shown to the model (0.4's <code>CURATED_MATCH_TOP_K</code>).</td>
+<td>Candidates shown to the model.</td>
 </tr>
 </tbody>
 </table>
@@ -3656,39 +3591,6 @@ open: it needs the owner's key.</p>
 <li><a href="../determinism/"><code>determinism.md</code></a>'s "the AST is checked ... before any SQL
   exists, on every path" becomes "on every generated path"; a verified path
   has no AST, and its checks are the matcher's.</li>
-</ul>
-<h2 id="not-built-yet">Not built yet</h2>
-<h3 id="business-metrics-deferred">Business metrics (deferred)</h3>
-<p>The format is fixed (<code>metrics:</code> in <code>curated.yaml</code>, parsed
-and validated), but nothing uses it yet. The sketch:</p>
-<ul>
-<li>Each metric is indexed as the existing, so far unused, <code>schema.metric</code>
-  chunk (<code>MetricChunk</code> in <code>nl2sql/indexing/models.py</code>), so schema retrieval
-  returns the metrics a sub-query is about.</li>
-<li>The planner refers to a metric by name: a new <code>Expr</code> kind <code>metric</code> with a
-  <code>metric_name</code>, which, like <code>func_name</code>, is model text, so the logical
-  validator must check it against the datasource's metrics before anything
-  else reads it.</li>
-<li>The validator also requires the metric's <code>table</code> in the plan and allowed for
-  the role; the generator parses <code>expression</code> with sqlglot in the adapter's
-  dialect and splices the expression tree in place of the reference.</li>
-</ul>
-<p>This is the hardest part of the feature, which is why it waits. A metric is
-an aggregate, so it cannot be nested in another aggregate or used in a
-<code>WHERE</code>; its table must be joined at the right grain or the sum fans out
-across a one-to-many join; and the decomposer already has a <code>MetricSpec</code>
-(<code>SubQuery.metrics</code>) with a different meaning, so the names need sorting out
-first. Every rule the generator would need, the validator has to enforce
-first, so the planner gets a retry rather than a dead end.</p>
-<h3 id="also-out-of-scope">Also out of scope</h3>
-<ul>
-<li><strong>An MCP server</strong> exposing <code>ask</code>, plus one tool per verified query. The typed
-  params are already a tool's input schema, so this is close to free once
-  verified queries exist.</li>
-<li><strong>Per-sub-query matching</strong>, so one part of a multi-part question can be
-  verified and the rest generated.</li>
-<li><strong>Asking a follow-up question</strong> for a missing value, instead of falling
-  back; that is conversations.</li>
 </ul>
 </article>
 </div>

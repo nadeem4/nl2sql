@@ -3341,17 +3341,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#responsibilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6268,17 +6257,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#purpose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Purpose
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#responsibilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6434,7 +6412,6 @@
 
 
 <h1 id="public-facade-api">Public Facade API</h1>
-<h2 id="purpose">Purpose</h2>
 <p>Provide one entry point: <code>NL2SQL</code> is built from one <code>Config</code>, owns everything
 it builds (its <code>Runtime</code>), and is the only thing an application talks to.
 Questions are top-level methods; everything else is a namespace.</p>
@@ -6536,7 +6513,7 @@ references only; <code>datasources.add</code>, <code>datasources.remove</code>, 
 the calls that change it.</p>
 <p>Each engine owns its config: nothing is process-global and nothing writes
 the environment, so two engines in one process share nothing. The CLI,
-<code>nl2sql-api</code> and the playground build their engine from <code>nl2sql.yaml</code> and call
+<code>nl2sql-api</code> and the web app build their engine from <code>nl2sql.yaml</code> and call
 <code>check()</code> at startup.</p>
 <h2 id="lifecycle">Lifecycle</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
@@ -6683,15 +6660,11 @@ datasource fails.</p>
 </table>
 <p>The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.</p>
-<p>The CLI, the playground and <code>nl2sql-api</code> are callers like any other: they use
+<p>The CLI, the MCP server and <code>nl2sql-api</code> are callers like any other: they use
 only these methods and namespaces, never the runtime behind them.
-<code>test_the_cli_the_playground_and_the_api_use_only_the_public_api</code> in
-<code>tests/architecture/test_boundaries.py</code> holds them to that, and
-<code>test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql</code>
-holds the playground, <code>nl2sql demo</code> and <code>nl2sql-api</code> to importing from the
-top-level <code>nl2sql</code> only (the old playground keeps a short, named
-list of exceptions in that test, each with the reason and the change that
-removes it; <code>nl2sql demo</code> is now a launcher that imports nothing from the engine but <code>nl2sql_cli</code>).</p>
+<code>test_the_cli_the_mcp_server_and_the_api_use_only_the_public_api</code> and
+<code>test_the_cli_and_the_api_import_only_the_public_nl2sql</code> in
+<code>tests/architecture/test_boundaries.py</code> hold them to that.</p>
 <h3 id="about">About</h3>
 <p><code>engine.about()</code> describes the engine and its pipeline: <code>version</code> (of
 <code>nl2sql-engine</code>), <code>git_sha</code> (when running from a checkout, else <code>None</code>),
@@ -6700,7 +6673,7 @@ them. Each step has its <code>node</code> (the name usage and timings are record
 under), <code>label</code>, what it <code>does</code>, its <code>kind</code> (<code>model</code> when a model decides it,
 <code>code</code> otherwise) and its <code>parent</code> (<code>sql_agent</code> for the steps nested in the SQL
 agent). A model step also has its <code>agent</code> and the <code>provider</code> and <code>model</code> it is
-configured to run on; never a key. The playground's Pipeline page reads it.</p>
+configured to run on; never a key. The web app's Pipeline page reads it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">about</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">about</span><span class="p">()</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="p">[(</span><span class="n">s</span><span class="p">[</span><span class="s2">"node"</span><span class="p">],</span> <span class="n">s</span><span class="p">[</span><span class="s2">"model"</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">about</span><span class="p">[</span><span class="s2">"steps"</span><span class="p">]</span> <span class="k">if</span> <span class="n">s</span><span class="p">[</span><span class="s2">"kind"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"model"</span><span class="p">]</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># [('curated_matcher', 'gpt-5.4'), ('datasource_resolver', 'gpt-5.4'), ...]</span>
@@ -6708,7 +6681,7 @@ configured to run on; never a key. The playground's Pipeline page reads it.</p>
 <h3 id="feedback">Feedback</h3>
 <p>Ratings of answered runs, and the guardrail rates over recorded runs. They live
 in the state store (<code>&lt;storage.path&gt;/state.db</code> by default); the rates also read the
-traces in <code>&lt;storage.path&gt;/traces</code>. <code>nl2sql feedback</code> and the playground's
+traces in <code>&lt;storage.path&gt;/traces</code>. <code>nl2sql feedback</code> and the web app's
 thumbs up and down are built on it. See
 <a href="../../../observability/feedback/">Feedback and signals</a> for what is stored.</p>
 <table>
@@ -6812,7 +6785,7 @@ classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>Ag
 (<code>CheckReport</code>, <code>DatasourceStatus</code>, <code>EngineNotReady</code>), the error types
 (<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>), and the evals' shapes
 (<code>EvalSuite</code>, <code>EvalCase</code>, <code>EvalReport</code>, <code>RegenerateReport</code>) and scorer
-interface (<code>Scorer</code>, <code>Score</code>, <code>CaseRun</code>), and release 0.8's shapes
+interface (<code>Scorer</code>, <code>Score</code>, <code>CaseRun</code>), and the knowledge, review, profiling and clarification shapes
 (<code>KnowledgeSourceConfig</code>, <code>CostRule</code>, <code>KnowledgeSourceInfo</code>,
 <code>DatasourceKnowledgeView</code>, <code>Proposal</code>, <code>AcceptReport</code>, <code>ReviewError</code>,
 <code>ProfileReport</code>, <code>ClarificationRequest</code>, <code>ClarificationOption</code>,

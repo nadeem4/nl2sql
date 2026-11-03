@@ -6491,7 +6491,7 @@
 (see <a href="../../configuration/storage/">Storage</a>). The built-in one is <code>sqlite</code>, a
 file at <code>&lt;storage.path&gt;/state.db</code>; any store implementing
 <code>nl2sql_sdk.stores.StateStore</code> can take its place. The same store holds the
-plan cache, the playground's answer ratings, the review queue, conversations,
+plan cache, the web app's answer ratings, the review queue, conversations,
 workspaces, dashboards with their last chart results, API keys and the index
 build lock. The interface is version 6.</p>
 <h3 id="snapshots-are-immutable">Snapshots are immutable</h3>
@@ -6536,24 +6536,22 @@ schema_version)</code>
 (<code>get_plan</code>, <code>put_plan</code>). Deleting a snapshot deletes its cached plans;
 <code>nl2sql cache clear</code> (<code>engine.clear_plan_cache()</code>) deletes them all and keeps
 the snapshots. See <a href="../../how-it-works/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
-<p>The playground's <strong>answer ratings</strong> are kept too (<code>add_feedback</code>,
+<p>The web app's <strong>answer ratings</strong> are kept too (<code>add_feedback</code>,
 <code>list_feedback</code>, <code>clear_feedback</code>): one row per rated run, questions and SQL,
 never rows. <code>nl2sql feedback clear</code> empties them and nothing else. See
 <a href="../../observability/feedback/">Feedback and Signals</a>.</p>
 <h3 id="migrations">Migrations</h3>
 <p>The <code>sqlite</code> store records each migration it has applied in a <code>nl2sql_meta</code>
 table, and the engine applies the pending ones when it starts
-(<code>StateStore.migrate()</code>). Migration 1 creates 0.5's three tables
-(<code>schema_snapshots</code>, <code>plan_cache</code>, <code>feedback</code>) if they are missing, so a 0.5
-<code>state.db</code> is adopted as it is; migration 2 adds the feedback columns that
+(<code>StateStore.migrate()</code>). Migration 1 creates the three base tables
+(<code>schema_snapshots</code>, <code>plan_cache</code>, <code>feedback</code>) if they are missing; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the <code>locks</code> table;
 migration 4 adds the <code>schema_diffs</code> table; migration 5 adds the <code>proposals</code>
 table, the review queue;
-migration 6 adds five tables, below; migration 7 adds the <code>approvals</code> table and migration 8 the <code>saved_answers</code> table, below. A 0.8 <code>state.db</code> is migrated in
+migration 6 adds five tables, below; migration 7 adds the <code>approvals</code> table and migration 8 the <code>saved_answers</code> table, below. An older <code>state.db</code> is migrated in
 place and keeps its rows.</p>
 <h3 id="conversations-dashboards-and-api-keys">Conversations, dashboards and API keys</h3>
-<p>Release 0.9.
-<code>StateStore</code> version 4 adds these methods. Each takes and returns a plain JSON
+<p><code>StateStore</code> version 4 adds these methods. Each takes and returns a plain JSON
 document (<code>dict</code>), because the SDK holds none of the engine's models; the
 document carries the fields the store filters on. The engine methods that use
 them are in the conversations, workspaces and dashboards services.</p>

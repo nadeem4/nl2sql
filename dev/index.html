@@ -2772,7 +2772,7 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="nl2sql-platform-documentation">NL2SQL Platform Documentation</h1>
-<p>This documentation describes the <strong>current runtime behavior</strong> of NL2SQL as implemented in code, including the parts that are not implemented yet. It is written for engineers and contributors who need a precise mental model of the architecture, contracts, and operational behavior. Where a page states a limitation, the limitation is the fact; nothing here describes intent.</p>
+<p>These docs describe the shipped behaviour of NL2SQL, for engineers who use it, run it or contribute to it. Where a page states a limitation, the limitation is the fact; known gaps are listed in <a href="reference/limitations/">Status and limitations</a>.</p>
 <h2 id="problem-this-system-solves">Problem this system solves</h2>
 <p>NL2SQL converts natural language requests into <strong>validated SQL</strong> across one or more datasources. The model emits a typed AST, never SQL text; the AST is checked against the retrieved schema and the caller's RBAC policy before any SQL is generated. The system is built for multi-datasource environments where correctness and inspectable failure matter more than conversational flexibility.</p>
 <p>Model output itself is not reproducible; see <a href="how-it-works/determinism/">Determinism</a> for exactly which parts of a run are stable and which are not.</p>
@@ -2865,14 +2865,12 @@
 </ul>
 <h2 id="navigate-the-docs">Navigate the docs</h2>
 <ul>
-<li><code>how-it-works/overview.md</code> for end-to-end system architecture and subsystem boundaries.</li>
-<li><code>how-it-works/pipeline.md</code> for LangGraph pipeline flow, routing, and execution DAG behavior.</li>
-<li><code>how-it-works/graph_state.md</code>, <code>how-it-works/determinism.md</code>, and <code>how-it-works/invariants.md</code> for state, determinism, and enforced rules.</li>
-<li><code>how-it-works/failure_recovery.md</code> for failure domains and retry scope.</li>
-<li><code>schema/store.md</code> and <code>how-it-works/indexing.md</code> for schema contracts, chunking, and retrieval.</li>
-<li><code>execution/isolation.md</code> for what the runtime bounds, and what it does not.</li>
-<li><code>adapters/architecture.md</code> for plugin discovery and capability-based routing.</li>
-<li><code>observability/stack.md</code> and <code>observability/error-handling.md</code> for metrics, logging, and error contracts.</li>
+<li><a href="get-started/">Get started</a> to install and ask a first question.</li>
+<li><a href="how-it-works/overview/">How it works</a>: the <a href="how-it-works/pipeline/">pipeline</a>, <a href="how-it-works/graph_state/">state</a>, <a href="how-it-works/determinism/">determinism</a>, <a href="how-it-works/invariants/">invariants</a>, <a href="how-it-works/failure_recovery/">failure and recovery</a> and <a href="how-it-works/indexing/">indexing</a>.</li>
+<li><a href="schema/store/">Schema store</a> for schema contracts and retrieval.</li>
+<li><a href="how-it-works/isolation/">Execution isolation</a> for what the runtime bounds, and what it does not.</li>
+<li><a href="adapters/architecture/">Adapters</a> for plugin discovery and capability-based routing.</li>
+<li><a href="observability/stack/">Observability</a> and <a href="observability/error-handling/">error handling</a> for metrics, logging and error contracts.</li>
 </ul>
 </article>
 </div>

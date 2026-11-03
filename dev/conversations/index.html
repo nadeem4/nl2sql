@@ -2755,12 +2755,7 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="conversations">Conversations</h1>
-<div class="admonition note">
-<p class="admonition-title">Release 0.9</p>
-<p><code>start</code>, <code>ask</code>, <code>stream</code>, <code>retry</code>, <code>ask_only</code>, <code>tool</code>, <code>report</code>, <code>get</code>, <code>list</code> and <code>delete</code> work, with the
-<a href="tools/">chat tools</a> <code>chart</code>, <code>diagram</code> and <code>report</code>. </p>
-</div>
-<p>A conversation is a chat over the database. The model decides, step by step, whether to answer or to ask the
+<p>A conversation (<code>engine.conversations</code>: <code>start</code>, <code>ask</code>, <code>stream</code>, <code>retry</code>, <code>ask_only</code>, <code>tool</code>, <code>report</code>, <code>get</code>, <code>list</code> and <code>delete</code>, with the <a href="tools/">chat tools</a>) is a chat over the database. The model decides, step by step, whether to answer or to ask the
 database a question through the same typed plan and validator as <code>run_query</code>. It never writes SQL and never
 sees result rows.</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="n">conversation</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">conversations</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>

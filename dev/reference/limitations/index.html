@@ -6091,6 +6091,7 @@
 
 
 <h1 id="status-and-limitations">Status and limitations</h1>
+<p>The known gaps in the released packages, for anyone deciding whether NL2SQL fits their use.</p>
 <p>The packages are pre-1.0. <code>nl2sql-sdk</code>, <code>nl2sql-engine</code>,
 <code>nl2sql-api</code> and <code>nl2sql-cli</code> share one version and are released together
 (<a href="../../contribute/releasing/">Releasing</a>). Unreleased changes are on <code>main</code>;
@@ -6117,12 +6118,15 @@ see the <a href="https://github.com/nadeem4/nl2sql/blob/main/CHANGELOG.md">chang
   <code>user_context</code> raises instead of refusing.</li>
 <li>OpenTelemetry metrics and traces are off unless an <code>otel</code> observer is
   configured (<a href="../../observability/stack/">Observability</a>).</li>
+<li><code>nl2sql launch</code> (<a href="../../get-started/launch/">Launch</a>) walks you from a
+  database to a working project, but it does not cover every datasource type
+  or every setting.</li>
+<li>The <code>metrics:</code> list in <code>curated.yaml</code> is parsed and validated, but no
+  question is answered from it yet; only verified queries are used
+  (<a href="../../how-it-works/curated_answers/">Curated answers</a>).</li>
+<li>A verified query answers a whole question: one part of a multi-part question
+  cannot be answered from a verified query while the rest is generated.</li>
 </ul>
-<p>Roadmap: using the engine on your own database (bring-your-own-database setup
-beyond the bundled demo databases) is planned. <code>nl2sql init</code> and the adapters
-exist, and <code>nl2sql launch</code> (<a href="../../get-started/launch/">Launch</a>) walks you
-from a database to a working project; it does not yet cover every datasource
-type or every setting.</p>
 
 
 

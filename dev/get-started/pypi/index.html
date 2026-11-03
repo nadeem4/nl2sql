@@ -6467,7 +6467,7 @@ See the Core API documentation at <a href="../../api/">docs/api/index.md</a>.</p
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[mysql,mssql]"</span><span class="w">   </span><span class="c1"># [mssql] also needs Microsoft's ODBC Driver for SQL Server</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[duckdb]"</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># The browser playground behind `nl2sql demo` (adds fastapi + uvicorn).</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># The browser web app behind `nl2sql demo` (adds fastapi + uvicorn).</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># `[all]` does NOT include it -- `all` covers database drivers only.</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-cli[web]"</span>
 </code></pre></div>
@@ -6674,7 +6674,7 @@ call, same SQL and rows; still validated every time), and
 <a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[hashicorp]"</span>
 </code></pre></div>
 <p>See <a href="../../configuration/system/">Configuration</a> for the whole config, the
-environment variables it reads, and where each 0.4 file and variable went.</p>
+environment variables it reads.</p>
 <h2 id="use-the-engine-from-python">Use the engine from Python</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>

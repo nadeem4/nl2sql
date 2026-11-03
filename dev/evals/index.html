@@ -1255,10 +1255,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#at-a-glance" class="md-nav__link">
+  <a href="#modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        At a glance
+        Modes
       
     </span>
   </a>
@@ -6280,10 +6280,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#at-a-glance" class="md-nav__link">
+  <a href="#modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        At a glance
+        Modes
       
     </span>
   </a>
@@ -6452,15 +6452,16 @@
 
 
 <h1 id="evals">Evals</h1>
-<h2 id="at-a-glance">At a glance</h2>
+<p><code>engine.evals</code> measures how well the engine answers your questions, and this
+page is for anyone writing a suite or reading a report. You write <strong>cases</strong> (a
+question, what each role should get, and the SQL a person reviewed) in
+<strong>suite</strong> files. A run asks every case once per role and scores it with
+registered <strong>scorers</strong> (<code>result_match</code>, <code>outcome</code>, <code>retrieval_recall</code>,
+<code>faithfulness</code>, <code>routing</code>), in three modes, and the result is an <code>EvalReport</code>.
+A case may carry reviewed <code>alt_sql</code> alternatives, so a second correct way to
+answer it scores as correct; gold data is never edited to make a run pass.</p>
+<h2 id="modes">Modes</h2>
 <ul>
-<li><strong><code>engine.evals</code>:</strong> suites of cases in <code>evals.yaml</code>, scored by registered
-  scorers (<code>result_match</code>, <code>outcome</code>, <code>retrieval_recall</code>, <code>faithfulness</code>,
-  <code>routing</code>), in three modes.</li>
-<li><strong>The Chinook suite:</strong> 47 cases (43 answerable, 4 deliberately not) with
-  expected results per role, including refusals. A case may carry reviewed
-  <code>alt_sql</code> alternatives, so a second correct way to answer it scores as
-  correct; gold data is never edited to make a run pass.</li>
 <li><strong>Mode plans</strong> (no key, runs in CI): the hand-written plans through the
   validator, generator and executor with a fake LLM, so a failure is a bug in
   code, not the model.</li>
@@ -6476,17 +6477,13 @@
   path, so <code>accuracy_generated</code> measures the model alone.</li>
 <li><strong>Mode retrieval</strong> (no key): the share of each case's needed tables and
   columns that schema retrieval sends the planner, and where routing sends it.</li>
-<li><strong>Feedback:</strong> playground ratings and guardrail rates via <code>nl2sql feedback stats</code>;
+<li><strong>Feedback:</strong> web app ratings and guardrail rates via <code>nl2sql feedback stats</code>;
   <code>feedback export --good</code> drafts new eval cases for review.</li>
 </ul>
 <p>Recorded runs are published with <code>nl2sql eval publish</code> to the
 README and <a href="../benchmarks/">Benchmarks</a>. Details:
 <a href="chinook-suite/">the Chinook suite</a>,
 <a href="../observability/feedback/">Feedback and Signals</a>.</p>
-<p><code>engine.evals</code> measures how well the engine answers your questions. You
-write <strong>cases</strong> (a question, what each role should get, and the SQL a person
-reviewed) in <strong>suite</strong> files. A run asks every case once per role and scores it
-with registered <strong>scorers</strong>, and the result is an <code>EvalReport</code>.</p>
 <p>The package ships one answer suite for the demo, Chinook's 47 gold cases, and
 <code>nl2sql init --demo</code> copies it next to the demo's <code>nl2sql.yaml</code>. (It also
 ships routing and clarify suites, and a Pagila suite for table recall on the
@@ -6696,10 +6693,9 @@ board.</p>
 <p><strong>Two accuracies, on purpose.</strong> <code>accuracy.overall</code> counts a case as passed
 only when every scorer that applies passes. In mode full with the default
 scorers, that includes <code>faithfulness</code>, <code>retrieval_recall</code> at 1.0 and
-<code>routing</code>. So it is stricter than the accuracy 0.6's tier 2 published.
-<code>accuracy.execution</code> is that older measure alone: <code>result_match</code> and
-<code>outcome</code> passed, no other scorer counted. Compare it, not <code>overall</code>, with
-the runs published before 0.7 (<code>docs/benchmarks.md</code>).</p>
+<code>routing</code>. <code>accuracy.execution</code> is the narrower measure: <code>result_match</code> and <code>outcome</code>
+passed, no other scorer counted. It is the series the published runs track
+(<a href="../benchmarks/">Benchmarks</a>), so compare it, not <code>overall</code>, with them.</p>
 <p>A board holds:</p>
 <table>
 <thead>
@@ -6786,9 +6782,9 @@ folder means its newest record of the run's mode, database and config.</p>
 suites' digests match and the mode is the same. Anything else is a series
 break: <code>ok</code> is false and nothing is compared.</p>
 <p><strong>The gate reads execution accuracy.</strong> A case passes when <code>result_match</code> and
-<code>outcome</code> pass; no other scorer counts. That is <code>accuracy.execution</code>, the
-measure 0.6's tier 2 published, so a run compares with the history published
-before 0.7 and a faithfulness verdict alone is never a regression. A
+<code>outcome</code> pass; no other scorer counts. That is <code>accuracy.execution</code>, so a run
+compares with the published history and a faithfulness verdict alone is never
+a regression. A
 <code>kind: routing</code> case has no rows to check and is left out of it. With
 curated answers on, it is checked twice: as users see it, and on the
 generated path. Mode retrieval has no execution, so its cases are read by

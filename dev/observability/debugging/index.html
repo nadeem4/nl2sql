@@ -2732,10 +2732,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-playground" class="md-nav__link">
+  <a href="#the-web-app" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The playground
+        The web app
       
     </span>
   </a>
@@ -6352,10 +6352,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-playground" class="md-nav__link">
+  <a href="#the-web-app" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The playground
+        The web app
       
     </span>
   </a>
@@ -6391,8 +6391,7 @@ read it, print its timeline, or replay it through the pipeline without calling
 the model again.</p>
 <h2 id="when-a-trace-is-written">When a trace is written</h2>
 <p>Each engine reads these from the <code>settings.traces</code> section of its config, so
-two engines in one process trace by their own settings. The 0.4 variable each
-one is still set from by the CLI and the playground is in brackets.</p>
+two engines in one process trace by their own settings.</p>
 <table>
 <thead>
 <tr>
@@ -6432,9 +6431,9 @@ startup and once a day.</p>
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
 A run that recovered on retry therefore still leaves a trace.</p>
 <p>The demo's config (<code>nl2sql init --demo</code>) sets <code>settings.traces.mode: always</code>
-in its <code>settings.yaml</code>, so every playground question is traced.</p>
+in its <code>settings.yaml</code>, so every web app question is traced.</p>
 <p>The trace is recorded by a callback that <code>run_with_graph</code> attaches to every
-run, so the CLI, the Python API, the REST API and the playground all produce it.
+run, so the CLI, the Python API, the REST API and the web app all produce it.
 Writing a trace never fails a run; a write error is logged as a warning.</p>
 <p>Where the file went is reported back:</p>
 <ul>
@@ -6444,7 +6443,7 @@ Writing a trace never fails a run; a write error is logged as a warning.</p>
   <code>engine.traces.get(trace_id)</code> reads the trace from any store. A trace records its asker (<code>owner</code>); with a
   <code>user_context</code> only that asker reads it, and with none the caller is the in-process operator (<code>nl2sql trace</code>).</li>
 <li><code>nl2sql run</code> prints <code>Trace written to &lt;path&gt;</code>.</li>
-<li>The playground shows a <strong>Download trace</strong> link under Cost &amp; time when Debug is on.</li>
+<li>The web app reads the trace with <code>GET /api/v1/traces/{trace_id}</code> when you open a node under <strong>Trace and cost</strong>.</li>
 </ul>
 <p>File names are <code>&lt;UTC timestamp&gt;_&lt;trace_id&gt;.json</code>, so a directory listing sorts
 by time.</p>
@@ -6709,25 +6708,18 @@ served. It then compares the replayed <code>QueryResult</code> with the recorded
 <li>Redaction applies to the recorded answers too: a model answer that
   contained something secret-shaped is replayed redacted.</li>
 </ul>
-<h2 id="the-playground">The playground</h2>
-<p>With <strong>Debug</strong> on, the per-node table under <strong>Cost &amp; time</strong> puts a bar beside
-each node's time, sized to the slowest node, so the slow step stands out. Each
-node name opens that node's record from the trace: every attempt and sub-query, its
-errors and warnings, what it read and returned, and for LLM nodes the exact
-prompt, the raw response and the parsed result. Long text is folded. For the
-<code>datasource_resolver</code> and <code>schema_retriever</code> nodes it also shows the retrieval
-record as a table: the pool nearest first, picks marked with their MMR order,
-dropped entries greyed, the picks in order as a row of chips, and a second row
-naming the entries MMR passed over because they repeat an earlier pick. The <strong>Retrieval</strong> inspector at the top of the page
-runs the same search for any text (see the
-<a href="../../get-started/demo/#the-retrieval-inspector">demo guide</a>). The page
-fetches the trace from <code>GET /api/trace/{trace_id}</code>, which reads it with
-<code>engine.traces.get</code>: any id that is not a plain token is rejected before the
-trace store sees it, and the <code>files</code> store reads only files directly inside its
-folder, so <code>../</code> or an absolute path never reaches the filesystem.</p>
-<p>Below the run, <strong>Was this answer right?</strong> records a rating keyed by the same
-trace id; <code>nl2sql feedback stats</code> reads the ratings together with the traces in
-<code>&lt;storage.path&gt;/traces</code>. See <a href="../feedback/">Feedback and Signals</a>.</p>
+<h2 id="the-web-app">The web app</h2>
+<p>Under an answered turn, <strong>Trace and cost</strong> shows the run's total cost and time and a table with one row per node:
+its tokens, cost and time. Selecting a node reads the run's trace (<code>GET /api/v1/traces/{trace_id}</code>) and opens that
+node's record: what it read and returned, and for LLM nodes the prompt and the response. For the <code>datasource_resolver</code>
+and <code>schema_retriever</code> nodes it also shows the retrieval record as a table: the pool nearest first, picks marked
+with their MMR order, and dropped entries greyed. The <strong>Retrieval</strong> page runs the same search for any text (see
+<a href="../../apps/web/#home-pipeline-and-retrieval">Web app</a>).</p>
+<p>A trace is readable only by the caller who asked the run: another caller's trace, an unknown one, and an id that is not
+a plain token are all a <code>404</code>, and the <code>files</code> store reads only files directly inside its folder, so <code>../</code> or an
+absolute path never reaches the filesystem.</p>
+<p><strong>Did this answer it?</strong> records a rating keyed by the same trace id; <code>nl2sql feedback stats</code> reads the ratings
+together with the traces in <code>&lt;storage.path&gt;/traces</code>. See <a href="../feedback/">Feedback and Signals</a>.</p>
 
 
 

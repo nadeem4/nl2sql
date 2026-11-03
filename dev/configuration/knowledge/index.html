@@ -6332,17 +6332,13 @@ say: table and column descriptions, synonyms, column roles, units, grains and
 code values, joins the database does not declare, business terms, prose rules
 and example questions. It is written in <code>glossary.yaml</code> and read by a
 <em>knowledge source</em>; the <code>knowledge</code> section lists the sources.</p>
-<div class="admonition note">
-<p class="admonition-title">Release 0.8</p>
-<p>The engine loads, merges, shows and exports knowledge from release 0.8,
-and the planner and refiner read it: descriptions, roles,
-units, grains, code values and glossary joins in the schema block, matched
-terms and rules in <code>[BUSINESS_CONTEXT]</code>. It reaches the index too: the
-chosen descriptions, the terms, the joins and the examples are index entries,
-and <code>nl2sql index --refresh</code> brings them up to date after an edit without
-reading the schema, and
+<p>The engine loads, merges, shows and exports knowledge, and the planner and
+refiner read it: descriptions, roles, units, grains, code values and glossary
+joins in the schema block, matched terms and rules in <code>[BUSINESS_CONTEXT]</code>. It
+reaches the index too: the chosen descriptions, the terms, the joins and the
+examples are index entries, and <code>nl2sql index --refresh</code> brings them up to date
+after an edit without reading the schema. See
 <a href="../../how-it-works/nodes/schema_retriever_node/#knowledge">the schema retriever</a>.</p>
-</div>
 <h2 id="the-section">The section</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># nl2sql.yaml</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">knowledge</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">knowledge.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span>

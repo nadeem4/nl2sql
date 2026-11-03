@@ -6396,7 +6396,7 @@ datasource, so each team can own its own database's file:</p>
 <tr>
 <td><code>domains</code></td>
 <td><code>[]</code></td>
-<td>A routing hint written by people. Routing does not read it yet.</td>
+<td>A routing hint written by people. Routing does not read it.</td>
 </tr>
 <tr>
 <td><code>required</code></td>
@@ -6510,8 +6510,7 @@ the form for connecting that database; a password is <code>"format": "password"<
   warning; see <a href="../../how-it-works/nodes/engine_aggregator_node/#row-cap-before-a-combine">row cap before a combine</a>.</li>
 <li><code>max_bytes</code>: passed to the adapter.</li>
 </ul>
-<p>There is one place for each limit: the 0.4 <code>options:</code> bag and the top-level
-spellings are gone.</p>
+<p>Each limit has one place: <code>limits:</code>.</p>
 <h2 id="index">Index</h2>
 <p><code>index</code> says what of the database is indexed. Every key is optional, and an
 unknown key is an error.</p>

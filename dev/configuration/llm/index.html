@@ -7133,25 +7133,15 @@ keeps its own key, endpoint and cache behaviour: the planner's system prompt is
 cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in <code>QueryResult.usage.calls</code> and
 in a run trace's <code>llm.by_node</code> (see <a href="../../observability/debugging/">Debugging</a>).</p>
-<p>In the demo, the playground's <strong>Settings</strong> page writes exactly these entries
-into the demo folder's <code>llm.yaml</code>. Choosing a provider and a model for a step adds
-an <code>agents:</code> entry with <code>provider</code>, <code>model</code> and the temperature that model
-takes: <code>0.0</code>, or <code>null</code> for <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code> and
-<code>claude-sonnet-5</code>. A step on the default's provider takes the default's
-<code>base_url</code> and <code>api_key</code>; a step on another provider names no key (its
-standard variable is read) and no <code>base_url</code>. A key saved on the page goes to
-the demo's <code>.env</code>. Choosing "Default" removes the entry. The running engine
-reloads its <code>llm</code> section from <code>nl2sql.yaml</code>, so the change applies to the
-next question. The page offers the providers and models in
-<code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>), OpenAI and Anthropic for
-now, and a provider only once its key is saved. See
-<a href="../../get-started/demo/#the-settings-page">the Settings page</a>.</p>
-<p>The playground's <strong>Pipeline</strong> page reads the same configuration back: it lists
-every step of a run and, for each of the seven a model decides, the provider and
-model it is set to use, then what it actually spent once a question has been
-asked. It is served by <code>GET /api/pipeline</code> from <code>engine.about()</code>, whose steps
-(<code>nl2sql.pipeline.steps</code>) take their seven model steps from <code>LLM_AGENTS</code> rather
-than repeating the table above. See <a href="../../get-started/demo/#the-pipeline-page">the Pipeline page</a>.</p>
+<p>The web app's <strong>Settings</strong> page changes models in two ways. An administrator saves the server's default model and each
+step's model with <code>PATCH /settings/llm</code>; the change is in memory, in the process that answered, and <code>llm.yaml</code> is read
+again on a restart. Anyone, where the server allows it (<code>api.request_llm</code>), can keep a key and a model per step in
+their own browser tab, sent with each question (see the hosted demo below). The page offers the providers and models
+from <code>GET /llm/providers</code>. See <a href="../../apps/web/#settings">the Settings page</a>.</p>
+<p>The web app's <strong>Pipeline</strong> page lists every step of a run and, for each of the seven a model decides, the provider and
+model it is set to use. It reads <code>GET /about</code>, from <code>engine.about()</code>, whose steps (<code>nl2sql.pipeline.steps</code>) take their
+seven model steps from <code>LLM_AGENTS</code> rather than repeating the table above. See
+<a href="../../apps/web/#home-pipeline-and-retrieval">the Pipeline page</a>.</p>
 <p>On the <strong>hosted demo</strong> (<code>nl2sql-api serve --demo --hosted</code>) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
 per step in their own browser tab, and both travel with each question: a key
@@ -7163,18 +7153,9 @@ each step's client for that one request from the key for the provider it names,
 caches none of them, and refuses with <code>400</code> -- naming the step and the
 provider -- when a step is on a provider the request brought no key for. See
 <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
-<p>When <code>nl2sql demo</code> picks replay or live mode at start-up it points the top
-level of <code>llm.yaml</code> at the chosen provider. In replay and record mode every
-<code>agents:</code> entry follows, with the local replay server or recording proxy as
-<code>base_url</code> and the placeholder <code>api_key</code> (<code>replay</code>, <code>proxy</code>) it accepts,
-because one fake or proxy serves every call; no key goes into the
-environment. In live mode a step keeps the provider it was given; only an
-entry with no provider, or one left on the replay endpoint, follows the top
-level, and no <code>api_key</code> is written. Moving an entry between OpenAI and
-Anthropic replaces a model the new provider does not serve (a <code>gpt-</code> model on
-Anthropic, a <code>claude-</code> one on OpenAI) with that provider's default and its
-temperature. Every provider key saved in the demo's <code>.env</code> is loaded at
-start-up, so each step finds its own.</p>
+<p><code>prepare_demo</code> writes the demo's <code>llm.yaml</code> for the first provider whose key variable is set, else Ollama when a local
+daemon has a model pulled, else <code>replay</code>. Every provider key in the demo's <code>.env</code> is loaded at start-up, so each step
+finds its own.</p>
 <h2 id="any-other-openai-style-server-openai_compatible">Any other OpenAI-style server (<code>openai_compatible</code>)</h2>
 <p><code>openai_compatible</code> is any server with an OpenAI-style chat API. Its
 <code>base_url</code> is required, and it reads no key variable: write <code>api_key</code> (usually
@@ -7407,7 +7388,7 @@ field (<code>api_key</code>, a <code>headers</code> value) and is an error anywh
 from your files never reads the environment. <code>nl2sql-api</code> serves it as the
 admin-only <a href="../../api/rest/settings/"><code>PUT /api/v1/settings/llm</code></a>: the body is the
 section as JSON, and a bad one is HTTP 422 with the <code>ConfigError</code> text. The
-playground's model switch calls <code>replace</code> too. <code>engine.llm.list()</code> shows the
+web app's model switch calls <code>replace</code> too. <code>engine.llm.list()</code> shows the
 model each agent runs on.</p>
 <h2 id="embeddings-are-a-separate-path">Embeddings are a separate path</h2>
 <p>None of Anthropic, OpenRouter or Ollama covers embeddings — they are not routed through

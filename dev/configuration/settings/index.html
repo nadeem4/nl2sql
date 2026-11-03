@@ -6502,7 +6502,7 @@ different settings.</p>
 <a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="w">  </span><span class="nt">match_floor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.6</span>
 <a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="nt">feedback</span><span class="p">:</span>
 <a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="nt">knowledge</span><span class="p">:</span><span class="w">                    </span><span class="c1"># read from release 0.8</span>
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="nt">knowledge</span><span class="p">:</span>
 <a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="w">  </span><span class="nt">item_max_chars</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500</span>
 <a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="w">  </span><span class="nt">block_max_chars</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000</span>
 <a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="w">  </span><span class="nt">top_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
@@ -6518,7 +6518,7 @@ different settings.</p>
 <a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.50</span>
 <a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="nt">review</span><span class="p">:</span>
 <a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="w">  </span><span class="nt">max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">365</span>
-<a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="nt">charts</span><span class="p">:</span><span class="w">                       </span><span class="c1"># read from release 0.9</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="nt">charts</span><span class="p">:</span>
 <a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="w">  </span><span class="nt">max_points</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
 <a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="w">  </span><span class="nt">max_categories</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
 <a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="w">  </span><span class="nt">max_series</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
@@ -6528,7 +6528,7 @@ different settings.</p>
 <p>Unknown keys are errors, as everywhere in the config. The demo
 (<code>nl2sql init --demo</code>) writes a <code>settings.yaml</code> with <code>pipeline.timeout_s: 300</code>
 (a live run makes six model calls; one OpenAI run took 136 s) and
-<code>traces.mode: always</code> (the playground's Debug drill-down reads every run's
+<code>traces.mode: always</code> (the web app's Debug drill-down reads every run's
 trace).</p>
 <p>In Python, the groups are <code>Settings</code>, <code>PipelineSettings</code>, <code>RetrySettings</code>,
 <code>RetrievalSettings</code>, <code>RoutingSettings</code>, <code>ResultSettings</code>, <code>TraceSettings</code>,
@@ -6536,8 +6536,7 @@ trace).</p>
 <code>ClarifySettings</code>, <code>ProfilerSettings</code>, <code>ReviewSettings</code> and <code>ChartSettings</code> in <code>nl2sql.config</code>.</p>
 <p>Where the engine's events, logs and metrics go is not a setting: it is the
 <a href="../observers/"><code>observers</code> section</a> of
-<code>nl2sql.yaml</code>. The 0.6 <code>observability</code> group (<code>exporter</code>, <code>otlp_endpoint</code>)
-is gone; an <code>otel</code> observer takes its place. The <code>schema</code> group is the attribute <code>schema_</code>
+<code>nl2sql.yaml</code>. An <code>otel</code> observer exports metrics and traces. The <code>schema</code> group is the attribute <code>schema_</code>
 (<code>cfg.settings.schema_.max_versions</code>), because <code>schema</code> would shadow a
 pydantic method; the YAML key is <code>schema</code>.</p>
 <h2 id="tenant_id"><code>tenant_id</code></h2>
@@ -6605,7 +6604,7 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 <tr>
 <td><code>sanity_checks</code></td>
 <td><code>true</code></td>
-<td>The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). <code>false</code> turns them all off. Read from release 0.7's sanity checks.</td>
+<td>The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). <code>false</code> turns them all off.</td>
 </tr>
 </tbody>
 </table>
@@ -6673,9 +6672,8 @@ check for work that is not a question: make the model calls with
 </tr>
 </tbody>
 </table>
-<p><code>table_k</code>, <code>planning_k</code> and <code>decomposer_tables</code> replace the constants the
-schema retriever and the resolver had before 0.7 (<code>TABLE_K</code>, <code>PLANNING_K</code>,
-<code>MAX_DECOMPOSER_TABLES</code>).</p>
+<p><code>table_k</code>, <code>planning_k</code> and <code>decomposer_tables</code> set how many tables the schema
+retriever and the resolver keep.</p>
 <p>How the tables are chosen past the threshold is in the
 <a href="../../how-it-works/nodes/schema_retriever_node/">schema retriever's reference</a>.</p>
 <h2 id="routing"><code>routing</code></h2>
@@ -6822,13 +6820,12 @@ the decomposer reads <code>max_sub_queries</code>.</p>
 <tr>
 <td><code>enabled</code></td>
 <td><code>true</code></td>
-<td>Let the playground record a thumbs up or down, with an optional note, for a run. Stored in <code>&lt;storage.path&gt;/state.db</code>: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
+<td>Reserved: the key is accepted and validated, and nothing reads it. Ratings of a run (<strong>Yes</strong> or <strong>Not quite</strong> in the web app) are stored in <code>&lt;storage.path&gt;/state.db</code>: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
 </tr>
 </tbody>
 </table>
 <h2 id="knowledge-clarify-profiler-and-review"><code>knowledge</code>, <code>clarify</code>, <code>profiler</code> and <code>review</code></h2>
-<p>Four groups for release 0.8. They are
-accepted and validated now; the change named with each reads it.</p>
+<p>Four groups of knobs.</p>
 <table>
 <thead>
 <tr>
@@ -6901,8 +6898,7 @@ accepted and validated now; the change named with each reads it.</p>
 </tbody>
 </table>
 <h2 id="charts"><code>charts</code></h2>
-<p>Release 0.9. <code>engine.results.chart</code> reads it
-(<a href="../../charts/">Charts</a>).</p>
+<p><code>engine.results.chart</code> reads it (<a href="../../charts/">Charts</a>).</p>
 <table>
 <thead>
 <tr>

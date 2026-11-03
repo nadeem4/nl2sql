@@ -7002,7 +7002,7 @@ adapter written before the hook keeps working unchanged.</p>
 <p>The hook is an optional protocol rather than a required method, so an adapter
 without it needs no change.</p>
 <h3 id="optional-hooks-estimate-and-probe_overlap">Optional hooks: <code>estimate</code> and <code>probe_overlap</code></h3>
-<p>Two optional protocols in <code>nl2sql_sdk.protocols</code>, added for release 0.8, found with <code>isinstance</code>
+<p>Two optional protocols in <code>nl2sql_sdk.protocols</code>, found with <code>isinstance</code>
 as the two hooks above are. The adapter interface stays at version 2.</p>
 <table>
 <thead>
@@ -7258,12 +7258,6 @@ vectors it is handed.</p>
 (<code>bucket = "acme_nl2sql.results:BucketResults"</code>), or register it in code with
 <code>registry.add_store("bucket", BucketResults)</code>. Then <code>results: {type: bucket,
 bucket: nl2sql-results}</code>.</p>
-<div class="admonition note">
-<p class="admonition-title">Built-ins only, for now</p>
-<p>The engine moves onto these interfaces one slot at a time during 0.6
-(the index, then the state, then the traces and results). Until a slot's
-move lands, the engine refuses a plugin store in that slot.</p>
-</div>
 <hr />
 <h2 id="interface-policycheck">Interface: <code>PolicyCheck</code></h2>
 <p>A policy check asks an outside service what a caller may read. The policies
@@ -7341,8 +7335,7 @@ standard library, with the glossary's models (<code>Glossary</code>,
 <code>item_max_chars</code>); a longer one is a load error naming the item. Declare a
 source in the <code>nl2sql.knowledge_sources</code> entry point group, or register it
 in code with <code>registry.add_knowledge_source(name, cls)</code> or
-<code>@registry.knowledge_source(name)</code>. The built-in <code>yaml</code> source arrives
-with release 0.8.</p>
+<code>@registry.knowledge_source(name)</code>. The built-in <code>yaml</code> source reads <code>glossary.yaml</code>.</p>
 <hr />
 <h2 id="optional-discoverableadapter">Optional: <code>DiscoverableAdapter</code></h2>
 <p>An adapter can declare what it is found by, so <code>engine.datasources.scan()</code>

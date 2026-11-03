@@ -2649,10 +2649,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#rating-an-answer-in-the-playground" class="md-nav__link">
+  <a href="#rating-an-answer-in-the-web-app" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rating an answer in the playground
+        Rating an answer in the web app
       
     </span>
   </a>
@@ -6196,10 +6196,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#rating-an-answer-in-the-playground" class="md-nav__link">
+  <a href="#rating-an-answer-in-the-web-app" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rating an answer in the playground
+        Rating an answer in the web app
       
     </span>
   </a>
@@ -6291,24 +6291,22 @@
 
 <h1 id="feedback-and-signals">Feedback and Signals</h1>
 <p>Nothing in the engine can tell on its own whether a live answer was right. Two
-small signals help: a person's rating of an answer in the playground, and the
+small signals help: a person's rating of an answer in the web app, and the
 guardrail rates the engine already records for every run. <code>nl2sql feedback</code>
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
 set, and thumbs-up generated answers as proposed verified queries.</p>
-<p>The playground and <code>nl2sql feedback</code> are both built on <code>engine.feedback</code>
+<p>The web app and <code>nl2sql feedback</code> are both built on <code>engine.feedback</code>
 (<code>record</code>, <code>list</code>, <code>stats</code>, <code>export</code>, <code>clear</code>, <code>correct</code>), which any Python caller can use
 too: see <a href="../../api/core/public-facade/#feedback">the public facade</a>.</p>
-<h2 id="rating-an-answer-in-the-playground">Rating an answer in the playground</h2>
-<p>After a run, below <strong>Cost &amp; time</strong>, the playground asks <strong>Was this answer
-right?</strong> with two buttons, <strong>👍 Right</strong> and <strong>👎 Wrong</strong>. A click saves the
-rating at once. A note is optional: pick <strong>Wrong number</strong>, <strong>Wrong table</strong>,
-<strong>Wrong filter</strong> or <strong>Missing rows</strong>, or type a few words (up to 280
-characters), then <strong>Save note</strong>. Rating the same run again replaces the earlier
-rating.</p>
-<p>The page sends only the run's trace id, the rating and the note. The server
-stores what <em>it</em> answered for that run, from its own copy of the last 200 runs,
-so a page cannot put a question or SQL into the table that the engine never
-produced. A run the playground did not answer is refused with <code>404</code>.</p>
+<h2 id="rating-an-answer-in-the-web-app">Rating an answer in the web app</h2>
+<p>Below an answered turn the web app asks <strong>Did this answer it?</strong> with two
+buttons, <strong>Yes</strong> and <strong>Not quite</strong>. <strong>Yes</strong> keeps the answer in <strong>My answers</strong>
+and rates the run up. <strong>Not quite</strong> rates the run down and opens a note and a
+corrected SQL, which <strong>Send for review</strong> files as a proposal. Rating the same
+run again replaces the earlier rating. See <a href="../../apps/web/#chat">Web app</a>.</p>
+<p>The server stores what <em>it</em> answered for that run, read from the run's own
+trace, so a caller cannot put a question or SQL into the table that the engine
+never produced.</p>
 <table>
 <thead>
 <tr>
@@ -6318,21 +6316,22 @@ produced. A run the playground did not answer is refused with <code>404</code>.<
 </thead>
 <tbody>
 <tr>
-<td><code>GET /api/feedback</code></td>
-<td>Whether feedback is on (and why not), the counts and the last 50 ratings. The ratings are returned only where the gate below passes.</td>
+<td><code>POST /feedback</code></td>
+<td><code>{"trace_id", "rating": "up" \| "down", "note"}</code>. Records a rating for a run the caller asked; another caller's run is a <code>404</code>.</td>
 </tr>
 <tr>
-<td><code>POST /api/feedback</code></td>
-<td><code>{"trace_id", "rating": "up" \| "down", "note"}</code>. Local only, the same gate as Settings, Rebuild and the Retrieval inspector: on a non-loopback <code>--host</code> it answers <code>403</code> unless <code>nl2sql demo --allow-settings</code>, and it refuses another site's page (a foreign <code>Origin</code>), a non-loopback hostname and anything but JSON.</td>
+<td><code>POST /feedback/correct</code></td>
+<td>Turns the caller's fix (<code>sql</code> or <code>plan</code>) into a proposal for a verified query, checked as the caller; a refused fix is <code>422 CORRECTION_REFUSED</code>.</td>
+</tr>
+<tr>
+<td><code>GET /feedback</code></td>
+<td>Every rating, newest first. Admin only.</td>
 </tr>
 </tbody>
 </table>
 <p>A rating needs a kept trace (<code>engine.feedback.record</code> reads the run's own
 trace), so on the default <code>settings.traces.mode: on_failure</code> only failed runs
 can be rated; set <code>always</code> to rate successful ones.</p>
-<p>Feedback is available in the playground that <code>nl2sql demo</code> starts, and on by
-default. <code>settings.feedback.enabled: false</code> turns it off: the control then says so and
-<code>POST /api/feedback</code> answers <code>403</code>.</p>
 <h2 id="what-is-stored">What is stored</h2>
 <p>One row per run, kept by the engine's state store (<code>storage.state</code>) beside the
 schema snapshots and the plan cache. The built-in <code>sqlite</code> state store keeps it
@@ -6585,7 +6584,7 @@ reaches every table in <code>tables</code> sees the proposal. Keep traces
 rated; the default keeps only failed runs' traces.</p>
 <h2 id="turning-it-off-and-clearing-it">Turning it off and clearing it</h2>
 <ul>
-<li><code>settings.feedback.enabled: false</code> stops the playground recording ratings.</li>
+<li><code>settings.feedback.enabled</code> is reserved: it is accepted and nothing reads it.</li>
 <li><code>nl2sql feedback clear</code> deletes every rating (<code>--yes</code> skips the prompt).
   Schema snapshots and the plan cache are kept, and <code>nl2sql cache clear</code>
   never touches the ratings.</li>

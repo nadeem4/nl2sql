@@ -3230,8 +3230,8 @@ namespace; the <code>chroma</code> store keeps one collection per namespace.</p>
   each configured datasource in turn, and a failure keeps that datasource's
   previous build live and exits <code>1</code>.</li>
 <li><code>nl2sql.indexing.rebuild.rebuild_index</code>, behind <code>engine.index.build</code>, is the
-  one entry point for <code>nl2sql index</code>, the demo's startup repair, the
-  playground's Rebuild and the REST index routes. Its <code>on_datasource</code> callback
+  one entry point for <code>nl2sql index</code>, the demo's startup repair and the
+  REST index job (<code>POST /api/v1/jobs/index</code>). Its <code>on_datasource</code> callback
   gets an <code>IndexProgress</code> per datasource (<code>started</code>, then <code>done</code> with the entry
   counts or <code>failed</code> with the reason): <code>nl2sql index</code> prints a line from it.</li>
 <li><strong>One build at a time.</strong> <code>rebuild_index</code> holds the state store's <code>index</code>
@@ -3268,8 +3268,8 @@ indexed (its pointer's <code>curated_hash</code> differs from the file's) gets
 stale entries still name queries that exist. A <code>preferred_tables</code> entry missing
 from the datasource's live snapshot is a warning too. <code>nl2sql doctor</code> prints it
 under <strong>Index</strong>, <code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the
-playground and <code>GET /api/v1/index</code> show it (through
-<code>engine.index.health()</code>), the playground with a Rebuild button.</p>
+<code>GET /api/v1/index</code> shows it (through
+<code>engine.index.health()</code>).</p>
 <h2 id="chunking-strategy-as-implemented">Chunking strategy (as implemented)</h2>
 <p>Chunking is aligned to planning intent:</p>
 <ul>
@@ -3390,7 +3390,7 @@ similarity, the store's distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see <a href="../../observability/debugging/#retrieval">Debugging a run</a>),
-and the playground's Retrieval inspector (<code>engine.index.inspect</code>) runs the same
+and the web app's Retrieval inspector (<code>engine.index.inspect</code>) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the <strong>Copy as text</strong> output. It is run as a

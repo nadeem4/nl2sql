@@ -6410,43 +6410,10 @@ unanswerable case cannot have an alternative.</p>
 package ships are in <code>nl2sql/evaluation/suites/</code>, and <code>nl2sql init --demo</code>
 copies them into the demo's <code>evals/</code> folder. <code>engine.evals.load(path)</code> and
 <code>engine.evals.run([path])</code> also take a suite file directly.</p>
-<p>The Chinook suite (<code>suites/chinook.yaml</code>) is 0.6's gold set
-(<code>chinook_gold.yaml</code> and <code>chinook_gold_plans.yaml</code>) with its keys renamed and
-nothing else changed:</p>
-<table>
-<thead>
-<tr>
-<th>Was</th>
-<th>Now</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>datasource</code></td>
-<td><code>datasources</code></td>
-</tr>
-<tr>
-<td><code>expected</code></td>
-<td><code>outcome</code></td>
-</tr>
-<tr>
-<td><code>needed_tables</code>, <code>needed_columns</code></td>
-<td><code>tables</code>, <code>columns</code></td>
-</tr>
-<tr>
-<td><code>gold_sql</code>, <code>gold_result</code>, <code>alt_gold_sql</code>, <code>alt_gold_result</code></td>
-<td><code>sql</code>, <code>rows</code>, <code>alt_sql</code>, <code>alt_rows</code></td>
-</tr>
-<tr>
-<td>plans in <code>chinook_gold_plans.yaml</code></td>
-<td><code>plan</code> on each case</td>
-</tr>
-</tbody>
-</table>
-<p><code>test_chinook_suite_holds_the_gold_data_unchanged</code> pins a SHA-256 of every
-case's question, SQL, rows, alternatives, outcomes, tables, columns and plan,
-taken from the old files with the old loader. <a href="../chinook-suite/">The Chinook
-suite</a> describes it.</p>
+<p>The Chinook suite (<code>suites/chinook.yaml</code>) is the gold set: <code>sql</code>, <code>rows</code>, <code>alt_sql</code>, <code>alt_rows</code> and a <code>plan</code> on each case.
+<code>test_chinook_suite_holds_the_gold_data_unchanged</code> pins a SHA-256 of every
+case's question, SQL, rows, alternatives, outcomes, tables, columns and plan.
+<a href="../chinook-suite/">The Chinook suite</a> describes it.</p>
 <h2 id="the-routing-suite">The routing suite</h2>
 <p><code>suites/routing.yaml</code> asks which of the demo's three databases (<code>chinook</code>,
 <code>support</code>, <code>webanalytics</code>) a question belongs to. Every case is <code>approved</code>,
@@ -6489,8 +6456,8 @@ the routing suite is run by name:</p>
 </code></pre></div>
 <p>In mode retrieval a case passes when routing ranks one of its datasources
 first and shortlists all of them (<code>settings.routing.candidates</code>, cut at
-<code>max_datasources</code>). A few cases fail today; the baseline records where
-routing misses, and the gate allows no other case to start failing. The test
+<code>max_datasources</code>). The baseline records the cases where routing misses,
+and the gate allows no other case to start failing. The test
 bed's 1,200-table wide schema has routing cases of its own in the <code>realdb</code>
 job (<code>tests/realdb/test_routing_wide.py</code>), since they need the test bed's
 databases.</p>

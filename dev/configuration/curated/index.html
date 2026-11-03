@@ -6463,19 +6463,17 @@
 <code>curated.yaml</code>, is where a data team writes <strong>verified queries</strong>: SQL they
 have already written and reviewed, with typed parameters, and the questions
 each query answers.</p>
-<div class="admonition note">
-<p class="admonition-title">What works today</p>
-<p>The section is loaded and checked (at startup and with
-<code>nl2sql curated validate</code>), every query can be run once with
-<code>nl2sql curated test</code>, its questions are indexed with <code>nl2sql index</code>, a
-question is matched to a verified query and answered by it (see
-<a href="#what-happens-at-question-time">What happens at question time</a>), and the
-playground badges such an answer <em>Verified</em>. The demo ships six verified
-queries (<a href="#in-the-demo">In the demo</a>). Preferred tables
-(<a href="#preferred-tables">below</a>) and proposals from thumbs-up feedback
+<p>The section is loaded and checked at startup and with
+<code>nl2sql curated validate</code>. <code>nl2sql curated test</code> runs every query once, and
+<code>nl2sql index</code> indexes their questions. A question is matched to a verified
+query and answered by it (see
+<a href="#what-happens-at-question-time">What happens at question time</a>), and the web
+app badges such an answer <em>Verified</em>. The demo ships six verified queries
+(<a href="#in-the-demo">In the demo</a>). Preferred tables (<a href="#preferred-tables">below</a>)
+and proposals from thumbs-up feedback
 (<a href="#from-feedback-to-verified-queries">From feedback to verified queries</a>)
-are built too. Business metrics are parsed but not used yet.</p>
-</div>
+belong to the same section. Business metrics are parsed but not used to answer
+questions.</p>
 <h2 id="where-it-lives">Where it lives</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># nl2sql.yaml</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">curated</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">curated.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span>
@@ -6484,7 +6482,7 @@ are built too. Business metrics are parsed but not used yet.</p>
 off</strong>, and nothing else changes. To turn them off, remove the line from
 <code>nl2sql.yaml</code> (the file can stay). A <code>file:</code> that does not exist is an error,
 and so is a section that is broken: building the engine (<code>NL2SQL(config)</code>,
-<code>nl2sql run</code>, the REST API, the playground) fails with a <code>ConfigError</code> that
+<code>nl2sql run</code>, the REST API, the web app) fails with a <code>ConfigError</code> that
 names every problem, as a broken datasource does.</p>
 <p>The matching knobs are in the <a href="../settings/"><code>settings</code> section</a>:</p>
 <table>
@@ -6621,7 +6619,7 @@ one of the demo's verified queries (<code>nl2sql init --demo</code> writes all s
 </ul>
 <h3 id="metrics">Metrics</h3>
 <p><code>metrics:</code> (a list of <code>name</code>, <code>description</code>, <code>expression</code>, <code>table</code>) is
-accepted and checked for shape so the format is fixed, but nothing uses it yet.</p>
+accepted and checked for shape, but not used to answer questions.</p>
 <p>Every key is checked: a misspelt one (<code>descripton:</code>) is an error, not ignored.</p>
 <h2 id="checking-the-file">Checking the file</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>validate<span class="w">                              </span><span class="c1"># ./nl2sql.yaml, or NL2SQL_CONFIG</span>
@@ -6788,7 +6786,7 @@ response):</p>
 <p>or <code>{"type": "generated", ...}</code> with the other fields <code>null</code>. The sub-query of
 a verified answer has <code>plan_source: "verified"</code>, its <code>sql</code> is your SQL with
 its <code>:name</code> placeholders, and its <code>plan</code> is <code>null</code>.</p>
-<p>In the playground a verified answer carries a green <strong>Verified ·
+<p>In the web app a verified answer carries a green <strong>Verified ·
 top_customers_by_revenue</strong> label beside the question, with the bound values
 in its tooltip. The Plan station says no plan was written and lists the query
 and its values, the Checks station shows the matcher's three checks (read-only,
@@ -6932,7 +6930,7 @@ overwritten: accept refuses with <code>FILE_CHANGED</code>.</p>
 <li>Facade: <code>packages/nl2sql/src/nl2sql/api/curated_api.py</code></li>
 <li>Command: <code>nl2sql-cli/src/nl2sql_cli/commands/curated.py</code></li>
 <li>The demo's verified queries: <code>CHINOOK_VERIFIED_QUERIES</code> in <code>packages/nl2sql/src/nl2sql/datasets/chinook.py</code></li>
-<li>The playground badge: <code>verifiedSource()</code> in <code>nl2sql-ui/src/outputs/results.js</code></li>
+<li>The web app badge: <code>verifiedSource()</code> in <code>nl2sql-ui/src/outputs/results.js</code></li>
 <li>Matching and running: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/</code></li>
 <li>Proposals from feedback: <code>packages/nl2sql/src/nl2sql/feedback/proposals.py</code>; the review queue and the
   canonical writer: <code>packages/nl2sql/src/nl2sql/review/</code></li>

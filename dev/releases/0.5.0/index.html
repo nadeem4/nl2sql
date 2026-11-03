@@ -5800,6 +5800,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mapping-a-04-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping a 0.4 config
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mapping a 0.4 config">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6271,6 +6332,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mapping-a-04-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping a 0.4 config
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mapping a 0.4 config">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6361,10 +6483,306 @@
 <ul>
 <li>The design for Configuration v2 and the extension registry (<a href="https://github.com/nadeem4/nl2sql/pull/260">#260</a>). The Configuration pages are rewritten for <code>nl2sql.yaml</code> in the PRs above.</li>
 </ul>
+<h2 id="mapping-a-04-config">Mapping a 0.4 config</h2>
+<p>0.5 reads only <code>nl2sql.yaml</code>. There is no migration command: map each 0.4 file,
+variable and flag with these tables. <code>nl2sql init</code> writes a fresh layout to
+start from.</p>
+<h3 id="files">Files</h3>
+<table>
+<thead>
+<tr>
+<th>0.4</th>
+<th>0.5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>configs/datasources.yaml</code> (<code>DATASOURCE_CONFIG</code>)</td>
+<td><code>datasources:</code>, one file per datasource in <code>datasources/</code>. <code>connection.type</code> moves up to <code>type</code>; <code>options:</code> and the top-level limits become <code>limits: {row_limit, timeout_ms, max_bytes}</code>.</td>
+</tr>
+<tr>
+<td><code>configs/llm.yaml</code> (<code>LLM_CONFIG</code>)</td>
+<td><code>llm:</code>, flat: <code>default:</code>'s keys are the top level; <code>agents:</code> are keyed by node name (<code>ast_planner</code>, not <code>astplanner</code>); <code>name:</code> and <code>version:</code> are gone.</td>
+</tr>
+<tr>
+<td><code>configs/policies.json</code> (<code>POLICIES_CONFIG</code>)</td>
+<td><code>policies:</code>, in YAML; the <code>role:</code> field that repeated the key is gone.</td>
+</tr>
+<tr>
+<td><code>configs/secrets.yaml</code> (<code>SECRETS_CONFIG</code>)</td>
+<td><code>secrets:</code>, without <code>version</code>. <code>hashi</code> is now <code>hashicorp</code>.</td>
+</tr>
+<tr>
+<td><code>configs/curated.yaml</code> (<code>CURATED_CONFIG</code>)</td>
+<td><code>curated:</code>, without <code>version</code>. Present means on.</td>
+</tr>
+<tr>
+<td><code>configs/sample_questions.yaml</code> (<code>SAMPLE_QUESTIONS</code>, <code>ROUTING_EXAMPLES</code>)</td>
+<td><code>sample_questions:</code> on each datasource.</td>
+</tr>
+<tr>
+<td><code>.env</code>, <code>.env.&lt;name&gt;</code> (<code>ENV</code>, <code>APP_ENV</code>, <code>ENV_FILE_PATH</code>)</td>
+<td>The <code>.env</code> next to <code>nl2sql.yaml</code>, loaded by the entry points only.</td>
+</tr>
+<tr>
+<td><code>.env.demo</code> and <code>configs/*.demo.*</code></td>
+<td><code>nl2sql init --demo</code> (and <code>nl2sql demo</code>, which runs it): <code>nl2sql.yaml</code>, its files, and <code>.env</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="settings-variables">Settings variables</h3>
+<table>
+<thead>
+<tr>
+<th>0.4 variable</th>
+<th>0.5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENAI_API_KEY</code></td>
+<td><code>llm.api_key</code> / <code>embeddings.api_key</code>, or the fallback variable above</td>
+</tr>
+<tr>
+<td><code>VECTOR_STORE</code></td>
+<td><code>storage.path</code> (the index is <code>&lt;path&gt;/index/</code>)</td>
+</tr>
+<tr>
+<td><code>VECTOR_STORE_COLLECTION</code></td>
+<td>removed (an internal constant)</td>
+</tr>
+<tr>
+<td><code>EMBEDDING_PROVIDER</code></td>
+<td><code>embeddings.provider</code></td>
+</tr>
+<tr>
+<td><code>EMBEDDING_MODEL</code></td>
+<td><code>embeddings.model</code></td>
+</tr>
+<tr>
+<td><code>TENANT_ID</code></td>
+<td><code>settings.tenant_id</code></td>
+</tr>
+<tr>
+<td><code>CURATED_ENABLED</code></td>
+<td>removed: the <code>curated</code> section is present or absent</td>
+</tr>
+<tr>
+<td><code>CURATED_MATCH_TOP_K</code></td>
+<td><code>settings.curated.match_top_k</code></td>
+</tr>
+<tr>
+<td><code>CURATED_MATCH_FLOOR</code></td>
+<td><code>settings.curated.match_floor</code></td>
+</tr>
+<tr>
+<td><code>GLOBAL_TIMEOUT_SEC</code></td>
+<td><code>settings.pipeline.timeout_s</code></td>
+</tr>
+<tr>
+<td><code>RESULT_ARTIFACT_BASE_URI</code></td>
+<td><code>storage.path</code> (<code>&lt;path&gt;/results/</code>)</td>
+</tr>
+<tr>
+<td><code>RESULT_ARTIFACT_PATH_TEMPLATE</code></td>
+<td>removed: a fixed layout under <code>&lt;path&gt;/results/</code></td>
+</tr>
+<tr>
+<td><code>RESULT_ARTIFACT_BACKEND</code>, <code>RESULT_ARTIFACT_S3_*</code>, <code>RESULT_ARTIFACT_ADLS_*</code></td>
+<td>removed: results are local; the S3 and ADLS backends are deleted</td>
+</tr>
+<tr>
+<td><code>SCHEMA_STORE_BACKEND</code></td>
+<td>removed: SQLite at <code>&lt;path&gt;/state.db</code></td>
+</tr>
+<tr>
+<td><code>SCHEMA_STORE_PATH</code></td>
+<td><code>storage.path</code> (<code>&lt;path&gt;/state.db</code>, which also holds the plan cache and feedback)</td>
+</tr>
+<tr>
+<td><code>SCHEMA_STORE_MAX_VERSIONS</code></td>
+<td><code>settings.schema.max_versions</code></td>
+</tr>
+<tr>
+<td><code>SCHEMA_VERSION_MISMATCH_POLICY</code></td>
+<td>removed: a run reads the schema version its index build was made from</td>
+</tr>
+<tr>
+<td><code>PLAN_CACHE_ENABLED</code></td>
+<td><code>settings.pipeline.plan_cache</code></td>
+</tr>
+<tr>
+<td><code>FEEDBACK_ENABLED</code></td>
+<td><code>settings.feedback.enabled</code></td>
+</tr>
+<tr>
+<td><code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code></td>
+<td><code>settings.retrieval.full_snapshot_max_tables</code></td>
+</tr>
+<tr>
+<td><code>LOGICAL_VALIDATOR_STRICT_COLUMNS</code></td>
+<td><code>settings.pipeline.strict_columns</code></td>
+</tr>
+<tr>
+<td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>
+<td><code>policies.refusal_names_tables</code></td>
+</tr>
+<tr>
+<td><code>SQL_AGENT_MAX_RETRIES</code></td>
+<td><code>settings.pipeline.retries.max</code></td>
+</tr>
+<tr>
+<td><code>SQL_AGENT_RETRY_BASE_DELAY_SEC</code></td>
+<td><code>settings.pipeline.retries.base_delay_s</code></td>
+</tr>
+<tr>
+<td><code>SQL_AGENT_RETRY_MAX_DELAY_SEC</code></td>
+<td><code>settings.pipeline.retries.max_delay_s</code></td>
+</tr>
+<tr>
+<td><code>SQL_AGENT_RETRY_JITTER_SEC</code></td>
+<td><code>settings.pipeline.retries.jitter_s</code></td>
+</tr>
+<tr>
+<td><code>LLM_PRICES</code></td>
+<td><code>llm.prices</code></td>
+</tr>
+<tr>
+<td><code>TRACE_MODE</code></td>
+<td><code>settings.traces.mode</code></td>
+</tr>
+<tr>
+<td><code>TRACE_DIR</code></td>
+<td><code>storage.path</code> (<code>&lt;path&gt;/traces/</code>)</td>
+</tr>
+<tr>
+<td><code>RESULT_ROW_LIMIT</code></td>
+<td><code>settings.results.row_limit</code></td>
+</tr>
+<tr>
+<td><code>RESULT_FETCH_BATCH_SIZE</code></td>
+<td><code>settings.results.fetch_batch_size</code></td>
+</tr>
+<tr>
+<td><code>ANSWER_PREVIEW_ROWS</code></td>
+<td><code>settings.results.preview_rows</code></td>
+</tr>
+<tr>
+<td><code>TRACE_SAMPLE_ROWS</code></td>
+<td><code>settings.traces.sample_rows</code></td>
+</tr>
+<tr>
+<td><code>TRACE_MAX_FIELD_CHARS</code></td>
+<td><code>settings.traces.max_field_chars</code></td>
+</tr>
+<tr>
+<td><code>NL2SQL_TODAY</code></td>
+<td><code>settings.pipeline.today</code></td>
+</tr>
+<tr>
+<td><code>OBSERVABILITY_EXPORTER</code></td>
+<td>an <code>otel</code> observer in the <code>observers</code> section (0.7)</td>
+</tr>
+<tr>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td>
+<td>the <code>otel</code> observer's <code>endpoint</code> (0.7)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="other-variables">Other variables</h3>
+<table>
+<thead>
+<tr>
+<th>0.4 variable</th>
+<th>0.5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NL2SQL_API_ROLE_HEADER</code></td>
+<td><code>api.proxy.roles_header</code> with <code>api.auth: proxy</code> (0.10)</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_ROLE</code></td>
+<td><code>api.static_role</code> with <code>api.auth: static</code> (0.10)</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_TRUST_BODY_ROLE</code></td>
+<td>removed in 0.10: a request body never carries the caller</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_CORS_ORIGINS</code> (comma-separated)</td>
+<td><code>api.cors_origins</code> (a list)</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_ADMIN_ROLES</code></td>
+<td><code>policies.admin_roles</code></td>
+</tr>
+<tr>
+<td><code>NL2SQL_DEMO_HOSTED</code></td>
+<td><code>nl2sql-api serve --demo --hosted</code></td>
+</tr>
+<tr>
+<td><code>NL2SQL_DEMO_QUESTIONS_PER_MINUTE</code>, <code>NL2SQL_DEMO_QUESTIONS_PER_SESSION</code></td>
+<td><code>nl2sql-api serve --questions-per-minute N --questions-per-session N</code></td>
+</tr>
+<tr>
+<td><code>VAULT_ADDR</code>, <code>VAULT_TOKEN</code></td>
+<td><code>secrets.providers[].url</code> / <code>.token</code> (write <code>${env:VAULT_TOKEN}</code> to keep reading the variable)</td>
+</tr>
+<tr>
+<td><code>AZURE_KEYVAULT_URL</code></td>
+<td><code>secrets.providers[].vault_url</code></td>
+</tr>
+<tr>
+<td><code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code></td>
+<td>unchanged: the fallback key variables</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cli">CLI</h3>
+<table>
+<thead>
+<tr>
+<th>0.4</th>
+<th>0.5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nl2sql setup</code></td>
+<td><code>nl2sql init [DIR] [--provider NAME] [--force]</code>; the guided flow comes in a later release</td>
+</tr>
+<tr>
+<td><code>nl2sql setup --demo</code></td>
+<td><code>nl2sql init --demo [DIR]</code> (or just <code>nl2sql demo</code>)</td>
+</tr>
+<tr>
+<td><code>--env NAME</code>, <code>--env-file PATH</code></td>
+<td>removed: the <code>.env</code> next to <code>nl2sql.yaml</code> is loaded</td>
+</tr>
+<tr>
+<td><code>--config PATH</code> (the datasource file), <code>--llm-config</code>, <code>--secrets-config</code>, <code>--policies-config</code>, <code>--vector-store</code></td>
+<td>the one global <code>nl2sql --config PATH/nl2sql.yaml</code></td>
+</tr>
+<tr>
+<td><code>curated validate/test --curated --config --secrets</code></td>
+<td><code>nl2sql --config ... curated validate/test</code></td>
+</tr>
+<tr>
+<td><code>policy validate --config --policies --secrets</code></td>
+<td><code>nl2sql --config ... policy validate</code></td>
+</tr>
+<tr>
+<td><code>nl2sql --env demo &lt;command&gt;</code> (from the demo folder)</td>
+<td><code>nl2sql --config nl2sql-demo/nl2sql.yaml &lt;command&gt;</code>, or run it from inside <code>nl2sql-demo/</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="known-limits">Known limits</h2>
 <ul>
 <li>Running several <code>nl2sql-api</code> replicas is not supported for a model switch. <code>PUT /api/v1/settings/llm</code> changes only the process that receives it, and the change is not saved: a restart reads <code>llm.yaml</code> again.</li>
-<li>There is no migration command. You map 0.4 files and variables by hand, using <a href="../../configuration/system/#from-04">the table</a>.</li>
+<li>There is no migration command. You map 0.4 files and variables by hand, using <a href="#mapping-a-04-config">the table</a>.</li>
 <li>Results are stored locally only. The S3 and ADLS backends are gone until the results-store interface in Phase 2.</li>
 <li><code>nl2sql init</code> is not interactive, and its <code>--provider</code> accepts <code>openai</code>, <code>anthropic</code> and <code>openrouter</code> only (Ollama has no default model). The guided setup flow comes in Phase 4.</li>
 <li>A datasource's <code>connection</code> block is checked by the adapter only, not by a typed model, and <code>check()</code> gives a generic reason when a connection fails. Typed connection models and connection-test stages come with SDK v2 in Phase 2.</li>
@@ -6375,7 +6793,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="go">pip install --upgrade "nl2sql-engine[demo]==0.5.0"</span>
 </code></pre></div>
 <p>Adapter and secret provider authors: <code>pip install "nl2sql-sdk==0.5.0"</code> and uninstall <code>nl2sql-adapter-sdk</code>.</p>
-<p>Breaking changes: many. 0.5 is a clean break with no compatibility layer, and the engine refuses a 0.4 config. Start with <code>nl2sql init</code>, then move your values across with <a href="../../configuration/system/#from-04">the 0.4 to 0.5 mapping</a>.</p>
+<p>Breaking changes: many. 0.5 is a clean break with no compatibility layer, and the engine refuses a 0.4 config. Start with <code>nl2sql init</code>, then move your values across with <a href="#mapping-a-04-config">the 0.4 to 0.5 mapping</a>.</p>
 <ul>
 <li><strong>One config file</strong> (<a href="https://github.com/nadeem4/nl2sql/pull/264">#264</a>, <a href="https://github.com/nadeem4/nl2sql/pull/272">#272</a>). <code>configs/datasources.yaml</code>, <code>llm.yaml</code>, <code>policies.json</code>, <code>secrets.yaml</code>, <code>curated.yaml</code>, <code>sample_questions.yaml</code> and about 48 environment variables are no longer read. <em>What to do:</em> run <code>nl2sql init</code> (or <code>nl2sql init --demo</code>) and move each value to its new place using the mapping table. Sample questions now sit on each datasource, policies are YAML, and LLM agents are keyed by node name (<code>ast_planner</code>).</li>
 <li><strong>Environment variables</strong> (<a href="https://github.com/nadeem4/nl2sql/pull/276">#276</a>). Only <code>NL2SQL_CONFIG</code>, <code>NL2SQL_LOG_LEVEL</code> and the provider keys (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code>) are read directly. <em>What to do:</em> write any other value in the YAML, as <code>${env:VAR}</code> where it should come from the environment.</li>

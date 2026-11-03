@@ -6288,10 +6288,9 @@ settings. It is optional. The engine validates it like every other section
 </tr>
 </tbody>
 </table>
-<p>The 0.9 fields <code>role_header</code>, <code>role</code> and <code>trust_body_role</code> are gone, and the
-engine rejects them as unknown keys. Use <code>auth: proxy</code> (the roles header is
-<code>proxy.roles_header</code>), <code>auth: static</code> with <code>static_role</code>, and nothing for the
-body role: a request body never carries the caller.</p>
+<p>The roles header is <code>proxy.roles_header</code> under <code>auth: proxy</code>, and <code>auth: static</code>
+takes <code>static_role</code>. There is no body role: a request body never carries the
+caller.</p>
 <h2 id="admin-routes">Admin routes</h2>
 <p>The routes that change datasources, LLMs or the index need one of the roles in
 <code>policies.admin_roles</code> (default <code>[admin]</code>), which is a policy, so it lives in
@@ -6316,8 +6315,6 @@ which never loads one. <code>uvicorn nl2sql_api.main:app</code> loads no <code>.
 to start over a config with <code>mode: hosted</code>, which needs <code>nl2sql-api serve</code>.</p>
 <p><code>serve</code> runs one worker, and with <code>auth: none</code> it refuses to bind any host but
 loopback, naming <code>api.auth</code> in the message.</p>
-<p>The <code>NL2SQL_API_*</code> variables of 0.4 are not read; see
-<a href="../system/#from-04">From 0.4</a>.</p>
 
 
 

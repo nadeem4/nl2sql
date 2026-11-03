@@ -6562,7 +6562,8 @@ nothing to ask yet, shows the <strong>start screen</strong> above that story. <c
 </table>
 <p><strong>Try a sample question</strong> asks the first guided question that has a recorded answer, so it works without a key. The
 guided questions and the recordings come from each datasource in <code>GET /meta</code> (<code>sample_questions</code>, <code>recorded</code>); the
-recording's model is <code>recorded_with</code>.</p>
+recording's model is <code>recorded_with</code>. Chat labels a recorded answer <strong>Recorded run</strong> when every model call in its usage
+reports no token count and names the recording's model.</p>
 <p><strong>Pipeline</strong> (<code>#/pipeline</code>) lists every step of a run from <code>GET /about</code>, and marks which a model decides. A page answers
 from recordings (it says so on each model step) when the visitor is on the hosted demo with no key, or when every model
 step in <code>/about</code> runs on the <code>replay</code> provider.</p>
@@ -6570,7 +6571,7 @@ step in <code>/about</code> runs on the <code>replay</code> provider.</p>
 (k, lambda, the entry types) and <code>POST /index/inspect</code> runs one search as the caller, so it shows only what the caller's
 scope reaches. The datasource list comes from <code>/meta</code>. With no datasource it says there is nothing to search yet.</p>
 <p><strong>Hosted first run.</strong> A hosted visitor without a key sees the guided questions replay recorded runs. A question with no
-recording comes back as a <code>REPLAY_MISS</code> error, and Chat then points to Settings to add a key. Chat labels a recorded answer <strong>Recorded run</strong> when every model call in its usage reports no token count and names the recording's model.</p>
+recording comes back as a <code>REPLAY_MISS</code> error, and Chat then points to Settings to add a key.</p>
 <h2 id="source-map">Source map</h2>
 <table>
 <thead>
@@ -6611,8 +6612,9 @@ recording comes back as a <code>REPLAY_MISS</code> error, and Chat then points t
 </tbody>
 </table>
 <h2 id="screenshots">Screenshots</h2>
-<p>Captured from the playground on the demo project, asking about Chinook, with
-recorded model responses (so token counts are placeholders).</p>
+<p>Captured from the earlier front end on the demo project, asking about Chinook,
+with recorded model responses (so token counts are placeholders). The pages
+above describe the current app, which lays these out differently.</p>
 <p><strong>An answer:</strong> the question, the plan the model wrote, the validator's checks,
 the generated SQL and the rows.</p>
 <p><img alt="The question, plan, checks, SQL and rows for &quot;Which artist has the most albums?&quot;" src="https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-answer.png" /></p>
@@ -6625,18 +6627,18 @@ marked and the deterministic ones left quiet. Before a question it shows the
 model each step is set to use; after one, the model that answered, that step's
 tokens and its time.</p>
 <p><img alt="The Pipeline page listing each step of a run, the seven marked as decided by a model, with tokens and time from the last run" src="https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-pipeline.png" /></p>
-<p><strong>Settings:</strong> save an API key per provider and choose a provider and model for
-each LLM step. Written to the demo project's <code>.env</code> and <code>llm.yaml</code>.</p>
+<p><strong>Settings:</strong> enter an API key per provider and choose a provider and model for
+each LLM step.</p>
 <p><img alt="The Settings page with the key form and a model per step" src="https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-settings.png" /></p>
 <p><strong>Retrieval inspector:</strong> run the engine's vector search for any text against the
 live index, with k, lambda, entry types and datasource as knobs, and see what
 MMR picked and what it dropped, as the role you chose, so entries it may not
 read are not shown. No LLM call.</p>
 <p><img alt="The Retrieval inspector page showing picks, similarity and MMR scores" src="https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-retrieval.png" /></p>
-<p><strong>Feedback:</strong> rate an answer right or wrong, with an optional note. Stored in the
+<p><strong>Feedback:</strong> rate an answer, with an optional note. Stored in the
 project with the question, role and SQL, never the rows;
 <code>nl2sql feedback stats</code> reports the rates.</p>
-<p><img alt="The &quot;Was this answer right?&quot; control after a thumbs-up" src="https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-feedback.png" /></p>
+<p><img alt="The rating control after a thumbs-up" src="https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-feedback.png" /></p>
 
 
 
