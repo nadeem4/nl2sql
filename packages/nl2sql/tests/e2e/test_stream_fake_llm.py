@@ -3,9 +3,7 @@
 ``stream_query`` reports every step as it runs, the result manifest as soon as
 the results are saved, the answer as the model writes it (the fake server
 streams the recorded tool call a word at a time), and ends in exactly what
-``run_query`` returns. Both apps serve it as Server-Sent Events. Last, every
-guided question the hosted Space replays without a key still replays when it
-is streamed.
+``run_query`` returns. ``nl2sql-api`` serves it as Server-Sent Events.
 """
 from __future__ import annotations
 
@@ -15,7 +13,6 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from .conftest import copy_demo  # noqa: E402
 from .test_answer_preview_fake_llm import ANSWER, QUESTION, RULES  # noqa: E402
 from .test_result_paging_fake_llm import _env  # noqa: E402
 
@@ -108,77 +105,3 @@ def test_the_rest_api_streams_server_sent_events(demo_project, fake_llm, monkeyp
     assert reply.headers["content-type"].startswith("text/event-stream")
     final = _check_progress(parse_sse(reply.text))
     assert final["status"] == "success", final["errors"]
-
-
-@pytest.mark.e2e
-def test_the_playground_streams_server_sent_events(demo_project, fake_llm, monkeypatch):
-    from fastapi.testclient import TestClient
-
-    from nl2sql import NL2SQL
-    from nl2sql.cli.demo.playground.app import build_app
-
-    server, env = fake_llm(RULES)
-    _env(monkeypatch, demo_project, env)
-    client = TestClient(build_app(NL2SQL.from_config(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
-    reply = client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"})
-    final = _check_progress(parse_sse(reply.text))
-    [entry] = final["result_manifest"]
-    page = client.get(f"/api/query/{final['trace_id']}/results/{entry['node_id']}", params={"role": "admin"}).json()
-
-    assert final["status"] == "success" and final["recorded"] is False
-    assert len(page["rows"]) == 25
-
-
-@pytest.mark.e2e
-def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, tmp_path, monkeypatch):
-    """The hosted Space, keyless, streaming each guided question from the packaged recordings."""
-
-    from fastapi.testclient import TestClient
-
-    from nl2sql import NL2SQL
-    import nl2sql.datasets
-    from pathlib import Path
-    from nl2sql.datasets.demo import DEMO_QUESTIONS
-    from nl2sql.cli.demo.llm_config import point_llm_config_at
-    from nl2sql.cli.demo.playground.app import build_app
-    from nl2sql.cli.demo.playground.hosted import Hosted, Limits, Replay
-    from nl2sql.llm.replay import ReplayStore
-    from nl2sql.testing.fake_llm import FakeLLMServer
-
-    project = tmp_path / "demo"
-    copy_demo(demo_project, project)
-    store = ReplayStore.load(Path(nl2sql.datasets.__file__).parent / "recordings" / "chinook.json")
-    assert set(store.covered(DEMO_QUESTIONS)) == set(DEMO_QUESTIONS)
-
-    for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
-    # As the Space runs it: the demo's own nl2sql.yaml, verified queries included.
-    point_llm_config_at(project, None, provider="openai")
-    replay = FakeLLMServer(store.rules(), stream_delay=0.0012).start()
-    finals = {}
-    try:
-        hosted = Hosted(enabled=True, limits=Limits(per_minute=100, per_session=100), replay=Replay(replay.base_url, store.covered(DEMO_QUESTIONS),
-                                                    store.recorded_with))
-        app = build_app(NL2SQL.from_config(project / "nl2sql.yaml"), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
-                        dataset="chinook", project_dir=project, host="0.0.0.0", hosted=hosted)
-        client = TestClient(app, base_url="http://demo.example:7860")
-        for question in DEMO_QUESTIONS:
-            events = parse_sse(client.post("/api/ask/stream", json={"question": question, "role": "admin"}).text)
-            name, data = events[-1]
-            finals[question] = ((name, data.get("result", data)), [n for n, _ in events].count("answer.delta"))
-    finally:
-        replay.stop()
-
-    missed = [q for q, ((name, body), _) in finals.items() if name != "run.finished" or body["replay_miss"]]
-    assert not missed, missed
-    failed = {q: body["errors"] for q, ((_, body), _) in finals.items() if body["status"] != "success"}
-    assert not failed, failed
-    assert all(body["recorded"] for (_, body), _ in finals.values())
-    # Each recorded answer streamed in pieces, not as one block.
-    assert all(deltas > 2 for _, deltas in finals.values())
-    # Every recorded call answered. The curated matcher's choice is the one
-    # exception until the demo is recorded again: recordings made before it
-    # hold no VerifiedQueryChoice, so it misses and the run falls back to the
-    # recorded generated answer, as asserted above.
-    unrecorded = {c["name"] for c in replay.calls if not c["matched"]}
-    assert unrecorded <= {"VerifiedQueryChoice"}, unrecorded

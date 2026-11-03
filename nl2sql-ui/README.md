@@ -144,7 +144,7 @@ the one raised card, with a 44px Pause / Play button. It follows
 reduced motion it holds the poster until Play. A clip with no video yet (the
 request fails) shows its poster alone, with no button. The files are served by
 the app at `/clips/<name>` from
-`packages/nl2sql/src/nl2sql/cli/demo/playground/assets/clips/`, outside the
+`packages/api/src/nl2sql_api/web/assets/clips/`, outside the
 bundle (which `npm run build` rewrites and which should not carry video) and
 named `<feature>[-dark].webm|jpg` for `ask`, `pipeline` and `retrieval`.
 

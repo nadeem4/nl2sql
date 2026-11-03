@@ -269,13 +269,6 @@ def test_an_existing_file_is_never_overwritten(folder, index, llm_server):
     assert not (folder / "nl2sql.yaml").exists()
 
 
-def test_demo_still_warns_for_a_stamp_from_an_older_version(tmp_path):
-    from nl2sql.cli.demo.stamp import STAMP_FILE, outdated_warning
-
-    (tmp_path / STAMP_FILE).write_text('{"engine_version": "0.0.1"}', encoding="utf-8")
-
-    assert "nl2sql-engine 0.0.1" in outdated_warning(tmp_path)
-
 # ---------------------------------------------------------------- review fixes
 
 

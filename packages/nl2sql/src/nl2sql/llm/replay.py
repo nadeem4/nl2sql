@@ -1,7 +1,7 @@
 """Recorded LLM responses for key-free demo mode.
 
 A :class:`ReplayStore` is a JSON file of model outputs captured once from a real
-provider by :class:`RecordingProxy`. Its :meth:`ReplayStore.rules` feeds
+provider by :class:`Recorder`. Its :meth:`ReplayStore.rules` feeds
 :class:`nl2sql.testing.fake_llm.FakeLLMServer`, which then answers the pipeline
 without an API key.
 
@@ -15,11 +15,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
-import threading
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -29,7 +25,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import ConfigDict
 
 from nl2sql.common.errors import ReplayMiss
-from nl2sql.testing.fake_llm import Rule, classify_anthropic_request, classify_request
+from nl2sql.testing.fake_llm import Rule
 
 # The markers each real prompt template puts in front of the user question (or,
 # for the planner, the sub-query intent). Each captures the first non-empty line
@@ -311,159 +307,3 @@ class Recorder:
 
 
 REPLAY = ReplayProvider()
-
-
-class RecordingProxy:
-    """An endpoint that forwards upstream and records the answer.
-
-    ``wire`` is the protocol the upstream speaks. ``"openai"`` (the default)
-    takes ``POST /v1/chat/completions`` and forwards it to
-    ``upstream_base_url + "/chat/completions"``; ``"anthropic"`` takes
-    ``POST /v1/messages`` and forwards it to ``upstream_base_url + "/v1/messages"``
-    with the key in ``x-api-key``. Either way a recording is keyed by the
-    structured-output name and the question, so a store recorded on one wire
-    replays on the other: the replay server answers both.
-
-    ``provider`` is the provider behind the upstream (OpenRouter speaks the
-    OpenAI wire); it defaults to the wire's own. Each answer recorded stamps
-    the store with it and with the model the request asked for.
-    """
-
-    def __init__(self, upstream_base_url: str, upstream_api_key: str, store: ReplayStore,
-                 host: str = "127.0.0.1", port: int = 0, wire: str = "openai",
-                 provider: Optional[str] = None):
-        if wire not in ("openai", "anthropic"):
-            raise ValueError(f"Unknown wire '{wire}': expected 'openai' or 'anthropic'.")
-        self.upstream_base_url = upstream_base_url.rstrip("/")
-        self.upstream_api_key = upstream_api_key
-        self.provider = provider or wire
-        self.store = store
-        self.host = host
-        self.port = port
-        self.wire = wire
-        self._server: Optional[HTTPServer] = None
-        self._thread: Optional[threading.Thread] = None
-
-    @property
-    def base_url(self) -> str:
-        """The OpenAI-wire endpoint (what ``ChatOpenAI`` takes as ``base_url``)."""
-        assert self._server is not None, "call start() first"
-        return f"http://{self.host}:{self._server.server_address[1]}/v1"
-
-    @property
-    def anthropic_base_url(self) -> str:
-        """The root the Anthropic client appends ``/v1/messages`` to."""
-        assert self._server is not None, "call start() first"
-        return f"http://{self.host}:{self._server.server_address[1]}"
-
-    def start(self) -> "RecordingProxy":
-        outer = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *_args):
-                return
-
-            def do_POST(self):
-                raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
-                if outer.wire == "anthropic":
-                    status, content_type, response_body = outer._forward_anthropic(
-                        raw, self.headers.get("anthropic-version"), self.headers.get("anthropic-beta"))
-                else:
-                    status, content_type, response_body = outer._forward(raw)
-                self.send_response(status)
-                self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(response_body)))
-                self.end_headers()
-                self.wfile.write(response_body)
-
-        self._server = HTTPServer((self.host, self.port), Handler)
-        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
-        self._thread.start()
-        return self
-
-    def _forward(self, raw: bytes) -> Tuple[int, str, bytes]:
-        request = urllib.request.Request(
-            self.upstream_base_url + "/chat/completions",
-            data=raw,
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {self.upstream_api_key}"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request) as response:
-                status = response.status
-                content_type = response.headers.get("Content-Type", "application/json")
-                body = response.read()
-        except urllib.error.HTTPError as exc:  # upstream said no; pass it through verbatim
-            return exc.code, exc.headers.get("Content-Type", "application/json"), exc.read()
-
-        if status == 200:
-            self._record(raw, body)
-        return status, content_type, body
-
-    def _forward_anthropic(self, raw: bytes, version: Optional[str],
-                           beta: Optional[str]) -> Tuple[int, str, bytes]:
-        headers = {"Content-Type": "application/json", "x-api-key": self.upstream_api_key,
-                   "anthropic-version": version or "2023-06-01"}
-        if beta:
-            headers["anthropic-beta"] = beta
-        request = urllib.request.Request(self.upstream_base_url + "/v1/messages", data=raw,
-                                         headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(request) as response:
-                status = response.status
-                content_type = response.headers.get("Content-Type", "application/json")
-                body = response.read()
-        except urllib.error.HTTPError as exc:
-            return exc.code, exc.headers.get("Content-Type", "application/json"), exc.read()
-
-        if status == 200:
-            self._record_anthropic(raw, body)
-        return status, content_type, body
-
-    def _record_anthropic(self, raw: bytes, body: bytes) -> None:
-        """Stores an Anthropic answer under the same key an OpenAI one would get."""
-        try:
-            request = json.loads(raw)
-            name, prompt_text = classify_anthropic_request(request)
-            content = json.loads(body)["content"]
-            if name == "plain":
-                payload: Any = "".join(block.get("text") or "" for block in content
-                                       if block.get("type") == "text")
-            else:
-                payload = next(block["input"] for block in content if block.get("type") == "tool_use")
-        except (KeyError, TypeError, ValueError, StopIteration):
-            return
-        self._add(request, Recording(name, extract_question(prompt_text), payload))
-
-    def _add(self, request: Any, recording: Recording) -> None:
-        """Stores ``recording``, stamping the store with who answered it."""
-        model = request.get("model") if isinstance(request, dict) else None
-        if model:
-            self.store.provider, self.store.model = self.provider, model
-        self.store.add(recording)
-
-    def _record(self, raw: bytes, body: bytes) -> None:
-        """Stores the upstream payload, keyed exactly as the replay server dispatches."""
-        try:
-            request = json.loads(raw)
-            mode, name, prompt_text = classify_request(request)
-            message = json.loads(body)["choices"][0]["message"]
-            if mode == "tools":
-                payload = json.loads(message["tool_calls"][0]["function"]["arguments"])
-            elif mode == "json_schema":
-                payload = json.loads(message["content"])
-            else:
-                payload = message["content"]
-        except (KeyError, IndexError, TypeError, ValueError):
-            # A response shape we cannot key is not worth failing the run over:
-            # the caller is recording, and a missing recording shows up as a
-            # replay miss rather than as a crashed provider call.
-            return
-        self._add(request, Recording(name, extract_question(prompt_text), payload))
-
-    def stop(self) -> None:
-        if self._server is not None:
-            self._server.shutdown()
-            self._server.server_close()
-            self._server = None

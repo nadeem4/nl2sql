@@ -1,7 +1,7 @@
 """Renders ``scripts/social_card.html`` into the link preview card.
 
 The card is the 1200x630 image a link to the hosted demo unfurls into: the
-playground's Open Graph tags name it, and the Hugging Face Space's front-matter
+web app's Open Graph tags name it, and the Hugging Face Space's front-matter
 points its ``thumbnail`` at the copy in ``docs/``.
 
 Two copies are written, and a test holds them byte-identical:
@@ -10,11 +10,11 @@ Two copies are written, and a test holds them byte-identical:
     what the Space's ``thumbnail:`` reads over raw.githubusercontent.com, so
     the Space card works before the Space has built, and what the docs show.
 
-``packages/nl2sql/src/nl2sql/cli/demo/playground/assets/social-card.png``
-    what the playground itself serves at ``/social-card.png``. It ships in the
+``packages/api/src/nl2sql_api/web/assets/social-card.png``
+    what ``nl2sql-api`` serves at ``/social-card.png``. It ships in the
     wheel, so ``pip install "nl2sql-engine[demo]"`` has it too.
 
-The card borrows the playground's bundled fonts, so run ``npm ci`` in
+The card borrows the web app's bundled fonts, so run ``npm ci`` in
 ``nl2sql-ui`` first, then::
 
     python scripts/render_social_card.py
@@ -41,7 +41,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "scripts" / "social_card.html"
 OUTPUTS = (
     ROOT / "docs" / "assets" / "social-card.png",
-    ROOT / "packages" / "nl2sql" / "src" / "nl2sql" / "cli" / "demo" / "playground" / "assets" / "social-card.png",
+    ROOT / "packages" / "api" / "src" / "nl2sql_api" / "web" / "assets" / "social-card.png",
 )
 WIDTH, HEIGHT = 1200, 630
 
