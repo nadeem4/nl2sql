@@ -80,7 +80,7 @@ Nothing about a key or a choice is posted to the server, so there is no save to
 succeed or fail; the copy on the page says exactly that, plus the limits from
 `meta.limits` and how to run the demo locally instead. Rebuild and answer
 ratings are off, and the retrieval inspector stays on. See
-[Hosted demo](../../docs/deployment/hosted-demo.md).
+[Hosted demo](../docs/deployment/hosted-demo.md).
 
 **Hosted, before a key** (`needsKey` in `src/pages/firstRun.js`: `meta.hosted` and
 nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`
@@ -389,7 +389,7 @@ Both are SIL Open Font License. The built page is about 350 KB (150 KB gzipped).
 
 The favicon is the plan spine: a teal root bar and stem with two indented ink
 steps, a typed plan in outline. Its one copy is
-[`docs/assets/favicon.svg`](../../docs/assets/favicon.svg), which follows
+[`docs/assets/favicon.svg`](../docs/assets/favicon.svg), which follows
 `prefers-color-scheme` (teal `#0c6a5c` and ink `#17201c` in light, `#62c7b1`
 and `#e2e9e5` in dark). `index.html` inlines it as a `data:` URI, so the icon
 costs no request either; the docs site names the file as `theme.favicon`, and

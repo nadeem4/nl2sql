@@ -28,8 +28,8 @@
   `feedback export --good` drafts new eval cases for review.
 
 Recorded runs are published with `nl2sql eval publish` to the
-block above and [docs/benchmarks.md](../benchmarks.md). Details:
-[Evals](index.md), [the Chinook suite](chinook-suite.md),
+README and [Benchmarks](../benchmarks.md). Details:
+[the Chinook suite](chinook-suite.md),
 [Feedback and Signals](../observability/feedback.md).
 
 `engine.evals` measures how well the engine answers your questions. You
