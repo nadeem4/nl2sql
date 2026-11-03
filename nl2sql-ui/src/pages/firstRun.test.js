@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   NO_KEY_REASON, firstRunCopy, hostedNote, isRecorded, lockControls, missPrompt, needsKey, recordedBadge,
 } from "./firstRun.js";
@@ -125,4 +126,11 @@ test("a live run, or one with no recording to match, carries no badge", () => {
 
 test("a server that reports no limits has none to quote", () => {
   assert.doesNotMatch(hostedNote(HOSTED, KEY), /a minute/);
+});
+
+test("the chat page shows the recorded badge and the replay-miss prompt", () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+  assert.match(read("../chat/Turn.jsx"), /recordedBadge\(/);
+  assert.match(read("../chat/Turn.jsx"), /missPrompt\(/);
+  assert.match(read("./Chat.jsx"), /missPrompt\(/);
 });

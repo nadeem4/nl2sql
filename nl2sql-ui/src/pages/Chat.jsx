@@ -6,6 +6,7 @@ import {
 import Composer from "../chat/Composer.jsx";
 import Spine from "../chat/Spine.jsx";
 import Turn from "../chat/Turn.jsx";
+import { missPrompt } from "./firstRun.js";
 import { addressChange, withConversation, withTurn } from "../chat/convstate.js";
 import { EMPTY_SPINE, spineOf } from "../chat/spine.js";
 import { hashFor } from "../router.js";
@@ -19,7 +20,8 @@ function describe(e) {
 // The conversation page: a list of the caller's conversations and one transcript. A turn streams its steps while it
 // runs and is then replaced by the stored turn the server sends last, so what stays is exactly what was saved.
 // `starter` is a question another page wants asked (Home's sample question); `onStarter` says it was taken.
-export default function Chat({ param, starter, onStarter }) {
+// `meta` is `GET /meta`: it says whether a missing recording should point to Settings (the hosted demo).
+export default function Chat({ param, starter, onStarter, meta = null }) {
   const [list, setList] = useState([]);
   const [conv, setConv] = useState(null);
   const [tools, setTools] = useState([]);
@@ -27,6 +29,8 @@ export default function Chat({ param, starter, onStarter }) {
   const [datasource, setDatasource] = useState(null);
   const [live, setLive] = useState(null);
   const [error, setError] = useState(null);
+  // A question with no recording on a keyless server: say so, and (hosted) point to Settings.
+  const [miss, setMiss] = useState(null);
   const abortRef = useRef(null);
   const createdRef = useRef(null);
   const busy = live !== null;
@@ -56,6 +60,7 @@ export default function Chat({ param, starter, onStarter }) {
   const send = async (body, label) => {
     if (busy) return;
     setError(null);
+    setMiss(null);
     let c = conv;
     try {
       if (!c) {
@@ -82,7 +87,7 @@ export default function Chat({ param, starter, onStarter }) {
         setLive({ label, spine, stoppable: true });
       }, controller.signal);
     } catch (e) {
-      if (!e || e.name !== "AbortError") setError(describe(e));
+      if (!e || e.name !== "AbortError") { setError(describe(e)); setMiss(missPrompt(e, meta)); }
     } finally {
       abortRef.current = null;
       setLive(null);
@@ -105,6 +110,7 @@ export default function Chat({ param, starter, onStarter }) {
   const act = async (work) => {
     if (busy || !conv) return;
     setError(null);
+    setMiss(null);
     const id = conv.id;
     setLive({ label: "", spine: EMPTY_SPINE, stoppable: false });
     try {
@@ -112,6 +118,7 @@ export default function Chat({ param, starter, onStarter }) {
       setConv((cur) => withTurn(cur, id, turn));
     } catch (e) {
       setError(describe(e));
+      setMiss(missPrompt(e, meta));
     } finally {
       setLive(null);
     }
@@ -143,10 +150,14 @@ export default function Chat({ param, starter, onStarter }) {
         {list.length === 0 && <p className="page-note">Your conversations will be listed here.</p>}
       </aside>
       <section className="chat-main">
-        {error && <p className="fault" role="alert">{error}</p>}
+        {miss ? (
+          <p className="fault" role="alert">
+            {miss.text}{miss.action && <> <a href={miss.action.route}>{miss.action.label}</a></>}
+          </p>
+        ) : error && <p className="fault" role="alert">{error}</p>}
         <div className="chat-transcript" aria-live="polite">
           {conv && conv.turns.map((turn) => (
-            <Turn key={turn.index} turn={turn} conversation={conv} tools={tools} busy={busy}
+            <Turn key={turn.index} turn={turn} conversation={conv} tools={tools} busy={busy} meta={meta}
               onPick={(option) => send({ choice: option.id, execute: true }, option.label)}
               onRetry={(ids) => act((id) => retryTurn(id, ids))}
               onTool={(name, args) => act((id) => runTool(id, name, args))} />

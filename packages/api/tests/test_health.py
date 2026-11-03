@@ -155,7 +155,7 @@ def test_meta_without_a_caller_lists_no_datasource(stub):
     response = client.get(f"{API}/meta")
 
     assert response.status_code == 200
-    assert response.json() == {"mode": "demo", "auth": "api_keys", "request_llm": True, "start": "choose"}
+    assert response.json() == {"mode": "demo", "auth": "api_keys", "request_llm": True, "start": None}
     assert engine.datasources.calls == []
 
 
@@ -172,6 +172,16 @@ def test_meta_start_says_choose_for_an_empty_project(stub):
     client, _ = stub(CheckReport(), authenticated=False, mode="your_data", datasources=[])
 
     assert client.get(f"{API}/meta").json()["start"] == "choose"
+
+
+def test_meta_start_hides_an_empty_project_from_anyone_but_an_admin(stub):
+    # No identity (api_keys without a key), and a caller who is not an admin: neither learns the project is empty.
+    client, _ = stub(CheckReport(), authenticated=False, mode="your_data", datasources=[],
+                     api={"auth": "api_keys"})
+    assert client.get(f"{API}/meta").json()["start"] is None
+    client, _ = stub(CheckReport(), authenticated=False, mode="your_data", datasources=[],
+                     api={"auth": "static", "static_role": "analyst"})
+    assert client.get(f"{API}/meta").json()["start"] is None
 
 
 def test_meta_start_is_null_once_the_project_has_a_datasource(stub):

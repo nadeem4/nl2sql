@@ -17,8 +17,8 @@ test("the three start values from /meta decide the screen", () => {
 });
 
 test("the fixture's start is read as the server wrote it", () => {
-  assert.equal(META.start, "choose");
-  assert.equal(startView(META, ADMIN).kind, "choose");
+  assert.equal(META.start, null);
+  assert.equal(startView(META, ADMIN), null);
   assert.equal(startView(null, ADMIN), null);
   assert.equal(startView({}, ADMIN), null);
 });
@@ -26,8 +26,8 @@ test("the fixture's start is read as the server wrote it", () => {
 test("on an empty project only an admin is offered the two actions", () => {
   assert.equal(startView({ start: "choose" }, VISITOR).canAct, false);
   assert.equal(startView({ start: "choose" }, ADMIN).canAct, true);
-  // A caller /meta did not name is offered them; the route's 403 stays the final word (lib/caller.js).
-  assert.equal(startView({ start: "choose" }, null).canAct, true);
+  // A caller /meta did not name as an admin is offered neither.
+  assert.equal(startView({ start: "choose" }, null).canAct, false);
 });
 
 test("hosted Connect shows run-it-yourself steps and calls no route", () => {
@@ -66,4 +66,13 @@ test("a cancelled demo job is not an error", async () => {
   const job = { id: "job1", kind: "demo", status: "cancelled", progress: [], result: null, error: null };
   fakeApi(job);
   assert.deepEqual(await demoFlow({ startDemo: metaApi.startDemo, follow: jobs.followJob }, {}), { cancelled: true });
+});
+
+test("cancelling a running demo is the job's own cancel, and the flow ends as cancelled, not as a fault", async () => {
+  const queued = { id: "job1", kind: "demo", status: "queued", progress: [], result: null, error: null };
+  const calls = fakeApi((method, path) => (path === "/jobs/demo" ? queued : { ...queued, status: "cancelled" }));
+  const flow = await demoFlow({ startDemo: metaApi.startDemo, follow: jobs.followJob }, {});
+  assert.deepEqual(flow, { cancelled: true });
+  await jobs.cancelJob("job1");
+  assert.deepEqual(calls.at(-1), { method: "DELETE", path: "/jobs/job1", body: undefined });
 });

@@ -82,7 +82,7 @@ def readiness_check(request: Request, engine: Engine, user: Visitor):
 def meta(request: Request, engine: Engine, user: Visitor):
     """Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`), `request_llm`,
     which is what a page needs to decide whether to ask for a sign-in or a key, and `start`, which screen the web app
-    opens on: `"hosted"` on the hosted demo, `"choose"` while the project has no datasource, else null. With a caller,
+    opens on: `"hosted"` on the hosted demo, `"choose"` while the project has no datasource and the caller is an administrator, else null. With a caller,
     also
     `caller` (`{"user_id", "admin"}`: who the caller is and whether it holds a role in `policies.admin_roles`, the
     check the admin routes make; on the hosted demo `user_id` is a one-way id of the session, never its cookie), and
@@ -91,7 +91,14 @@ def meta(request: Request, engine: Engine, user: Visitor):
     recordings came from (or null). On the hosted demo, also `limits`: `questions_per_minute`,
     `questions_per_session`, `asked` (this session's count), and `jobs` and `streams` (the most at once)."""
     config = engine.config
-    start = "hosted" if config.mode == "hosted" else None if config.datasources else "choose"
+    # `choose` (an empty project) goes only to an administrator, who is the one who can act on it; anyone else would
+    # learn from it whether the project has a datasource.
+    if config.mode == "hosted":
+        start = "hosted"
+    elif config.datasources:
+        start = None
+    else:
+        start = "choose" if user is not None and identity.is_admin(user, engine) else None
     body: Dict[str, Any] = {"mode": config.mode, "auth": config.api.auth, "request_llm": config.api.request_llm,
                             "start": start}
     if user is None:

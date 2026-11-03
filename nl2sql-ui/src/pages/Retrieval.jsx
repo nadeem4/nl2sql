@@ -182,8 +182,8 @@ export default function RetrievalInspector({ options, error, question }) {
   if (!options.datasources.length) {
     return (
       <div className="settings-off" id="retrieval-unavailable">
-        <h3>There is nothing to search yet</h3>
-        <p>No datasource is connected, so the index is empty. Try the demo on Home or connect a database first.</p>
+        <h3>There is nothing here you can search yet</h3>
+        <p>No datasource you can reach has been added. An administrator can try the demo on Home or connect a database.</p>
       </div>
     );
   }

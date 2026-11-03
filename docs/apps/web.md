@@ -180,7 +180,7 @@ nothing to ask yet, shows the **start screen** above that story. `GET /meta` dec
 
 | `start` | When | What Home shows |
 |---|---|---|
-| `choose` | The served project has no datasource | Two cards. **Try the demo** (administrators) runs `POST /jobs/demo`, shows its progress, then opens Chat on a sample question. **Connect your database** opens the Connect page. Someone who is not an administrator is told an administrator can do either, and is offered neither. |
+| `choose` | The served project has no datasource and the caller is an administrator | Two cards. **Try the demo** (administrators) runs `POST /jobs/demo`, shows its progress, then opens Chat on a sample question. **Connect your database** opens the Connect page. Anyone else gets no `start` at all. |
 | `hosted` | The hosted demo | **Ask a sample question** opens Chat. **Connect your database** only explains: the hosted server connects nothing, so it shows the steps to run nl2sql yourself (install and `nl2sql demo`, or Docker Compose) and links the [self-hosting guide](../deployment/compose.md). No route is called. |
 | `null` | A datasource exists | No start screen. |
 
@@ -197,8 +197,7 @@ step in `/about` runs on the `replay` provider.
 scope reaches. The datasource list comes from `/meta`. With no datasource it says there is nothing to search yet.
 
 **Hosted first run.** A hosted visitor without a key sees the guided questions replay recorded runs. A question with no
-recording comes back as a `REPLAY_MISS` error, and the page then points to Settings to add a key. A recorded answer is
-labelled **Recorded run** when every model call in its usage reports no token count and names the recording's model.
+recording comes back as a `REPLAY_MISS` error, and Chat then points to Settings to add a key. Chat labels a recorded answer **Recorded run** when every model call in its usage reports no token count and names the recording's model.
 
 ## Source map
 

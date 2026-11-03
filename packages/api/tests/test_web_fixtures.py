@@ -108,7 +108,8 @@ def build() -> dict:
 
         class Engine:
             results = Results()
-            config = make_config(pathlib.Path(folder), api={"auth": "static", "static_role": "analyst"})
+            config = make_config(pathlib.Path(folder), api={"auth": "static", "static_role": "analyst"},
+                                 datasources=[{"id": "chinook", "type": "sqlite", "connection": {"database": "c.db"}}])
             conversations = Conversations()
             dashboards = Recorder()
             proposals = Recorder()
@@ -143,7 +144,7 @@ def build() -> dict:
         Engine.datasources.returns["list"] = [DatasourceInfo(
             id="chinook", type="sqlite", status="ready", description="A music store", sample_questions=["How many customers?"])]
         Engine.llm.returns.update({"recorded": ["How many customers?"],
-                                   "recorded_with": "anthropic/claude-sonnet-5-5"})
+                                   "recorded_with": {"provider": "anthropic", "model": "claude-sonnet-5-5"}})
 
         app = create_app()
         app.dependency_overrides[get_engine] = lambda: Engine

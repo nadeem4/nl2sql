@@ -7,7 +7,7 @@
 //   it shows how to run nl2sql yourself and calls no route.
 // - anything else: no start screen.
 
-import { mayAdminister } from "../lib/caller.js";
+import { isAdmin } from "../lib/caller.js";
 import { withStep } from "../dashboards/generate.js";
 import { DOCS } from "./home.js";
 
@@ -21,11 +21,11 @@ export const HOSTED_STEPS = [
 ];
 
 // `{kind: "choose", canAct}`, `{kind: "hosted"}` or null. `canAct`: whether to offer the two actions, which are
-// admin work; the route's 403 stays the final word when the caller is not known.
+// admin work, so a caller `/meta` does not name as an admin is offered neither.
 export function startView(meta, caller) {
   if (!meta) return null;
   if (meta.start === "hosted") return { kind: "hosted" };
-  if (meta.start === "choose") return { kind: "choose", canAct: mayAdminister(caller) };
+  if (meta.start === "choose") return { kind: "choose", canAct: isAdmin(caller) };
   return null;
 }
 

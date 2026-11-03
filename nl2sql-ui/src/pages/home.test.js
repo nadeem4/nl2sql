@@ -57,6 +57,11 @@ test("the sample question is one a visitor with no key can replay", () => {
   assert.equal(sampleQuestion(null), null);
 });
 
+test("the sample question is found on the meta read after the demo is added, not on the empty one", () => {
+  assert.equal(sampleQuestion({ datasources: [] }), null);
+  assert.equal(sampleQuestion({ datasources: [ds("chinook", ["a"], ["a"])] }), "a");
+});
+
 test("the facts only promise what this server does", () => {
   const recorded = facts({ mode: "hosted", datasources: [ds("c", ["a"], ["a"])] });
   assert.deepEqual(recorded, ["No sign-in", "Sample databases included", "A key is only needed for your own questions"]);

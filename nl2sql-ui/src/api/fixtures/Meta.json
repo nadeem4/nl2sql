@@ -17,7 +17,10 @@
     }
   ],
   "mode": "your_data",
-  "recorded_with": "anthropic/claude-sonnet-5-5",
+  "recorded_with": {
+    "model": "claude-sonnet-5-5",
+    "provider": "anthropic"
+  },
   "request_llm": false,
-  "start": "choose"
+  "start": null
 }

@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import JobProgress from "../components/JobProgress.jsx";
-import { followJob } from "../api/jobs.js";
+import { cancelJob, followJob } from "../api/jobs.js";
 import { startDemo } from "../api/meta.js";
 import { HOSTED_STEPS, demoFlow } from "./startScreen.js";
 
@@ -14,21 +14,18 @@ export default function StartScreen({ view, onTry, onDemoAdded }) {
   const [job, setJob] = useState(null);
   const [fault, setFault] = useState(null);
   const [steps, setSteps] = useState(false);
-  const abort = useRef(null);
 
   if (!view) return null;
   const hosted = view.kind === "hosted";
 
   const runDemo = async () => {
     setFault(null);
-    abort.current = new AbortController();
     try {
-      const out = await demoFlow({ startDemo, follow: followJob }, { onJob: setJob, signal: abort.current.signal });
+      const out = await demoFlow({ startDemo, follow: followJob }, { onJob: setJob });
       if (out.done) onDemoAdded();
     } catch (err) {
       setFault(err);
     } finally {
-      abort.current = null;
       setJob(null);
     }
   };
@@ -53,7 +50,7 @@ export default function StartScreen({ view, onTry, onDemoAdded }) {
               {job ? "Adding the demo" : "Try the demo"}
             </button>
           ) : null}
-          {job && <JobProgress job={job} onCancel={() => abort.current && abort.current.abort()} />}
+          {job && <JobProgress job={job} onCancel={() => cancelJob(job.id).catch(() => {})} />}
           {fault && (
             <p className="fault" role="alert">{fault.message}{fault.fix ? ` ${fault.fix}` : ""}</p>
           )}

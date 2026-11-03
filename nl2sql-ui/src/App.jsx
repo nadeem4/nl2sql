@@ -141,8 +141,8 @@ export default function App() {
   // What the server is, who is asking, the pipeline and the retrieval defaults: all v1 routes. `loadMeta` runs again
   // once the demo has been added, since `start` and the datasources have changed.
   const loadMeta = () => getMeta()
-    .then((m) => { setMeta(m); setCaller(callerOf(m)); setRequestLlm(Boolean(m.request_llm)); })
-    .catch((e) => setError(e.message));
+    .then((m) => { setMeta(m); setCaller(callerOf(m)); setRequestLlm(Boolean(m.request_llm)); return m; })
+    .catch((e) => { setError(e.message); return null; });
   useEffect(() => {
     loadMeta();
     getInspectDefaults().then(setInspectDefaults).catch((e) => setRetrievalError(e.message));
@@ -169,8 +169,8 @@ export default function App() {
   }, [page]);
 
   // Try a sample question on Home: open Chat and have it ask one, a recorded one when the server has some.
-  const trySample = () => {
-    const q = sampleQuestion(meta);
+  const openSample = (m) => {
+    const q = sampleQuestion(m);
     window.location.hash = hashFor("chat");
     if (q) setStarter(q);
   };
@@ -233,8 +233,8 @@ export default function App() {
       <main className="page" id="page" ref={pageRef} tabIndex={-1}
         aria-labelledby={page === "home" ? "home-title" : "page-title"}>
         {error && <p className="fault" role="alert">{error}</p>}
-        {page === "home" && <Home meta={meta} caller={caller} replaying={replaying} onTry={trySample}
-          onDemoAdded={() => { loadMeta(); trySample(); }} />}
+        {page === "home" && <Home meta={meta} caller={caller} replaying={replaying} onTry={() => openSample(meta)}
+          onDemoAdded={() => loadMeta().then(openSample)} />}
         {/* On Chat the conversation says where you are; the heading stays for screen readers. Home has its own. */}
         {page !== "home" && <div className={page === "chat" ? "page-head visually-hidden" : "page-head"}>
           <h1 id="page-title">{current.title}</h1>
@@ -246,7 +246,7 @@ export default function App() {
 
         {page === "chat" && (
           <Suspense fallback={null}>
-            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} />
+            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} meta={meta} />
           </Suspense>
         )}
 
