@@ -7,10 +7,10 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
 <meta content="Platform Engineering" name="author"/>
-<link href="../../observability/error-handling/" rel="prev"/>
+<link href="../../storage/artifact-store/" rel="prev"/>
 <link href="../multi-tenant/" rel="next"/>
 <link href="../../assets/favicon.svg" rel="icon"/>
-<meta content="mkdocs-1.6.1, mkdocs-material-9.8.0" name="generator"/>
+<meta content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.0" name="generator"/>
 <title>Security Model - NL2SQL Platform</title>
 <link href="../../assets/stylesheets/main.57a0d79d.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.fb2fffe2.min.css" rel="stylesheet"/>
@@ -116,20 +116,11 @@
       </a>
 </li>
 <li class="md-tabs__item">
-<a class="md-tabs__link" href="../../architecture/overview/">
-          
-  
-  
-  Architecture
-
-        </a>
-</li>
-<li class="md-tabs__item">
 <a class="md-tabs__link" href="../../getting_started/">
           
   
   
-  Getting Started
+  Get started
 
         </a>
 </li>
@@ -138,34 +129,7 @@
           
   
   
-  Apps
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../conversations/">
-          
-  
-  
-  Conversations
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../charts/">
-          
-  
-  
-  Charts
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../dashboards/">
-          
-  
-  
-  Dashboards
+  Use it
 
         </a>
 </li>
@@ -174,106 +138,52 @@
           
   
   
-  Configuration
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../adapters/">
-          
-  
-  
-  Adapters
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../schema/store/">
-          
-  
-  
-  Schema
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../execution/isolation/">
-          
-  
-  
-  Execution
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../storage/artifact-store/">
-          
-  
-  
-  Storage
-
-        </a>
-</li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../observability/stack/">
-          
-  
-  
-  Observability
+  Configure
 
         </a>
 </li>
 <li class="md-tabs__item md-tabs__item--active">
-<a class="md-tabs__link" href="./">
-          
-  
-  
-  Security
-
-        </a>
-</li>
-<li class="md-tabs__item">
 <a class="md-tabs__link" href="../../deployment/architecture/">
           
   
   
-  Deployment
+  Deploy and operate
 
         </a>
 </li>
 <li class="md-tabs__item">
-<a class="md-tabs__link" href="../../development/">
+<a class="md-tabs__link" href="../../extend/">
           
   
   
-  Development
+  Extend
 
         </a>
 </li>
 <li class="md-tabs__item">
-<a class="md-tabs__link" href="../../evals/">
+<a class="md-tabs__link" href="../../reference/cli/">
           
   
   
-  Evals
+  Reference
 
         </a>
 </li>
 <li class="md-tabs__item">
-<a class="md-tabs__link" href="../../testing/architecture/">
+<a class="md-tabs__link" href="../../architecture/overview/">
           
   
   
-  Testing
+  How it works
 
         </a>
 </li>
 <li class="md-tabs__item">
-<a class="md-tabs__link" href="../../api/">
+<a class="md-tabs__link" href="../../contribute/">
           
   
   
-  API
+  Contribute
 
         </a>
 </li>
@@ -287,13 +197,13 @@
         </a>
 </li>
 <li class="md-tabs__item">
-<a class="md-tabs__link" href="../../glossary/">
+<a class="md-tabs__link" href="../../benchmarks/">
         
   
   
     
   
-  Glossary
+  Benchmarks
 
       </a>
 </li>
@@ -331,7 +241,7 @@
 <span class="md-ellipsis">
     
   
-    Architecture
+    Get started
   
 
     
@@ -343,361 +253,7 @@
 <span class="md-nav__icon md-icon"></span>
             
   
-    Architecture
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/overview/">
-<span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/pipeline/">
-<span class="md-ellipsis">
-    
-  
-    Pipeline
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/graph_state/">
-<span class="md-ellipsis">
-    
-  
-    Graph State
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/determinism/">
-<span class="md-ellipsis">
-    
-  
-    Determinism
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/invariants/">
-<span class="md-ellipsis">
-    
-  
-    Invariants
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/failure_recovery/">
-<span class="md-ellipsis">
-    
-  
-    Failure + Recovery
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/indexing/">
-<span class="md-ellipsis">
-    
-  
-    Indexing + Retrieval
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/curated_answers/">
-<span class="md-ellipsis">
-    
-  
-    Curated Answers
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Subgraphs
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_9">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Subgraphs
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/subgraphs/main_pipeline_graph/">
-<span class="md-ellipsis">
-    
-  
-    Main Pipeline Graph
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/subgraphs/sql_agent/">
-<span class="md-ellipsis">
-    
-  
-    SQL Agent Subgraph
-  
-
-    
-  </span>
-</a>
-</li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_10" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Nodes
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_10">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Nodes
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/">
-<span class="md-ellipsis">
-    
-  
-    Node Catalog
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/answer_synthesizer_node/">
-<span class="md-ellipsis">
-    
-  
-    Answer Synthesizer
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/ast_planner_node/">
-<span class="md-ellipsis">
-    
-  
-    AST Planner
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/clarifier_node/">
-<span class="md-ellipsis">
-    
-  
-    Clarifier
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/curated_matcher_node/">
-<span class="md-ellipsis">
-    
-  
-    Curated Matcher
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/datasource_resolver_node/">
-<span class="md-ellipsis">
-    
-  
-    Datasource Resolver
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/decomposer_node/">
-<span class="md-ellipsis">
-    
-  
-    Decomposer
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/engine_aggregator_node/">
-<span class="md-ellipsis">
-    
-  
-    Engine Aggregator
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/executor_node/">
-<span class="md-ellipsis">
-    
-  
-    Executor
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/generator_node/">
-<span class="md-ellipsis">
-    
-  
-    Generator
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/logical_validator_node/">
-<span class="md-ellipsis">
-    
-  
-    Logical Validator
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/refiner_node/">
-<span class="md-ellipsis">
-    
-  
-    Refiner
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/nodes/schema_retriever_node/">
-<span class="md-ellipsis">
-    
-  
-    Schema Retriever
-  
-
-    
-  </span>
-</a>
-</li>
-</ul>
-</nav>
-</li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
-<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Getting Started
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_3">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Getting Started
+    Get started
   
 
           </label>
@@ -790,24 +346,24 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
-<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
 <span class="md-ellipsis">
     
   
-    Apps
+    Use it
   
 
     
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_4">
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
 <span class="md-nav__icon md-icon"></span>
             
   
-    Apps
+    Use it
   
 
           </label>
@@ -836,12 +392,9 @@
   </span>
 </a>
 </li>
-</ul>
-</nav>
-</li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
-<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -852,8 +405,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_5">
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -890,8 +443,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
-<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -902,8 +455,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_6">
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_4">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -939,29 +492,6 @@
 </ul>
 </nav>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
-<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Dashboards
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_7">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Dashboards
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
 <a class="md-nav__link" href="../../dashboards/">
 <span class="md-ellipsis">
@@ -974,28 +504,114 @@
   </span>
 </a>
 </li>
-</ul>
-</nav>
-</li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
-<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
 <span class="md-ellipsis">
     
   
-    Configuration
+    Evals
   
 
     
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_8">
+<nav aria-expanded="false" aria-labelledby="__nav_3_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_6">
 <span class="md-nav__icon md-icon"></span>
             
   
-    Configuration
+    Evals
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/cases/">
+<span class="md-ellipsis">
+    
+  
+    Cases and Suites
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/scorers/">
+<span class="md-ellipsis">
+    
+  
+    Scorers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/seeding/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/chinook-suite/">
+<span class="md-ellipsis">
+    
+  
+    The Chinook Suite
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Configure
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Configure
   
 
           </label>
@@ -1023,6 +639,92 @@
     
   </span>
 </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Databases
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Databases
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/duckdb/">
+<span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/mssql/">
+<span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/mysql/">
+<span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/postgres/">
+<span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sqlite/">
+<span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/llm/">
@@ -1168,158 +870,21 @@
   </span>
 </a>
 </li>
-</ul>
-</nav>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../api-keys/">
+<span class="md-ellipsis">
+    
+  
+    API keys
+  
+
+    
+  </span>
+</a>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
-<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Adapters
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_9">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Adapters
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/">
-<span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/architecture/">
-<span class="md-ellipsis">
-    
-  
-    Architecture
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/sdk/">
-<span class="md-ellipsis">
-    
-  
-    SDK Reference
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/sqlalchemy/">
-<span class="md-ellipsis">
-    
-  
-    SQLAlchemy Reference
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/development/">
-<span class="md-ellipsis">
-    
-  
-    Building Adapters
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/duckdb/">
-<span class="md-ellipsis">
-    
-  
-    DuckDB
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/mssql/">
-<span class="md-ellipsis">
-    
-  
-    Microsoft SQL Server
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/mysql/">
-<span class="md-ellipsis">
-    
-  
-    MySQL
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/postgres/">
-<span class="md-ellipsis">
-    
-  
-    PostgreSQL
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../adapters/sqlite/">
-<span class="md-ellipsis">
-    
-  
-    SQLite
-  
-
-    
-  </span>
-</a>
-</li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
-<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4_17" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_17" id="__nav_4_17_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -1330,8 +895,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_10">
+<nav aria-expanded="false" aria-labelledby="__nav_4_17_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_17">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -1379,67 +944,92 @@
 </ul>
 </nav>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_11" type="checkbox"/>
-<label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
 <span class="md-ellipsis">
     
   
-    Execution
+    Deploy and operate
   
 
     
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_11_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_11">
+<nav aria-expanded="true" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
 <span class="md-nav__icon md-icon"></span>
             
   
-    Execution
+    Deploy and operate
   
 
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../execution/isolation/">
+<a class="md-nav__link" href="../../deployment/architecture/">
 <span class="md-ellipsis">
     
   
-    Execution Isolation + Concurrency
+    Deployment Architecture
   
 
     
   </span>
 </a>
 </li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_12" type="checkbox"/>
-<label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/docker/">
 <span class="md-ellipsis">
     
   
-    Storage
+    Docker
   
 
     
   </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_12_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_12">
-<span class="md-nav__icon md-icon"></span>
-            
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/compose/">
+<span class="md-ellipsis">
+    
   
-    Storage
+    Docker Compose
   
 
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/kubernetes/">
+<span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/hosted-demo/">
+<span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+</a>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../../storage/artifact-store/">
 <span class="md-ellipsis">
@@ -1452,118 +1042,6 @@
   </span>
 </a>
 </li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_13" type="checkbox"/>
-<label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Observability
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_13_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_13">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Observability
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../observability/stack/">
-<span class="md-ellipsis">
-    
-  
-    Observability Stack
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../observability/events/">
-<span class="md-ellipsis">
-    
-  
-    Events
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../observability/debugging/">
-<span class="md-ellipsis">
-    
-  
-    Debugging a Run (Traces)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../observability/feedback/">
-<span class="md-ellipsis">
-    
-  
-    Feedback and Signals
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../observability/error-handling/">
-<span class="md-ellipsis">
-    
-  
-    Error Handling + Circuit Breaker
-  
-
-    
-  </span>
-</a>
-</li>
-</ul>
-</nav>
-</li>
-<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_14" type="checkbox"/>
-<label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="">
-<span class="md-ellipsis">
-    
-  
-    Security
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="true" aria-labelledby="__nav_14_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_14">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Security
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item md-nav__item--active">
 <input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
 <label class="md-nav__link md-nav__link--active" for="__toc">
@@ -1593,6 +1071,15 @@
       Table of contents
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#at-a-glance">
+<span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+</a>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#the-role-is-supplied-by-the-caller">
 <span class="md-ellipsis">
@@ -1671,12 +1158,83 @@
   </span>
 </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../api-keys/">
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_9" id="__nav_5_9_label" tabindex="">
 <span class="md-ellipsis">
     
   
-    API keys
+    Observability
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/stack/">
+<span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/events/">
+<span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/debugging/">
+<span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/error-handling/">
+<span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
   
 
     
@@ -1686,117 +1244,34 @@
 </ul>
 </nav>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
-<span class="md-ellipsis">
-    
-  
-    Deployment
-  
-
-    
-  </span>
-<span class="md-nav__icon md-icon"></span>
-</label>
-<nav aria-expanded="false" aria-labelledby="__nav_15_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_15">
-<span class="md-nav__icon md-icon"></span>
-            
-  
-    Deployment
-  
-
-          </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../deployment/architecture/">
-<span class="md-ellipsis">
-    
-  
-    Deployment Architecture
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../deployment/docker/">
-<span class="md-ellipsis">
-    
-  
-    Docker
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../deployment/compose/">
-<span class="md-ellipsis">
-    
-  
-    Docker Compose
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../deployment/kubernetes/">
-<span class="md-ellipsis">
-    
-  
-    Kubernetes
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../deployment/hosted-demo/">
-<span class="md-ellipsis">
-    
-  
-    Hosted demo
-  
-
-    
-  </span>
-</a>
-</li>
 </ul>
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
 <span class="md-ellipsis">
     
   
-    Development
+    Extend
   
 
     
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_16_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_16">
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
 <span class="md-nav__icon md-icon"></span>
             
   
-    Development
+    Extend
   
 
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../development/">
+<a class="md-nav__link" href="../../extend/">
 <span class="md-ellipsis">
     
   
@@ -1808,19 +1283,7 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../development/releasing/">
-<span class="md-ellipsis">
-    
-  
-    Releasing
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../extensions/add-adapter/">
+<a class="md-nav__link" href="../../extend/add-adapter/">
 <span class="md-ellipsis">
     
   
@@ -1832,7 +1295,7 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../extensions/add-chunk-types/">
+<a class="md-nav__link" href="../../extend/add-chunk-types/">
 <span class="md-ellipsis">
     
   
@@ -1844,7 +1307,7 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../extensions/extend-planner/">
+<a class="md-nav__link" href="../../extend/extend-planner/">
 <span class="md-ellipsis">
     
   
@@ -1856,7 +1319,7 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../extensions/add-execution-backend/">
+<a class="md-nav__link" href="../../extend/add-execution-backend/">
 <span class="md-ellipsis">
     
   
@@ -1867,34 +1330,31 @@
   </span>
 </a>
 </li>
-</ul>
-</nav>
-</li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_17" type="checkbox"/>
-<label class="md-nav__link" for="__nav_17" id="__nav_17_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6_6" id="__nav_6_6_label" tabindex="0">
 <span class="md-ellipsis">
     
   
-    Evals
+    Adapters
   
 
     
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_17_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_17">
+<nav aria-expanded="false" aria-labelledby="__nav_6_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_6_6">
 <span class="md-nav__icon md-icon"></span>
             
   
-    Evals
+    Adapters
   
 
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../evals/">
+<a class="md-nav__link" href="../../adapters/">
 <span class="md-ellipsis">
     
   
@@ -1906,11 +1366,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../evals/cases/">
+<a class="md-nav__link" href="../../adapters/architecture/">
 <span class="md-ellipsis">
     
   
-    Cases and Suites
+    Architecture
   
 
     
@@ -1918,11 +1378,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../evals/scorers/">
+<a class="md-nav__link" href="../../adapters/sdk/">
 <span class="md-ellipsis">
     
   
-    Scorers
+    SDK Reference
   
 
     
@@ -1930,11 +1390,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../evals/seeding/">
+<a class="md-nav__link" href="../../adapters/sqlalchemy/">
 <span class="md-ellipsis">
     
   
-    Benchmark Your Own Database
+    SQLAlchemy Reference
   
 
     
@@ -1942,23 +1402,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../testing/evaluation-dataset/">
+<a class="md-nav__link" href="../../adapters/development/">
 <span class="md-ellipsis">
     
   
-    The Chinook Suite
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../benchmarks/">
-<span class="md-ellipsis">
-    
-  
-    Benchmark Results
+    Building Adapters
   
 
     
@@ -1968,59 +1416,47 @@
 </ul>
 </nav>
 </li>
+</ul>
+</nav>
+</li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18" type="checkbox"/>
-<label class="md-nav__link" for="__nav_18" id="__nav_18_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
 <span class="md-ellipsis">
     
   
-    Testing
+    Reference
   
 
     
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_18_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_18">
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
 <span class="md-nav__icon md-icon"></span>
             
   
-    Testing
+    Reference
   
 
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../testing/architecture/">
+<a class="md-nav__link" href="../../reference/cli/">
 <span class="md-ellipsis">
     
   
-    Testing Architecture
+    CLI
   
 
     
   </span>
 </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../testing/test-bed/">
-<span class="md-ellipsis">
-    
-  
-    Real-Database Test Bed
-  
-
-    
-  </span>
-</a>
-</li>
-</ul>
-</nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_19" type="checkbox"/>
-<label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -2031,8 +1467,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_19_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_19">
+<nav aria-expanded="false" aria-labelledby="__nav_7_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_2">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -2054,8 +1490,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_19_2" type="checkbox"/>
-<label class="md-nav__link" for="__nav_19_2" id="__nav_19_2_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7_2_2" id="__nav_7_2_2_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -2066,8 +1502,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_19_2_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_19_2">
+<nav aria-expanded="false" aria-labelledby="__nav_7_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_2_2">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -2200,8 +1636,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_19_3" type="checkbox"/>
-<label class="md-nav__link" for="__nav_19_3" id="__nav_19_3_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7_2_3" id="__nav_7_2_3_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -2212,8 +1648,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_19_3_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_19_3">
+<nav aria-expanded="false" aria-labelledby="__nav_7_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_2_3">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -2228,6 +1664,18 @@
     
   
     Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/routes/">
+<span class="md-ellipsis">
+    
+  
+    All routes
   
 
     
@@ -2420,9 +1868,476 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../reference/limitations/">
+<span class="md-ellipsis">
+    
+  
+    Status and limitations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../reference/glossary/">
+<span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_20" type="checkbox"/>
-<label class="md-nav__link" for="__nav_20" id="__nav_20_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    How it works
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/graph_state/">
+<span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/determinism/">
+<span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/invariants/">
+<span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/failure_recovery/">
+<span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/curated_answers/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/isolation/">
+<span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_8_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/subgraphs/main_pipeline_graph/">
+<span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/subgraphs/sql_agent/">
+<span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8_11" id="__nav_8_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_8_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/">
+<span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/answer_synthesizer_node/">
+<span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/ast_planner_node/">
+<span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/clarifier_node/">
+<span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/datasource_resolver_node/">
+<span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/decomposer_node/">
+<span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/engine_aggregator_node/">
+<span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/executor_node/">
+<span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/generator_node/">
+<span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/logical_validator_node/">
+<span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/refiner_node/">
+<span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/schema_retriever_node/">
+<span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Contribute
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../contribute/">
+<span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../contribute/testing/">
+<span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../contribute/test-bed/">
+<span class="md-ellipsis">
+    
+  
+    Real-Database Test Bed
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../contribute/releasing/">
+<span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -2433,8 +2348,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_20_label" class="md-nav" data-md-level="1">
-<label class="md-nav__title" for="__nav_20">
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -2663,11 +2578,11 @@
 </nav>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../glossary/">
+<a class="md-nav__link" href="../../benchmarks/">
 <span class="md-ellipsis">
     
   
-    Glossary
+    Benchmarks
   
 
     
@@ -2688,6 +2603,15 @@
       Table of contents
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#at-a-glance">
+<span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+</a>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#the-role-is-supplied-by-the-caller">
 <span class="md-ellipsis">
@@ -2759,6 +2683,32 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="security-model">Security Model</h1>
+<h2 id="at-a-glance">At a glance</h2>
+<ul>
+<li><strong>What reaches the LLM provider:</strong> the question; the schema the planner needs
+  (table and column names, types, keys, relationships, descriptions); <strong>sample
+  column values</strong> for tables the role may read; and the <strong>result rows</strong>, which
+  the answer writer summarises. With <code>settings.traces.mode</code> on, run traces store prompts,
+  responses and sample rows on disk.</li>
+<li><strong>RBAC is strict.</strong> A plan that touches a table the role may not read is
+  refused before any SQL exists, never answered from the tables the role can
+  see. Sample values and statistics of forbidden tables are stripped from the
+  prompt and the trace. An unknown role grants nothing. There is no column
+  masking and no row-level security.</li>
+<li><strong>Read-only is a database setting, not something the executor checks.</strong> The
+  plan type only allows <code>SELECT</code> and the generator only builds one, but the
+  executor does not inspect the SQL. A SQLite datasource is always opened
+  read-only at the driver level (SQLite's <code>mode=ro</code> URI), so a write is refused
+  by SQLite itself. No other dialect opens read-only yet, so on PostgreSQL, MySQL, SQL Server
+  or DuckDB, <strong>give the engine a read-only database user.</strong></li>
+<li><strong>No authentication</strong> in the CLI or REST API. The CLI
+  takes the role from the caller. The REST API takes it from a trusted
+  proxy header or a static setting, never from the body unless a dev flag is
+  on; put your own auth in the proxy and derive the role from it.</li>
+<li><code>settings.pipeline.timeout_s</code> bounds how long the caller waits, not how long the work
+  runs; the graph runs in-process with no sandbox.</li>
+</ul>
+<p>Details are below and in <a href="../../architecture/isolation/">Execution Isolation</a>.</p>
 <p>Authorization is enforced at <strong>planning time</strong>, by the logical validator, before
 any SQL exists. That is the one security property this engine provides. It is
 not authentication, it is not containment, and it is not row- or column-level
