@@ -152,8 +152,8 @@ test("the nav names every page, marks the current one and says which are off", (
   const items = navItems("settings", { retrieval: true });
 
   assert.deepEqual(items.map((i) => i.id), PAGES.filter((p) => !p.stub).map((p) => p.id));
-  assert.deepEqual(items.map((i) => i.href), ["#/", "#/chat", "#/pipeline", "#/settings", "#/retrieval", "#/dashboards", "#/connect", "#/knowledge", "#/approvals"]);
-  assert.deepEqual(items.map((i) => i.label), ["Home", "Chat", "Pipeline", "Settings", "Retrieval", "Dashboards", "Connect", "Knowledge", "Approvals"]);
+  assert.deepEqual(items.map((i) => i.href), ["#/", "#/chat", "#/pipeline", "#/settings", "#/retrieval", "#/dashboards", "#/connect", "#/knowledge", "#/approvals", "#/evals"]);
+  assert.deepEqual(items.map((i) => i.label), ["Home", "Chat", "Pipeline", "Settings", "Retrieval", "Dashboards", "Connect", "Knowledge", "Approvals", "Evals"]);
   assert.equal(items.filter((i) => i.current).length, 1);
   assert.equal(items.find((i) => i.id === "settings").current, true);
   // An off page keeps its place in the nav: it opens and says why.
@@ -208,8 +208,8 @@ const WAVE_D = ["chat", "dashboards", "approvals", "evals", "trace"];
 // Pages W3 filled: real routes in the nav.
 const FILLED = ["connect", "knowledge"];
 
-// The rows that have shipped (W1: chat, approvals; W2b: dashboards); the rest stay stubs the nav does not list.
-const SHIPPED = ["chat", "dashboards", "approvals"];
+// The rows that have shipped (W1: chat, approvals; W2b: dashboards; W4a: evals); the rest stay stubs the nav does not list.
+const SHIPPED = ["chat", "dashboards", "approvals", "evals"];
 
 test("Wave D's routes are all there; the shipped ones are in the nav, the rest are stubs", () => {
   for (const id of WAVE_D) {

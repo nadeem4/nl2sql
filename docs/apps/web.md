@@ -6,7 +6,7 @@ repository root, is built into the API package, and talks to nothing but the
 page can do, an SDK or REST caller can do the same way.
 
 Pages are reached by hash route: `#/chat`, `#/approvals`, `#/settings`,
-`#/retrieval`, `#/pipeline`. A route nobody serves opens Home.
+`#/retrieval`, `#/pipeline`, `#/evals`. A route nobody serves opens Home.
 
 ## Chat
 
@@ -153,6 +153,26 @@ Removing a datasource asks first. Once a datasource is added, secrets typed into
 - **Waiting for review** (administrators; the page does not ask for these unless `/meta` says you are one, and a 403 still hides them): the proposals from profiling and starter questions, grouped by kind. Each shows everything accepting would write (a role, a unit, code values, text), and the counts and checks that back it, never rows of data. Accept or reject one or many; "Edit and accept" lets you change a proposal's text first. Accepting writes to the knowledge files; the page names the files and shows any proposal the server refused and why.
 - **Drift** (administrators): **Check for drift** compares each live database with its index and lists what changed (tables, columns, types, foreign keys) and what the change may break: verified queries, glossary items, policy rules and preferred tables. To bring a drifted index up to date, run `nl2sql index`.
 
+## Evals
+
+**Evals** (`#/evals`) runs the suites named in `evals.suites` on the server and shows the report. It is for administrators: a report holds every role's cases, plans and SQL, so `GET /meta` (`caller.admin`) decides whether the page is listed, and a caller who opens it anyway is told it is off.
+
+1. Pick a **mode**. *Plans only* and *Retrieval only* call no model. *Full* asks every case end to end, spends money, and needs a **cost cap** in dollars (the run stops when its model calls reach it).
+2. Tick the suites to run (all by default; each shows how many of its cases are approved).
+3. **Run** starts `POST /jobs/eval`. The job shows its progress and can be cancelled.
+
+The report shows, for each configuration: accuracy with its interval, the generated path's accuracy, cost, latency (p50 and p95) and planner retries; accuracy by source (curated or generated) and the pass, fail, error and skip counts by role; and every case that did not pass, with its question, the reason each scorer gave and its SQL. A run that stopped at its cost cap, or was cancelled, says so, and a model call with no known price is counted so the cost reads as a floor.
+
+## Settings
+
+**Settings** (`#/settings`) holds up to four cards, depending on the server and on who you are.
+
+- **API key** and **Model for each step** appear when the server lets a request bring its own model (`api.request_llm`, which `GET /meta` reports). The key and the choices stay in this browser tab (`sessionStorage`) and travel as headers with each question; nothing is written on the server. A step put on a provider needs a key for it in the same tab, or the question is refused. The providers, their models and the steps come from `GET /llm/providers` and `GET /llm`.
+- **The server's model** (administrators) edits the default model and the model of each step, and saves with `PUT /settings/llm`. That replaces the server's whole `llm` section in memory only: `llm.yaml` is read again on a restart. Each provider's key is read from its environment variable, as before. The page no longer warns about models that ignore temperature 0, because `GET /llm/providers` does not say which they are.
+- **API keys for this server** (administrators) lists the keys the server issues, and creates one from a user id, roles, an optional tenant and an optional label (`POST /api-keys`). The new key's token is shown once and never again. **Revoke** ends a key (`DELETE /api-keys/{id}`).
+
+A caller who is not an administrator, on a server that does not take a key with a question, sees that there is nothing to set.
+
 ## Source map
 
 | Path | What it holds |
@@ -162,5 +182,7 @@ Removing a datasource asks first. Once a datasource is added, secrets typed into
 | `src/chat/turns.js` | Reads a stored turn: answer, steps, pending questions, tool buttons |
 | `src/pages/Chat.jsx` | The page: list, transcript, composer, streaming |
 | `src/pages/Approvals.jsx` | The approvals queue |
+| `src/api/evals.js`, `src/pages/Evals.jsx`, `src/evals/report.js` | Run a suite and read the report |
+| `src/api/settings.js`, `src/pages/Settings.jsx`, `src/lib/settings.js` | The tab's keys and models, the server's model, API keys |
 
 Where the code and `docs/architecture/wave_d.md` differ, the code is right.
