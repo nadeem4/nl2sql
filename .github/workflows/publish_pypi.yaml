@@ -129,19 +129,19 @@ jobs:
       # nowhere. Each leg is an independent upload to an independent project;
       # let the survivors finish and re-publish only what actually failed.
       fail-fast: false
-      # One leg at a time, the SDK first, then the API, the engine, the CLI: the
-      # API requires the engine and the SDK, the CLI the engine (and, with its
-      # `web` extra, the API), so a version is installable only once all four are up.
-      # In this order each upload finds what it depends on already published.
+      # One leg at a time, the SDK first, then the engine, the API, the CLI: the
+      # engine requires the SDK, the API the engine, the CLI the engine (and, with
+      # its `web` extra, the API), so a version is installable only once all four
+      # are up. In this order each upload finds what it depends on already published.
       max-parallel: 1
       matrix:
         include:
           - package: nl2sql-sdk
             stem: nl2sql_sdk
-          - package: nl2sql-api
-            stem: nl2sql_api
           - package: nl2sql-engine
             stem: nl2sql_engine
+          - package: nl2sql-api
+            stem: nl2sql_api
           - package: nl2sql-cli
             stem: nl2sql_cli
     environment: pypi-${{ matrix.package }}
@@ -165,16 +165,16 @@ jobs:
           cp dist/${{ matrix.stem }}-*.tar.gz dist/${{ matrix.stem }}-*.whl upload/
           ls -1 upload/
 
-      # The legs are independent (fail-fast is off), so the engine leg looks for
-      # its own dependency: the same version of nl2sql-api.
-      - name: Check the API is on PyPI
-        if: matrix.package == 'nl2sql-engine'
+      # The legs are independent (fail-fast is off), so the api leg looks for
+      # its own dependency: the same version of nl2sql-engine.
+      - name: Check the engine is on PyPI
+        if: matrix.package == 'nl2sql-api'
         run: |
           wheel="$(ls upload/*.whl | head -n 1)"
-          version="${wheel#upload/nl2sql_engine-}"
+          version="${wheel#upload/nl2sql_api-}"
           version="${version%%-*}"
-          curl -fsS --retry 10 --retry-delay 15 --retry-all-errors "https://pypi.org/pypi/nl2sql-api/$version/json" > /dev/null \
-            || { echo "nl2sql-api $version is not on PyPI; not uploading an engine that cannot install its demo extra."; exit 1; }
+          curl -fsS --retry 10 --retry-delay 15 --retry-all-errors "https://pypi.org/pypi/nl2sql-engine/$version/json" > /dev/null \
+            || { echo "nl2sql-engine $version is not on PyPI; not uploading an API that cannot install."; exit 1; }
 
       # The CLI leg is last: `pip install "nl2sql-cli[web]"` needs the engine and the API at its own version.
       - name: Check the engine and the API are on PyPI
@@ -220,8 +220,8 @@ jobs:
           packages-dir: upload/
           attestations: false
 
-  # The root Dockerfile installs nl2sql-sdk, nl2sql-engine and
-  # nl2sql-api from the local sources, not from PyPI, and its COPY paths are
+  # The root Dockerfile installs nl2sql-sdk, nl2sql-engine, nl2sql-api and
+  # nl2sql-cli from the local sources, not from PyPI, and its COPY paths are
   # written relative to the repository root (`./packages/...`). COPY resolves
   # against the build context, so the context must be the repo root and the
   # Dockerfile has to be named explicitly with `file:`. Pointing `context` at
@@ -295,7 +295,7 @@ jobs:
           mike deploy --push --update-aliases "$TAG" latest
           mike set-default --push latest
 
-  # The release as a user gets it: `pip install "nl2sql-engine[demo]==X.Y.Z"`
+  # The release as a user gets it: `pip install "nl2sql-cli[web]==X.Y.Z"`
   # from PyPI itself into an empty virtualenv on a fresh runner, then the same
   # key-free boot of `nl2sql-api serve --demo --hosted` the `fresh-install` job in test.yml
   # runs on the wheels. PyPI accepts an upload at once but its CDN serves the

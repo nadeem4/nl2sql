@@ -428,7 +428,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     source.add_argument("--pypi", metavar="VERSION",
                         help="install this published version from PyPI instead, retrying while the index catches up")
     source.add_argument("--url", help="check a deployed web app instead of installing one; needs --expect-version")
-    parser.add_argument("--build", action="store_true", help="build the three distributions into --dist first")
+    parser.add_argument("--build", action="store_true", help="build the four distributions into --dist first")
     parser.add_argument("--expect-version", help="with --url: the version /api/v1/health must report")
     parser.add_argument("--attempts", type=int, default=10, help="with --pypi: install attempts (default 10, 30s apart)")
     parser.add_argument("--timeout", type=float, default=900,

@@ -691,8 +691,8 @@ flowchart TD
 1. `nl2sql-sdk` — no internal dependencies.
 2. `nl2sql-engine` — needs the SDK. Carries the engine and the dialect
    adapters, so its extras (`nl2sql-engine[postgres]` and friends) add only database
-   drivers from PyPI and cannot be broken by publish order.
-3. `nl2sql-api` — needs `nl2sql-engine`.
+   drivers from PyPI and cannot be broken by publish order. It does not depend on the API.
+3. `nl2sql-api` — needs `nl2sql-engine`; its leg first checks the engine is on PyPI at the same version.
 4. `nl2sql-cli` — needs `nl2sql-engine`, and `nl2sql-api` for its `web` extra. It uploads last, after a step that checks the other two are on PyPI.
 
 PyPI never lets a version be re-uploaded. If a release goes out broken, yank it

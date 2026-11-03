@@ -205,8 +205,8 @@ def test_the_mysql_extras_install_cryptography_for_mysql_8_logins(extra):
     assert "rsa" in pymysql.extras
 
 
-def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_then_the_cli_one_at_a_time():
-    """The API needs the engine and the SDK, the CLI needs the engine (its `web` extra, the API): upload what is depended on first."""
+def test_pypi_uploads_the_sdk_then_the_engine_then_the_api_then_the_cli_one_at_a_time():
+    """The engine needs the SDK, the API the engine, the CLI the engine (and the API for its `web` extra): upload what is depended on first."""
     import re
     from pathlib import Path
 
@@ -214,21 +214,22 @@ def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_then_the_cli_one_at_a
 
     assert "max-parallel: 1" in workflow
     order = re.findall(r"- package: (nl2sql-[a-z]+)", workflow)
-    assert order == ["nl2sql-sdk", "nl2sql-api", "nl2sql-engine", "nl2sql-cli"]
+    assert order == ["nl2sql-sdk", "nl2sql-engine", "nl2sql-api", "nl2sql-cli"]
 
 
-def test_the_engine_upload_waits_for_the_api_to_be_on_pypi():
-    """The legs are independent (fail-fast is off), so the engine leg checks for its API itself."""
+def test_the_api_upload_waits_for_the_engine_to_be_on_pypi():
+    """The legs are independent (fail-fast is off), so the api leg checks for its engine itself; the engine needs no API."""
     from pathlib import Path
 
     workflow = (Path(__file__).resolve().parents[4] / ".github" / "workflows" / "publish_pypi.yaml").read_text(encoding="utf-8")
-    check = workflow.index("Check the API is on PyPI")
+    check = workflow.index("Check the engine is on PyPI")
 
-    assert "matrix.package == 'nl2sql-engine'" in workflow[check - 200:check + 400]
-    assert "https://pypi.org/pypi/nl2sql-api/" in workflow[check:check + 1200]
+    assert "matrix.package == 'nl2sql-api'" in workflow[check - 200:check + 400]
+    assert "https://pypi.org/pypi/nl2sql-engine/" in workflow[check:check + 1200]
     # PyPI's JSON API can lag a fresh upload: the check retries before it fails the release.
     assert "--retry-all-errors" in workflow[check:check + 1200]
     assert check < workflow.index("Publish ${{ matrix.package }} to PyPI")
+    assert "Check the API is on PyPI" not in workflow
 
 
 def _publish() -> str:
