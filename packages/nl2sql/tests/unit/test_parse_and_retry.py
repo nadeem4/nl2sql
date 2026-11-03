@@ -3,8 +3,7 @@
 ``structured()`` and ``streaming_structured()`` send the model's answer back
 with the validation errors, up to the agent's ``parse_retries`` times, and then
 raise ``StructuredOutputError``, which ``provider_error()`` reports as
-``MODEL_OUTPUT_INVALID``. See docs/architecture/phase2.md, section 5,
-"Structured output, and parse-and-retry".
+``MODEL_OUTPUT_INVALID``. 
 """
 import pytest
 from langchain_core.prompts import ChatPromptTemplate

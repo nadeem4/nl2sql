@@ -1,4 +1,4 @@
-"""The MCP server's three tools over an in-process MCP client (wave_a.md, section 12).
+"""The MCP server's three tools over an in-process MCP client.
 
 The engine is the real facade over a stub runtime: the real ``datasources.schema``
 and ``policies.scope``, a scripted ``run_query``. The run end to end, on a fake
@@ -261,7 +261,7 @@ def test_ask_on_an_unreachable_datasource_is_not_found_and_never_runs():
 
 
 def test_the_identity_is_resolved_on_every_call():
-    """``identity`` may be a function, so a server over HTTP can name a caller per request (Wave C)."""
+    """``identity`` may be a function, so a server over HTTP can name a caller per request."""
     callers = iter([ADMIN, VIEWER])
     engine = _Engine()
 
@@ -301,7 +301,7 @@ def test_ask_never_names_a_denied_table():
     ("describe_table", {"datasource_id": "chinook", "table": "Album"}),
 ])
 def test_an_identity_that_raises_returns_no_exception_text(tool, arguments):
-    """Wave C resolves a caller per request; a resolver's failure (a rejected token, say) is never echoed."""
+    """A caller is resolved per request; a resolver's failure (a rejected token, say) is never echoed."""
     def rejected():
         raise RuntimeError("token=SECRET123 rejected")
 

@@ -1,5 +1,5 @@
 // A dashboard filter's chosen values and the body of a refresh that carries them. A refresh with filters returns its
-// result and stores nothing (wave_d.md, "Dashboards and workspaces"), so the selection lives only on the page.
+// result and stores nothing, so the selection lives only on the page.
 // `in` filters take a list of a dimension's values; `between` takes [from, to] of a temporal or number column.
 
 export function setValues(selection, id, values) {

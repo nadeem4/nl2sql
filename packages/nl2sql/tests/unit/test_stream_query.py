@@ -1,9 +1,8 @@
-"""``stream_query``: one run, as bus ``Event``s from the caller-safe allow-list (D17).
+"""``stream_query``: one run, as bus ``Event``s from the caller-safe allow-list.
 
 The real ``run_with_graph`` runs a small graph with the pipeline's node names
 (``build_graph`` is swapped for it), so the events come through the same
-callbacks, scope, thread and telemetry a real run uses. The design is
-docs/architecture/wave_a.md, section 3, "The run's stream".
+callbacks, scope, thread and telemetry a real run uses. 
 """
 import threading
 from types import SimpleNamespace
@@ -140,7 +139,7 @@ def test_stream_terminal_event_carries_the_query_result(api):
     assert _volatile_free(result) == _volatile_free(plain)
     assert result["final_answer"]["summary"] == "Rock leads."
     assert set(result["timings"]) >= {"answer_synthesizer", "LangGraph"}
-    # The summary is the bus event's; only the stream's copy holds the result (D15).
+    # The summary is the bus event's; only the stream's copy holds the result.
     assert final.data["status"] == result["status"]
     assert {k: v for k, v in final.data.items() if k != "result"} == seen_on_bus[0].data
     assert all("result" not in e.data for e in seen_on_bus)
@@ -172,7 +171,7 @@ def test_the_stream_allow_list_is_the_catalogs():
 
 
 def test_an_open_scopes_earlier_events_reach_the_stream_with_extra_names(api):
-    """Wave C's turn: run.started and its own event come before stream_query, in the turn's scope."""
+    """turn: run.started and its own event come before stream_query, in the turn's scope."""
     scope = api.open_scope("and by month?")
     with scope.entered():
         publish("plan_cache.lookup", {"datasource_id": "shop", "hit": True})

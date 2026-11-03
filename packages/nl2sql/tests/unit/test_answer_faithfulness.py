@@ -117,7 +117,7 @@ def test_no_answer_text_is_not_checked():
         "faithful": True, "unsupported_numbers": [], "unsupported_entities": [], "checked": 0}
 
 
-# --- C-W6a: Decimal cells, derived numbers (operands stated), the preview size -------
+# --- Decimal cells, derived numbers (operands stated), the preview size -------
 
 PAGILA = {c.id: c for c in load_suite(SUITES_DIR / "pagila.yaml").cases}
 

@@ -1,8 +1,5 @@
 """``RunScope``: the life of one question on the bus, and the module function ``publish``.
 
-The design is docs/architecture/wave_a.md, section 3, "Run events go through
-the run's scope":
-
 1. The caller that builds the result opens it (``QueryAPI.run_query`` and
    ``stream_query``, and the eval runner): ``RunScope(...)``, ``attach`` the
    run-scoped pieces, then ``start()``, which publishes ``run.started``. The
@@ -98,7 +95,7 @@ class RunScope:
         self.usage = usage
         self._handlers: List[Any] = []
         # Every event this run published, in order: the trace lists them, and a stream that
-        # joins an open scope (Wave C's turn) starts from them.
+        # joins an open scope (turn) starts from them.
         self.events: List[Event] = []
         self.late_events = 0
         self._lock = threading.RLock()
@@ -151,7 +148,7 @@ class RunScope:
 
         The replay and the attach happen under the scope's lock, so an event
         published meanwhile on another thread is neither lost nor seen twice.
-        For a stream joining a scope opened before it (Wave C's turn).
+        For a stream joining a scope opened before it (turn).
         """
         wanted = frozenset(names)
         with self._lock:
@@ -165,7 +162,7 @@ class RunScope:
         the handlers attached (the budget).
 
         ``run_with_graph`` adds them to the graph's; a call made outside the
-        graph (Wave C's rewrite) passes them itself, inside ``entered()``, so
+        graph (rewrite) passes them itself, inside ``entered()``, so
         it counts in the run's usage and limits and carries its ``trace_id``.
         """
         return ([self.usage] if self.usage is not None else []) + list(self._handlers)
@@ -223,7 +220,7 @@ class RunScope:
         """Close with ``run.failed``: the run could not start, or crashed outside the pipeline.
 
         ``message`` is often an exception's text, which a provider's error can
-        fill with a key: it is redacted before it reaches the bus (D15).
+        fill with a key: it is redacted before it reaches the bus.
         """
         from nl2sql.llm.failures import redact_keys
 
@@ -232,7 +229,7 @@ class RunScope:
                                           "user_id": self.user_id, "roles": self.roles})
 
     def end(self, name: str, data: Any) -> Optional[Event]:
-        """Close with the event ``name`` instead of ``run.finished``: a scope that is not a question (Wave C's
+        """Close with the event ``name`` instead of ``run.finished``: a scope that is not a question (
         conversation turn closes with ``conversation.turn``). A second close does nothing."""
         return self._close(name, data)
 

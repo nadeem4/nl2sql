@@ -1,4 +1,4 @@
-// Run with `npm test`. What a turn's stream adds up to: Wave A's event names fill the spine.
+// Run with `npm test`. What a turn's stream adds up to: event names fill the spine.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EMPTY_SPINE, liveStations, spineOf } from "./spine.js";

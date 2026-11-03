@@ -62,10 +62,10 @@ executed is therefore **pinned** and reused
   `engine.llm.replace` a plan written by the old model is never served. Its
   entries stay, and swapping back hits them again
   ([LLM configuration → Replacing the LLM at runtime](../configuration/llm.md#replacing-the-llm-at-runtime)).
-- **The glossary.** The datasource's knowledge digest (Wave B, D57): a changed
+- **The glossary.** The datasource's knowledge digest: a changed
   definition of "revenue" plans again, and swapping the glossary back hits the
   old entries. A plan whose planner answer carried other readings is never
-  stored (D47).
+  stored.
 - **The run date.** The planner is told today's date (`settings.pipeline.today`, else the
   UTC date) and writes "this year" or "the last 30 days" as literal dates, so a
   plan made yesterday would answer for yesterday's window. Every entry is keyed

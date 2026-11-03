@@ -33,7 +33,7 @@ def parse_sse(text):
     return events
 
 
-def test_query_stream_yields_wave_a_events(api_client):
+def test_query_stream_yields_the_run_events(api_client):
     client, engine = api_client(_query_result())
 
     response = client.post("/api/v1/query/stream", json={"question": "revenue by region",

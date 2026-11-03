@@ -102,17 +102,17 @@ table, and the engine applies the pending ones when it starts
 `state.db` is adopted as it is; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the `locks` table;
 migration 4 adds the `schema_diffs` table; migration 5 adds the `proposals`
-table, the review queue (release 0.8, [Wave B](../architecture/wave_b.md#5-the-review-queue));
-migration 6 adds Wave C's five tables, below; migration 7 adds the `approvals` table and migration 8 the `saved_answers` table (Wave D), below. A 0.8 `state.db` is migrated in
+table, the review queue;
+migration 6 adds five tables, below; migration 7 adds the `approvals` table and migration 8 the `saved_answers` table, below. A 0.8 `state.db` is migrated in
 place and keeps its rows.
 
 ### Conversations, dashboards and API keys
 
-Release 0.9 ([Wave C](../architecture/wave_c.md#10-the-registry-and-the-state-store-after-wave-c)).
+Release 0.9.
 `StateStore` version 4 adds these methods. Each takes and returns a plain JSON
 document (`dict`), because the SDK holds none of the engine's models; the
 document carries the fields the store filters on. The engine methods that use
-them arrived in C1 and D1 to D4.
+them are in the conversations, workspaces and dashboards services.
 
 | Table (migration 6) | Methods | Filtered on | Notes |
 | --- | --- | --- | --- |
@@ -129,7 +129,7 @@ Each document's timestamps are ISO 8601; a stamp with no zone is read as UTC.
 
 ### Approvals
 
-Wave D ([D215](../architecture/wave_d.md)). `StateStore` version 5 adds the approval methods, one JSON document per
+`StateStore` version 5 adds the approval methods, one JSON document per
 approval request, in the `approvals` table that migration 7 creates (`CREATE TABLE IF NOT EXISTS`, so it is safe to
 run again).
 
@@ -139,7 +139,7 @@ run again).
 
 ### Saved answers
 
-Wave D ([D238](../architecture/wave_d.md)). `StateStore` version 6 adds the saved-answer methods, one JSON document
+`StateStore` version 6 adds the saved-answer methods, one JSON document
 per answer, in the `saved_answers` table that migration 8 creates (`CREATE TABLE IF NOT EXISTS`).
 
 | Table (migration 8) | Methods | Filtered on | Notes |

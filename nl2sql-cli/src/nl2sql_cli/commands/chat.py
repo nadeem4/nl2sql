@@ -1,4 +1,4 @@
-"""`nl2sql chat`: the terminal app over the engine facade (wave_d.md, section 7).
+"""`nl2sql chat`: the terminal app over the engine facade.
 
 The caller is named here once: ``--user`` (default the operating-system user) and ``--as`` (a role). Every engine
 call the app makes carries that ``UserContext``, so the policy a role sets holds in the terminal as it does in the API.

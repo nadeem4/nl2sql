@@ -6,7 +6,7 @@ import { GRID_COLUMNS, arrangeBody, cellStyle, order, pack, placeTiles, resize, 
 const view = JSON.parse(readFileSync(new URL("../api/fixtures/DashboardView.json", import.meta.url), "utf8"));
 const tile = (id, x, y, w, h) => ({ id, layout: { x, y, w, h } });
 
-test("the grid has the four columns of Wave C's TileLayout", () => {
+test("the grid has the four columns of TileLayout", () => {
   assert.equal(GRID_COLUMNS, 4);
 });
 

@@ -1,6 +1,6 @@
-"""``estimate`` on PostgreSQL, MySQL and SQL Server in the test bed: rows read, not rows returned (C1).
+"""``estimate`` on PostgreSQL, MySQL and SQL Server in the test bed: rows read, not rows returned.
 
-docs/architecture/wave_b.md, section 9, "The adapter method" (D52). The kit's
+The kit's
 checks run in ``test_conformance.py``; these use the samples' larger tables.
 """
 from __future__ import annotations

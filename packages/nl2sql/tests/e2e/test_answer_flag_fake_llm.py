@@ -1,4 +1,4 @@
-"""``answer=False``: a run that stops at the aggregator and writes no prose (wave_c.md, D119).
+"""``answer=False``: a run that stops at the aggregator and writes no prose.
 
 A dashboard refresh re-runs stored plans with ``run_query(plan=..., answer=False)``: no model call at all,
 ``final_answer`` is None, and the rows are the same.

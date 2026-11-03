@@ -1,8 +1,7 @@
 """The built-in LLM and embeddings providers the registry hands out.
 
 The five LLM providers are made from ``PROVIDER_PRESETS``, which stays the one
-table of key variables. See docs/architecture/configuration_v2.md,
-"Interfaces and versions".
+table of key variables. 
 """
 import pytest
 

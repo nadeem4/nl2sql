@@ -36,7 +36,7 @@ The matching knobs are in the [`settings` section](settings.md):
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `settings.curated.match_top_k` | `5` | Verified query candidates a question's search returns and the model is shown, one per query. |
-| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if there were no curated section, with no model call. Calibrated on the local embedding model; see [the design](../architecture/curated_answers.md#settings). |
+| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if there were no curated section, with no model call. Calibrated on the local embedding model; see [Curated answers](../architecture/curated_answers.md#settings). |
 
 ## Writing the file
 

@@ -23,10 +23,10 @@ datasource_id, schema_version)``:
   served. Its entries stay, and swapping back hits them again;
 * the datasource, because the same words mean different tables elsewhere;
 * the schema version, so a rebuilt index with a changed schema misses;
-* the datasource's knowledge digest (wave_b.md, D57), so a changed definition
+* the datasource's knowledge digest, so a changed definition
   of "revenue" plans again; swapping the glossary back hits the old entries.
 
-A plan whose planner answer carried alternatives is never stored (D47): the
+A plan whose planner answer carried alternatives is never stored: the
 sub-query wrapper skips it, so a later run asks the planner, which flags the
 ambiguity again.
 

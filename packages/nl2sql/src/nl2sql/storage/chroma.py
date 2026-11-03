@@ -6,7 +6,7 @@ Each namespace's collection records the vector ``dimension`` it was opened
 with and, as ``pointer:<datasource id>``, each datasource's live
 ``BuildPointer``. Chroma replaces a collection's metadata as a whole, so
 ``set_pointers`` writes every change in one ``modify``: that write is the
-commit. See docs/architecture/phase2.md, section 4.
+commit. 
 
 Reading a namespace or a folder that does not exist creates nothing.
 """

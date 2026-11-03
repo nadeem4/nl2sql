@@ -1,4 +1,4 @@
-"""How the declared types of a join key meet (docs/architecture/wave_a.md, D30).
+"""How the declared types of a join key meet.
 
 The decomposer declares each join key's ``dtype`` on both sides; the engine's
 aggregator casts both sides to one type before the join; the logical validator

@@ -82,7 +82,7 @@ run's trace.
 | `warnings` | Each one's `code` and `message`, under the same rule as `errors`. |
 | `trace_id` | The run's trace. The full results are read by it with `engine.results`. |
 | `errors` | When the run failed: each one's `code`, `node` and `message`. A refusal (`SECURITY_VIOLATION`) always carries the generic "You do not have permission to see the data this question requires.", whatever `refusal_names_tables` says. A hook's denial, a limit, a provider failure or an answer check keeps the engine's message; any other message names only its code and the trace, since it may carry an exception's text. |
-| `approvals_needed` | When `status` is `needs_approval`: what a person must approve, as `run_query` returns it ([Approval](../architecture/wave_a.md#7-approval)). |
+| `approvals_needed` | When `status` is `needs_approval`: what a person must approve, as `run_query` returns it. |
 | `stop` | When `status` is `stopped`: which limit stopped the run. |
 | `clarification` | When `status` is `needs_clarification`: the `phrase`, and each option's `id`, `label` and plain-English `explanation`. The request itself stays in the conversation. |
 

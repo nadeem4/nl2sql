@@ -20,7 +20,7 @@ Questions are top-level methods; everything else is a namespace.
 ## Creating an engine
 
 Every way builds the same `Config` (see
-[Configuration v2, section 4](../../architecture/configuration_v2.md#4-creating-the-engine)).
+[Configuration](../../configuration/system.md)).
 Names in it (`type: postgres`, `provider: anthropic`) are resolved through a
 `Registry`; `Registry.default()` is used when none is passed.
 

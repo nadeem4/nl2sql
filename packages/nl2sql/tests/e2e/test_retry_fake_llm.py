@@ -93,7 +93,7 @@ def _count_customers(fake_llm, monkeypatch, demo_project, planner_rules):
 
 @pytest.mark.e2e
 def test_a_count_star_plan_runs_first_time_without_a_retry(demo_project, fake_llm, monkeypatch):
-    """The planner writes ``COUNT(*)`` as a ``*`` column; the generator must not quote it (C-W3)."""
+    """The planner writes ``COUNT(*)`` as a ``*`` column; the generator must not quote it."""
     result, _ = _count_customers(fake_llm, monkeypatch, demo_project,
                                  [Rule("PlannerAnswer", _count_customers_plan(None))])
 

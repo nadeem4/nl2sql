@@ -1,7 +1,6 @@
 """The per-engine LLM client cache and ``engine.llm.replace``.
 
-docs/architecture/configuration_v2.md, section 4 ("Replacing the LLM at
-runtime") and the PR 9 row of section 11.
+Replacing the LLM at runtime.
 """
 from __future__ import annotations
 

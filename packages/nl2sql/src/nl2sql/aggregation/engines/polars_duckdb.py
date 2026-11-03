@@ -126,7 +126,7 @@ def _key_types(left: Frame, right: Frame, key: Dict[str, Any]) -> Optional[Tuple
 
 
 def _coerce_keys(left: Frame, right: Frame, join_keys: List[Dict[str, Any]]) -> Tuple[Frame, Frame]:
-    """Both sides of every typed join key cast to one type, in polars (wave_a.md, D30).
+    """Both sides of every typed join key cast to one type, in polars.
 
     A key the decomposer gave no dtypes (none reaches here from a run) is left
     as it is. A value that does not convert becomes null and matches nothing;

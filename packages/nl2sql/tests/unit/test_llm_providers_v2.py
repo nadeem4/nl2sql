@@ -1,7 +1,5 @@
 """LLM providers, interface version 2: ``openai_compatible`` and its presets, and the agent fields
 ``structured_output``, ``max_tokens``, ``timeout_s``, ``max_retries`` and ``headers``.
-
-See docs/architecture/phase2.md, section 5, "LLM and embeddings providers".
 """
 import json
 import tomllib

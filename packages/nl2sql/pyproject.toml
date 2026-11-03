@@ -138,7 +138,7 @@ log = "nl2sql.observers.log:LogObserver"
 audit = "nl2sql.observers.audit:AuditObserver"
 otel = "nl2sql.observers.otel:OtelObserver"
 
-# The built-in chat tools (docs/architecture/wave_c.md, section 4). A plugin declares its own in the same group.
+# The built-in chat tools. A plugin declares its own in the same group.
 [project.entry-points."nl2sql.chat_tools"]
 chart = "nl2sql.chat_tools.chart:ChartTool"
 diagram = "nl2sql.chat_tools.diagram:DiagramTool"
@@ -146,7 +146,7 @@ report = "nl2sql.chat_tools.report:ReportTool"
 dashboard_edit = "nl2sql.chat_tools.dashboard_edit:DashboardEditTool"
 dashboard_pin = "nl2sql.chat_tools.dashboard_pin:DashboardPinTool"
 
-# The built-in knowledge source (docs/architecture/wave_b.md, section 3).
+# The built-in knowledge source.
 [project.entry-points."nl2sql.knowledge_sources"]
 yaml = "nl2sql.knowledge.yaml_source:YamlKnowledgeSource"
 

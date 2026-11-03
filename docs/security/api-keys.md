@@ -2,7 +2,7 @@
 
 An API key authenticates a client of [MCP over HTTP](../getting_started/mcp.md#over-http). It carries the user,
 tenant and roles its holder runs as, so a key per person or per app is the unit of revocation. Nothing
-is inferred from the client. The design is [Wave C, section 9](../architecture/wave_c.md#9-mcp-over-http-with-auth).
+is inferred from the client. 
 
 ```text
 nl2sql keys create --as admin --user ana --role analyst --tenant acme --label laptop

@@ -3,8 +3,7 @@
 ``build_server(engine, identity)`` returns a ``FastMCP`` server from the
 official ``mcp`` SDK; ``nl2sql mcp`` runs it over stdio. It imports the
 top-level ``nl2sql`` and nothing else of the engine (the boundary test holds
-it), so every tool is something any SDK caller can do. See
-``docs/architecture/wave_a.md``, section 12, and ``docs/getting_started/mcp.md``.
+it), so every tool is something any SDK caller can do. See ``docs/getting_started/mcp.md``.
 
 Every tool runs as ``identity``: the tables and datasources the caller's scope
 does not reach are hidden, and a denied table answers exactly as a missing one

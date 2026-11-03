@@ -5,7 +5,7 @@ checks every component the config names through the registry. ``--connect``
 also connects to each datasource. Problems are printed by file; a secret is
 reported as present or missing, never printed. Exit code 0 means no problems,
 1 means problems, 2 is a usage error. Nothing is written under
-``storage.path``. See docs/architecture/configuration_v2.md, sections 6 and 10.
+``storage.path``.
 """
 from __future__ import annotations
 

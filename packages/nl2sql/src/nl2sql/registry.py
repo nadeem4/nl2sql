@@ -3,8 +3,7 @@
 A ``Registry`` is a value passed to the engine, not a global, so two engines
 or two tests never see each other's registrations. ``Registry.default()``
 lists the installed entry points and imports none of them; a name is imported,
-and checked, when ``load`` is asked for it. See
-docs/architecture/configuration_v2.md, sections 5 and 6.
+and checked, when ``load`` is asked for it. 
 
 This module imports only the standard library, so ``Registry.default()`` stays
 cheap: the import-time rule in docs/architecture/invariants.md.
@@ -66,7 +65,6 @@ _Entry = Tuple[str, str, str]
 
 class RegistryError(ValueError):
     """A name could not be registered or loaded. The message says why and how to fix it."""
-
 
 @functools.cache
 def _scan() -> Dict[str, Tuple[_Entry, ...]]:

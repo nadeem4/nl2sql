@@ -1,4 +1,4 @@
-"""The routing suite and its gate (wave_a.md, section 9, "The routing gate").
+"""The routing suite and its gate.
 
 ``suites/routing.yaml`` holds approved cases over the demo's three databases,
 single and cross-database. In mode retrieval (no key, no model, the local

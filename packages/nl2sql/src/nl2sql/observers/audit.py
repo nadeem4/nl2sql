@@ -1,4 +1,4 @@
-"""The ``audit`` observer: who did what, as JSON lines under ``<storage.path>/audit/`` (D19, B27).
+"""The ``audit`` observer: who did what, as JSON lines under ``<storage.path>/audit/``.
 
 One line per audited event, in ``<storage.path>/audit/<date>.jsonl`` (the
 event's UTC date): the event itself, ``name``, ``at``, ``trace_id``,

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 // What a person can change on a chart without a model: its title, its chart type, its place and size, and whether it
-// stays. Changing what data a chart shows is chat's job (Wave C's D133), so none of that is here.
+// stays. Changing what data a chart shows is chat's job, so none of that is here.
 const CHARTS = [["auto", "Automatic"], ["line", "Line"], ["bar", "Bar"], ["big_number", "Big number"], ["table", "Table"]];
 
 export default function TileEdit({ tile, busy, first, last, onTitle, onChart, onShift, onSize, onRemove }) {

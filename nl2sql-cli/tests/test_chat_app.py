@@ -1,4 +1,4 @@
-"""``nl2sql chat``: Textual's pilot over the app, with a stand-in engine behind the public facade (wave_d.md, section 7)."""
+"""``nl2sql chat``: Textual's pilot over the app, with a stand-in engine behind the public facade."""
 from __future__ import annotations
 
 import asyncio

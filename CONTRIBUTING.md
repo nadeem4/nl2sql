@@ -178,6 +178,8 @@ python -m pip install -r requirements-docs.txt
 mkdocs serve
 ```
 
+Docs describe what is built, in the present tense. Design and planning documents do not belong in the repo, and code, tests and comments do not cite doc sections or decision ids.
+
 ## Contribution workflow
 
 1. Create a feature branch (e.g., `feat/my-change`).

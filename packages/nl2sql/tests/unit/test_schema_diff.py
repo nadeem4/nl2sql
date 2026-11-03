@@ -1,6 +1,6 @@
-"""The structural diff between two schema snapshots of one datasource (D1, D31).
+"""The structural diff between two schema snapshots of one datasource.
 
-docs/architecture/wave_a.md, section 10, "The diff": it compares exactly what
+The diff compares exactly what
 the fingerprint covers, so for two snapshots of one datasource the diff is
 empty exactly when the fingerprints are equal. A rename is a drop and an add.
 """

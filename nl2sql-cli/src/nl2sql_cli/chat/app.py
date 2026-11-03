@@ -1,4 +1,4 @@
-"""``nl2sql chat``: a keyboard-first terminal app over the facade (wave_d.md, section 7).
+"""``nl2sql chat``: a keyboard-first terminal app over the facade.
 
 It imports only the top-level ``nl2sql`` and ``textual``. Every engine call names the caller (``UserContext``),
 and a turn is streamed from ``engine.conversations.stream`` on a worker thread, so the screen never waits on the

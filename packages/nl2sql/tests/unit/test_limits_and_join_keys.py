@@ -1,11 +1,10 @@
-"""Wave A, R2: the sub-query limit (D29) and join-key coercion (D30, B30).
+"""The sub-query limit and join-key coercion.
 
 A join across datasources on keys of different types used to fail in the
-aggregator, terminally, or silently match nothing (B30). Now the decomposer
+aggregator, terminally, or silently match nothing. Now the decomposer
 declares each key's type, the aggregator coerces both sides to it in polars,
 and the logical validator rejects only a column that cannot be coerced
-(temporal against number or boolean). See docs/architecture/wave_a.md,
-"Limits" and "The join-key type check". The model is ``FakeLLMServer``: no key,
+(temporal against number or boolean). The model is ``FakeLLMServer``: no key,
 no network.
 """
 from __future__ import annotations
@@ -77,7 +76,7 @@ def _decompose(rules, settings=None):
     return result, server
 
 
-# --- D29: the sub-query limit -----------------------------------------------
+# --- the sub-query limit -----------------------------------------------
 
 def test_decomposition_over_the_limit_is_question_too_broad():
     payload = _join([("customer_id", "int")], [("customer_id", "int")])
@@ -104,7 +103,7 @@ def test_the_limit_is_stated_in_the_prompt():
     assert "at most 4 sub_queries" in prompt
 
 
-# --- D30, part 1: the decomposer declares the type --------------------------
+# --- the decomposer declares the type --------------------------
 
 def test_join_key_without_dtype_is_retried_by_parse_retry():
     bad = _join([("customer_id", None)], [("customer_id", "int")])
@@ -161,7 +160,7 @@ def test_the_node_marks_the_join_keys_on_its_own_copy():
     assert combine.attributes["join_keys"][0]["right_dtype"] == "string"
 
 
-# --- D30, part 2: the aggregator coerces -----------------------------------
+# --- the aggregator coerces -----------------------------------
 
 def _engine():
     return PolarsDuckdbEngine.__new__(PolarsDuckdbEngine)
@@ -171,7 +170,7 @@ KEY = {"left": "customer_id", "right": "customer_id", "left_dtype": "int", "righ
 
 
 def test_text_and_integer_keys_join_after_coercion():
-    # B30: an integer key from one database, a text one from another.
+    # an integer key from one database, a text one from another.
     music = pl.LazyFrame({"customer_id": [45, 37, 7], "spend": [49.62, 43.62, 42.62]})
     tickets = pl.LazyFrame({"customer_id": ["45", " 7", "99"], "tickets": [2, 1, 3]})
 
@@ -240,7 +239,7 @@ def test_the_aggregator_node_reports_unconverted_values_with_the_datasource(tmp_
     assert warning.detail == {"column": "customer_id", "failed": 1, "total": 3, "dtype": "int"}
 
 
-# --- D30, part 3: the validator rejects only what cannot be coerced ---------
+# --- the validator rejects only what cannot be coerced ---------
 
 def _validate(column_type, declared, *, join_key=True, expr=None):
     table = Table(name="Orders", columns=[Column(name="OrderKey", type=column_type)])

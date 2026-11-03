@@ -135,8 +135,7 @@ run prints the seed it used; reproduce a failure with
 
 ## Settings in tests
 
-The engine reads its settings from its runtime, not from a process global
-([configuration v2, section 8](../architecture/configuration_v2.md#8-process-globals)),
+The engine reads its settings from its runtime, not from a process global,
 so a test sets them on the runtime it builds:
 
 - **One node or service:** `nl2sql.testing.runtime.fake_runtime(settings=...,

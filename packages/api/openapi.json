@@ -178,7 +178,7 @@
       },
       "ApiKey": {
         "additionalProperties": false,
-        "description": "An API key as `engine.api_keys` lists it: never the secret (D127).",
+        "description": "An API key as `engine.api_keys` lists it: never the secret.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -591,7 +591,7 @@
       },
       "BuilderOptions": {
         "additionalProperties": false,
-        "description": "The chips of the builder: everything on it exists and is readable by the caller (D245).",
+        "description": "The chips of the builder: everything on it exists and is readable by the caller.",
         "properties": {
           "curated": {
             "items": {
@@ -746,7 +746,7 @@
       },
       "ChartPlan": {
         "additionalProperties": false,
-        "description": "The typed plan behind a chart: a whole run (its decomposition and a plan per sub-query), or a\nverified query. Exactly one; shaped on ``PinnedRun`` (A1).",
+        "description": "The typed plan behind a chart: a whole run (its decomposition and a plan per sub-query), or a\nverified query. Exactly one; shaped on ``PinnedRun``.",
         "properties": {
           "decomposition": {
             "anyOf": [
@@ -927,7 +927,7 @@
         "type": "object"
       },
       "ClarificationChoice": {
-        "description": "The caller's pick, passed to ``run_query(choice=...)`` (from L2) to run that option's plan.",
+        "description": "The caller's pick, passed to ``run_query(choice=...)`` to run that option's plan.",
         "properties": {
           "option_id": {
             "title": "Option Id",
@@ -2349,7 +2349,7 @@
         "type": "object"
       },
       "Estimate": {
-        "description": "The database's estimate of a query, without running it (``EstimatingAdapterProtocol.estimate``).\n\n``rows`` is the rows the database expects to *read*, added up over the\nplan's scan operators (a full scan counts its table, not its filtered\noutput), so a ``LIMIT`` on the result does not hide a billion-row scan.\n``cost`` is the planner's own cost units, for display: comparable within\none database only, never with a limit. ``source`` says what was read, for\npeople. See docs/architecture/wave_b.md, section 9.",
+        "description": "The database's estimate of a query, without running it (``EstimatingAdapterProtocol.estimate``).\n\n``rows`` is the rows the database expects to *read*, added up over the\nplan's scan operators (a full scan counts its table, not its filtered\noutput), so a ``LIMIT`` on the result does not hide a billion-row scan.\n``cost`` is the planner's own cost units, for display: comparable within\none database only, never with a limit. ``source`` says what was read, for\npeople.",
         "properties": {
           "cost": {
             "anyOf": [
@@ -5151,7 +5151,7 @@
       },
       "Rule": {
         "additionalProperties": false,
-        "description": "A business rule in prose (D40), sent when a sub-query reads one of ``tables`` (empty: every sub-query).",
+        "description": "A business rule in prose, sent when a sub-query reads one of ``tables`` (empty: every sub-query).",
         "properties": {
           "id": {
             "title": "Id",
@@ -5329,7 +5329,7 @@
       },
       "SaveReport": {
         "additionalProperties": false,
-        "description": "What ``engine.answers.save`` did. The answer is always saved (D241); the proposal may not be filed.",
+        "description": "What ``engine.answers.save`` did. The answer is always saved; the proposal may not be filed.",
         "properties": {
           "answer": {
             "$ref": "#/components/schemas/SavedAnswer"
@@ -5370,7 +5370,7 @@
       },
       "SavedAnswer": {
         "additionalProperties": false,
-        "description": "One answer its owner kept: the question and the typed plan that answered it. No rows and no SQL text are\nstored; a re-run builds both again under the viewer's scope (D240).",
+        "description": "One answer its owner kept: the question and the typed plan that answered it. No rows and no SQL text are\nstored; a re-run builds both again under the viewer's scope.",
         "properties": {
           "chart": {
             "default": "auto",
@@ -5523,7 +5523,7 @@
       },
       "ScheduleIdentity": {
         "additionalProperties": false,
-        "description": "D134: the owner, as they were when they set the schedule. Stored only on the schedule.",
+        "description": "The owner, as they were when they set the schedule. Stored only on the schedule.",
         "properties": {
           "roles": {
             "items": {

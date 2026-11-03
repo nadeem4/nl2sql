@@ -4,7 +4,6 @@ Two runtimes with different settings in one process each get their own values:
 the nodes read ``ctx.settings`` (the ``settings`` section of the engine's
 ``Config``), the executor and the aggregator write to ``ctx.artifact_store``,
 and a module with no runtime takes the value as a parameter (``run_date(today)``).
-See docs/architecture/configuration_v2.md, section 8.
 """
 from __future__ import annotations
 

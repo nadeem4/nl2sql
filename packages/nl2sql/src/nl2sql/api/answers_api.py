@@ -1,7 +1,7 @@
-"""``engine.answers``: a person's saved answers (docs/architecture/wave_d.md, section 18, DB1a).
+"""``engine.answers``: a person's saved answers.
 
 The logic is ``nl2sql.answers.service``. Every method takes the caller keyword-only and required: a saved answer is
-its owner's alone, an admin's read included (D247), and another caller's is ``AnswerNotFound``.
+its owner's alone, an admin's read included, and another caller's is ``AnswerNotFound``.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ class AnswersAPI:
 
         The plan comes from the stored step (the helper ``AddTile`` uses), never from model text. The run is
         rated up through ``engine.feedback``, which also files its ``verified_query`` proposal when it can; the
-        answer is saved either way, and the report says why no proposal was filed (D241). Saving the same run
+        answer is saved either way, and the report says why no proposal was filed. Saving the same run
         again is the same answer and the same proposal.
 
         Returns:
@@ -37,7 +37,7 @@ class AnswersAPI:
         Raises:
             ConversationNotFound: no such conversation for this caller.
             NotSavable: the step did not answer, kept no plan, or ``trace_id`` is not its run.
-            AnswerLimitReached: the caller holds ``answers.max_per_user`` answers already (D242).
+            AnswerLimitReached: the caller holds ``answers.max_per_user`` answers already.
             TypeError: ``user_context`` is not a ``UserContext`` with a ``user_id``.
         """
         return self._service.save(trace_id=trace_id, conversation_id=conversation_id, step=step,
@@ -61,7 +61,7 @@ class AnswersAPI:
 
     def run(self, answer_id: str, *, user_context: UserContext, llm_override: Any = None,
             approvals: Optional[Sequence[Union[Approval, str]]] = None) -> QueryResult:
-        """Runs the saved plan again as the caller (D240): scope, hooks, validator and approvals apply, as for any run.
+        """Runs the saved plan again as the caller: scope, hooks, validator and approvals apply, as for any run.
 
         A plan the schema has outgrown comes back as a result with status ``error`` whose first error has
         ``error_code`` ``TILE_NEEDS_FIXING``, as a dashboard tile reports it; the answer stays, and its owner asks

@@ -1,4 +1,4 @@
-"""``prepare_demo``, ``engine.add_demo()`` and the ``Recorder`` (docs/architecture/wave_d.md, row G2b).
+"""``prepare_demo``, ``engine.add_demo()`` and the ``Recorder``.
 
 The indexing step is replaced by a recorder here: building the real index needs the local
 embedding model, which the e2e tests (``tests/e2e/test_replay_fake_llm.py``) do use.

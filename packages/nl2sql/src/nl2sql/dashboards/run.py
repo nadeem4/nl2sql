@@ -1,5 +1,4 @@
-"""Running a dashboard's charts: each stored plan is re-run through ``run_query`` (docs/architecture/wave_c.md,
-section 6, D116 and D132).
+"""Running a dashboard's charts: each stored plan is re-run through ``run_query``.
 
 A refresh costs no tokens. A chart is a run of its stored plan, ``run_query(question, plan=SuppliedPlan(...),
 answer=False, user_context=...)``: the plan goes through ``plan.after``, the validator and the generator under the
@@ -58,7 +57,7 @@ class TileRunner:
     def run(self, tile: Tile, user: UserContext, *, execute: bool = True, approvals: Sequence[Approval] = (),
             draw: bool = True, active: Sequence[Active] = ()) -> TileRun:
         """The chart's run. ``execute=False`` is the access check: the plan is validated and generated, not run.
-        ``draw=False`` leaves out the chart (a check's result is thrown away). ``active`` are the filters (D117)
+        ``draw=False`` leaves out the chart (a check's result is thrown away). ``active`` are the filters
         added to the plan as predicates before it goes to ``run_query``."""
         at = datetime.now(timezone.utc)
         try:
@@ -155,7 +154,7 @@ def _classify(result: QueryResult) -> Tuple[TileStatus, Optional[Dict[str, Any]]
 
 
 class Refresher:
-    """Runs a dashboard's charts, one after another, stores their results and says so (D132)."""
+    """Runs a dashboard's charts, one after another, stores their results and says so."""
 
     def __init__(self, ctx: Any, store: DashboardStore) -> None:
         self._ctx = ctx
@@ -174,7 +173,7 @@ class Refresher:
             yield
 
     def check(self, tiles: Sequence[Tile], user: UserContext) -> Dict[str, TileRun]:
-        """The access check of each chart under the caller's current scope: a run that executes nothing (D135). A
+        """The access check of each chart under the caller's current scope: a run that executes nothing. A
         generated plan is validated and generated; a verified query is checked by the curated matcher. Nothing is
         stored."""
         return {tile.id: self._runner.run(tile, user, execute=False, draw=False) for tile in tiles}
@@ -185,7 +184,7 @@ class Refresher:
             token: Optional[CancellationToken] = None) -> DashboardRun:
         """Refresh ``tiles`` in layout order as ``user``; call it under the lock. A chart that needs approval or
         fails keeps its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too.
-        A run with ``active`` filters (D117) is a view for whoever asked: it is returned and never stored, so the
+        A run with ``active`` filters is a view for whoever asked: it is returned and never stored, so the
         stored results stay the dashboard's own. ``on_tile`` is called after each chart; a cancelled ``token`` raises
         ``RunCancelled`` before the next chart starts, and nothing of this run is stored."""
         runs: List[TileRun] = []

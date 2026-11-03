@@ -1,12 +1,12 @@
 """``engine.knowledge.profile``: read the live snapshot, probe a bounded number of join candidates, file proposals.
 
-docs/architecture/wave_b.md, section 6. The run reads the live build's snapshot (it never reflects on its own)
-and only the tables the caller's scope reaches (D60), so its proposals name only tables that caller can see.
+The run reads the live build's snapshot (it never reflects on its own)
+and only the tables the caller's scope reaches, so its proposals name only tables that caller can see.
 Probes run in order of candidate strength, one at a time, until ``settings.profiler.max_probes`` or
-``time_budget_s`` is reached; the candidates left are proposed with ``overlap: null`` (D45). Everything goes
-through the review queue (D38, D41): nothing here writes a file.
+``time_budget_s`` is reached; the candidates left are proposed with ``overlap: null``. Everything goes
+through the review queue: nothing here writes a file.
 
-With ``draft=True`` (D44) the ``profiler`` model also drafts the descriptions the glossary and the database leave
+With ``draft=True`` the ``profiler`` model also drafts the descriptions the glossary and the database leave
 blank, under one ``Budget`` for the whole call (``max_cost_usd``). A column's role and its drafted description go
 into ONE ``column`` proposal: the queue supersedes an open proposal of the same kind, datasource and target, so
 filed apart the second would retire the first.

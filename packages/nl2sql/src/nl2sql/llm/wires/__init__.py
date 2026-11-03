@@ -130,7 +130,7 @@ def _location(loc: Any) -> str:
 def _validation_messages(exc: BaseException) -> Optional[List[str]]:
     """The validation errors behind a parse failure, one ``path: message`` each, or None when there are none.
 
-    Only pydantic's messages, never the input: ``llm.parse_retry`` carries them (D15).
+    Only pydantic's messages, never the input: ``llm.parse_retry`` carries them.
     """
     from pydantic import ValidationError
 

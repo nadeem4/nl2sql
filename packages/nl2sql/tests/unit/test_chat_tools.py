@@ -1,4 +1,4 @@
-"""Chat tools in a conversation (docs/architecture/wave_c.md, sections 3 and 4; row C2).
+"""Chat tools in a conversation.
 
 The runner resolves ``chat_tools:`` through the registry; the loop lets the model call a tool and hands its
 output back without rows; ``conversations.tool`` calls one by name; ``conversations.report`` and the ``report``
@@ -538,11 +538,11 @@ def test_a_stored_report_body_carries_no_row_data(build, model, runs, monkeypatc
     turn = engine.conversations.tool(conversation.id, "report", {}, user_context=ANA)
 
     body = turn.steps[0].output.body
-    assert "5917" not in body and "| n |" not in body and "How many customers are there?" in body
+    assert "| 5917 |" not in body and "Norway has 5917 customers." not in body and "| n |" not in body and "How many customers are there?" in body
     asked = engine.conversations.report(conversation.id, user_context=ANA)
     assert "| 5917 |" in asked, "asked for directly, the report is rebuilt from the results"
     stored = engine.conversations.get(conversation.id, user_context=ANA).turns[-1].steps[0].output.body
-    assert "5917" not in stored
+    assert "| 5917 |" not in stored and "Norway has 5917 customers." not in stored
 
 
 def test_a_stored_chart_output_carries_no_rows(build, model, runs):

@@ -1,9 +1,9 @@
 """``engine.knowledge``: the glossary as the engine uses it, the profiler, and saving a clarification pick.
 
-See docs/architecture/wave_b.md, sections 3, 6 and 7. Every method that shows
+Every method that shows
 knowledge or schema takes the caller as a required keyword and shows only what
-the caller's scope reaches (D60): there is no admin default. Each method has its
-final signature; the Wave B PR named in its docstring builds it.
+the caller's scope reaches: there is no admin default. Each method has its
+final signature; a later change builds it.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ HIDDEN_ERROR = "The last reload failed; the previous knowledge is still in use. 
 
 
 def _caller(user_context: Any) -> "UserContext":
-    """The caller, required: there is no default view (D60)."""
+    """The caller, required: there is no default view."""
     from nl2sql.policies import UserContext
 
     if not isinstance(user_context, UserContext):
@@ -70,7 +70,7 @@ class KnowledgeAPI:
                     per_datasource[ds_id] = counts(visible(block, snapshot, scope.allows, deny_names(scope)))
             error = knowledge.errors.get(source.type)
             if error is not None and not may_reload:
-                # The error quotes the file: its path, its lines and any table it names (D60).
+                # The error quotes the file: its path, its lines and any table it names.
                 error = HIDDEN_ERROR
             infos.append(KnowledgeSourceInfo(type=source.type, counts=per_datasource, sha256=source.sha256,
                                              loaded_at=source.loaded_at, error=error))
@@ -81,11 +81,11 @@ class KnowledgeAPI:
         """The merged knowledge as the engine uses it, per datasource the caller reaches.
 
         Each item carries its origin (``knowledge``, ``database`` or
-        ``derived``, D38) and the source that set it; the roles the snapshot
-        proves are included (D61). ``problems`` lists the names that do not
+        ``derived``) and the source that set it; the roles the snapshot
+        proves are included. ``problems`` lists the names that do not
         resolve against the live snapshot and the joins whose types cannot be
         compared. An item on a table the caller cannot read, or whose text
-        mentions one, is left out (D39, D60). A datasource not indexed yet
+        mentions one, is left out. A datasource not indexed yet
         shows nothing but that problem: without its schema, names cannot be
         checked against the caller's scope.
 
@@ -164,7 +164,7 @@ class KnowledgeAPI:
                 cancellation_token: Optional["CancellationToken"] = None) -> List["ProfileReport"]:
         """Profile each datasource's live snapshot, probing only the tables the caller reaches, and file what
         it finds as proposals (``origin: profiler``): joins the database does not declare (by name, type and a
-        bounded value-overlap probe) and heuristic column roles. Nothing is written but the review queue (D38).
+        bounded value-overlap probe) and heuristic column roles. Nothing is written but the review queue.
 
         One report per datasource the caller reaches. A datasource that is not indexed yet is reported with an
         issue and skipped: the profiler reads the live build's snapshot and never reflects on its own. The
@@ -173,7 +173,7 @@ class KnowledgeAPI:
 
         ``draft=True`` also has the ``profiler`` model draft the table and column descriptions (and column
         synonyms) that neither the glossary nor the database has, as ``origin: draft`` proposals: a draft
-        reaches no prompt and no index until a person accepts it (D38). A column's drafted description and its
+        reaches no prompt and no index until a person accepts it. A column's drafted description and its
         role are one proposal. The model's calls are capped at ``max_cost_usd`` across the whole call
         (``settings.profiler.max_cost_usd`` when None); a run that reaches the cap reports
         ``stopped_by: "cost_cap"`` with what it drafted so far. With no model for the agent, nothing is drafted
@@ -196,7 +196,7 @@ class KnowledgeAPI:
 
     def save_choice(self, choice: "ClarificationChoice", *, user_context: "UserContext",
                     term: Optional[str] = None) -> "Proposal":
-        """Turn a clarification pick into a ``term`` proposal (D50): the phrase (or ``term``) as the term's name,
+        """Turn a clarification pick into a ``term`` proposal: the phrase (or ``term``) as the term's name,
         the chosen option's label as its definition, and the columns and tables its plan reads.
 
         It reaches the glossary only when an admin accepts it (``engine.proposals.accept``); a term of that name

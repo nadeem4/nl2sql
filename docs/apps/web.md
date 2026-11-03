@@ -211,4 +211,3 @@ recording comes back as a `REPLAY_MISS` error, and Chat then points to Settings 
 | `src/api/evals.js`, `src/pages/Evals.jsx`, `src/evals/report.js` | Run a suite and read the report |
 | `src/api/settings.js`, `src/pages/Settings.jsx`, `src/lib/settings.js` | The tab's keys and models, the server's model, API keys |
 
-Where the code and `docs/architecture/wave_d.md` differ, the code is right.

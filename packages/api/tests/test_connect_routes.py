@@ -1,4 +1,4 @@
-"""The Connect routes over a real engine built in a temp folder (docs/architecture/wave_c.md, section 7).
+"""The Connect routes over a real engine built in a temp folder.
 
 ``GET /datasource-types``, ``POST /datasources/test`` and ``POST /datasources`` (with ``save``) are admin-only.
 Nothing here reads or writes a real ``.env``: every project is a ``tmp_path`` folder.
@@ -188,7 +188,7 @@ def test_add_without_save_writes_no_file(connect):
 
 # ---------------------------------------------------------------- save
 
-def test_save_uses_wave_cs_writer_with_env_file_only_on_fresh_local_install(connect):
+def test_save_uses_the_config_writer_with_env_file_only_on_fresh_local_install(connect):
     client, engine, folder = connect()
 
     response = client.post("/api/v1/datasources", json={"config": _postgres(password=PASSWORD), "save": True})
@@ -247,7 +247,7 @@ def test_save_over_a_file_changed_since_load_is_a_409(connect):
 
 
 def test_save_on_a_read_only_config_is_its_own_error(connect, monkeypatch):
-    # Docker mounts the config read-only (D212): the save fails with its own message and the datasource stays
+    # Docker mounts the config read-only: the save fails with its own message and the datasource stays
     # registered in memory until the server restarts.
     import nl2sql.config.writer as writer
 

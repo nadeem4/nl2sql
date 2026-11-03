@@ -1,4 +1,4 @@
-"""``engine.datasources.save`` (docs/architecture/wave_c.md, row L2): one datasource as ``datasources/<id>.yaml``.
+"""``engine.datasources.save``: one datasource as ``datasources/<id>.yaml``.
 
 Temp folders only: nothing here reads or writes a real ``.env``.
 """

@@ -1,7 +1,6 @@
 """What ``nl2sql`` exports is a fixed list, so a change to the public surface is a deliberate one.
 
 Adding or removing a name here is a semver decision: a removal is breaking.
-See docs/architecture/configuration_v2.md, section 7.
 """
 import nl2sql
 
@@ -28,11 +27,11 @@ PUBLIC_SURFACE = {
     "configure_logging", "TraceContextFilter",
     # Evals: suites, reports and the scorer interface
     "EvalSuite", "EvalCase", "EvalReport", "RegenerateReport", "GateResult", "Scorer", "Score", "CaseRun",
-    # Wave B: knowledge, the review queue, the profiler, clarification and the explanation
+    # knowledge, the review queue, the profiler, clarification and the explanation
     "KnowledgeSourceConfig", "CostRule", "KnowledgeSourceInfo", "DatasourceKnowledgeView", "Proposal",
     "AcceptReport", "ReviewError", "ProfileReport", "ClarificationRequest", "ClarificationOption",
     "ClarificationChoice", "Explanation", "ExplainedStep", "TermUse",
-    # Wave C: conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys
+    # conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys
     "Conversation", "Turn", "ToolStep", "ToolCall", "ToolOutput", "ModelStep", "ConversationInfo",
     "ChartSpec", "ChartData", "Encoding", "ColumnKind", "diagram_for",
     "Workspace", "Dashboard", "DashboardInfo", "DashboardView", "DashboardRun", "Tile", "TileRun", "TileLayout",
@@ -47,9 +46,9 @@ PUBLIC_SURFACE = {
     "NL2SQLError", "NotAuthorized", "InvalidArgument", "ReplayMiss", "NotPinnable", "ChartNotSupported", "CorrectionRefused", "UnknownTile", "UnknownFilter", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey", "DatasourceNotFound", "DatasourceExists",
     "SavedAnswer", "SaveReport", "AnswerNotFound", "AnswerLimitReached", "NotSavable", "LockHeld",
     "LLMOverride", "resolve_mode", "provider_for_key", "provider_keys_in_environment",
-    # The CLI is a client of the facade (CL0a): the config check and the provider key facts it prints
+    # The CLI is a client of the facade: the config check and the provider key facts it prints
     "check_config", "KEYED_PROVIDERS", "api_key_from_env", "env_var_for_provider", "ANTHROPIC_EXTRA_HINT",
-    # CL0b: what the rest of the CLI commands read from the engine
+    # What the rest of the CLI commands read from the engine
     "looks_like_api_key", "KEY_SHAPE_MESSAGE", "LLMFileConfig",
     "check_file_name", "load_trace", "load_llm_file", "resolve_llm_spec", "import_records", "publish_records", "run_stamp", "write_records", "RegistryError",
     "default_llm", "starter_config", "write_env_values", "write_project",

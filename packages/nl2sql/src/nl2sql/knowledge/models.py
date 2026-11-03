@@ -1,9 +1,9 @@
-"""The knowledge shapes the engine's tracks share (docs/architecture/wave_b.md, D59).
+"""The knowledge shapes the engine's tracks share.
 
 ``KnowledgeUsed`` is what one sub-query's prompt was sent: the schema
-retriever fills it (K2), the explanation reads it (X1) and ``knowledge.used``
+retriever fills it, the explanation reads it and ``knowledge.used``
 publishes it. ``KnowledgeSourceInfo`` and ``DatasourceKnowledgeView`` are what
-``engine.knowledge.sources`` and ``show`` return (K1).
+``engine.knowledge.sources`` and ``show`` return.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 
 Origin = Literal["knowledge", "database", "derived"]
-"""Where an item came from (D38): a knowledge source, the database's own comment, or a fact the snapshot proves."""
+"""Where an item came from: a knowledge source, the database's own comment, or a fact the snapshot proves."""
 
 
 class TermMatch(BaseModel):

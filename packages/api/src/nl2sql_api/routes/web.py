@@ -1,4 +1,4 @@
-"""The web app: the built page, its chunks, the clips and the social card (docs/architecture/wave_d.md, "nl2sql-api serve").
+"""The web app: the built page, its chunks, the clips and the social card.
 
 None of these is an API route: they are served at ``/`` and left out of the OpenAPI document. Any GET that is not a
 file or a route answers the page (:func:`install`), so the page's hash router owns navigation; an unknown path under ``/api/`` is the

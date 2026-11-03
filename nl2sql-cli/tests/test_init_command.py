@@ -1,4 +1,4 @@
-"""``nl2sql init [DIR] [--demo] [--provider NAME] [--force]`` (configuration v2, section 10)."""
+"""``nl2sql init [DIR] [--demo] [--provider NAME] [--force]``."""
 from __future__ import annotations
 
 from typer.testing import CliRunner

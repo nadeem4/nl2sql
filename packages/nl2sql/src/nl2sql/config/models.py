@@ -2,8 +2,7 @@
 
 Every model is strict (``extra="forbid"``) and frozen. Field names are the YAML
 keys. ``load_config`` builds a ``Config`` from the files; building one in code
-gives exactly the same object. See docs/architecture/configuration_v2.md,
-section 2.
+gives exactly the same object.
 """
 from __future__ import annotations
 
@@ -95,18 +94,18 @@ AgentName = Literal[
     "curated_matcher",
     "datasource_resolver",
     "decomposer",
-    "table_selector",  # picking tables from a catalog on a schema past full_snapshot_max_tables (C-W4)
+    "table_selector",  # picking tables from a catalog on a schema past full_snapshot_max_tables
     "ast_planner",
     "refiner",
     "answer_synthesizer",
-    "profiler",  # drafting table and column descriptions, only with profile(draft=True) (Wave B, D44)
-    "eval_seeder",  # seeding a draft eval suite (V3)
-    "conversation",  # the model-led turn of engine.conversations (Wave C, D101)
+    "profiler",  # drafting table and column descriptions, only with profile(draft=True)
+    "eval_seeder",  # seeding a draft eval suite
+    "conversation",  # the model-led turn of engine.conversations
 ]
 
 
 Mode = Literal["demo", "your_data", "hosted"]
-"""What a project is for: the bundled demo, the owner's own data, or a hosted public demo (D229)."""
+"""What a project is for: the bundled demo, the owner's own data, or a hosted public demo."""
 
 
 class _Model(BaseModel):
@@ -265,11 +264,10 @@ class CostRule(_Model):
     """The cost guard (``policies.cost``): a limit on the rows a query is estimated to read.
 
     ``over_limit``, and ``unknown`` (no estimate: not declared, failed, or no
-    rows), each ``allow``, ``confirm`` (a person approves, through Wave A's
+    rows), each ``allow``, ``confirm`` (a person approves, through the
     approval) or ``refuse``. ``max_estimated_rows: null`` is no limit. On a
     role, the fields it sets replace the top-level ones for that role. Enforced
-    by the built-in ``policy.cost`` hook from C2 (docs/architecture/wave_b.md,
-    section 9).
+    by the built-in ``policy.cost`` hook.
     """
 
     max_estimated_rows: Optional[PositiveInt] = None
@@ -470,22 +468,22 @@ class PipelineSettings(_Model):
     strict_columns: bool = True
     today: Optional[date] = None  # pin the run date
     retries: RetrySettings = Field(default_factory=RetrySettings)
-    # Per-question caps (enforced from E3): model calls, parse retries
+    # Per-question caps: model calls, parse retries
     # included, and dollars. None turns a cap off.
     max_llm_calls: Optional[PositiveInt] = 60
     max_cost_usd: Optional[PositiveFloat] = None
-    # The answer sanity checks (read from S1).
+    # The answer sanity checks.
     sanity_checks: bool = True
 
 
 class RetrievalSettings(_Model):
     full_snapshot_max_tables: int = Field(15, ge=0)
-    # Read by the schema retriever and the resolver from R1: they were
+    # Read by the schema retriever and the resolver: they were
     # TABLE_K, PLANNING_K and MAX_DECOMPOSER_TABLES.
     table_k: PositiveInt = 8
     planning_k: PositiveInt = 12
     decomposer_tables: PositiveInt = 30
-    # Table recall past full_snapshot_max_tables (C-W4, docs/architecture/wave_c.md section 17): a model
+    # Table recall past full_snapshot_max_tables: a model
     # picks tables from a catalog of every visible table (the nearest selector_catalog_max past that many),
     # and the tables that join the picks are added from the foreign keys, up to join_path_max_hops joins apart.
     table_selector: bool = True
@@ -494,9 +492,9 @@ class RetrievalSettings(_Model):
 
 
 class RoutingSettings(_Model):
-    """Cross-database routing (read from R1 and R2)."""
+    """Cross-database routing (read by the router)."""
 
-    candidates: PositiveInt = 3  # datasources shown to the answerability check (D28)
+    candidates: PositiveInt = 3  # datasources shown to the answerability check
     max_datasources: PositiveInt = 3  # datasources one question may use
     max_sub_queries: PositiveInt = 6  # sub-queries one question may have
     floor_ratio: float = Field(0.5, ge=0.0, le=1.0)  # drop a candidate less similar than this share of the best
@@ -528,22 +526,22 @@ class FeedbackSettings(_Model):
 
 
 class KnowledgeSettings(_Model):
-    """How much knowledge reaches a prompt (read from K1 and K2)."""
+    """How much knowledge reaches a prompt (read by the knowledge sources and the schema retriever)."""
 
     item_max_chars: PositiveInt = 500  # one glossary text; longer is a load error
     block_max_chars: PositiveInt = 4000  # the whole [BUSINESS_CONTEXT] block; cut by score, and traced
     top_k: PositiveInt = 8  # matched terms kept per sub-query
-    match_floor: float = Field(0.6, ge=0.0, le=1.0)  # a term entry's similarity to match (K3)
+    match_floor: float = Field(0.6, ge=0.0, le=1.0)  # a term entry's similarity to match
 
 
 class ClarifySettings(_Model):
-    """Clarify instead of guess (read from L1)."""
+    """Clarify instead of guess (read by the clarifier)."""
 
     enabled: bool = True
 
 
 class ProfilerSettings(_Model):
-    """The schema profiler's bounds (read from P1 and P2)."""
+    """The schema profiler's bounds (read by the profiler)."""
 
     sample_rows: PositiveInt = 1000  # distinct values one overlap probe reads
     max_probes: PositiveInt = 200  # overlap probes per datasource
@@ -554,19 +552,19 @@ class ProfilerSettings(_Model):
 
 
 class ReviewSettings(_Model):
-    """The review queue (read from Q1)."""
+    """The review queue (read by the review queue)."""
 
     max_age_days: PositiveInt = 365  # decided proposals are purged after this
 
 
 class ApprovalSettings(_Model):
-    """Stored approval grants (read from Wave D's G3a; docs/architecture/wave_d.md, "Approvals over REST")."""
+    """Stored approval grants."""
 
     max_age_hours: PositiveInt = 24  # a request and its grant are purged this long after their last change
 
 
 class ChartSettings(_Model):
-    """How a result becomes a chart (read from K1; docs/architecture/wave_c.md, section 5)."""
+    """How a result becomes a chart."""
 
     max_points: PositiveInt = 1000  # rows charted; a longer line becomes a table
     max_categories: PositiveInt = 20  # bars
@@ -601,7 +599,7 @@ class Settings(_Model):
 class ObserverConfig(_PluginBlock):
     """One observer, by name: ``ObserverConfig(type="log")``. The observer's ``config_model`` checks the other keys.
 
-    The engine builds its observers from the ``observers`` section from E2.
+    The engine builds its observers from the ``observers`` section.
     """
 
 
@@ -629,7 +627,7 @@ class KnowledgeSourceConfig(_PluginBlock):
     """One knowledge source, by name: ``KnowledgeSourceConfig(type="yaml", path="glossary.yaml")``.
 
     The source's ``config_model`` checks the other keys. The engine builds and
-    loads its knowledge sources from K1 (docs/architecture/wave_b.md, section 3).
+    loads its knowledge sources.
     """
 
 
@@ -657,12 +655,12 @@ HookEntry = Annotated[Union[HookConfig, Any], BeforeValidator(_entry(HookConfig,
 KnowledgeEntry = Annotated[Union[KnowledgeSourceConfig, Any],
                            BeforeValidator(_entry(KnowledgeSourceConfig, "a knowledge source", "load"))]
 
-# The built-in scorers (from V1): the default list.
+# The built-in scorers: the default list.
 DEFAULT_SCORERS = ("result_match", "outcome", "faithfulness", "retrieval_recall", "routing")
 
 
 class EvalGate(_Model):
-    """The regression gate (from V2): regressions, accuracy and cost against a baseline."""
+    """The regression gate regressions, accuracy and cost against a baseline."""
 
     max_regressions: NonNegativeInt = 2  # mode full: cases that passed in the baseline and fail now
     alpha: float = Field(0.05, gt=0.0, lt=1.0)  # mode full: McNemar's exact two-sided p, when more were lost
@@ -670,7 +668,7 @@ class EvalGate(_Model):
 
 
 class EvalsConfig(_Model):
-    """The ``evals`` section: the suites, the scorers and the gate. ``engine.evals`` reads it from V1.
+    """The ``evals`` section: the suites, the scorers and the gate. ``engine.evals`` reads it.
 
     A relative suite path is relative to the folder of ``nl2sql.yaml``. A
     suite file is data, read when a run asks for it, not when the engine
@@ -679,15 +677,15 @@ class EvalsConfig(_Model):
 
     suites: List[Path] = Field(default_factory=list)
     scorers: List[str] = Field(default_factory=lambda: list(DEFAULT_SCORERS))
-    curated: bool = True  # D12: curated answers on in mode full
+    curated: bool = True  # curated answers on in mode full
     max_cost_usd: Optional[PositiveFloat] = None  # across a run in mode full; required for it
     gate: EvalGate = Field(default_factory=EvalGate)
 
 
-# ---------------------------------------------------------------- Wave C sections (docs/architecture/wave_c.md)
+# ---------------------------------------------------------------- Sections for conversations, dashboards and chat tools
 
 class Conversations(_Model):
-    """The ``conversations`` section: how a model-led turn is bounded and kept (read from C1)."""
+    """The ``conversations`` section: how a model-led turn is bounded and kept."""
 
     context_turns: PositiveInt = 3  # turns the model sees
     max_tool_calls: PositiveInt = 12  # tool calls per turn; the model then makes one last call, tools off
@@ -696,7 +694,7 @@ class Conversations(_Model):
 
 
 class Dashboards(_Model):
-    """The ``dashboards`` section (read from D1 to D3)."""
+    """The ``dashboards`` section (read by the dashboards service)."""
 
     max_tiles: PositiveInt = 10  # the starter dashboard's size
     min_refresh_minutes: PositiveInt = 15
@@ -704,7 +702,7 @@ class Dashboards(_Model):
 
 
 class Answers(_Model):
-    """The ``answers`` section: saved answers (DB1a, D242)."""
+    """The ``answers`` section: saved answers."""
 
     max_per_user: PositiveInt = 100  # saved answers one person may keep; the next save is refused by name
 
@@ -726,7 +724,7 @@ class McpHttp(_Model):
 
 
 class Mcp(_Model):
-    """The ``mcp`` section: ``nl2sql mcp --http`` (read from M2)."""
+    """The ``mcp`` section: ``nl2sql mcp --http`` (read by the MCP server)."""
 
     http: McpHttp = Field(default_factory=McpHttp)
     auth: Literal["api_keys", "none"] = "api_keys"  # none: loopback only
@@ -759,7 +757,7 @@ class Api(_Model):
     auth: Literal["api_keys", "proxy", "static", "none"] = "none"
     proxy: ApiProxy = Field(default_factory=ApiProxy)
     static_role: Optional[str] = None  # auth: static only
-    request_llm: bool = False  # callers may send their own key and models (D210)
+    request_llm: bool = False  # callers may send their own key and models
     cors_origins: List[str] = Field(default_factory=list)
 
 
@@ -790,7 +788,7 @@ class Config(_Model):
     dashboards: Dashboards = Field(default_factory=Dashboards)
     answers: Answers = Field(default_factory=Answers)
     mcp: Mcp = Field(default_factory=Mcp)
-    # What this project is for (D229): demo, your_data or hosted. NL2SQL_MODE and the launcher flags override it
+    # What this project is for: demo, your_data or hosted. NL2SQL_MODE and the launcher flags override it
     # at the entry point (resolve_mode); the engine reads no environment.
     mode: Mode = "your_data"
 

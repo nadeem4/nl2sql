@@ -5,7 +5,6 @@ replay tells the prompts the date the recording was told. They build a
 run-scoped runtime from a derived config (``Runtime.derive``) and leave the
 engine's config, LLM set and curated answers alone, so a query running on
 the engine meanwhile sees its own settings.
-docs/architecture/configuration_v2.md, section 8.
 """
 from __future__ import annotations
 

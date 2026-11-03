@@ -1,4 +1,4 @@
-"""``/health``, ``/ready``, ``/meta`` and ``/about`` (docs/architecture/wave_d.md, "Health and readiness", D208)."""
+"""``/health``, ``/ready``, ``/meta`` and ``/about``."""
 import threading
 import time
 from importlib.metadata import PackageNotFoundError, version
@@ -105,7 +105,7 @@ def meta(request: Request, engine: Engine, user: Visitor):
         return body
     hosted = getattr(request.app.state, "hosted", None)
     body["caller"] = {"admin": identity.is_admin(user, engine)}
-    if user.user_id is not None:  # on the hosted demo a one-way id, never the session cookie (A4d)
+    if user.user_id is not None:  # on the hosted demo a one-way id, never the session cookie
         body["caller"] = {"user_id": user.user_id, **body["caller"]}
     listed = engine.datasources.list(user_context=user)
     questions = [q for d in listed for q in d.sample_questions]

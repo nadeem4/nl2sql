@@ -1,4 +1,4 @@
-"""Stored approval grants (docs/architecture/wave_d.md, D215 and D236): ``engine.approvals`` and request ids."""
+"""Stored approval grants: ``engine.approvals`` and request ids."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -223,7 +223,7 @@ def test_refresh_with_a_granted_id(ctx, approvals):
     assert resolve_refresh_approvals(ctx, [request.id], ANA) == [Approval(request=request, by=DBA)]
 
 
-# ---------------------------------------------------------------- the review's findings (PR #410)
+# ---------------------------------------------------------------- the review's findings
 
 MALLORY = UserContext(user_id="mallory", tenant_id="globex", roles=["dba"])
 

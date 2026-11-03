@@ -1,4 +1,4 @@
-# The API image: nl2sql-api with its web app, the `nl2sql` command, all five adapters and the SQL Server ODBC driver (D213, D226, D233).
+# The API image: nl2sql-api with its web app, the `nl2sql` command, all five adapters and the SQL Server ODBC driver.
 #
 # Build context is the repository root:
 #   docker build -t nl2sql-api .
@@ -40,7 +40,7 @@ RUN apt-get update \
 COPY ./packages/sdk /app/packages/sdk
 COPY ./packages/nl2sql /app/packages/nl2sql
 COPY ./packages/api /app/packages/api
-# The `nl2sql` command (D230): `docker compose run --rm api nl2sql index`, and this build below.
+# The `nl2sql` command: `docker compose run --rm api nl2sql index`, and this build below.
 COPY ./nl2sql-cli /app/nl2sql-cli
 # The page nl2sql-api serves, built in stage one.
 COPY --from=ui /build/packages/api/src/nl2sql_api/web/static /app/packages/api/src/nl2sql_api/web/static
@@ -78,5 +78,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=4)"
 
 # `serve`, not bare uvicorn: the mode checks and the .env load live there. One worker: jobs and the state they share
-# live in this process (D205).
+# live in this process.
 CMD ["nl2sql-api", "serve", "--host", "0.0.0.0", "--port", "8000"]

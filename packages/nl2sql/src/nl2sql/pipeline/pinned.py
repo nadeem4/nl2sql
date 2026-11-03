@@ -1,11 +1,11 @@
 """The pinned-plan entry: a run whose decomposition and plans are given, not routed and planned.
 
-Three callers pin a plan (docs/architecture/wave_a.md, section 7):
+Three callers pin a plan:
 
 - ``supplied``: ``run_query(plan=SuppliedPlan(...))``, a plan the caller holds.
 - ``approved``: the re-run of a question with an ``Approval``; the request's
   decomposition and plan are pinned.
-- ``chosen``: Wave B's clarification re-ask, a plan the asker picked.
+- ``chosen``: clarification re-ask, a plan the asker picked.
 
 A pinned run skips the curated matcher, the datasource resolver, the
 decomposer and the planner's model call. ``PinnedEntryNode`` checks every
@@ -164,15 +164,14 @@ def check_pinned(pinned: Optional[PinnedRun], approvals: Sequence[Approval],
                  datasource_id: Optional[str] = None, *, curated: bool = True) -> None:
     """Refuse, at the call and before the run's scope opens, a pin the run cannot take.
 
-    A chosen plan (Wave B's clarification re-ask) is a new question, not an
+    A chosen plan (clarification re-ask) is a new question, not an
     approved one, so it cannot come with approvals. A ``datasource_id``
     passed with a pinned plan must be the plan's own datasource. A supplied
     verified query runs only where the curated matcher is in the graph (a
     curated file with a verified query loaded) and never falls back to a
-    model run, so without one it is refused here (wave_c.md, D132: a refresh
-    uses no tokens). With ``execute`` off the matcher checks it (the caller's
+    model run, so without one it is refused here. With ``execute`` off the matcher checks it (the caller's
     scope, its values, every table it reads) and runs nothing: a dashboard's
-    access check (D135).
+    access check.
 
     Raises:
         ValueError: a rule is broken.

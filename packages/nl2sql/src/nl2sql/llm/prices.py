@@ -1,4 +1,4 @@
-"""USD per million tokens, dated and sourced: what every model call is priced with (D11).
+"""USD per million tokens, dated and sourced: what every model call is priced with.
 
 ``PRICES`` is the engine's table, updated by hand when a provider changes its
 prices (with the row's ``source``, and ``PRICES_CHECKED_ON``). ``llm.prices``
@@ -41,7 +41,7 @@ class ModelPrice(NamedTuple):
     source: str
 
 
-# Owner to confirm: not yet re-verified against OpenAI's published prices (review of PR #326).
+# Owner to confirm: not yet re-verified against OpenAI's published prices.
 _OPENAI = "OpenAI pricing page, checked 2026-09-21"
 _ANTHROPIC = ("Anthropic model table in the claude-api skill (cached 2026-06-24); "
               "cache write 1.25x and cache read 0.1x of input")

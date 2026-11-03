@@ -1,4 +1,4 @@
-"""Wave C's CLI stubs (docs/architecture/wave_c.md, row C0b): ``keys``, ``launch`` and ``dashboards``.
+"""CLI stubs: ``keys``, ``launch`` and ``dashboards``.
 
 Each is registered with its final options. A command whose row has landed is tested in its own file (``launch``: `test_launch_command.py`).
 """

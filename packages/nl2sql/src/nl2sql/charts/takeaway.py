@@ -1,4 +1,4 @@
-"""The one-line takeaway of a chart: a template filled from the data, never a model call (D111)."""
+"""The one-line takeaway of a chart: a template filled from the data, never a model call."""
 from __future__ import annotations
 
 from typing import Any, List, Optional

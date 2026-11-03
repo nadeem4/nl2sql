@@ -172,7 +172,7 @@ def test_lenient_still_needs_every_gold_column_matched():
     assert not lenient([["Jazz", 907520], ["Metal", 816509]], gold)
 
 
-# --- C-W6a: gold rows written as JSON against live Decimal and datetime cells ------
+# --- gold rows written as JSON against live Decimal and datetime cells ------
 
 
 def test_a_decimal_matches_a_numeric_string_a_float_and_an_int():
@@ -261,7 +261,7 @@ def test_extra_columns_respect_the_column_cap():
     assert not extra_columns([["USA", 1, 2, 3], ["Canada", 3, 4, 5]], gold, order_matters=True)   # 4 > cap 3
 
 
-# --- C-W7d: the same rows with the columns in another order pass ----
+# --- the same rows with the columns in another order pass ----
 
 
 def test_reordered_columns_with_the_same_values_pass():
@@ -322,7 +322,7 @@ def test_column_picks_prefers_the_columns_in_their_own_order():
     assert pick([[9, 2]], gold, order_matters=True) is None
 
 
-# --- C-W7d review: a bounded search, the in-order extra-column rule kept, the mirror-image limit ----
+# --- a bounded search, the in-order extra-column rule kept, the mirror-image limit ----
 
 
 def _flags(width):

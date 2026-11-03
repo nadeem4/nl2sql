@@ -111,7 +111,7 @@ def test_show_perf_prints_each_steps_time(engine_with, capsys):
     assert "decomposer" in output and "0.25s" in output
 
 
-# ---------------------------------------------------------------- clarification (L2)
+# ---------------------------------------------------------------- clarification
 
 
 class AskingEngine(StreamEngine):

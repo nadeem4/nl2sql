@@ -1,4 +1,4 @@
-"""The MCP server over the demo project and the real graph, on the fake LLM (wave_a.md, section 12).
+"""The MCP server over the demo project and the real graph, on the fake LLM.
 
 An in-process MCP client calls the tools; the engine is the demo's, indexed
 locally, and every model answer comes from ``FakeLLMServer``.

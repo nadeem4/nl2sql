@@ -1,4 +1,4 @@
-"""Mermaid diagrams of an answer and of a schema (docs/architecture/wave_c.md, section 4, "Diagrams"; D113).
+"""Mermaid diagrams of an answer and of a schema.
 
 ``diagram_for`` draws the tables an answer read from its plans and nothing else: no row, no model call. ``schema_diagram``
 draws a schema view that ``datasources.schema`` has already cut to the caller's scope. Both write Mermaid with no colour,

@@ -74,7 +74,7 @@ def test_mode_retrieval_asks_the_retriever_about_the_cases_datasource_with_the_s
     report = run_module.run_evals(ctx, [suite], mode="retrieval", scorers=["retrieval_recall", "routing"],
                                   curated=True)
 
-    # No model runs in mode retrieval, so the table selector is off for it (C-W4) and on for the engine.
+    # No model runs in mode retrieval, so the table selector is off for it and on for the engine.
     assert asked == [("chinook_002", "chinook", "admin", 0, False)]
     assert ctx.settings.retrieval.full_snapshot_max_tables == 15 and ctx.settings.retrieval.table_selector is True
     board = report.configs["retrieval"]

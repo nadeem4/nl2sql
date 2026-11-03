@@ -1,4 +1,4 @@
-"""Plain-English phrases for a plan's names and expressions (docs/architecture/wave_b.md, section 8).
+"""Plain-English phrases for a plan's names and expressions.
 
 A table or column is named by its glossary description's first clause when it
 has one, else by its name split into words (``InvoiceDate`` on ``Invoice`` is

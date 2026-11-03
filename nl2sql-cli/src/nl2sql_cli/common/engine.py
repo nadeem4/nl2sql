@@ -4,7 +4,7 @@
 ``NL2SQL_CONFIG``, then ``./nl2sql.yaml`` (``nl2sql.load_config``). The
 app callback keeps the flag in ``ctx.obj`` and loads the ``.env`` next to the
 file (``nl2sql.load_env_file``), never overriding a variable already
-set. See docs/architecture/configuration_v2.md, section 10.
+set.
 """
 from __future__ import annotations
 

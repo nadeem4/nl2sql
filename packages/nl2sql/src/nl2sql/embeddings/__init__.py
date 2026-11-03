@@ -2,8 +2,7 @@
 
 A provider is registered under the ``nl2sql.embeddings`` entry point group, or
 in code with ``Registry.add_embeddings``. The built-ins are ``local``,
-``openai`` and ``openai_compatible``. See docs/architecture/phase2.md,
-section 5, "Embeddings".
+``openai`` and ``openai_compatible``. 
 """
 from __future__ import annotations
 

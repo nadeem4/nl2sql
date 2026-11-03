@@ -1,4 +1,4 @@
-"""``NL2SQL.serve_mcp``: the facade method ``nl2sql mcp`` calls to start the MCP server (D232)."""
+"""``NL2SQL.serve_mcp``: the facade method ``nl2sql mcp`` calls to start the MCP server."""
 import pytest
 
 pytest.importorskip("mcp")

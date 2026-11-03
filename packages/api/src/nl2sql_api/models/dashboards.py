@@ -1,4 +1,4 @@
-"""Request bodies of the dashboards and workspaces routes (docs/architecture/wave_d.md, D224). Strict: an unknown
+"""Request bodies of the dashboards and workspaces routes. Strict: an unknown
 field is a 422. Responses are the engine's own models (``Dashboard``, ``DashboardView``, ``DashboardRun``,
 ``Workspace``), served as they are."""
 from typing import Any, Dict, List, Literal, Optional
@@ -15,7 +15,7 @@ class _Body(BaseModel):
 class RefreshBody(_Body):
     tile_id: Optional[str] = None  # one chart; else all of them
     filters: Optional[Dict[str, List[Any]]] = None  # filter id -> values; the result is returned, never stored
-    approval_ids: List[str] = []  # request ids of granted approvals (D215, D236)
+    approval_ids: List[str] = []  # request ids of granted approvals
 
 
 class TitleBody(_Body):

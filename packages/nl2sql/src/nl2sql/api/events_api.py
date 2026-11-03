@@ -1,7 +1,6 @@
 """``engine.events``: the operator's view of every run and of the engine.
 
-See docs/architecture/wave_a.md, section 3, "The facade", and
-docs/observability/events.md.
+See docs/observability/events.md.
 """
 from __future__ import annotations
 

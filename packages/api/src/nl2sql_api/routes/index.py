@@ -1,4 +1,4 @@
-"""The `index` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", row A3): the vector index's health,
+"""The `index` namespace of `/api/v1`: the vector index's health,
 drift and retrieval inspector. Building the index is the `index` job (`POST /jobs/index`, `routes/jobs.py`)."""
 from typing import Annotated, Any, Dict, List, Optional
 

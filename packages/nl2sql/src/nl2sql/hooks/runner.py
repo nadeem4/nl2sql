@@ -2,8 +2,8 @@
 
 The runtime builds the list (``build_hook`` for each entry of the ``hooks``
 section, in order) and hands it to the runner, so a built-in hook such as
-Wave B's ``policy.cost`` can be put first with approvers of its own. The
-runner reads no config. The rules (docs/architecture/wave_a.md, section 6):
+``policy.cost`` can be put first with approvers of its own. The
+runner reads no config. The rules:
 
 - Hooks run in order. A ``Modify`` replaces the fields it sets and the next
   hook sees the result; the first ``Deny`` or ``NeedsApproval`` ends the
@@ -13,7 +13,7 @@ runner reads no config. The rules (docs/architecture/wave_a.md, section 6):
   allow. ``on_error: open`` turns an exception, and only an exception, into
   an allow: a disallowed decision is a bug in the hook, not an outage.
 - A ``NeedsApproval`` that one of the run's approvals covers counts as
-  ``Allow``, and the next hook still runs (D24). The runner checks the
+  ``Allow``, and the next hook still runs. The runner checks the
   approval (``approval_problem``) against the hook's configured approver
   roles, by default ``policies.admin_roles``.
 - Every hook asked publishes ``hook.decision`` on the run's scope.

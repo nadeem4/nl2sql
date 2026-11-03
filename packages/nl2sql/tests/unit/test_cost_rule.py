@@ -1,6 +1,6 @@
-"""The cost rule: ``policies.cost`` and the built-in ``policy.cost`` hook (C2).
+"""The cost rule: ``policies.cost`` and the built-in ``policy.cost`` hook.
 
-docs/architecture/wave_b.md, section 9, and D52 to D54. The hook asks the
+The hook asks the
 adapter's ``estimate`` once per sub-query at ``execute.before``, ahead of every
 configured hook, and answers allow, ``NeedsApproval`` or ``Deny``. The adapter
 here is a stand-in with a scripted estimate: no database and no model.

@@ -1,4 +1,4 @@
-"""The chat-tool runner (docs/architecture/wave_c.md, section 4).
+"""The chat-tool runner.
 
 ``build_chat_tools`` resolves the ``chat_tools:`` names through the registry when the engine is built. A
 ``ChatToolRunner`` calls one tool for a conversation and turns whatever happens into a ``ToolStep``: an output,

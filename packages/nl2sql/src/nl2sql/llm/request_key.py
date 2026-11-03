@@ -125,7 +125,7 @@ class RequestLLMs(NamedTuple):
 
         Raises:
             MissingProviderKey: a step is put on a provider the override carries no key for. A caller's model
-                choice is never moved onto the operator's account (D210), so this is refused before anything runs.
+                choice is never moved onto the operator's account, so this is refused before anything runs.
             InvalidArgument: a key or a model names a provider that takes no key of its own (``ollama``,
                 ``openai_compatible``, a plugin with no ``api_key_env``). Such a provider is reached by the
                 operator's endpoint and credentials, so a caller may not move a step onto it.

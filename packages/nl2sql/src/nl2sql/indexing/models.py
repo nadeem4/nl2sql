@@ -52,8 +52,7 @@ class DatasourceExampleChunk(BaseChunk):
     """One example question a datasource answers, as an entry of its own.
 
     One entry per phrasing, so the fifth example moves routing as much as the
-    first; in one shared text it barely moved the vector. See
-    docs/architecture/wave_a.md, section 9.
+    first; in one shared text it barely moved the vector.
     """
 
     type: Literal["schema.datasource_example"] = Field(

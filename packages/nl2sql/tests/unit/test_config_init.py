@@ -1,6 +1,6 @@
 """``init_project`` writes a config that ``load_config`` reads, and ``demo_config`` is the demo.
 
-docs/architecture/configuration_v2.md, section 10 (CLI) and the PR 6 row.
+``nl2sql init`` writes a project that loads.
 """
 import sqlite3
 from pathlib import Path
@@ -284,7 +284,7 @@ def test_demo_config_takes_its_llm_and_storage_path(tmp_path):
     assert config.storage.path == tmp_path / "store"
 
 
-# ---------------------------------------------------------------- knowledge (wave_b.md, K1)
+# ---------------------------------------------------------------- knowledge
 
 def test_init_writes_knowledge_yaml_and_an_empty_glossary(tmp_path):
     from nl2sql.knowledge.yaml_source import canonical_yaml

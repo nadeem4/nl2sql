@@ -1,7 +1,6 @@
 """``engine.datasources.types()``, ``test(Datasource)`` and ``add()``: the methods behind Connect a database.
 
-See docs/architecture/phase2.md, section 7, "`engine.datasources`: the methods
-behind Connect a database". A real engine on a small SQLite database and a
+A real engine on a small SQLite database and a
 fake embedder; stub adapters stand in for a driver that is missing and for a
 server that refuses a login.
 """

@@ -1,5 +1,5 @@
 """``/approvals``: the requests a ``needs_approval`` run stored, granted or denied by an approver, then named by the
-asker's re-run (docs/architecture/wave_d.md, D215).
+asker's re-run.
 
 The engine here is the real facade over a fake runtime with one hook whose approvers hold the role ``dba``.
 """

@@ -1,4 +1,4 @@
-"""``engine.api_keys`` (docs/architecture/wave_c.md, section 9, row M1; D127, D130)."""
+"""``engine.api_keys``."""
 from __future__ import annotations
 
 import hashlib
@@ -260,7 +260,7 @@ def test_keys_survive_a_new_engine(tmp_path):
         assert second.api_keys.verify(token).user_id == "ana"
 
 
-# ------------------------------------------------------------------ check: why a token was refused (row M2)
+# ------------------------------------------------------------------ check: why a token was refused
 
 def _flip(secret):
     return ("B" if secret[0] != "B" else "C") + secret[1:]

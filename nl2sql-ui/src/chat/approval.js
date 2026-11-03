@@ -9,7 +9,7 @@ export function approvalState(needed, records) {
   return { state: "waiting", ids: [] };
 }
 
-// The list also holds the caller's own requests. The server marks them (`own`, A4d), so the page compares no ids and
+// The list also holds the caller's own requests. The server marks them (`own`), so the page compares no ids and
 // holds no approval rule: it only leaves the buttons off requests the caller asked.
 export const ownRequest = (record) => record.own === true;
 export const toDecide = (records) => records.filter((r) => !ownRequest(r));

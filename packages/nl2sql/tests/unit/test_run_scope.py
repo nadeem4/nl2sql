@@ -1,4 +1,4 @@
-"""``RunScope``: the life of one question on the bus (docs/architecture/wave_a.md, section 3).
+"""``RunScope``: the life of one question on the bus.
 
 ``QueryAPI`` opens it and closes it once, with ``run.finished`` (a summary,
 never rows) or ``run.failed``. Its context is entered inside
@@ -123,7 +123,7 @@ def test_run_finished_is_published_once_with_a_summary(monkeypatch):
     assert summary["source"] == "generated"
     assert summary["user_id"] == "ada" and summary["roles"] == ["analyst"]
     assert summary["duration_s"] >= 0
-    assert "result" not in summary, "the bus never carries the QueryResult (D15)"
+    assert "result" not in summary, "the bus never carries the QueryResult"
 
 
 def test_run_failed_is_published_on_the_bus(monkeypatch):
@@ -255,7 +255,7 @@ def test_two_scopes_in_flight_keep_their_own_trace_ids(monkeypatch):
     assert len(seen) == 2 and all(a == b for a, b in seen) and seen[0][0] != seen[1][0]
 
 
-# ---------------------------------------------------------------- a scope opened before the run (Wave C's turn)
+# ---------------------------------------------------------------- a scope opened before the run (turn)
 
 def _model_call(handlers, node="conversation_rewriter"):
     """What LangChain does around one chat-model call made with ``callbacks=handlers``."""
@@ -333,7 +333,7 @@ def test_scope_callbacks_hold_the_usage_collector_and_the_attached_handlers():
     from nl2sql.pipeline.events import RunEvents
 
     handlers = scope.callbacks()
-    # The usage collector, the run's step events (E1), the question's budget (E3), then what was attached.
+    # The usage collector, the run's step events, the question's budget, then what was attached.
     assert isinstance(handlers[0], TokenUsageCallback) and isinstance(handlers[1], RunEvents)
     assert isinstance(handlers[2], Budget) and handlers[2].usage is handlers[0]
     assert handlers[3:] == [extra]

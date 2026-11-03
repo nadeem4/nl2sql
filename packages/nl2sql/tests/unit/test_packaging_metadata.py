@@ -53,7 +53,7 @@ def _cli() -> dict:
 
 
 def test_nl2sql_command_is_installed_by_nl2sql_cli():
-    """The ``nl2sql`` script moved with the CLI (D227, D231); the engine installs no command and has no ``demo`` extra."""
+    """The ``nl2sql`` script moved with the CLI; the engine installs no command and has no ``demo`` extra."""
     import importlib
 
     assert _cli()["name"] == "nl2sql-cli"
@@ -66,7 +66,7 @@ def test_nl2sql_command_is_installed_by_nl2sql_cli():
 
 
 def test_the_cli_depends_on_the_engine_and_textual_and_the_api_is_its_web_extra():
-    """D231: the engine is its one repository dependency, Textual is a plain dependency, the API is the ``web`` extra."""
+    """the engine is its one repository dependency, Textual is a plain dependency, the API is the ``web`` extra."""
     cli = _cli()
     engine = Version(_project("nl2sql")["version"])
     requirements = {Requirement(d).name: Requirement(d) for d in cli["dependencies"]}
@@ -76,7 +76,7 @@ def test_the_cli_depends_on_the_engine_and_textual_and_the_api_is_its_web_extra(
     assert not {name for name in requirements if name.startswith("nl2sql")} - {"nl2sql-engine"}
     assert set(cli["optional-dependencies"]) == {"web"}
     assert cli["optional-dependencies"]["web"] == [f"nl2sql-api~={engine}"]
-    # The release-please marker on each of the CLI's version and pins, so CL2's updater bumps them.
+    # The release-please marker on each of the CLI's version and pins, so the release updater bumps them.
     marked = [line for line in CLI_PROJECT.read_text(encoding="utf-8").splitlines() if "x-release-please-version" in line]
     assert len(marked) == 3 and any("nl2sql-engine" in line for line in marked) and any("nl2sql-api" in line for line in marked)
     assert cli["version"] == str(engine)

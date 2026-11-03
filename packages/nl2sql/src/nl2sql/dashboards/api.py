@@ -1,10 +1,10 @@
-"""The dashboards service behind ``engine.dashboards`` (docs/architecture/wave_c.md, section 6).
+"""The dashboards service behind ``engine.dashboards``.
 
-D1 is the store and the manual edits: a dashboard is private to its owner (D118), lives in one of their
-workspaces (D131), is built as a draft and saved whole by ``pin``. D2 runs the charts: ``open`` serves the stored
+The store and the manual edits: a dashboard is private to its owner, lives in one of their
+workspaces, is built as a draft and saved whole by ``pin``. Running the charts: ``open`` serves the stored
 results after the access check, ``refresh`` re-runs the stored plans as the caller, ``run_scheduled`` does so for
-each due schedule as its owner (D134). D3 is the starter dashboard: ``generate`` builds the template charts from the
-column roles, runs each as the caller and saves the ones that answered. D4 lets a conversation build a draft and add or
+each due schedule as its owner. The starter dashboard: ``generate`` builds the template charts from the
+column roles, runs each as the caller and saves the ones that answered. A conversation can build a draft and add or
 replace a chart from an answer it holds, after a no-execute check of the plan. None of it calls a model.
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ class Dashboards:
 
     @property
     def builder(self) -> Any:
-        """The guided builder (DB1b), made on first use: a refresh or an edit never loads the model layer."""
+        """The guided builder, made on first use: a refresh or an edit never loads the model layer."""
         if self._builder is None:
             from nl2sql.dashboards.builder import Builder
 
@@ -194,15 +194,15 @@ class Dashboards:
         return question, ChartPlan(verified=VerifiedRef(id=query.id, params=params), verified_datasource_id=datasource_id)
 
     def _saved(self, answer_id: str, user: UserContext) -> Tuple[str, ChartPlan, ChartChoice]:
-        """A saved answer of the caller's own (another's is not found, an admin included: D247)."""
+        """A saved answer of the caller's own (another's is not found, an admin included)."""
         from nl2sql.answers.service import Answers
 
         answer = Answers(self._ctx).get(answer_id, user_context=user)
         return answer.question, answer.plan, answer.chart
 
     def _check(self, tile: Tile, user: UserContext) -> None:
-        """The access check of D135 for a chart about to be saved: its plan is validated and generated as the caller,
-        running nothing. A plan the validator rejects, or that the caller may not read, never lands (D4)."""
+        """The access check for a chart about to be saved: its plan is validated and generated as the caller,
+        running nothing. A plan the validator rejects, or that the caller may not read, never lands."""
         run = self._refresher.check([tile], user)[tile.id]
         if run.status not in SERVES:
             why = (run.error or {}).get("message") or f"the check ended {run.status}"
@@ -236,7 +236,7 @@ class Dashboards:
     def move(self, dashboard_id: str, workspace_id: str, *, user_context: UserContext) -> Dashboard:
         return self.edit(dashboard_id, [MoveDashboard(workspace_id=workspace_id)], user_context=user_context)
 
-    # ------------------------------------------------------------ open and refresh (D2)
+    # ------------------------------------------------------------ open and refresh
 
     def open(self, dashboard_id: str, *, user_context: UserContext, refresh_due: bool = True) -> DashboardView:
         owner = self._owner(user_context)
@@ -303,7 +303,7 @@ class Dashboards:
         tiles = {t.id for t in dashboard.tiles}
         return {run.tile_id: run for run in self._store.runs(dashboard.id) if run.tile_id in tiles}
 
-    # ------------------------------------------------------------ schedules (D2)
+    # ------------------------------------------------------------ schedules
 
     def run_scheduled(self, *, now: Optional[datetime] = None) -> List[DashboardRun]:
         if now is not None and now.utcoffset() is None:
@@ -353,13 +353,13 @@ class Dashboards:
         self._ctx.bus.publish("dashboard.schedule_stopped", DashboardScheduleStopped(
             dashboard_id=dashboard.id, reason=code), tenant_id=dashboard.tenant_id or self._ctx.tenant_id)
 
-    # ------------------------------------------------------------ the starter dashboard (D3)
+    # ------------------------------------------------------------ the starter dashboard
 
     def generate(self, source: Source, *, user_context: UserContext, title: Optional[str] = None,
                  workspace_id: Optional[str] = None, max_tiles: Optional[int] = None,
                  on_tile: Optional[Callable[[TileProgress], None]] = None,
                  token: Optional[CancellationToken] = None) -> Tuple[Dashboard, DashboardRun]:
-        """The no-model starter (D115): the template charts for ``source``, each run as the caller, the ones that
+        """The no-model starter: the template charts for ``source``, each run as the caller, the ones that
         answered kept, laid out and saved whole. A generated dashboard is an ordinary one. ``on_tile`` hears of
         each chart as it ran; a cancelled ``token`` raises ``RunCancelled`` before the next chart, and the draft
         and a workspace this call made are removed, as for any failure."""

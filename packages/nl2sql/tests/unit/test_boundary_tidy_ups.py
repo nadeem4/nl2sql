@@ -1,4 +1,4 @@
-"""Small boundary fixes from the architecture audit (F13, F16, F17, F18, F19, F20).
+"""Small boundary fixes from the architecture audit.
 
 The package boundaries themselves are enforced in
 ``packages/nl2sql/tests/architecture/test_boundaries.py``.
@@ -50,7 +50,7 @@ def test_semantic_sql_comparison_parses_in_the_given_dialect():
 def test_sqlalchemy_base_has_no_duplicate_result_models():
     import nl2sql_sdk.sqlalchemy as base
 
-    # B24: DryRunResult, QueryPlan and CostEstimate went with dry_run, explain and cost_estimate.
+    # DryRunResult, QueryPlan and CostEstimate went with dry_run, explain and cost_estimate.
     for name in ("QueryResult", "AdapterError", "DryRunResult", "QueryPlan", "CostEstimate"):
         assert not hasattr(base, name)
 
@@ -92,11 +92,7 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
     assert not set(DECLARED_AHEAD) & raised, sorted(set(DECLARED_AHEAD) & raised)
 
 
-# Codes added by a wave's foundation PR before their producers, so the parallel
-# PRs never edit errors.py (docs/architecture/wave_a.md, D35; wave_b.md, D59),
-# each with the PR that raises it. Wave A's are all raised now (S1, E3), and
-# Wave B's too (L2). Wave C's (wave_c.md, section 3 and 6) leave as D2 lands.
-# Wave D's are added by D0a-1 (wave_d.md, section 14).
+# Codes declared before their producer exist; each leaves this list when raised.
 DECLARED_AHEAD: dict = {
 }
 

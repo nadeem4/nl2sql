@@ -1,4 +1,4 @@
-"""One error envelope for every non-2xx response (docs/architecture/wave_d.md, D202, B200).
+"""One error envelope for every non-2xx response.
 
 Only the facade's own ``NL2SQLError`` is mapped to its status; anything else is a 500 that names a request id and
 never its text.
@@ -168,7 +168,7 @@ ANSWERS_200 = {"/api/v1/health", "/api/v1/ready", "/api/v1/meta", "/api/v1/query
 
 @pytest.mark.parametrize("kind", EXCEPTIONS)
 def test_no_route_returns_exception_text(tmp_path, kind):
-    """B200: through every registered route, a built-in exception carrying a connection string is a 500 (or a
+    """through every registered route, a built-in exception carrying a connection string is a 500 (or a
     refusal that says nothing of it), and no part of the string is in the body."""
     app = create_app()
     config = make_config(tmp_path / "project")

@@ -1,4 +1,4 @@
-"""The hosted demo: anonymous sessions, limits, one job and two streams per session (D221, "The hosted demo")."""
+"""The hosted demo: anonymous sessions, limits, one job and two streams per session."""
 import asyncio
 import json
 import os

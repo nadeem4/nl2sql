@@ -182,7 +182,7 @@ of more than 12 columns is not searched for a reordering (the in-order match sti
 match it was (`detail.match`: `strict`, `reordered`, `extra columns` or
 `extra columns, reordered`). Period labels never pass this way; they stay
 lenient-only. The row count, every row value and, when `order_matters`, the row
-order are as strict as before. (Column order used to count, C-W6a; C-W7d
+order are as strict as before. (Column order used to count
 dropped that rule, because a question asks for no column order and Spider-style
 execution checks ignore it.)
 

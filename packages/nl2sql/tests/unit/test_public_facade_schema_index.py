@@ -141,7 +141,7 @@ def test_datasources_schema_before_the_first_index_has_no_tables(tmp_path):
 
 
 def test_schema_requires_a_caller(tmp_path):
-    """No default view (B29, D33): an app that forgot the caller fails rather than seeing everything."""
+    """No default view: an app that forgot the caller fails rather than seeing everything."""
     with pytest.raises(TypeError):
         _engine(_Context(tmp_path, snapshot=_snapshot())).datasources.schema("chinook")
 

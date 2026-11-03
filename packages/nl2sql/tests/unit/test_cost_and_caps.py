@@ -1,12 +1,12 @@
 """The price table, a run's cost, and the per-question caps.
 
-docs/architecture/wave_a.md, section 5, row E3. A dated table in ``llm/``
+A dated table in ``llm/``
 prices every call, ``llm.prices`` overrides it, and a model neither lists has
-a null cost (D11). ``max_llm_calls`` (60) and ``max_cost_usd`` (none) are
+a null cost. ``max_llm_calls`` (60) and ``max_cost_usd`` (none) are
 checked before each model call, by a ``Budget`` that cancels the run's token
 with a ``RunStop`` reason, so the run ends ``stopped`` rather than retried as
-a planner error (D20). A ``Budget`` also works outside a question, with caps
-of its own (Wave B's profiler, V3's seeding).
+a planner error. A ``Budget`` also works outside a question, with caps
+of its own (profiler, eval seeding).
 """
 from __future__ import annotations
 
@@ -416,7 +416,7 @@ def test_engine_llm_prices_is_the_effective_table(tmp_path):
     assert rows["claude-opus-5"]["citation"]
 
 
-# ---------------------------------------------------------------- review fixes (PR #326)
+# ---------------------------------------------------------------- review fixes
 
 def test_a_config_price_for_the_configured_name_wins_over_the_table_for_the_served_name():
     # A deployment alias whose responses carry a table model's name keeps its negotiated rate.

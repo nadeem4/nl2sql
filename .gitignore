@@ -48,3 +48,4 @@ traces/
 
 # The web app's build (nl2sql-ui: npm run build); the API image and the wheel build it fresh.
 packages/api/src/nl2sql_api/web/static/
+.playwright-mcp/

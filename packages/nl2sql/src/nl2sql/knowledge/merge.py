@@ -1,4 +1,4 @@
-"""Loading the knowledge sources and merging them in config order (docs/architecture/wave_b.md, section 3).
+"""Loading the knowledge sources and merging them in config order.
 
 ``load_knowledge(config, registry=, secrets=)`` builds each entry of the
 ``knowledge`` section (a ``KnowledgeSourceConfig`` through the registry, an
@@ -12,7 +12,7 @@ object as given), calls ``load()`` once, checks every text against
   first source;
 - each item records the source it came from (``provenance``);
 - each datasource's merged knowledge has a digest: the SHA-256 of its
-  canonical JSON, which keys the plan cache (D57) and the build pointer (D56).
+  canonical JSON, which keys the plan cache and the build pointer.
 
 ``Knowledge`` is immutable: a reload builds a new one and the runtime swaps it.
 """

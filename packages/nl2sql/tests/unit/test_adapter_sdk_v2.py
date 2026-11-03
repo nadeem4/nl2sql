@@ -1,6 +1,4 @@
 """The adapter SDK v2 contract: strict connection models, ``IndexScope``, version 2.
-
-docs/architecture/phase2.md, section 7.
 """
 import pytest
 from pydantic import SecretStr, ValidationError

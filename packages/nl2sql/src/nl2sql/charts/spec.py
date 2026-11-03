@@ -1,8 +1,8 @@
-"""``ChartSpec``: our own small typed chart, with Vega-Lite as its export (D110).
+"""``ChartSpec``: our own small typed chart, with Vega-Lite as its export.
 
 Four kinds: ``line``, ``bar``, ``big_number`` and ``table``. No colour is ever
 set; the renderer's theme decides. ``choose.py`` picks one from a result
-and ``vega.py`` exports it (docs/architecture/wave_c.md, section 5); this module holds the shapes. It
+and ``vega.py`` exports it; this module holds the shapes. It
 imports only pydantic, so a model that carries a ``ColumnKind`` costs nothing to import.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pydantic import Field
 
 from nl2sql.common.strict import StrictModel
 
-# Wave A's D30 categories.
+# The type categories.
 ColumnKind = Literal["number", "text", "temporal", "boolean", "other"]
 
 

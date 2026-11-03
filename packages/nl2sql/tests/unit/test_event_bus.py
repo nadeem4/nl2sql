@@ -1,7 +1,6 @@
 """The event bus: ``nl2sql_sdk.events.Event`` and ``Observer``, and ``nl2sql.events.EventBus``.
 
-The design is docs/architecture/wave_a.md, section 3: synchronous and in
-process, one bus per engine, subscribers fail open unless they ask to raise,
+The bus is synchronous and in-process, one bus per engine, subscribers fail open unless they ask to raise,
 and only catalogued names with valid data are published.
 """
 from __future__ import annotations
@@ -183,27 +182,26 @@ def test_close_closes_every_observer_subscribed_and_detaches_it():
 
 # ---------------------------------------------------------------- the catalog
 
-WAVE_A_EVENTS = {
+RUN_AND_INDEX_EVENTS = {
     "run.started", "run.finished", "run.failed", "node.started", "node.finished", "answer.delta",
     "result.manifest", "llm.call", "llm.parse_retry", "plan_cache.lookup", "policy.decision",
     "hook.decision", "run.limit_reached", "sanity.flagged",
     "datasource.failed", "index.started", "index.column_failed", "index.swapped", "index.failed",
     "schema.drifted", "retention.purged", "llm.changed", "eval.case", "eval.finished",
 }
-# docs/architecture/wave_b.md, section 11, added by its foundation PR (B0).
-WAVE_B_EVENTS = {
+KNOWLEDGE_EVENTS = {
     "knowledge.loaded", "knowledge.used", "clarification.requested", "cost.estimated", "profile.finished",
     "proposal.created", "proposal.decided",
 }
-WAVE_C_EVENTS = {
+CONVERSATION_EVENTS = {
     "conversation.started", "conversation.step", "conversation.turn", "chat_tool.called", "dashboard.generated",
     "dashboard.refreshed", "dashboard.changed", "dashboard.schedule_set", "dashboard.schedule_stopped",
     "workspace.changed", "datasource.saved", "api_key.created", "api_key.revoked", "mcp.denied",
 }
 
 
-def test_the_catalog_lists_every_wave_a_and_wave_b_event():
-    assert set(CATALOG) == WAVE_A_EVENTS | WAVE_B_EVENTS | WAVE_C_EVENTS
+def test_the_catalog_lists_every_event():
+    assert set(CATALOG) == RUN_AND_INDEX_EVENTS | KNOWLEDGE_EVENTS | CONVERSATION_EVENTS
     assert RUN_EVENTS == {"run.started", "run.finished", "run.failed", "node.started", "node.finished",
                           "answer.delta", "result.manifest", "llm.call", "llm.parse_retry",
                           "plan_cache.lookup", "policy.decision", "hook.decision", "run.limit_reached",
@@ -214,7 +212,7 @@ def test_the_catalog_lists_every_wave_a_and_wave_b_event():
 def test_catalog_describes_each_event_with_its_json_schema():
     infos = {info.name: info for info in catalog()}
 
-    assert set(infos) == WAVE_A_EVENTS | WAVE_B_EVENTS | WAVE_C_EVENTS
+    assert set(infos) == RUN_AND_INDEX_EVENTS | KNOWLEDGE_EVENTS | CONVERSATION_EVENTS
     finished = infos["run.finished"]
     assert finished.description
     assert "status" in finished.data_schema["properties"]

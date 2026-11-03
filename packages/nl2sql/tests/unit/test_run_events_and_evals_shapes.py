@@ -1,4 +1,4 @@
-"""The shapes Wave A's tracks share, added before any of them (docs/architecture/wave_a.md, D35).
+"""The shared shapes of run events and evals.
 
 The config sections and settings, the registry kinds, the error codes, the
 result fields, the engine's bus and the stub ``engine.events`` and
@@ -191,7 +191,7 @@ WARNINGS = ["JOIN_KEY_UNCONVERTED", "ALL_NULL_COLUMN"]
 
 
 @pytest.mark.parametrize("code", NOT_RETRYABLE + RETRYABLE + WARNINGS)
-def test_wave_a_error_codes_exist(code):
+def test_run_event_and_eval_error_codes_exist(code):
     assert ErrorCode(code).value == code
 
 
@@ -270,7 +270,7 @@ def test_two_engines_have_two_buses(tmp_path):
 
 
 def test_the_events_and_evals_namespaces_exist(tmp_path):
-    """Stubs: E1 fills ``engine.events``, V1 ``engine.evals``. Neither loads nl2sql.evaluation."""
+    """The ``engine.events`` and ``engine.evals`` namespaces. Neither loads nl2sql.evaluation."""
     from nl2sql.api.evals_api import EvalsAPI
     from nl2sql.api.events_api import EventsAPI
 

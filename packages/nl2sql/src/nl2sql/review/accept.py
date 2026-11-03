@@ -1,4 +1,4 @@
-"""Accept and reject: the only code that writes a file a person owns (docs/architecture/wave_b.md, section 5, D42).
+"""Accept and reject: the only code that writes a file a person owns.
 
 ``accept`` writes two files at most: the first ``yaml`` knowledge source's
 glossary (``table``, ``column``, ``join`` and ``term`` proposals) and the

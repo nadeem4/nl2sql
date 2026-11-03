@@ -3,8 +3,7 @@
 The checking is ``nl2sql.check_config``; this prints its result:
 the problems grouped by file, every secret as present or missing (never its
 value), and with ``--connect`` each datasource's status. Exit code 0 means no
-problems and 1 means problems; a usage error is 2. See
-docs/architecture/configuration_v2.md, sections 6 and 10.
+problems and 1 means problems; a usage error is 2.
 """
 from __future__ import annotations
 

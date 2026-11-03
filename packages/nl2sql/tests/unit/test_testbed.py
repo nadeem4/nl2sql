@@ -1,6 +1,6 @@
 """The test bed's own scripts: the wide schema, the samples and the CI gate.
 
-docs/architecture/phase2.md, section 3. These need no database: they check
+These need no database: they check
 the files the compose file loads and the decision the ``realdb-gate`` job makes.
 """
 from __future__ import annotations
@@ -187,7 +187,6 @@ case "$*" in
   *DB_ID*) echo 1 ;;
 esac
 """
-
 
 def _bash():
     import os

@@ -61,8 +61,7 @@ PLANNER_ANSWER = "PlannerAnswer"
 def as_planner_answer(name: str, payload: Any) -> Any:
     """A ``PlannerAnswer`` rule's payload, with a bare plan wrapped as ``{"plan": <plan>}``.
 
-    The planner's structured output is ``PlannerAnswer`` (docs/architecture/wave_b.md,
-    section 7), whose plan is under ``plan``; a test that answers with a plan
+    The planner's structured output is ``PlannerAnswer``, whose plan is under ``plan``; a test that answers with a plan
     alone, as before, gets it wrapped. Any other name, and a payload that
     already has ``plan``, are returned as given.
     """

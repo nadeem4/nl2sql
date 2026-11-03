@@ -1,6 +1,6 @@
-"""What the review queue returns and raises (docs/architecture/wave_b.md, section 5).
+"""What the review queue returns and raises.
 
-The proposal row itself is the SDK's ``nl2sql_sdk.stores.Proposal`` (D36), so
+The proposal row itself is the SDK's ``nl2sql_sdk.stores.Proposal``, so
 a third-party state store can keep it.
 """
 from __future__ import annotations

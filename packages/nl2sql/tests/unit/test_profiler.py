@@ -1,6 +1,6 @@
-"""The schema profiler: join candidates, column roles and ``engine.knowledge.profile`` (P1).
+"""The schema profiler: join candidates, column roles and ``engine.knowledge.profile``.
 
-docs/architecture/wave_b.md, section 6, and decisions D38, D41, D44, D45, D46 and D61. The pure rules
+The pure rules
 (``nl2sql.profiler.joins`` and ``roles``) are tested on hand-built snapshots; the engine tests run a real
 SQLite database with a fake embedder, so nothing is downloaded and no model is called.
 """
@@ -515,7 +515,7 @@ def test_profile_finished_is_published(engine):
     assert "customers" not in str(event.data)  # counts only, never names or values
 
 
-# ---------------------------------------------------------------- progress and cancellation (G3b)
+# ---------------------------------------------------------------- progress and cancellation
 
 def test_profile_reports_each_datasource(tmp_path):
     seen = []

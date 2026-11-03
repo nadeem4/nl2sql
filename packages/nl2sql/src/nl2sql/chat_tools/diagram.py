@@ -1,8 +1,8 @@
-"""The ``diagram`` chat tool (docs/architecture/wave_c.md, sections 4 and "Diagrams").
+"""The ``diagram`` chat tool.
 
 Draws the tables an answer of the conversation read (``nl2sql.diagram_for``), or a datasource's schema as the
 conversation's caller may see it (``engine.datasources.diagram``), as Mermaid: no model call. Like every chat tool it
-imports only the top-level ``nl2sql`` and its own interface module (D109).
+imports only the top-level ``nl2sql`` and its own interface module.
 """
 from __future__ import annotations
 

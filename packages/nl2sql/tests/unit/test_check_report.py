@@ -1,4 +1,4 @@
-"""``CheckReport.ready`` and ``CheckReport.problems``: what ``/ready`` and ``nl2sql doctor`` judge by (D208, G3b)."""
+"""``CheckReport.ready`` and ``CheckReport.problems``: what ``/ready`` and ``nl2sql doctor`` judge by."""
 from __future__ import annotations
 
 import pytest

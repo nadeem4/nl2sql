@@ -143,7 +143,7 @@ engine.evals.run(suites=["evals/clarify.yaml"], clarify=True)
 `suites/pagila.yaml` holds 11 approved cases over the test bed's Pagila
 database (a datasource named `pagila`), which is past
 `settings.retrieval.full_snapshot_max_tables`, so the retriever has to choose
-tables ([the design](../architecture/wave_c.md#17-c-w4-table-recall-on-large-schemas)).
+tables.
 Each case is chosen so a table it needs is more than one join from the
 others, or the question's words are not near the table's name ("revenue" is
 not near `payment`): the smoke question "top 5 films by revenue in the top

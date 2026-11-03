@@ -4,8 +4,7 @@ The built-ins are ``log`` (``observers/log.py``), ``audit``
 (``observers/audit.py``) and ``otel`` (``observers/otel.py``, the ``otel``
 extra). A plugin declares its own under the ``nl2sql.observers`` entry point
 group. With no section the engine runs ``log`` and ``audit``; ``observers: []``
-runs none. Observers fail open: the bus catches what one raises (D9). The
-design is docs/architecture/wave_a.md, section 4.
+runs none. Observers fail open: the bus catches what one raises.
 """
 from __future__ import annotations
 
@@ -20,7 +19,7 @@ if TYPE_CHECKING:
     from nl2sql.registry import Registry
     from nl2sql.secrets import SecretManager
 
-# ``observers`` absent from the config (D18).
+# ``observers`` absent from the config.
 DEFAULT_OBSERVERS = (ObserverConfig(type="log"), ObserverConfig(type="audit"))
 
 

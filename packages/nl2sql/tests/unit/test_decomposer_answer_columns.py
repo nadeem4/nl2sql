@@ -1,4 +1,4 @@
-"""A split answer's columns follow the question (C-W7c).
+"""A split answer's columns follow the question.
 
 Pagila 001 ("Top 5 films by revenue in the top category"): the decomposer's one
 sort op carried an ``expected_schema`` of exactly the answer's columns, but the

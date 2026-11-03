@@ -1,4 +1,4 @@
-// Evals: the suites and scorers the server knows, and the job that runs them (A4a). Follow the job with `followJob`
+// Evals: the suites and scorers the server knows, and the job that runs them. Follow the job with `followJob`
 // in jobs.js.
 import { request } from "./http.js";
 

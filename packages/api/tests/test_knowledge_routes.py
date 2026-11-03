@@ -1,4 +1,4 @@
-"""The knowledge and proposals routes (docs/architecture/wave_d.md, row A3): thin over ``engine.knowledge`` and
+"""The knowledge and proposals routes: thin over ``engine.knowledge`` and
 ``engine.proposals``, each passing the caller. A stub engine records the calls; the models are the engine's own."""
 import pytest
 from dashboard_stubs import AT, Recorder

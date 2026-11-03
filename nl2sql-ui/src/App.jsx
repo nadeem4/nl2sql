@@ -19,8 +19,8 @@ import {
   createRouter, hashFor, indicatorTransform, navItems, pageFor, routeFromHash, swapView,
 } from "./router.js";
 
-// Wave D's pages, each its own chunk. Chat and Approvals are real (W1); the others are stubs until their rows fill them
-// (wave_d.md, section 14).
+// pages, each its own chunk. Chat and Approvals are real; the others are stubs until their rows fill them
+//.
 const Chat = lazy(() => import("./pages/Chat.jsx"));
 const Approvals = lazy(() => import("./pages/Approvals.jsx"));
 
@@ -127,7 +127,7 @@ export default function App() {
   // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
   const [starter, setStarter] = useState(null);
   const [waiting, setWaiting] = useState([]);
-  // What this server is and who the caller is, from GET /meta (A4a, A4c): Connect, Knowledge, Evals and Settings offer
+  // What this server is and who the caller is, from GET /meta: Connect, Knowledge, Evals and Settings offer
   // admin work only to an admin, and Settings keeps browser-held keys only when the server takes them (`request_llm`).
   // Null until /meta answers, or when it names no caller.
   const [caller, setCaller] = useState(null);

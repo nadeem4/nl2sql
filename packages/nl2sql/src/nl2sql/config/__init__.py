@@ -1,7 +1,7 @@
 """The typed config: ``nl2sql.yaml`` and its sections.
 
 ``load_config`` reads the files; building a ``Config`` in code gives the same
-object. See docs/architecture/configuration_v2.md, section 2.
+object.
 """
 from nl2sql.config.errors import ConfigError, Problem
 from nl2sql.config.loader import load_config, load_env_file

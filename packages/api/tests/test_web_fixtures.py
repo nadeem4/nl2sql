@@ -1,6 +1,6 @@
 """The golden files the web app's node tests read: ``ApiError``, ``Job``, ``QueryResult``, ``Turn``, the ``ChartSpec``s (a line of two series, a bar, a big number) and a ``ResultPage``, the ``Dashboard`` and
 ``DashboardView``, the ``Proposal``, the ``DriftReport`` (a ``drifted`` one with its diff and impact, and an ``unchanged`` one),
-an eval ``Job`` (its result an ``EvalReport``) and ``/meta`` for a signed-in caller (docs/architecture/wave_d.md, "Testing").
+an eval ``Job`` (its result an ``EvalReport``) and ``/meta`` for a signed-in caller.
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
 Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.

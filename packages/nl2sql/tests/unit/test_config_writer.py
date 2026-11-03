@@ -1,4 +1,4 @@
-"""``write_project``, ``starter_config`` and ``write_env_values`` (docs/architecture/wave_c.md, row L2, "Writing the config").
+"""``write_project``, ``starter_config`` and ``write_env_values``.
 
 Temp folders only: nothing here reads or writes a real ``.env``.
 """

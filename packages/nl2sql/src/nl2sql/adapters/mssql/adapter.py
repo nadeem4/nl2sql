@@ -32,7 +32,6 @@ _SEEKS = {"Index Seek", "Clustered Index Seek"}
 class OdbcDriverMissing(ImportError):
     """No Microsoft ODBC Driver for SQL Server is installed: the ``driver`` stage."""
 
-
 def newest_sql_server_driver() -> str:
     """The newest "ODBC Driver N for SQL Server" that pyodbc can see."""
     import pyodbc

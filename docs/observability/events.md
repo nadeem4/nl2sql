@@ -2,7 +2,7 @@
 
 Everything the engine does is published as an **event** on its event bus: each
 step of a question, its result manifest, its answer as it is written, and how
-it ended; and, as Wave A lands, model calls, policy denials, hook decisions,
+it ended; and model calls, policy denials, hook decisions,
 index builds, purges and LLM swaps. Two readers see them:
 
 - **The caller who asked the question** sees their own run's events on
@@ -11,7 +11,7 @@ index builds, purges and LLM swaps. Two readers see them:
 - **An operator** sees every event of every run, and the engine's own, through
   `engine.events.subscribe`.
 
-The design is [Wave A, section 3](../architecture/wave_a.md#3-the-event-bus).
+
 
 ## The event
 
@@ -62,7 +62,7 @@ Run events (they carry the run's `trace_id`):
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
 | `policy.decision` | a denial: `datasource_id`, `schema`, `table` (both None for a datasource), `rule`, `step` (`logical_validator`, `curated_matcher` or `datasource_resolver`) | no |
 | `hook.decision` | `hook`, `point`, `decision`, `reason`, ... | no |
-| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; not yet published (Wave B's K2) |
+| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; not yet published |
 | `clarification.requested` | `sub_query_id`, `phrase`, `options` (how many) | no; published by the clarifier when a run ends `needs_clarification` |
 | `cost.estimated` | `datasource_id`, `sub_query_id`, `estimated_rows`, `cost`, `limit`, `decision` (`allow`, `confirm`, `refuse`; the audit observer writes `confirm` and `refuse`) | no; published by the `policy.cost` hook when a cost limit applies, once per sub-query's SQL (an approved re-run asks again) |
 
@@ -85,23 +85,23 @@ on the engine's bus directly.
 | `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | a new proposal entered the review queue (a thumbs-up, or another track's finding) |
 | `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | `engine.proposals.accept` or `reject` decided one (audited) |
 
-Release 0.9 ([Wave C](../architecture/wave_c.md)) adds the events below. They are catalogued now; the change named
+Release 0.9 adds the events below. They are catalogued now; the change named
 with each publishes it. None is on `stream_query`'s allow-list: `conversations.stream` adds the two conversation
 events to its own. The three marked *turn* belong to a conversation turn, which opens a scope of its own and so has a
 `trace_id`; none carries rows, a value of an argument, or a token.
 
 | Name | Data | Published when |
 | --- | --- | --- |
-| `conversation.started` | `conversation_id`, `user_id`, `datasource_id` | `engine.conversations.start` (C1) |
-| `conversation.step` (turn) | `conversation_id`, `turn`, `tool`, `status`, `trace_id` (an `ask` step's), `args` (argument names only) | the model's loop finished one tool call (C1) |
-| `conversation.turn` (turn) | `conversation_id`, `turn`, `kind`, `status`, `trace_id`, `steps`, `stored` (the stored `Turn` as JSON, on the conversation stream only) | a turn was stored (C1) |
-| `chat_tool.called` (turn) | `tool`, `conversation_id`, `turn`, `ok`, `seconds`, `error_code` | a registry chat tool ran, in the model's loop or by name; in the turn's scope (C2) |
-| `dashboard.generated` | `dashboard_id`, `datasource_id`, `tiles`, `skipped` | `engine.dashboards.generate` (D3) |
-| `dashboard.refreshed` | `dashboard_id`, `trigger`, `counts` (charts per status), `filters` (ids, never values) | a refresh, an open that refreshed, or a scheduled run (D2) |
-| `dashboard.changed` | `dashboard_id`, `change` (the edit kinds, a move being the kind `move`; `pinned`; `deleted`; `created`, a new draft), `by` | an edit, a pin, a delete or a new draft (D1, D4) |
-| `dashboard.schedule_set` | `dashboard_id`, `every_minutes`, `by` | a schedule was set; it saves a role snapshot (audited, D1) |
-| `dashboard.schedule_stopped` | `dashboard_id`, `reason` | a schedule stopped with a visible error (audited, D2) |
-| `workspace.changed` | `workspace_id`, `change` (`created`, `renamed`, `deleted`), `by` | `engine.workspaces` (D1) |
+| `conversation.started` | `conversation_id`, `user_id`, `datasource_id` | `engine.conversations.start` |
+| `conversation.step` (turn) | `conversation_id`, `turn`, `tool`, `status`, `trace_id` (an `ask` step's), `args` (argument names only) | the model's loop finished one tool call |
+| `conversation.turn` (turn) | `conversation_id`, `turn`, `kind`, `status`, `trace_id`, `steps`, `stored` (the stored `Turn` as JSON, on the conversation stream only) | a turn was stored |
+| `chat_tool.called` (turn) | `tool`, `conversation_id`, `turn`, `ok`, `seconds`, `error_code` | a registry chat tool ran, in the model's loop or by name; in the turn's scope |
+| `dashboard.generated` | `dashboard_id`, `datasource_id`, `tiles`, `skipped` | `engine.dashboards.generate` |
+| `dashboard.refreshed` | `dashboard_id`, `trigger`, `counts` (charts per status), `filters` (ids, never values) | a refresh, an open that refreshed, or a scheduled run |
+| `dashboard.changed` | `dashboard_id`, `change` (the edit kinds, a move being the kind `move`; `pinned`; `deleted`; `created`, a new draft), `by` | an edit, a pin, a delete or a new draft |
+| `dashboard.schedule_set` | `dashboard_id`, `every_minutes`, `by` | a schedule was set; it saves a role snapshot (audited) |
+| `dashboard.schedule_stopped` | `dashboard_id`, `reason` | a schedule stopped with a visible error (audited) |
+| `workspace.changed` | `workspace_id`, `change` (`created`, `renamed`, `deleted`), `by` | `engine.workspaces` |
 | `datasource.saved` | `datasource_id`, `file`, `by` | `engine.datasources.save` wrote one datasource file (`file` is `datasources/<id>.yaml`; audited) |
 | `api_key.created`, `api_key.revoked` | `key_id`, `user_id`, `tenant_id`, `roles`, `by` (on revoke, `user_id` is whose key it was); never the token | `engine.api_keys.create` and `revoke` (audited); revoking an already revoked key publishes nothing |
 | `mcp.denied` | `reason` (`missing`, `malformed`, `unknown`, `revoked`), `key_id` | `nl2sql mcp --http` refused a bearer token: no header, a malformed token, an unknown key or a revoked one (audited; never the token) |
@@ -120,7 +120,7 @@ once per check, even when the plan names it twice. A scope asked only to filter 
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
 nobody asked for. Every catalogued event is published today except
-`run.limit_reached`, whose Wave A
+`run.limit_reached`, whose
 PR is named in its description. While a
 [hook](../configuration/hooks.md) is attached at `answer.after`, a run
 publishes no `answer.delta` and sends `result.manifest` only after the hooks

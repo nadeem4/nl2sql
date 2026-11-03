@@ -5,7 +5,7 @@ import { keyMismatch, keyTail, looksLikeKey, providerCards, providerForKey } fro
 import { providersNeeded } from "../lib/hostedModels.js";
 import { isAdmin } from "../lib/caller.js";
 
-// Settings. Two kinds of thing live here. When the server lets a request bring its own model (api.request_llm, D210)
+// Settings. Two kinds of thing live here. When the server lets a request bring its own model (api.request_llm)
 // the page keeps the visitor's keys and the model for each step in this tab and sends them with each question. For an
 // administrator it also shows the server's own LLM (changed in memory, not in llm.yaml) and the API keys it issues.
 // Admin parts are not offered to anyone else: /meta says who the caller is, and a 403 stays the server's final word.

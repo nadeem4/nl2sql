@@ -1,4 +1,4 @@
-"""One error envelope for every non-2xx response (docs/architecture/wave_d.md, D202).
+"""One error envelope for every non-2xx response.
 
 ``{"error": {"code", "message", "fix", "details", "request_id"}}``. Only the facade's own ``NL2SQLError`` is mapped to
 its status; a route that refuses on its own raises :class:`RequestRefused`. Anything else is a 500 that names a request

@@ -1,4 +1,4 @@
-"""Workspaces and dashboards in the state store: ownership, and the models behind the JSON documents (D118, D131).
+"""Workspaces and dashboards in the state store: ownership, and the models behind the JSON documents.
 
 A workspace or a dashboard is its owner's, a ``(tenant_id, user_id)`` pair as for a conversation: another
 caller's is "not found", never "forbidden".
@@ -13,7 +13,7 @@ from nl2sql.dashboards.models import Dashboard, TileRun, Workspace
 
 
 def owner_for(user_context: Any, default_tenant: Optional[str]) -> Owner:
-    """The caller's owner pair. A missing caller is a bug in the calling code, never an anonymous owner (D130)."""
+    """The caller's owner pair. A missing caller is a bug in the calling code, never an anonymous owner."""
     if user_context is None:
         raise TypeError("user_context is required")
     return owner_of(user_context, default_tenant)

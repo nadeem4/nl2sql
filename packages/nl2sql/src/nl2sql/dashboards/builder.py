@@ -1,6 +1,6 @@
-"""The guided dashboard builder, engine side (docs/architecture/wave_d.md, section 18; decisions D243 to D248).
+"""The guided dashboard builder, engine side.
 
-Two steps, no second pipeline (D244). ``propose`` is read-only: it turns the person's picks into a list of tiles to
+Two steps, no second pipeline. ``propose`` is read-only: it turns the person's picks into a list of tiles to
 tick, and calls a model at most once, only for "tell us what matters". ``build`` takes the ticked list and makes an
 ordinary dashboard with the edits every caller already has: a curated or saved tile is one no-model edit, and a new
 question is an ``ask`` step of one builder conversation joined by ``add_tile``. Every tile is checked as the caller
@@ -32,7 +32,7 @@ from nl2sql.policies import UserContext
 
 logger = logging.getLogger(__name__)
 
-MAX_ASKED = 3  # questions that go to the model (D246)
+MAX_ASKED = 3  # questions that go to the model
 AGENT = "conversation"  # the role the one model call runs as: it already answers for the person in chat
 TileSource = Literal["curated", "saved", "asked"]
 SOURCES = ("curated", "saved", "asked")
@@ -45,7 +45,7 @@ class TimeRange(StrictModel):
 
 TIME_RANGES = (TimeRange(id="last_7_days", label="last 7 days"), TimeRange(id="last_30_days", label="last 30 days"),
                TimeRange(id="last_90_days", label="last 90 days"), TimeRange(id="last_12_months", label="last 12 months"),
-               TimeRange(id="this_year", label="this year"))  # D245
+               TimeRange(id="this_year", label="this year"))
 
 
 class BuilderQuestion(StrictModel):
@@ -71,7 +71,7 @@ class ColumnOption(StrictModel):
 
 
 class BuilderOptions(StrictModel):
-    """The chips of the builder: everything on it exists and is readable by the caller (D245)."""
+    """The chips of the builder: everything on it exists and is readable by the caller."""
 
     curated: List[BuilderQuestion] = Field(default_factory=list)
     saved: List[BuilderQuestion] = Field(default_factory=list)
@@ -247,7 +247,7 @@ class Builder:
         return questions[:count]
 
     def _model(self, registry: Any) -> Any:
-        """The model for the one call, or the missing-key error (D248) when this caller has no key for it."""
+        """The model for the one call, or the missing-key error when this caller has no key for it."""
         config = registry.get_llm_config(AGENT)
         if config.get("provider") == "replay" and current_request_llms() is None:
             # The keyless hosted demo: replay needs no key, but it has recorded nothing for new questions.

@@ -1,9 +1,9 @@
-"""A conversation's Markdown report (docs/architecture/wave_c.md, section 4, "Reports").
+"""A conversation's Markdown report.
 
-Assembled from the stored turns with no model call (D114): each answered question with the plain-English
+Assembled from the stored turns with no model call: each answered question with the plain-English
 explanation the run stored, the first rows read back through ``engine.results``, the takeaway of the chart the
 data is drawn as, the SQL and the trace id. A result that has been purged is said to have expired; the text,
-the SQL and the trace stay. The rows are read when the report is asked for and never stored (D106): the
+the SQL and the trace stay. The rows are read when the report is asked for and never stored: the
 ``report`` tool's stored output is the report without them.
 """
 from __future__ import annotations

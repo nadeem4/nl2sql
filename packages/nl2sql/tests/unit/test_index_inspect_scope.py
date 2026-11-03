@@ -1,4 +1,4 @@
-"""``engine.index.inspect`` shows a caller only the entries their scope reaches (B-K3b; wave_b.md, D60).
+"""``engine.index.inspect`` shows a caller only the entries their scope reaches.
 
 It reads the same scope the query path reads and the same visibility
 ``engine.knowledge.show`` applies: a denied table's entries, a term on one and

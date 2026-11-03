@@ -1,9 +1,8 @@
-"""The values the facade's namespaces return: plain dataclasses, and (Wave C) two pydantic models.
+"""The values the facade's namespaces return: plain dataclasses, and two pydantic models.
 
 They import nothing heavy, so ``from nl2sql import DatasourceInfo`` costs
 nothing at import (docs/architecture/invariants.md, the import rule).
-``Candidate`` and ``ApiKey`` are pydantic models as the Wave C design writes them
-(docs/architecture/wave_c.md, sections 7 and 9): both are also JSON on the wire.
+``Candidate`` and ``ApiKey`` are pydantic models: both are also JSON on the wire.
 """
 from __future__ import annotations
 
@@ -88,10 +87,10 @@ class TileProgress:
 
 
 class Candidate(StrictModel):
-    """A database `engine.datasources.scan()` found, with the connection fields it could fill in (D120).
+    """A database `engine.datasources.scan()` found, with the connection fields it could fill in.
 
     `connection` carries the URL's password: `repr` and `str` mask it, but `model_dump()` and
-    `model_dump_json()` do not. Never log or serialise a Candidate; there is no REST route for scan (D121).
+    `model_dump_json()` do not. Never log or serialise a Candidate; there is no REST route for scan.
     """
 
     type: str  # the adapter's registry name
@@ -112,7 +111,7 @@ class Candidate(StrictModel):
 
 
 class ApiKey(StrictModel):
-    """An API key as `engine.api_keys` lists it: never the secret (D127)."""
+    """An API key as `engine.api_keys` lists it: never the secret."""
 
     id: str  # 8 characters, shown in lists and logs
     label: str

@@ -1,12 +1,10 @@
 """``EventBus``: one engine's events, delivered synchronously to its subscribers.
 
-The design is docs/architecture/wave_a.md, section 3, "The bus":
-
 - ``publish`` calls each subscriber in subscription order, on the publishing
   thread, and returns. No queue, no worker.
 - One bus per engine (``Runtime.bus``): two engines in one process share
   nothing.
-- Subscribers fail open (D9): an exception is caught, logged once per
+- Subscribers fail open: an exception is caught, logged once per
   subscriber and event name at WARNING, and counted in ``failures``. A
   subscriber made with ``fail="raise"`` (a run collector) propagates instead,
   since a broken collector is an engine bug a test must see.

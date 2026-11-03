@@ -20,8 +20,7 @@ gets it with the scope's callbacks, and it publishes, through the scope:
 
 ``sub_query_id`` is None for a step outside a sub-query. ``stream_query``
 yields these, with the scope's own ``run.*`` events, from the caller-safe
-allow-list (``nl2sql.events.STREAM_EVENTS``). See docs/architecture/wave_a.md,
-section 3.
+allow-list (``nl2sql.events.STREAM_EVENTS``).
 """
 from __future__ import annotations
 

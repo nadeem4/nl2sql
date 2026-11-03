@@ -1,4 +1,4 @@
-"""Finding a database: ``engine.datasources.scan()`` (docs/architecture/wave_c.md, section 7, D120).
+"""Finding a database: ``engine.datasources.scan()``.
 
 Three places, each declared by the adapters: a URL the caller passes, database files under a folder, and the
 default ports on the loopback address. The adapters name the suffixes, ports and schemes; this module names no

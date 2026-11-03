@@ -1,6 +1,6 @@
 """DATE_DIFF(unit, start, end): the elapsed days between two dates, fraction kept, on every database.
 
-The keyed Pagila run (C-W4) timed out on "late rentals". The planner first tried EXTRACT_EPOCH
+The keyed Pagila run timed out on "late rentals". The planner first tried EXTRACT_EPOCH
 (UNSUPPORTED_FUNCTION), then subtracted two timestamp columns and compared the interval with
 ``film.rental_duration``: Postgres refused ``interval > smallint``. A plan now says
 ``DATE_DIFF('day', start, end)``, a number, and the adapter renders it. The first version used sqlglot's

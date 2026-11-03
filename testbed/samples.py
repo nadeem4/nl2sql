@@ -54,7 +54,6 @@ Download = Callable[[str, Path], None]
 class ChecksumError(RuntimeError):
     """A downloaded sample is not the pinned file."""
 
-
 def download(url: str, target: Path) -> None:
     with urllib.request.urlopen(url, timeout=120) as response, target.open("wb") as out:
         shutil.copyfileobj(response, out)

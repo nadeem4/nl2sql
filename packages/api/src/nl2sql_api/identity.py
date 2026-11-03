@@ -1,4 +1,4 @@
-"""Who is asking (docs/architecture/wave_d.md, D203 and D205).
+"""Who is asking.
 
 ``api.auth`` in ``nl2sql.yaml`` picks one source and every request resolves one ``UserContext`` through it:
 
@@ -33,7 +33,6 @@ ADMIN_RESPONSES = {**AUTH_RESPONSES,
 class StartRefused(Exception):
     """The server would start in a configuration that is not safe; the message says what to change."""
 
-
 def _is_loopback(host: str) -> bool:
     if host == "localhost":
         return True
@@ -44,7 +43,7 @@ def _is_loopback(host: str) -> bool:
 
 
 def check_bind(auth: str, host: str) -> None:
-    """D205: with ``api.auth: none`` the server binds a loopback host only.
+    """with ``api.auth: none`` the server binds a loopback host only.
 
     Raises:
         StartRefused: ``auth`` is ``none`` and ``host`` is not loopback.
@@ -162,5 +161,5 @@ def admin(user: UserContext = Depends(caller), engine: NL2SQL = Depends(get_engi
 
 def is_local_operator(engine: NL2SQL) -> bool:
     """Whether callers who pass :func:`admin` are the local operator (``api.auth: none``). A literal secret typed into
-    a Connect form may be written to the ``.env`` beside ``nl2sql.yaml`` only then (D122)."""
+    a Connect form may be written to the ``.env`` beside ``nl2sql.yaml`` only then."""
     return engine.config.api.auth == "none"

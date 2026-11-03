@@ -1,4 +1,4 @@
-"""``packages/api/openapi.json`` is the committed contract; the web app calls only routes listed in it (D200).
+"""``packages/api/openapi.json`` is the committed contract; the web app calls only routes listed in it.
 
 Rewrite it after a route changes with ``python packages/api/tests/test_openapi_snapshot.py``.
 """

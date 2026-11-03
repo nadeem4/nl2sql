@@ -1,6 +1,4 @@
 """Each server connects through its adapter's public, strict connection model (adapter SDK v2).
-
-docs/architecture/phase2.md, section 7.
 """
 from __future__ import annotations
 

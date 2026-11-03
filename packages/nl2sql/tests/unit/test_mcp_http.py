@@ -1,5 +1,4 @@
-"""MCP over HTTP: bearer keys, one identity per request, Host and Origin checks (docs/architecture/wave_c.md,
-section 9, row M2).
+"""MCP over HTTP: bearer keys, one identity per request, Host and Origin checks.
 
 The engine is real (no datasources); an ``ask`` is a run through ``QueryAPI.run_query`` replaced by a function that
 answers with the caller it ran as, so no database and no model are involved (the fake LLM has nothing to answer:

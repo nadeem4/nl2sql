@@ -1,4 +1,4 @@
-"""The one place a Server-Sent Events response is built (docs/architecture/wave_d.md, D207).
+"""The one place a Server-Sent Events response is built.
 
 ``event_stream`` sends the facade's events as they come (each is ``Event.sse()``), a ``: keep-alive`` comment while
 nothing does, and stops the run when the client goes away. ``frame`` and ``KEEP_ALIVE`` are the same wire for streams
@@ -69,7 +69,7 @@ def event_stream(open_events: Callable[[], Iterator[Event]], request: Request, *
 
 def _failed(exc: Exception) -> Event:
     """The ``run.failed`` that ends a stream whose run raised. A named error keeps its code and message; any other
-    is ``UNKNOWN_ERROR`` with a fixed message, never the exception text (D202)."""
+    is ``UNKNOWN_ERROR`` with a fixed message, never the exception text."""
     if isinstance(exc, NL2SQLError):
         data = {"message": exc.message, "error_code": exc.code}
     else:

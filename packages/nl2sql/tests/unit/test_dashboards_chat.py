@@ -1,4 +1,4 @@
-"""Chat builds and edits dashboards (docs/architecture/wave_c.md, section 6; row D4).
+"""Chat builds and edits dashboards.
 
 The conversation agent is the ``FakeLLMServer`` of ``test_conversations.py``. Both runs a dashboard needs are
 replaced by one function returning canned ``QueryResult``s: an ``ask`` step (it has a scope) and the no-execute
@@ -31,7 +31,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 # The fixtures and helpers of the conversation and dashboard tests.
 from test_conversations import (ANA, BOB, _block, ask, engine, make, model, reply, server,  # noqa: F401
                                 started)
-from test_dashboards_d2 import NOW, chart_plan, seed, stored, tile
+from test_dashboards_refresh import NOW, chart_plan, seed, stored, tile
 
 
 def plan_json(table: str = "orders") -> Dict[str, Any]:

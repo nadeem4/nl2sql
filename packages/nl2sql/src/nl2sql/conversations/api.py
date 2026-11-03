@@ -1,4 +1,4 @@
-"""The conversations service behind ``engine.conversations`` (docs/architecture/wave_c.md, section 3).
+"""The conversations service behind ``engine.conversations``.
 
 A turn is a bounded loop. The model chooses, step by step, a reply or the ``ask`` tool; an ``ask`` step is a
 run through ``run_query`` with its own scope. The turn has a scope of its own for the loop's model calls: it
@@ -344,7 +344,7 @@ class Conversations:
             self._pending_option(conversation, args.choice)  # still pending now that the lock is held
             pending = conversation.pending
             choice = ClarificationChoice(request=pending, option_id=args.choice)
-            question = pending.question  # Wave B refuses a choice unless the question is the request's own
+            question = pending.question  # a choice is refused unless the question is the request's own
         queries = self._queries
         scope = queries.open_scope(question, datasource_id=conversation.datasource_id, execute=run.execute,
                                    user_context=run.user)
@@ -384,7 +384,7 @@ class Conversations:
         began = time.monotonic()
         step = self._chat.run(conversation.model_copy(update={"turns": [*conversation.turns, in_flight]}),
                               run.user, call)
-        step = strip_output_rows(step)  # stored without rows (D106)
+        step = strip_output_rows(step)  # stored without rows
         if call.name == "dashboard_edit" and step.output is not None \
                 and step.output.refs.get("created"):
             conversation.dashboard_id = step.output.refs["dashboard_id"]  # the draft it made is now the conversation's

@@ -50,7 +50,6 @@ class Wire(Protocol):
         count) is None, never 0.
         """
 
-
 def temperature_error(model: str, tags: Optional[list], reason: str) -> ValueError:
     """The error for a model that refused the configured temperature: what to set, and where."""
     agent = tags[0] if tags else "default"

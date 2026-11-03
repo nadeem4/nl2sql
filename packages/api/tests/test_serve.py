@@ -1,4 +1,4 @@
-"""``nl2sql-api serve``: one worker, and D205's refusal to bind a non-loopback host with ``api.auth: none``."""
+"""``nl2sql-api serve``: one worker, and its refusal to bind a non-loopback host with ``api.auth: none``."""
 from pathlib import Path
 
 import pytest
@@ -47,7 +47,7 @@ def test_serve_reports_a_bad_config_without_a_traceback(tmp_path, launched):
     assert launched == []
 
 
-# ---- modes (D229) and the demo (A4b)
+# ---- modes and the demo
 
 @pytest.fixture
 def served(monkeypatch):

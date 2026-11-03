@@ -1,4 +1,4 @@
-"""Mermaid diagrams of an answer and of a schema, and the ``diagram`` chat tool (wave_c.md, section 4; row K2).
+"""Mermaid diagrams of an answer and of a schema, and the ``diagram`` chat tool.
 
 The answer view is a pure function of a ``QueryResult`` (its plans, never its rows); the schema view is read through
 ``datasources.schema``, so the caller's scope decides which tables it shows. No model is called anywhere.

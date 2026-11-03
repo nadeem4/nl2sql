@@ -1,6 +1,4 @@
-"""``check()`` warns about a datasource whose adapter cannot make its session read-only (owner decision 4).
-
-docs/architecture/phase2.md, section 7, "Read-only and timeouts, honestly".
+"""``check()`` warns about a datasource whose adapter cannot make its session read-only.
 """
 from __future__ import annotations
 

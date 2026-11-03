@@ -45,7 +45,7 @@ curated:
   match_floor: 0.6
 feedback:
   enabled: true
-knowledge:                    # read from release 0.8 (Wave B)
+knowledge:                    # read from release 0.8
   item_max_chars: 500
   block_max_chars: 4000
   top_k: 8
@@ -61,11 +61,11 @@ profiler:
   max_cost_usd: 0.50
 review:
   max_age_days: 365
-charts:                       # read from release 0.9 (Wave C)
+charts:                       # read from release 0.9
   max_points: 1000
   max_categories: 20
   max_series: 5
-approvals:                    # Wave D: stored approval grants (G3a)
+approvals:                    # stored approval grants
   max_age_hours: 24
 ```
 
@@ -105,7 +105,7 @@ The tenant id for requests that name none. Result files are kept per tenant.
 | `retries.jitter_s` | `0.5` | Most jitter added to a delay. |
 | `max_llm_calls` | `60` | The most model calls one question may make, parse retries included; `null` turns the cap off. 60 covers the largest legitimate run: the resolver, the decomposer, six sub-queries each with a planner call and three refiner and planner retries, the answer, and parse retries. See [Per-question caps](#per-question-caps). |
 | `max_cost_usd` | none | The most one question may spend, in dollars; `null` (the default) is no cap. With a cap set, every model the `llm` section names must have a [price](llm.md#prices), or the engine does not build. See [Per-question caps](#per-question-caps). |
-| `sanity_checks` | `true` | The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). `false` turns them all off. Read from release 0.7's sanity checks ([Wave A](../architecture/wave_a.md#11-answer-sanity-checks)). |
+| `sanity_checks` | `true` | The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). `false` turns them all off. Read from release 0.7's sanity checks. |
 
 ### Per-question caps
 
@@ -152,8 +152,7 @@ How the tables are chosen past the threshold is in the
 Cross-database routing: which datasources a question goes to, and how far it
 may spread. The resolver reads `candidates`, `max_datasources` and
 `floor_ratio` ([Routing](../architecture/indexing.md#routing-five-signals-fused));
-the decomposer reads `max_sub_queries`
-([Wave A, Limits](../architecture/wave_a.md#limits)).
+the decomposer reads `max_sub_queries`.
 
 | Key | Default | Description |
 | --- | --- | --- |
@@ -202,27 +201,27 @@ Whether curated answers are on is not a setting: the
 
 ## `knowledge`, `clarify`, `profiler` and `review`
 
-Four groups for release 0.8 ([Wave B](../architecture/wave_b.md)). They are
-accepted and validated now; the Wave B change named with each reads it.
+Four groups for release 0.8. They are
+accepted and validated now; the change named with each reads it.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `knowledge.item_max_chars` | `500` | The longest one glossary text may be; a longer one is a load error naming the item, so nothing is silently cut (K1). |
-| `knowledge.block_max_chars` | `4000` | The longest the `[BUSINESS_CONTEXT]` block of a prompt may be; the lowest-scored terms, then rules, are dropped, and the trace records what was (K2). |
-| `knowledge.top_k` | `8` | Matched glossary terms kept per sub-query (K2). |
-| `knowledge.match_floor` | `0.6` | Similarity a term's index entry must reach to the sub-query's intent to match, between 0 and 1 (K3). |
-| `clarify.enabled` | `true` | Ask which reading was meant when the planner flags a real ambiguity, instead of guessing (L1). |
-| `profiler.sample_rows` | `1000` | Distinct values one join-overlap probe reads (P1). |
-| `profiler.max_probes` | `200` | Overlap probes per datasource; the remaining candidates are proposed without one (P1). |
-| `profiler.time_budget_s` | `60` | Seconds per datasource after which no probe starts (P1). |
-| `profiler.min_overlap` | `0.9` | A measured overlap under this drops a join candidate, between 0 and 1 (P1). |
-| `profiler.enum_max_distinct` | `50` | The most distinct values a column proposed as an `enum` may have (P1). |
+| `knowledge.item_max_chars` | `500` | The longest one glossary text may be; a longer one is a load error naming the item, so nothing is silently cut. |
+| `knowledge.block_max_chars` | `4000` | The longest the `[BUSINESS_CONTEXT]` block of a prompt may be; the lowest-scored terms, then rules, are dropped, and the trace records what was. |
+| `knowledge.top_k` | `8` | Matched glossary terms kept per sub-query. |
+| `knowledge.match_floor` | `0.6` | Similarity a term's index entry must reach to the sub-query's intent to match, between 0 and 1. |
+| `clarify.enabled` | `true` | Ask which reading was meant when the planner flags a real ambiguity, instead of guessing. |
+| `profiler.sample_rows` | `1000` | Distinct values one join-overlap probe reads. |
+| `profiler.max_probes` | `200` | Overlap probes per datasource; the remaining candidates are proposed without one. |
+| `profiler.time_budget_s` | `60` | Seconds per datasource after which no probe starts. |
+| `profiler.min_overlap` | `0.9` | A measured overlap under this drops a join candidate, between 0 and 1. |
+| `profiler.enum_max_distinct` | `50` | The most distinct values a column proposed as an `enum` may have. |
 | `profiler.max_cost_usd` | `0.50` | The most one `profile(draft=True)` call may spend drafting descriptions (`profile(draft=True)`, `nl2sql profile --draft`). |
-| `review.max_age_days` | `365` | Decided proposals older than this are purged by `engine.storage.purge()` (Q1). |
+| `review.max_age_days` | `365` | Decided proposals older than this are purged by `engine.storage.purge()`. |
 
 ## `charts`
 
-Release 0.9 ([Wave C](../architecture/wave_c.md)). `engine.results.chart` reads it
+Release 0.9. `engine.results.chart` reads it
 ([Charts](../charts/index.md)).
 
 | Key | Default | Description |
@@ -233,7 +232,7 @@ Release 0.9 ([Wave C](../architecture/wave_c.md)). `engine.results.chart` reads 
 
 ## `approvals`
 
-Wave D ([design](../architecture/wave_d.md)). Read by stored approval grants (`engine.approvals`).
+Read by stored approval grants (`engine.approvals`).
 
 | Key | Default | Description |
 | --- | --- | --- |

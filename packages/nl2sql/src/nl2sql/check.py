@@ -1,6 +1,6 @@
 """What ``engine.check()`` reports, and the error it raises when the engine cannot start.
 
-See docs/architecture/configuration_v2.md, "Lifecycle". Plain dataclasses, so
+Plain dataclasses, so
 ``from nl2sql import CheckReport`` costs nothing at import.
 """
 from __future__ import annotations
@@ -60,7 +60,7 @@ class CheckReport:
         return all(d.status == "ready" for d in self.datasources) and not self.llm and self.index == "ok"
 
     def ready(self, *, keys_optional: bool) -> bool:
-        """Whether the engine can answer now: what ``GET /ready`` reports (D208).
+        """Whether the engine can answer now: what ``GET /ready`` reports.
 
         Every required datasource is ready and at least one datasource is, every agent's key resolves unless
         ``keys_optional`` (a caller brings its own, or every agent is on ``replay``), and the index is ``ok``

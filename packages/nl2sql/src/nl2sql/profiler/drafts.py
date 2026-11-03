@@ -1,9 +1,9 @@
 """The profiler's drafted descriptions: the evidence a model is shown, the cleaning of its answer, and the run.
 
-``profile(draft=True)`` (docs/architecture/wave_b.md, section 6) calls :func:`draft_descriptions`. The evidence
-and cleaning functions were ``indexing/enrichment_service.py``'s, moved here unchanged by K3, which stopped the
-index from writing a model's text into the schema snapshot (B31): a draft is a proposal in the review queue
-and reaches nothing until a person accepts it (D38).
+``profile(draft=True)`` calls :func:`draft_descriptions`. The evidence
+and cleaning functions were ``indexing/enrichment_service.py``'s, moved here unchanged. The
+index no longer writes a model's text into the schema snapshot: a draft is a proposal in the review queue
+and reaches nothing until a person accepts it.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from nl2sql.limits import Budget, LimitReached, describe
 from nl2sql.schema import SchemaSnapshot
 
-# Name of the agent in the llm section of nl2sql.yaml that drafts descriptions (docs/architecture/wave_b.md, D44).
+# Name of the agent in the llm section of nl2sql.yaml that drafts descriptions.
 ENRICHMENT_LLM_NAME = "profiler"
 
 

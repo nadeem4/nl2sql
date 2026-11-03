@@ -1,7 +1,6 @@
 """``nl2sql-api`` starts from ``nl2sql.yaml`` and calls ``engine.check()`` before it serves.
 
-docs/architecture/configuration_v2.md, "Lifecycle" and the ``nl2sql-api`` row of
-"Impact on the consumers": the lifespan loads the ``.env`` next to
+The lifespan loads the ``.env`` next to
 ``NL2SQL_CONFIG``'s file (never overriding a variable already set), builds the
 engine with ``NL2SQL.from_config()``, and starts even when a required datasource fails (``/ready`` then says not ready).
 """
@@ -28,7 +27,7 @@ def _project(tmp_path, *, required):
 
 
 def test_the_api_starts_with_a_failed_required_datasource_and_is_not_ready(tmp_path, monkeypatch):
-    """D208: a restart loop would hide the reason; the API serves, `/ready` is 503 and an admin reads why."""
+    """a restart loop would hide the reason; the API serves, `/ready` is 503 and an admin reads why."""
     from nl2sql_api.routes import health
 
     monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=True)))
@@ -58,7 +57,7 @@ def test_the_api_starts_degraded_from_its_config_and_leaves_the_env_file_to_serv
             assert engine.config.api.static_role == "viewer"
             assert client.get("/api/v1/health").status_code == 200
         assert engine.closed
-        # The lifespan loads no .env: `nl2sql-api serve` does, and a hosted one never does (A4b).
+        # The lifespan loads no .env: `nl2sql-api serve` does, and a hosted one never does.
         assert "NL2SQL_API_TEST_FROM_FILE" not in os.environ
         assert os.environ["NL2SQL_API_TEST_SET"] == "shell"
     finally:
@@ -127,7 +126,7 @@ def test_api_purges_at_startup(tmp_path, monkeypatch):
 
 
 def test_api_lifespan_runs_the_scheduler(tmp_path, monkeypatch):
-    """The API calls ``engine.dashboards.run_scheduled()`` every minute while it serves (wave_c.md, D132)."""
+    """The API calls ``engine.dashboards.run_scheduled()`` every minute while it serves."""
     import time
 
     from nl2sql.api.dashboards_api import DashboardsAPI

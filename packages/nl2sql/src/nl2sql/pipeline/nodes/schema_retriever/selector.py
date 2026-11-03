@@ -1,4 +1,4 @@
-"""The table selector: one model call that picks tables from a catalog (docs/architecture/wave_c.md, section 17.4).
+"""The table selector: one model call that picks tables from a catalog.
 
 On a schema past ``full_snapshot_max_tables`` vector search misses a table
 whose name is far from the question's words ("revenue" is not near

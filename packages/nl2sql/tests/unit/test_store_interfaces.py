@@ -1,7 +1,6 @@
 """The four store slots: ``StoreConfig``, the ``Storage`` sub-blocks, the ``store`` registry kind.
 
-docs/architecture/phase2.md, section 4 ("The config", "The interfaces") and
-the S1 row of section 12.
+The store interfaces and their config.
 """
 from __future__ import annotations
 
@@ -177,8 +176,8 @@ def test_store_interface_version_is_checked():
 
 def test_store_version_2_is_rejected():
     """Version 3 added the review queue's proposal methods to ``StateStore`` and ``BuildPointer.knowledge_hash``
-    (docs/architecture/wave_b.md, D41), version 4 Wave C's conversation, dashboard and key methods,
-    version 5 Wave D's approval methods, version 6 its saved-answer methods: one version
+    version 4 conversation, dashboard and key methods,
+    version 5 approval methods, version 6 its saved-answer methods: one version
     per kind, so every store class declares it."""
     registry = Registry.empty()
 

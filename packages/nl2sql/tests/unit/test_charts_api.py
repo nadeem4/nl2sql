@@ -1,4 +1,4 @@
-"""``engine.results.chart`` and the ``chart`` chat tool (wave_c.md, section 5): a saved result becomes a ChartSpec
+"""``engine.results.chart`` and the ``chart`` chat tool: a saved result becomes a ChartSpec
 from the kinds the artifact writer recorded, refined by the plan when the run had one sub-query. No model call."""
 from __future__ import annotations
 

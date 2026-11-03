@@ -1,7 +1,6 @@
 """The SDK's SQLAlchemy base on real servers: reflect once, catalog estimates, the scope, values, issues.
 
-docs/architecture/phase2.md, section 7, "IndexScope: what gets indexed" and
-"Profiling and row estimates".
+IndexScope (what gets indexed), profiling and row estimates.
 """
 from __future__ import annotations
 
@@ -72,7 +71,7 @@ def _namespace(server, schema: str) -> str:
 
 def test_wide_schema_catalog_snapshot_under_60_seconds(server, adapter_on, wide):
     if server.name != "postgres":
-        pytest.skip("The 60-second target is set on PostgreSQL (phase2.md, section 7).")
+        pytest.skip("The 60-second target is set on PostgreSQL.")
     adapter = adapter_on("wide")
 
     start = time.perf_counter()
@@ -88,7 +87,7 @@ def test_wide_schema_catalog_snapshot_under_60_seconds(server, adapter_on, wide)
 
 
 def test_pagila_payment_partitions_fold_into_payment(server, adapter_on):
-    # wave_c.md, section 18.3 (C-W6): Pagila's payment is partitioned and its keys sit on the partitions.
+    # Pagila's payment is partitioned and its keys sit on the partitions.
     if server.name != "postgres":
         pytest.skip("Pagila's partitioned payment is on the PostgreSQL test bed.")
     adapter = adapter_on()

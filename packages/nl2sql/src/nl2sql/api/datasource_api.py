@@ -15,7 +15,6 @@ from pydantic import BaseModel, SecretStr
 from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.errors import DatasourceNotFound, NotAuthorized
-from nl2sql.common.planned import arrives_with
 from nl2sql.config import Datasource
 from nl2sql.config.models import is_secret_key
 from nl2sql.datasources.registry import mask_connection_args
@@ -389,7 +388,7 @@ class DatasourcesAPI:
         """One datasource as ``datasources/<id>.yaml`` beside the config the engine was loaded from; ``by`` must
         hold an admin role. Returns the file.
 
-        Every secret field is written as a reference (D122): a literal in the connection becomes
+        Every secret field is written as a reference: a literal in the connection becomes
         ``${env:NL2SQL_<ID>_<KEY>}`` and, with ``env_file``, its value goes to the ``.env`` beside ``nl2sql.yaml``
         (the other lines are kept); without it a literal is refused. A reference is written as it is. The
         engine keeps running on the value it holds. Like an accept, it records each datasource file's SHA-256

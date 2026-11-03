@@ -1,13 +1,12 @@
 # nl2sql-ui
 
 The React source of the web app. It talks to `nl2sql-api` through `src/api/http.js` (JSON and Server-Sent
-Events, with the tab's API key and model keys). Until X1b, `nl2sql demo` still serves the older single page
-committed in the engine package.
+Events, with the tab's API key and model keys).
 
 ## Layout
 
 `src/lib/` pure helpers, `src/components/` pieces shared by pages (`JobProgress`, `SqlCard`, `IndexPanel`, ...),
-`src/outputs/` what a result or tool output renders as, `src/pages/` one file per route (the Wave D pages are stubs
+`src/outputs/` what a result or tool output renders as, `src/pages/` one file per route (the pages not yet built are stubs
 until their row), `src/connect/`, `src/chat/`, `src/answers/` (My answers), `src/api/` one client file per area, `src/styles/` the stylesheet in
 cascade order (`index.css`), `src/router.js` the hash routes.
 
@@ -169,7 +168,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
 ## What the page shows
 
 - **Database and Search index** (the old Ask rail) are gone with the Ask page. `src/components/IndexPanel.jsx`
-  stays for the page that takes the index over (Settings and Retrieval, row W4).
+  stays for the page that takes the index over.
 
 - **Status pill** (`.status`, top bar, on the same row as the wordmark and the
   nav at 1061px and wider): the mode in a few words, from `modeStatus` in

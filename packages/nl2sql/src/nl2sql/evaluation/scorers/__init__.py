@@ -1,4 +1,4 @@
-"""Scorers: what makes an eval case pass (wave_a.md, section 8, "Scorers").
+"""Scorers: what makes an eval case pass.
 
 A scorer is a registry kind (``nl2sql.scorers``, interface version 1). The
 engine ships five, declared as entry points in its own ``pyproject.toml``:
@@ -54,7 +54,7 @@ class CaseRun(BaseModel):
     mode: Mode
     result: QueryResult = Field(default_factory=QueryResult)
     # The run's terminal result sets: what the aggregator saved, every row. A question the decomposer splits
-    # still has one, the combined result; the sub-queries' scans under it are not result sets (C-W7a).
+    # still has one, the combined result; the sub-queries' scans under it are not result sets.
     sets: List[RowSample] = Field(default_factory=list)
     # The first result set's rows, every row (not the capped sample a caller sees).
     rows: Optional[List[List[Any]]] = None

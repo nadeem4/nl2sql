@@ -10,7 +10,7 @@ rewritten.
 
 Every build goes into the namespace of the configured embedding model, so a
 model change needs no special rebuild: the new model's namespace starts
-empty, and ``nl2sql index`` fills it (docs/architecture/phase2.md, section 4).
+empty, and ``nl2sql index`` fills it.
 
 A build holds the state store's ``index`` lock, so ``nl2sql index`` is safe
 to run while ``nl2sql-api`` serves the same ``storage.path``: a second build
@@ -177,6 +177,6 @@ def _publish(ctx, progress: IndexProgress) -> None:
     elif progress.state == "failed":
         from nl2sql.tracing.trace import redact_for
 
-        # The reason is exception text, so it is redacted (D15).
+        # The reason is exception text, so it is redacted.
         ctx.bus.publish("index.failed", {"datasource_id": progress.datasource_id,
                                          "reason": redact_for(ctx, progress.reason or "")}, tenant_id=ctx.tenant_id)

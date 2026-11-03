@@ -18,7 +18,7 @@ function stub(id, path, label, description, param = null) {
   return { id, path, label, title: label, description, stub: true, param };
 }
 
-// A Wave D page whose row has shipped: it is in the nav.
+// A page that has shipped: it is in the nav.
 function page(id, path, label, description, param = null) {
   return { id, path, label, title: label, description, param };
 }
@@ -64,7 +64,7 @@ export const PAGES = [
       "MMR trades similarity against overlap with earlier picks. There is no re-ranking model, and nothing on this page calls the LLM.",
   },
 
-  // Wave D's pages. Each is a stub (pages/<Name>.jsx) until the row that owns
+  // pages. Each is a stub (pages/<Name>.jsx) until the row that owns
   // it fills it, and stays out of the nav until then. `param` is the one id a
   // route may carry: "optional" (#/chat and #/chat/{id}) or "required".
   page("dashboards", "/dashboards", "Dashboards", "Whole dashboards in workspaces: open one with its stored results, then rename, arrange, filter, schedule or move it.", "optional"),

@@ -1,4 +1,4 @@
-"""`nl2sql demo` is a launcher: it starts `nl2sql_api serve --demo` and gets out of the way (wave_d.md, D211)."""
+"""`nl2sql demo` is a launcher: it starts `nl2sql_api serve --demo` and gets out of the way."""
 import signal
 import subprocess
 import sys

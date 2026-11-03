@@ -1,7 +1,6 @@
-"""Read-only sessions, statement timeouts and connection stages, proven on each real server (B3).
+"""Read-only sessions, statement timeouts and connection stages, proven on each real server.
 
-docs/architecture/phase2.md, section 7, "Read-only and timeouts, honestly" and
-"test_connection: which stage failed". The adapters connect with the test
+Read-only and timeouts, and which stage a connection failed at. The adapters connect with the test
 bed's admin login, so a write that fails was stopped by the session, not by
 a missing grant.
 """
@@ -73,7 +72,7 @@ def probe(server):
 def test_write_through_execute_fails(server, adapter_for, probe):
     adapter = adapter_for()
     if DatasourceCapability.ENFORCES_READ_ONLY not in adapter.capabilities():
-        # Owner decision 4: SQL Server has no session-level read-only, says so, and check() warns.
+        # SQL Server has no session-level read-only, says so, and check() warns.
         pytest.skip(f"{adapter.title} does not declare ENFORCES_READ_ONLY: the login's grants are the only guard")
 
     inserted = adapter.execute(_sql(f"INSERT INTO {PROBE} (id) VALUES (1)"))

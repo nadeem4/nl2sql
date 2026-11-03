@@ -25,7 +25,7 @@ _EXPORTS = {
                                            "ResultPage", "ResultSummary"),
     "nl2sql.services.callbacks.token_handler": ("QuestionUsage",),
     "nl2sql.common.logger": ("configure_logging", "TraceContextFilter"),
-    # Wave A: events, the run's stop and approval shapes.
+    # events, the run's stop and approval shapes.
     "nl2sql_sdk.events": ("Event", "Observer"),
     "nl2sql.events.catalog": ("EventInfo",),
     "nl2sql.limits": ("RunStop",),
@@ -69,7 +69,7 @@ _EXPORTS = {
     "nl2sql.evaluation.regenerate": ("RegenerateReport",),
     "nl2sql.evaluation.gate": ("GateResult",),
     "nl2sql.evaluation.scorers": ("Scorer", "Score", "CaseRun"),
-    # Wave B: knowledge, the review queue, the profiler, clarification and the explanation.
+    # knowledge, the review queue, the profiler, clarification and the explanation.
     "nl2sql.config.models": ("KnowledgeSourceConfig", "CostRule"),
     "nl2sql.knowledge.models": ("KnowledgeSourceInfo", "DatasourceKnowledgeView"),
     "nl2sql_sdk.stores": ("Proposal",),
@@ -77,7 +77,7 @@ _EXPORTS = {
     "nl2sql.profiler.models": ("ProfileReport",),
     "nl2sql.clarify.models": ("ClarificationRequest", "ClarificationOption", "ClarificationChoice"),
     "nl2sql.explain.models": ("Explanation", "ExplainedStep", "TermUse"),
-    # Wave C: conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys.
+    # conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys.
     "nl2sql.conversations.models": ("Conversation", "Turn", "ToolStep", "ToolCall", "ToolOutput", "ModelStep",
                                     "ConversationInfo"),
     "nl2sql.charts.spec": ("ChartSpec", "ChartData", "Encoding", "ColumnKind"),

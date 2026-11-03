@@ -1,4 +1,4 @@
-// Who the caller is, from the `caller` field of GET /meta (A4c). The server computes it with the code the routes use,
+// Who the caller is, from the `caller` field of GET /meta. The server computes it with the code the routes use,
 // so the page never guesses: not from a conversation's owner, not from a route answering 403.
 
 // `{id, admin}` for a caller, or null when /meta has not arrived or names none. `id` is null for a hosted visitor,

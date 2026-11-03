@@ -1,4 +1,4 @@
-"""``DATE_DIFF('day', start, end)`` on PostgreSQL, MySQL and SQL Server in the test bed (C-W6d).
+"""``DATE_DIFF('day', start, end)`` on PostgreSQL, MySQL and SQL Server in the test bed.
 
 The elapsed days with the fraction kept, the same on every database: the answers
 below are computed here, not by the database under test.

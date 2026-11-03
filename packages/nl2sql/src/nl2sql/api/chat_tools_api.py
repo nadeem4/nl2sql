@@ -1,4 +1,4 @@
-"""``engine.chat_tools``: the chat tools a conversation can call (docs/architecture/wave_c.md, section 4)."""
+"""``engine.chat_tools``: the chat tools a conversation can call."""
 from __future__ import annotations
 
 from typing import List

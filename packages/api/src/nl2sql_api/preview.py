@@ -1,4 +1,4 @@
-"""The link preview: what a pasted link to the hosted demo unfurls into (moved from the engine's playground, A4b).
+"""The link preview: what a pasted link to the hosted demo unfurls into (moved from the engine's playground).
 
 Three things have to be true for a card to appear, and each is why a piece of
 this module exists:

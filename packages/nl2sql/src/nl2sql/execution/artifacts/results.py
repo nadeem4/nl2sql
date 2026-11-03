@@ -35,9 +35,9 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 
 
 def column_kinds(schema: Mapping[str, Any]) -> Dict[str, ColumnKind]:
-    """Each column's kind (Wave A's D30 categories) from a polars schema, i.e. from the saved file's Arrow
+    """Each column's kind (type categories) from a polars schema, i.e. from the saved file's Arrow
     types: integer, decimal and float are ``number``; date, time and timestamp ``temporal``; string ``text``;
-    bool ``boolean``; anything else ``other`` (docs/architecture/wave_c.md, D112)."""
+    bool ``boolean``; anything else ``other``."""
     import polars as pl
 
     def kind(dtype: Any) -> ColumnKind:
@@ -61,8 +61,8 @@ class ResultSummary(BaseModel):
     row_count: int = 0
     # True when a sub-query feeding it was cut at its row ceiling, so rows may be missing.
     truncated: bool = False
-    # Each column's type category (Wave A's D30), from the saved file's schema, so a chart can be chosen
-    # without reading rows. Empty until the artifact writer fills it (docs/architecture/wave_c.md, D112).
+    # Each column's type category, from the saved file's schema, so a chart can be chosen
+    # without reading rows. Empty until the artifact writer fills it.
     column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)
 
 

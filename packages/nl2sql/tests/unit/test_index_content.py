@@ -92,7 +92,7 @@ def test_the_datasource_chunk_contains_the_configured_description(tmp_path):
 
 
 def test_each_example_question_is_an_entry_of_its_own(tmp_path):
-    """One entry per phrasing (Phase R): in the datasource entry the fifth question barely moved the vector."""
+    """One entry per phrasing: in the datasource entry the fifth question barely moved the vector."""
     ctx = _ctx(tmp_path)
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter())

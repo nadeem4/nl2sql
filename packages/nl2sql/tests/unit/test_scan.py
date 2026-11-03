@@ -1,6 +1,6 @@
 """``engine.datasources.scan()``: finding a database in a URL, a folder and on loopback ports.
 
-See docs/architecture/wave_c.md, section 7, "Finding a database". Real engine, real SQLite and DuckDB-shaped
+Real engine, real SQLite and DuckDB-shaped
 files; the port probe is a fake socket; a plugin adapter proves the engine names no database itself.
 """
 from __future__ import annotations

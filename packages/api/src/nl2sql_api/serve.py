@@ -1,4 +1,4 @@
-"""``nl2sql-api serve``: run the API on one Uvicorn worker (docs/architecture/wave_d.md, D205, D206, D229).
+"""``nl2sql-api serve``: run the API on one Uvicorn worker.
 
 One worker, because jobs and the state they share live in this process. With ``api.auth: none`` the server binds a
 loopback host only (:func:`nl2sql_api.identity.check_bind`).
@@ -50,7 +50,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                        help="Hosted: questions per browser session")
     args = parser.parse_args(argv)
 
-    env_mode = os.environ.get("NL2SQL_MODE")  # the only read of it in the code base (D229)
+    env_mode = os.environ.get("NL2SQL_MODE")  # the only read of it in the code base
     flag = "hosted" if args.hosted else "demo" if args.demo else None
     try:
         config_path = args.config

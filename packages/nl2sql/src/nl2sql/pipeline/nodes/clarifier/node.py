@@ -1,4 +1,4 @@
-"""The clarifier: ask instead of guess, when the planner flagged a phrase it could read two ways (wave_b.md, section 7).
+"""The clarifier: ask instead of guess, when the planner flagged a phrase it could read two ways.
 
 It sits on the logical validator's "valid" edge, before the generator, so
 every path from the planner to the generator still passes the validator. With
@@ -12,12 +12,12 @@ renders each that passed and drops one whose SQL another option already has.
 An option is never offered, nor listed as an assumption, unless the validator
 would pass it, so no option names a table the caller cannot read.
 
-A phrase the glossary settles (a term's name, or a synonym exactly one term lists, D48) is not asked: the flag
+A phrase the glossary settles (a term's name, or a synonym exactly one term lists) is not asked: the flag
 and the alternatives are dropped and the default plan goes on.
 
 When at least one alternative is left, the planner named the phrase, and the
 sub-query may ask (``state.clarify``: the run's ``clarify`` is on and this is
-its only sub-query, D47), ``settings.clarify.enabled`` is on and no attempt of
+its only sub-query), ``settings.clarify.enabled`` is on and no attempt of
 the sub-query has executed yet (a sanity retry's re-plan never asks), the sub-query
 ends with ``NEEDS_CLARIFICATION`` (INFO, never retried) before the generator,
 and ``clarification.requested`` is published. The error's ``details`` carry
@@ -95,7 +95,7 @@ class ClarifierNode:
         return digest(DatasourceKnowledge())
 
     def _settled(self, datasource_id: str, phrase: Optional[str]) -> bool:
-        """Whether the glossary settles ``phrase`` (D48): a term's name, or a synonym exactly one term lists."""
+        """Whether the glossary settles ``phrase``: a term's name, or a synonym exactly one term lists."""
         if self._knowledge is None or not phrase:
             return False
         key = phrase.strip().casefold()
@@ -133,12 +133,12 @@ class ClarifierNode:
             return {}
         if self._settled(state.sub_query.datasource_id, response.ambiguous_phrase):
             # The glossary already says what the phrase means: the default reading runs, nothing is asked or
-            # listed as an assumption. ``alternatives_offered`` stays (the plan is still never cached, D47).
+            # listed as an assumption. ``alternatives_offered`` stays (the plan is still never cached).
             return {"ast_planner_response": response.model_copy(update={"ambiguous_phrase": None,
                                                                         "alternatives": []})}
         kept = self._options(state, response)
-        # Only ``alternatives`` is cut: K2's ``alternatives_offered`` (every reading the planner gave) stays,
-        # and the plan cache's "never cache an answer with readings" rule (D47) reads it.
+        # Only ``alternatives`` is cut: ``alternatives_offered`` (every reading the planner gave) stays,
+        # and the plan cache's "never cache an answer with readings" rule reads it.
         update: Dict[str, Any] = {"ast_planner_response": response.model_copy(update={"alternatives": kept})}
         # Never once an attempt executed (a sanity retry's re-plan): the default reading runs again, so the
         # flagged attempt's rows are replaced, and the other readings are assumptions.

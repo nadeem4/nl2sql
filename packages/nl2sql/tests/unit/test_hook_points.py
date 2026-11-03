@@ -1,4 +1,4 @@
-"""The six hook points where the pipeline calls them (docs/architecture/wave_a.md, section 6).
+"""The six hook points where the pipeline calls them.
 
 ``run.before`` in the run's worker, ``datasources.after`` in the resolver,
 ``plan.after`` in the planner (on a cached plan too), ``execute.before`` and
@@ -520,7 +520,7 @@ def _aggregate(groups, dropped, rows):
 
     ctx = fake_runtime(settings={"tenant_id": "t1"})
     ids = sorted({i.subquery_id for g in groups for i in g.inputs})
-    # Every join here is on `id`, which each sub-query declares (D30).
+    # Every join here is on `id`, which each sub-query declares.
     decomposition = DecomposerResponse(sub_queries=[SubQuery(id=i, datasource_id="shop", intent=i,
                                                              expected_schema=[ExpectedColumn(name="id", dtype="int")])
                                                     for i in ids],

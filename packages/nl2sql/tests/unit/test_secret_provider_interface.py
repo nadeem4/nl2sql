@@ -3,8 +3,7 @@
 Each one declares ``interface_version = 1`` and a strict ``config_model`` for
 its block in the secrets config, and is built with ``from_config``. A provider
 reads its settings from that block only: the 0.4 fallbacks to ``VAULT_ADDR``,
-``VAULT_TOKEN`` and ``AZURE_KEYVAULT_URL`` are gone. See
-docs/architecture/configuration_v2.md, "Interfaces and versions".
+``VAULT_TOKEN`` and ``AZURE_KEYVAULT_URL`` are gone. 
 """
 import sys
 import types

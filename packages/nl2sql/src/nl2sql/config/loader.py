@@ -1,6 +1,6 @@
 """``load_config``: ``nl2sql.yaml`` and its included files, into one ``Config``.
 
-The rules are section 2 of docs/architecture/configuration_v2.md:
+The rules:
 
 - a section is inline, or exactly ``{file: <path>}``, relative to
   ``nl2sql.yaml``; only ``nl2sql.yaml`` includes, and only it has ``version``;
@@ -42,7 +42,7 @@ _UNIONS = (Union, getattr(types, "UnionType", Union))
 LIST_SECTIONS = ("datasources", "observers", "hooks", "knowledge", "chat_tools")
 
 # Keys a release renamed: still an error (no alias), with a message that names the new key.
-RENAMED_KEYS = {"indexing_enrichment": "profiler"}  # llm.agents, 0.8 (docs/architecture/wave_b.md, D44)
+RENAMED_KEYS = {"indexing_enrichment": "profiler"}  # llm.agents, 0.8
 
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_-]*):([^{}]+)\}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")

@@ -1,4 +1,4 @@
-"""``nl2sql launch`` (docs/architecture/wave_c.md, section 7; row L3).
+"""``nl2sql launch``.
 
 A temp folder holds a SQLite file. Indexing is replaced by a build that writes the snapshot and the pointer without
 embedding (as ``test_cli_profile`` does), so no model is loaded; a fake LLM server stands behind ``OPENAI_BASE_URL``

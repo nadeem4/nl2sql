@@ -20,7 +20,6 @@ search can append a record of what it saw and how it chose (the query, the
 pool with scores, the picks in order and what was dropped) to an ``explain``
 list for the run trace.
 
-See docs/architecture/phase2.md, section 4.
 """
 from __future__ import annotations
 
@@ -208,7 +207,7 @@ class Retriever:
     SCOPE_OVERFETCH = 4
     # Routing (route): the entries each vote search reads, and the reciprocal
     # rank fusion constant (the value the RRF literature uses). Constants until
-    # the routing suite shows a reason to tune them (D28).
+    # the routing suite shows a reason to tune them.
     VOTE_K = 20
     RRF_K = 60
 
@@ -351,7 +350,7 @@ class Retriever:
               explain: Optional[List[Dict[str, Any]]] = None, *,
               limit: int = 3, floor_ratio: float = 0.5,
               allows: Optional[Callable[[Mapping[str, Any]], bool]] = None) -> List[RouteCandidate]:
-        """The datasources ``question`` most likely needs, best first (docs/architecture/wave_a.md, section 9).
+        """The datasources ``question`` most likely needs, best first.
 
         Five searches (:data:`ROUTE_SIGNALS`) run over the live builds of
         ``datasource_ids`` only, so a datasource the caller's scope does not

@@ -1,4 +1,4 @@
-"""The explanation's shapes: ``QueryResult.explanation`` and each clarification option's (D51)."""
+"""The explanation's shapes: ``QueryResult.explanation`` and each clarification option's."""
 from __future__ import annotations
 
 from typing import List, Literal, Optional

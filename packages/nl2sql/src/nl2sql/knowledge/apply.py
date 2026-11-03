@@ -1,4 +1,4 @@
-"""The glossary appliers: a proposal's ``change`` merged into a ``Glossary`` (docs/architecture/wave_b.md, section 5).
+"""The glossary appliers: a proposal's ``change`` merged into a ``Glossary``.
 
 The review queue's accept calls ``apply_change`` (or ``apply_proposal``) for
 each accepted ``table``, ``column``, ``join`` and ``term`` proposal, then
@@ -10,7 +10,7 @@ returns a new, validated glossary and writes nothing.
 | ``table`` | the table's name | sets its fields over the table's knowledge |
 | ``column`` | ``table.column`` | sets its fields over the column's knowledge |
 | ``join`` | ``from->to`` | the join (``from``, ``to``, ...) replaces the same join, or is added |
-| ``term`` | the term's name | the term replaces the one of the same name (D50), or is added |
+| ``term`` | the term's name | the term replaces the one of the same name, or is added |
 | ``example`` | the question | the ``question`` is appended to the datasource's ``examples`` unless it is there |
 """
 from __future__ import annotations

@@ -1,12 +1,11 @@
-"""The Phase 2 events, published (row E4 of docs/architecture/wave_a.md).
+"""Engine events, published.
 
-Phase 2 returned this data instead of publishing it (phase2.md, section 9);
-Wave A publishes it. Engine events (an index build, a datasource check, a
+Engine events (an index build, a datasource check, a
 purge) go through the runtime's bus, ``ctx.bus``, because they run outside
 any question. Run events (a parse retry, a policy denial) go through the
-run's scope. Events never carry sample values, rows or keys (D15), and
+run's scope. Events never carry sample values, rows or keys, and
 ``policy.decision`` is published for denials at the three enforcement points
-only (D16), never on the caller's stream (D17).
+only, never on the caller's stream.
 """
 from __future__ import annotations
 
@@ -122,7 +121,7 @@ def test_index_issue_publishes_column_failed(tmp_path):
         {"datasource_id": "chinook", "table": "main.*", "column": None, "stage": "estimate",
          "message": "no catalog row estimates"},
     ]
-    # Never a sample value (D15): not on this event, nor any other of the build.
+    # Never a sample value: not on this event, nor any other of the build.
     assert SAMPLE not in json.dumps([e.model_dump(mode="json") for e in seen])
 
 
@@ -221,7 +220,7 @@ def test_purge_publishes_counts(tmp_path):
     assert event.data == {"counts": counts}
     assert set(counts) == {"traces", "results", "proposals", "approvals", "conversations", "dashboards", "audit"}
     assert event.trace_id is None
-    # It is audited (D19): the audit observer wrote it.
+    # It is audited: the audit observer wrote it.
     lines = [json.loads(line) for path in (engine.config.storage.path / "audit").glob("*.jsonl")
              for line in path.read_text(encoding="utf-8").splitlines()]
     assert [line["name"] for line in lines] == ["retention.purged"]
@@ -302,7 +301,7 @@ def test_validator_denial_publishes_policy_decision():
     assert event.data["datasource_id"] == "ds1" and event.data["table"] == "secret"
     assert event.data["schema"] == "main" and event.data["step"] == "logical_validator"
     assert "user" in event.data["rule"]
-    assert "policy.decision" not in STREAM_EVENTS  # an operator event (D17)
+    assert "policy.decision" not in STREAM_EVENTS  # an operator event
 
 
 def test_a_self_join_on_a_denied_table_publishes_one_policy_decision():
@@ -325,7 +324,7 @@ def test_a_self_join_on_a_denied_table_publishes_one_policy_decision():
 
 
 def test_retriever_filtering_publishes_nothing():
-    """The schema retriever hides a denied table: filtering, not a refusal, so nothing is published (D16)."""
+    """The schema retriever hides a denied table: filtering, not a refusal, so nothing is published."""
     from test_policy_refusal import _assert_customer_is_hidden, _retrieve, _retriever  # same directory
 
     bus = EventBus()

@@ -1,4 +1,4 @@
-"""Example questions in the review queue (docs/architecture/wave_c.md, section 7, need B2).
+"""Example questions in the review queue.
 
 ``engine.proposals.propose_examples`` files each question as an ``example`` proposal (origin ``template``); only an
 accept appends it to the glossary's ``examples``. A real engine on a small SQLite file with a fake embedder.

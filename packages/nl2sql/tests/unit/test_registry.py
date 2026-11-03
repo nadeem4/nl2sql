@@ -1,8 +1,7 @@
 """The registry: the lookup from a name in the config to the code behind it.
 
 ``Registry.default()`` lists the installed entry points and imports none of
-them; a name is imported, and checked, when it is loaded. See
-docs/architecture/configuration_v2.md, sections 5 and 6.
+them; a name is imported, and checked, when it is loaded.
 """
 import sys
 import tomllib
@@ -180,7 +179,7 @@ def test_the_built_ins_are_declared_in_pyproject():
     from nl2sql.llm.registry import PROVIDER_PRESETS
 
     assert set(_declared("nl2sql.adapters")) == {"duckdb", "mssql", "mysql", "postgres", "sqlite"}
-    # `replay` answers from recordings with no key and no key variable, so it is declared but is not a preset (G2b).
+    # `replay` answers from recordings with no key and no key variable, so it is declared but is not a preset.
     assert set(_declared("nl2sql.llms")) == set(PROVIDER_PRESETS) | {"replay"}
     assert set(_declared("nl2sql.embeddings")) == {"local", "openai", "openai_compatible"}
     assert set(_declared("nl2sql.secrets")) == {"env", "aws", "azure", "hashicorp"}

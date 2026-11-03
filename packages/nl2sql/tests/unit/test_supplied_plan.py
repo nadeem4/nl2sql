@@ -1,4 +1,4 @@
-"""The pinned-plan entry: ``run_query(plan=SuppliedPlan(...))`` and the approval re-run (wave_a.md, section 7).
+"""The pinned-plan entry: ``run_query(plan=SuppliedPlan(...))`` and the approval re-run.
 
 A pinned plan skips the curated matcher, the resolver, the decomposer and the
 planner's model call. Its datasource is scope-checked for the caller, and the
@@ -250,7 +250,7 @@ def test_only_a_pinned_run_enters_at_the_pinned_entry(monkeypatch):
 
 
 def test_without_execute_only_a_supplied_verified_query_keeps_the_matcher(monkeypatch):
-    """A dashboard's access check of a verified chart (wave_c.md, D135): the matcher checks it and runs nothing."""
+    """A dashboard's access check of a verified chart: the matcher checks it and runs nothing."""
     from nl2sql.config import Curated
     from nl2sql.pipeline import graph as control
 
@@ -325,7 +325,7 @@ def test_the_facade_passes_the_plan_and_the_approvals_to_the_run(monkeypatch, ho
     assert seen["pinned"].source == PinnedSource.SUPPLIED and seen["approvals"] == approvals
 
 
-# ---------------------------------------------------------------- the review's attacks (PR #319)
+# ---------------------------------------------------------------- the review's attacks
 
 
 def test_an_approver_without_the_role_pins_nothing():
@@ -382,7 +382,7 @@ def test_the_rest_schema_lists_the_plan_sources():
     assert set(schema["enum"]) == {"llm", "cache", "verified", "supplied", "approved", "chosen"}
 
 
-# ---------------------------------------------------------------- answer=False (wave_c.md, D119)
+# ---------------------------------------------------------------- answer=False
 
 
 def _graph_edges(monkeypatch, **flags):

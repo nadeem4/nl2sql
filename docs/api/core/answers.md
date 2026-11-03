@@ -2,7 +2,7 @@
 
 ## Purpose
 `engine.answers`: a person's own record of "this answered my question". It stores the typed plan behind an
-answer, not SQL and not rows, and runs it again on request. Design: [Wave D, section 18](../../architecture/wave_d.md).
+answer, not SQL and not rows, and runs it again on request. 
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/answers_api.py` (`AnswersAPI`, internal)
@@ -29,20 +29,20 @@ tile holds), `chart` (`auto` by default), `created_at` and `trace_id`. `SaveRepo
 ## Behaviour
 
 - **Owner only.** An answer is read, run, deleted and listed only by its owner. Another caller, an admin
-  included, gets `AnswerNotFound` (`ANSWER_NOT_FOUND`, 404) (D247).
+  included, gets `AnswerNotFound` (`ANSWER_NOT_FOUND`, 404).
 - **`save` takes the plan from the stored step**, the helper `AddTile` uses, so no model text becomes a plan. The
   step must have answered and kept a plan, and `trace_id` must be that step's run: otherwise `NotSavable`
   (`NOT_SAVABLE`, 422). A conversation that is not the caller's is `ConversationNotFound`.
 - **It rates the run up** through `engine.feedback`, which also files the run's `verified_query` proposal when it
-  can (origin `thumbs_up`). The answer is saved either way (D241): `proposed` is `False` and
+  can (origin `thumbs_up`). The answer is saved either way: `proposed` is `False` and
   `not_proposed_reason` says why (`verified`, `multiple_statements`, `failed`, `no_sql`, `no_trace` when the run's
   trace was not kept, and the other reasons `skip_reason` gives). `note` is stored on the rating.
 - **A cross-database answer is filed under its first sub-query's datasource**, so `list(datasource_id=...)` for its other datasources does not return it.
 - **The cap never overflows.** `save` counts and stores under the owner's lock; a save that meets another in flight raises `LockHeld` and can be retried. A verified answer whose source names no datasource is `NotSavable`.
 - **Saving the same run twice** is one answer and one proposal.
 - **The cap.** At most `answers.max_per_user` answers (default 100) per person. The next save is refused with
-  `AnswerLimitReached` (`ANSWER_LIMIT_REACHED`, 409) before anything is rated; deleting one frees a place (D242).
-- **`run` is a normal run as the viewer** (D240): the plan goes through `plan.after`, the validator, the generator,
+  `AnswerLimitReached` (`ANSWER_LIMIT_REACHED`, 409) before anything is rated; deleting one frees a place.
+- **`run` is a normal run as the viewer**: the plan goes through `plan.after`, the validator, the generator,
   the scope and the hooks, as for any run, and `approvals` are as `run_query` takes them. A plan the schema has
   outgrown comes back as a result with status `error` whose first error has `error_code` `TILE_NEEDS_FIXING`, as a
   dashboard tile reports it. The answer is kept.

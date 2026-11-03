@@ -1,6 +1,4 @@
 """The test bed is what it says: each sample and the wide schema are loaded, and the reader login is limited.
-
-docs/architecture/phase2.md, section 3.
 """
 from __future__ import annotations
 

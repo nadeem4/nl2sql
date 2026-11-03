@@ -1,4 +1,4 @@
-"""Request headers become the engine's ``LLMOverride`` (docs/architecture/wave_d.md, D210)."""
+"""Request headers become the engine's ``LLMOverride``."""
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient

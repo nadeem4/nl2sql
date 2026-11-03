@@ -18,7 +18,7 @@ from nl2sql.common.logger import get_logger
 logger = get_logger("router")
 
 # What ends a run once the layer in flight is done: a hook's ending (the cost rule's refusal is one), or a
-# question asked back (L1).
+# question asked back.
 _RUN_ENDINGS = {ErrorCode.HOOK_DENIED, ErrorCode.HOOK_FAILED, ErrorCode.NEEDS_APPROVAL,
                 ErrorCode.NEEDS_CLARIFICATION, ErrorCode.COST_LIMIT_EXCEEDED}
 

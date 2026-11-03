@@ -1,4 +1,4 @@
-"""A demo question on the bus, with no key: no event carries rows (D15, docs/architecture/wave_a.md).
+"""A demo question on the bus, with no key: no event carries rows.
 
 A capturing subscriber sees every event of a real run. None of them has a
 ``rows`` key at any depth, and the run's summary names what it read.

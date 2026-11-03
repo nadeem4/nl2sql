@@ -74,7 +74,7 @@ when the `SuppliedPlan` is built. What is not skipped:
 
 The sub-query's `plan_source` is `"supplied"`. The question is still asked:
 the answer is written for it (unless `answer=False`). The same entry serves
-the approved re-run (`"approved"`) and, in Wave B, a plan the asker chose
+the approved re-run (`"approved"`) and a plan the asker chose
 (`"chosen"`).
 
 A supplied verified query is run by the curated matcher with its values, and
@@ -211,7 +211,7 @@ Fields:
 | `approvals_needed` | `List[ApprovalRequest]` | no | Set when `status` is `"needs_approval"`: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an `Approval` for each. |
 | `clarification` | `Optional[ClarificationRequest]` | no | Set when `status` is `"needs_clarification"`: the phrase, and two or three readings, each a label, a validated plan and its explanation. See [Clarification](#clarification). |
 | `explanation` | `Optional[Explanation]` | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a `success` or `plan_only` run's, and the successful steps of a partly failed one); `None` when no step did, when a hook ended the run, or when it cannot be rendered. See [Explanation](#explanation). |
-| `decomposition` | `Optional[DecomposerResponse]` | no | The run's whole decomposition (sub-queries and combine groups), set on every run that has one and withheld, like the data, when a hook ended the run. With each sub-query's `plan` it rebuilds the run: a dashboard chart stores both ([Wave C](../../architecture/wave_c.md)). |
+| `decomposition` | `Optional[DecomposerResponse]` | no | The run's whole decomposition (sub-queries and combine groups), set on every run that has one and withheld, like the data, when a hook ended the run. With each sub-query's `plan` it rebuilds the run: a dashboard chart stores both. |
 
 `errors` holds the `ERROR` and `CRITICAL` entries, and the one `INFO` entry
 `NEEDS_CLARIFICATION` of a run that asked which reading was meant;
@@ -231,8 +231,7 @@ on warnings alone) adds a `MISSING_SQL` error, so the run reports `"error"`.
 `"plan_only"` when no sub-query produced rows or an artifact (an
 `execute=False` run), otherwise `"success"`. A state with no sub-queries and no
 errors leaves it `None`. Hooks, approval and the caps
-that produce `"needs_approval"` and `"stopped"` arrive with release 0.7 (see
-[Wave A](../../architecture/wave_a.md)).
+that produce `"needs_approval"` and `"stopped"` arrive with release 0.7.
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set lives in artifact storage, addressed through `artifact_refs`; each
@@ -308,7 +307,7 @@ nothing is stored. The engine checks, before anything runs:
 
 A refused choice ends the run with that one error (`status` `"error"`) and
 calls no model. A `plan` or a `pinned` passed with a `choice` is a `ValueError`
-at the call. Otherwise the run enters at Wave A's pinned entry with one
+at the call. Otherwise the run enters at pinned entry with one
 sub-query, standalone: no resolver, decomposer or `datasources.after`. The
 planner step returns the chosen plan with `plan_source` `"chosen"` and no model
 call; then it is an ordinary run: `plan.after`, the validator with the
@@ -345,8 +344,7 @@ synthesizer says them; see the
 0.7 changed this shape: a warning was a dict with `error_code` and `severity`,
 and is now a `RunWarning` with `code`, and `detail.recovered` where `severity`
 said `ERROR`. A run's state is never kept across an upgrade (a run that ended
-`needs_approval` is asked again, not resumed; see
-[Wave A, D10](../../architecture/wave_a.md#7-approval)), so no older warning is
+`needs_approval` is asked again, not resumed), so no older warning is
 ever read back.
 
 ### Explanation
@@ -413,8 +411,7 @@ scope filters it; without it, names are the split names and every join is a
 declared key. A run on the Chinook
 suite's gold plans renders as the files in
 `packages/nl2sql/tests/unit/explain/golden/`, which are compared on every
-test run, so a change to the wording is a reviewed diff. Design:
-[Wave B, section 8](../../architecture/wave_b.md#8-why-this-answer).
+test run, so a change to the wording is a reviewed diff. 
 
 ## Streaming a run
 
@@ -459,7 +456,7 @@ playground send it.
 | `node.finished` | `node`, `sub_query_id`, `seconds`, `ok` | The step ended; `ok` is False when it raised. |
 | `result.manifest` | `results` | The aggregator saved the results: `results` is the run's `result_manifest` and the event's `trace_id` its `request_id`, so `engine.results.page` can be called before the answer is written. |
 | `answer.delta` | `field`, `text` | The next piece of `final_answer.summary` or `final_answer.content`, as the answer model writes it. |
-| `sanity.flagged`, `run.limit_reached` | see [Events](../../observability/events.md) | Published by the sanity checks and the caps when they arrive (Wave A's S1 and E3). |
+| `sanity.flagged`, `run.limit_reached` | see [Events](../../observability/events.md) | Published by the sanity checks and the caps when they arrive. |
 | `run.finished` | the run's summary (`status`, `duration_s`, `usage`, `error_codes`, `source`, `datasources`, `tables`, `result_manifest`, `user_id`, `roles`) plus `result` | The run finished. `result` is exactly what `run_query` returns, as JSON; it is on the stream's copy only, never on the bus. A refusal, a provider failure, a timeout or a cancel is a `run.finished` with `status: "error"`, as `run_query` returns it. |
 | `run.failed` | `message`, `error_code` | The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built). |
 
@@ -563,10 +560,10 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. `"dropped"` when a [hook](../../configuration/hooks.md) denied it with `scope="sub_query"`: the run went on without it. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
-| `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved for Wave B), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
+| `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
-| `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever (Wave B's K2); `None` when no term or rule matched, and for a plan served from the plan cache, which sent no prompt. |
+| `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever; `None` when no term or rule matched, and for a plan served from the plan cache, which sent no prompt. |
 | `estimate` | `Optional[Estimate]` | no | The database's estimate of the rows this sub-query reads, when the cost rule asked for one. `rows` is what the query is expected to *read*; `cost` is the database's own units, for display. `None` when the cost rule asked for none: no `policies.cost` limit applies to the caller, or the run did not reach `execute.before`. Present too when the rule then refused or asked for approval. |
 
 ### RowSample

@@ -1,4 +1,4 @@
-"""The `workspaces` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", D224).
+"""The `workspaces` namespace of `/api/v1`.
 
 Thin over ``engine.workspaces``: a workspace is a named group of the caller's own dashboards.
 """

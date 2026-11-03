@@ -1,4 +1,4 @@
-"""Dashboard refresh and open end to end on the demo databases, with no key (wave_c.md, row D2).
+"""Dashboard refresh and open end to end on the demo databases, with no key.
 
 A chart keeps the typed plan that produced it. A refresh re-runs it through ``run_query(plan=..., answer=False)``
 as the caller: the plan goes through ``plan.after``, the validator and the generator, is never cached, and makes no
@@ -135,7 +135,7 @@ def test_stored_results_are_denied_once_access_is_lost(engine):
 
 @pytest.mark.e2e
 def test_open_checks_a_verified_chart_without_running_it(demo_project, fake_llm, monkeypatch):
-    """D135: the access check executes nothing, a verified chart's included; it still denies once access is lost."""
+    """the access check executes nothing, a verified chart's included; it still denies once access is lost."""
     from nl2sql import VerifiedRef
     from nl2sql.dashboards.models import ChartPlan
     from nl2sql.execution.executor import SqlExecutorService
@@ -332,7 +332,7 @@ def test_cost_guard_confirm_makes_a_chart_need_approval_and_a_manual_refresh_wit
         engine.close()
 
 
-# ---------------------------------------------------------------- filters (D2b)
+# ---------------------------------------------------------------- filters
 
 def _filter(filter_id, column, op="in", kind="text"):
     from nl2sql.dashboards.models import DashboardFilter

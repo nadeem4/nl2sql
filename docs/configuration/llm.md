@@ -535,8 +535,7 @@ with no model.
 
 ## Per-request keys and models
 
-A caller can bring its own key, and its own model for a step, for one call
-(D210): `llm_override=LLMOverride(keys={"anthropic": key}, models={"ast_planner": ("anthropic", "claude-opus-5")})`
+A caller can bring its own key, and its own model for a step, for one call: `llm_override=LLMOverride(keys={"anthropic": key}, models={"ast_planner": ("anthropic", "claude-opus-5")})`
 on `run_query`, `stream_query`, and a conversation's `ask`, `stream` and
 `retry`. `keys` maps a provider to the caller's key; `models` maps an agent
 name (the node name, such as `ast_planner`) to `(provider, model)`.

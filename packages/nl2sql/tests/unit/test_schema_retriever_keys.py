@@ -1,4 +1,4 @@
-"""The schema retriever keeps what a join and an answer need, and survives a failed search (B103).
+"""The schema retriever keeps what a join and an answer need, and survives a failed search.
 
 The 0.9.0 smoke test asked Pagila (29 tables) for "the five films in the
 Sports category with the highest total rental revenue". The planning search

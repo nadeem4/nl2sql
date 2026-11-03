@@ -1,6 +1,6 @@
-"""Drafted descriptions: ``engine.knowledge.profile(draft=True)`` and ``nl2sql profile --draft`` (P2).
+"""Drafted descriptions: ``engine.knowledge.profile(draft=True)`` and ``nl2sql profile --draft``.
 
-docs/architecture/wave_b.md, section 6 ("Drafted descriptions"), decisions D38, D44, D60 and B31. The model is a
+Drafted descriptions. The model is a
 ``FakeLLMServer`` answering the profiler's structured output (``SchemaEnrichment``) from the evidence in the
 prompt, so nothing calls a real model. The database is a small SQLite file indexed without embedding.
 """

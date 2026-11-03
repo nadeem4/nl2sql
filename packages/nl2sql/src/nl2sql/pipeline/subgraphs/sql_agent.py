@@ -40,7 +40,7 @@ def build_sql_agent_graph(
     The clarifier is on the validator's "valid" edge: with no alternative
     readings from the planner it passes straight through; when it asks which
     reading was meant (``NEEDS_CLARIFICATION``) the sub-query ends before the
-    generator (docs/architecture/wave_b.md, section 7).
+    generator.
 
     Feedback Loop:
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner

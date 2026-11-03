@@ -1,10 +1,10 @@
 # Dashboards API
 
 !!! note "Partly built"
-    The workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`,
-    `refresh` and `run_scheduled` (D2), `generate` and `suggest_questions` (D3), and `filter_values` and
-    `refresh(filters=...)` (D2b). A conversation builds and edits a draft with the `dashboard_edit` and
-    `dashboard_pin` chat tools (D4).
+    The workspaces, the dashboard store, `pin`, `move` and the manual edits work, and so do `open`,
+    `refresh` and `run_scheduled`, `generate` and `suggest_questions`, and `filter_values` and
+    `refresh(filters=...)`. A conversation builds and edits a draft with the `dashboard_edit` and
+    `dashboard_pin` chat tools.
 
 ## Purpose
 `engine.workspaces` and `engine.dashboards` ([Dashboards](../../dashboards/index.md)).
@@ -64,7 +64,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.
 - **`set_schedule(every_minutes)`** below `dashboards.min_refresh_minutes` is `ScheduleTooFrequent`; otherwise it
-  stores the schedule with the caller's `user_id`, `tenant_id` and roles (D134), and `None` removes it. It runs
+  stores the schedule with the caller's `user_id`, `tenant_id` and roles, and `None` removes it. It runs
   only while a long-running process calls `run_scheduled` (`nl2sql-api` does, every minute).
 - **Stored results.** `remove_tile` discards that chart's stored result and `set_filters` (when the filters
   change) every chart's; renaming, redrawing, arranging, moving and scheduling keep them.
@@ -85,7 +85,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   `approvals_needed`; the stored result is kept), `stopped` (a cap; the remaining charts are `stopped` and keep
   theirs) and `error` (returned, not stored: the chart keeps its last good result). It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
   edited, `ApprovalNotFound` for a request id in `approvals` that is unknown, waiting, denied or expired (nothing runs), and `ValueError` for a `tile_id` the dashboard does not have.
-- **`filters`** maps filter ids to values (D117): `refresh(dashboard_id, filters={"country": ["Brazil"]})`. Each
+- **`filters`** maps filter ids to values: `refresh(dashboard_id, filters={"country": ["Brazil"]})`. Each
   value is checked against the filter's kind first (`number`, `temporal` as `YYYY-MM-DD` or
   `YYYY-MM-DDTHH:MM[:SS[.ffffff]]` with an optional `Z` or `+HH:MM`, `boolean`, `text`; `in` takes 1 to 100 values,
   `between` exactly two), and a wrong one, or an id the dashboard does not have, is a `ValueError` naming the
@@ -126,10 +126,10 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
   saved dashboards are never purged.
 
-## Guided builder (DB1b)
+## Guided builder
 
 `engine.dashboards.builder_options`, `propose_tiles` and `build` build a dashboard from choices, not from a
-description. Design: [Wave D, section 18](../../architecture/wave_d.md). All take `user_context`, and the ids
+description. All take `user_context`, and the ids
 they offer are limited to what the caller's scope reaches.
 
 - **`builder_options(datasource_id, *, user_context) -> BuilderOptions`** returns `curated` (the datasource's
@@ -157,16 +157,16 @@ they offer are limited to what the caller's scope reaches.
 
 ## Methods
 
-| Method | Row |
-|---|---|
-| `workspaces.create(name, *, user_context)`, `rename(workspace_id, name, *, user_context)`, `list(*, user_context)`, `delete(workspace_id, *, user_context)` | D1 |
-| `dashboards.get(dashboard_id, *, user_context)`, `list(*, user_context, workspace_id=None, status="saved")`, `delete(...)` | D1 |
-| `dashboards.pin(dashboard_id, *, user_context, workspace_id=None, title=None)`, `move(dashboard_id, workspace_id, *, user_context)` | D1 |
-| `dashboards.edit(dashboard_id, edits, *, user_context)` and the named edits `rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule` | D1 |
-| `dashboards.open(dashboard_id, *, user_context, refresh_due=True) -> DashboardView` | D2 |
-| `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2, `filters` D2b; `approvals` are `Approval` objects or granted request ids (D236) |
-| `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100) -> list` | D2b |
-| `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` | D2 |
-| `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)` | D3, `on_tile` and `cancellation_token` G3b |
-| `dashboards.suggest_questions(datasource_id, *, user_context, n=5) -> list[str]` | D3 |
-| `dashboards.builder_options(...)`, `propose_tiles(...)`, `build(...)`; edits `add_verified_tile`, `add_saved_tile`; `curated.list(...)` | DB1b |
+| Method |
+|---|
+| `workspaces.create(name, *, user_context)`, `rename(workspace_id, name, *, user_context)`, `list(*, user_context)`, `delete(workspace_id, *, user_context)` |
+| `dashboards.get(dashboard_id, *, user_context)`, `list(*, user_context, workspace_id=None, status="saved")`, `delete(...)` |
+| `dashboards.pin(dashboard_id, *, user_context, workspace_id=None, title=None)`, `move(dashboard_id, workspace_id, *, user_context)` |
+| `dashboards.edit(dashboard_id, edits, *, user_context)` and the named edits `rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule` |
+| `dashboards.open(dashboard_id, *, user_context, refresh_due=True) -> DashboardView` |
+| `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` (`approvals` are `Approval` objects or granted request ids) |
+| `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100) -> list` |
+| `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` |
+| `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)` |
+| `dashboards.suggest_questions(datasource_id, *, user_context, n=5) -> list[str]` |
+| `dashboards.builder_options(...)`, `propose_tiles(...)`, `build(...)`; edits `add_verified_tile`, `add_saved_tile`; `curated.list(...)` |

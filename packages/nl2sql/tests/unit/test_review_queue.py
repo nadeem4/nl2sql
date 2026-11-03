@@ -1,7 +1,6 @@
-"""The review queue: proposals, accept, reject, the review file and thumbs-up (Q1).
+"""The review queue: proposals, accept, reject, the review file and thumbs-up.
 
-docs/architecture/wave_b.md, section 5, and decisions D41, D42, D43, D60 and
-D61. The engine tests build a real engine on a small SQLite database with a
+The engine tests build a real engine on a small SQLite database with a
 fake embedder, so nothing is downloaded and no model is called.
 """
 from __future__ import annotations

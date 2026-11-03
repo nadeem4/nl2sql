@@ -1,4 +1,4 @@
-"""The curated section's own file: where it is, its canonical form and its writer (docs/architecture/wave_b.md, D42).
+"""The curated section's own file: where it is, its canonical form and its writer.
 
 ``write_curated`` is engine-internal: only the review queue's accept calls it,
 under its lock, after its admin check (``test_only_accept_writes_a_persons_file``).
@@ -73,7 +73,6 @@ def loaded_sha256(config: "Config") -> Optional[str]:
 
 class _Dumper(yaml.SafeDumper):
     """Multi-line text (the SQL) as a literal block, so the file reads as written."""
-
 
 _Dumper.add_representer(
     str,

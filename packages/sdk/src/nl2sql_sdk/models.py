@@ -118,7 +118,7 @@ class Estimate(BaseModel):
     output), so a ``LIMIT`` on the result does not hide a billion-row scan.
     ``cost`` is the planner's own cost units, for display: comparable within
     one database only, never with a limit. ``source`` says what was read, for
-    people. See docs/architecture/wave_b.md, section 9.
+    people.
     """
 
     rows: Optional[int] = None

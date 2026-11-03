@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
-MAPPING_PAGE = "architecture/configuration_v2"
+MAPPING_PAGE = "configuration/system#from-04"
 
 
 @dataclass(frozen=True)

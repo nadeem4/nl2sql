@@ -1,4 +1,4 @@
-"""The `settings` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", row A4a): the server's LLM, the
+"""The `settings` namespace of `/api/v1`: the server's LLM, the
 providers, API keys and the event catalog. Thin over the facade; a refusal is the facade's own error or a 4xx here."""
 from dataclasses import asdict
 from typing import Annotated, Any, Dict, List, Optional
@@ -144,7 +144,7 @@ def create_api_key(body: ApiKeyRequest, engine: Engine, user: Admin):
         key, token = engine.api_keys.create(user_id=body.user_id, roles=body.roles, by=user,
                                             tenant_id=body.tenant_id, label=body.label)
     except ValueError:
-        # A built-in exception's text is never echoed (B200): the two causes are named here.
+        # A built-in exception's text is never echoed: the two causes are named here.
         raise RequestRefused(422, "INVALID_REQUEST", "The user is empty or a role is not one of policies.roles.",
                              fix="Fix the user or the roles and send it again.") from None
     return ApiKeyCreated(key=key, token=token)

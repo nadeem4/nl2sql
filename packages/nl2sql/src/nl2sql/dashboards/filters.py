@@ -1,4 +1,4 @@
-"""Dashboard filters (docs/architecture/wave_c.md, section 6 "Filters", D117).
+"""Dashboard filters.
 
 A filter value becomes a typed predicate added to each stored plan that reads the filter's table, before ``plan.after``,
 the validator and the generator: never text added to a question or to SQL. The values are plan literals, so the

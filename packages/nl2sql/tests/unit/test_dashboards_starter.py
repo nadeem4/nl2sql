@@ -1,4 +1,4 @@
-"""The starter dashboard (docs/architecture/wave_c.md, section 6; row D3).
+"""The starter dashboard.
 
 ``generate`` reads the datasource's indexed snapshot and the glossary, chooses charts from the column roles, builds
 each one's typed plan in code, runs it as the caller and keeps the ones that answered. Here the snapshot is hand-built
@@ -584,7 +584,7 @@ def test_every_template_plan_validates_and_renders_without_a_star(dialect):
             sql = made["generator_response"].sql_draft
             assert sql and '"*"' not in sql and "[*]" not in sql and "`*`" not in sql, (dialect, sql)
 
-# ------------------------------------------------------------------ progress and cancellation (G3b)
+# ------------------------------------------------------------------ progress and cancellation
 
 def test_generate_reports_each_tile(engine, runs):
     runs.respond = lambda call: failed() if "total" in call["question"].lower() else good()

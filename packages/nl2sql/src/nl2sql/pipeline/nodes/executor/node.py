@@ -163,7 +163,7 @@ class ExecutorNode:
             # execute.before: after the validator, a hook may only stop the SQL.
             fields = self._hook_fields(state, ds_id, sql)
             verdict = self.hooks.call("execute.before", **fields)
-            # What the cost rule estimated (C2) goes on the result, whether or not the SQL then runs.
+            # What the cost rule estimated goes on the result, whether or not the SQL then runs.
             record = take_record(state.trace_id, state.sub_query.id)
             # A rule that ran but got no estimate clears the previous attempt's, which was for other SQL.
             estimate = {"estimate": record.estimate} if record is not None else {}

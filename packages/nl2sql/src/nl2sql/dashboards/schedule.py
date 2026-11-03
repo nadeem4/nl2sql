@@ -1,5 +1,4 @@
-"""Schedules: when a dashboard is due, and the checks of its saved identity (docs/architecture/wave_c.md, section 6,
-D132 and D134).
+"""Schedules: when a dashboard is due, and the checks of its saved identity.
 
 A schedule re-runs a dashboard as its owner was when they set it: the snapshot of their user, tenant and roles saved on
 the schedule. Each run resolves that snapshot against the current policies, so it can only narrow what is allowed now.

@@ -4,8 +4,7 @@
 through the registry, builds the secret manager, the adapters (not
 connected), the LLM clients (no model call), the embedder and the local
 stores under ``storage.path``, and raises one ``ConfigError`` listing every
-problem. Every node, store and service is handed the runtime. See
-docs/architecture/configuration_v2.md, sections 4, 6 and 8.
+problem. Every node, store and service is handed the runtime. 
 
 Nothing here is shared between engines, and nothing is process-global: every
 module reads its settings from the runtime it is handed (``ctx.settings``) or
@@ -87,7 +86,7 @@ class Runtime:
         self._lock = RLock()
         self._closed = False
         # The engine's events: one bus per engine, shared by its derived and
-        # run-scoped runtimes (docs/architecture/wave_a.md, section 3).
+        # run-scoped runtimes.
         self.bus = EventBus()
         source = "nl2sql.yaml" if config.folder is not None else "Config"
         problems: List[Problem] = []
@@ -134,7 +133,7 @@ class Runtime:
 
         self.curated = config.curated
         # The hash of the curated section's own file as the config holds it: accept refuses a file changed
-        # since the config was loaded (D42).
+        # since the config was loaded.
         self.curated_sha256 = None
         if config.curated is not None:
             from nl2sql.config.curated import check_curated
@@ -519,7 +518,7 @@ class Runtime:
     def _published(self, status: DatasourceStatus) -> DatasourceStatus:
         """``status``, after publishing ``datasource.failed`` on the engine's bus when it failed.
 
-        The driver's words are redacted (D15): a plugin adapter may echo its DSN.
+        The driver's words are redacted: a plugin adapter may echo its DSN.
         """
         if status.status == "failed":
             from nl2sql.tracing.trace import redact_for
@@ -647,7 +646,7 @@ def _llm_provider_problems(llm: "LLM", registry: Registry, source: str) -> List[
 
 
 def _unpriced_problems(llm: "LLM", pipeline: Any, source: str) -> List[Problem]:
-    """With ``settings.pipeline.max_cost_usd`` set, a problem for every model ``llm`` names that has no price (D20).
+    """With ``settings.pipeline.max_cost_usd`` set, a problem for every model ``llm`` names that has no price.
 
     A call is priced by the name the provider reports, else by its configured
     name, so an engine whose configured models are all priced prices every

@@ -1,9 +1,9 @@
 """Observers: the ``observers`` section built, and the built-in ``log``, ``audit`` and ``otel``.
 
-docs/architecture/wave_a.md, section 4, row E2. Observers fail open and never
-block (D9); with no section the engine runs ``log`` and ``audit`` (D18); the
+Observers fail open and never
+block; with no section the engine runs ``log`` and ``audit``; the
 audit log is JSON lines under ``storage.path/audit/``, one summary line per
-run, purged by ``engine.storage.purge()`` (D19).
+run, purged by ``engine.storage.purge()``.
 """
 from __future__ import annotations
 
@@ -242,7 +242,7 @@ def test_audit_writes_a_failed_run_with_its_user(tmp_path):
 
 
 def test_the_audited_events_come_from_the_catalog(monkeypatch, tmp_path):
-    """A later wave adds an audited event by its catalog entry alone (Wave C: datasource.saved)."""
+    """A later release adds an audited event by its catalog entry alone (for example datasource.saved)."""
     monkeypatch.setitem(CATALOG, "eval.finished",
                         CATALOG["eval.finished"].model_copy(update={"audit": True}))
     bus = EventBus()
@@ -429,7 +429,7 @@ def test_a_full_audit_queue_drops_and_warns_once(tmp_path, monkeypatch, caplog):
 
 
 def test_run_failed_redacts_a_key_in_the_message(tmp_path):
-    """D15: a provider error that quotes a key never reaches the bus, the stream or the audit log."""
+    """a provider error that quotes a key never reaches the bus, the stream or the audit log."""
     bus = EventBus()
     audit = AuditObserver(tmp_path)
     bus.subscribe(audit)

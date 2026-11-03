@@ -74,7 +74,7 @@ class SubQueryResult(BaseModel):
     # was still validated, generated and executed), "verified" when there was
     # no plan because a verified query's SQL ran, "supplied" for a plan passed
     # to run_query(plan=...), "approved" for an approval's pinned plan
-    # ("chosen" is Wave B's), else "llm".
+    # ("chosen" is reserved), else "llm".
     plan_source: Literal["llm", "cache", "verified", "supplied", "approved", "chosen"] = "llm"
     # The row ceiling that bounded this sub-query's SQL, when the plan asked for
     # no smaller LIMIT; ``truncated`` is True when the result reached it, so
@@ -83,7 +83,7 @@ class SubQueryResult(BaseModel):
     truncated: bool = False
     # The knowledge this sub-query's prompts carried (glossary terms and rules), and the database's
     # estimate of the rows it reads, when the cost rule asked for one. knowledge_used holds only items
-    # within the caller's scope: nothing on, or mentioning, a table the caller cannot read (D39), so
+    # within the caller's scope: nothing on, or mentioning, a table the caller cannot read, so
     # returning it names no denied table.
     knowledge_used: Optional[KnowledgeUsed] = None
     estimate: Optional[Estimate] = None
@@ -122,7 +122,7 @@ class QueryResult(BaseModel):
     errors: List[Dict[str, Any]] = Field(default_factory=list)
     trace_id: str = Field(default="")
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
-    # What the answer should say without failing the run (D34): a missing filter value, a join
+    # What the answer should say without failing the run: a missing filter value, a join
     # fan-out, an all-null column, a cut or unconverted result, an earlier attempt a retry replaced.
     warnings: List[RunWarning] = Field(default_factory=list)
     artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
@@ -151,7 +151,7 @@ class QueryResult(BaseModel):
     # sub-query with a plan or a verified answer; None when the run has neither.
     explanation: Optional[Explanation] = None
     # The run's whole decomposition (sub-queries and combine groups), set on every run that has one, so a
-    # stored turn can rebuild the run: a dashboard chart keeps it with each sub-query's plan (Wave C, D116).
+    # stored turn can rebuild the run: a dashboard chart keeps it with each sub-query's plan.
     decomposition: Optional[DecomposerResponse] = None
 
 
@@ -533,18 +533,18 @@ class QueryAPI:
             cancellation_token: Optional token the caller cancels to stop the
                 run. It stops before the next step or model call; the one in
                 flight finishes, and the result carries a ``CANCELLED`` error.
-            scope: A scope :meth:`open_scope` opened (Wave C's turn); the run
+            scope: A scope :meth:`open_scope` opened (turn); the run
                 goes on in it and closes it, instead of opening its own.
             plan: A plan the caller holds: the run skips the curated matcher,
                 the resolver, the decomposer and the planner, and validates,
                 generates and runs it under ``user_context``'s scope.
             approvals: Approvals for what an earlier run of the question asked
                 (its ``approvals_needed``), as ``Approval`` objects or as request ids
-                (``engine.approvals``, D215): an id that is unknown, waiting, denied or
+                (``engine.approvals``): an id that is unknown, waiting, denied or
                 expired ends the run ``APPROVAL_NOT_GRANTED``. The first that is this run's, by a
                 holder of the hook's approver roles, pins its decomposition
                 and plan.
-            pinned: (internal) a pin of another source, such as Wave B's
+            pinned: (internal) a pin of another source, such as a chosen plan's
                 chosen plan, in place of ``plan``.
             clarify: When the planner reads a phrase two ways and both
                 readings pass the validator, end the run ``needs_clarification``
@@ -562,7 +562,7 @@ class QueryAPI:
             answer: False skips the answer synthesizer: no prose is written,
                 ``final_answer`` is None and the run makes no model call for it
                 (a dashboard refresh re-runs stored plans this way).
-            llm_override: The caller's own keys and models for this call only (D210);
+            llm_override: The caller's own keys and models for this call only;
                 see ``NL2SQL.run_query``. None keeps the caller's context, if it bound one.
 
         Returns:
@@ -632,7 +632,7 @@ class QueryAPI:
         return resolved, None
 
     def _store_requests(self, result: "QueryResult") -> None:
-        """A run that ended ``needs_approval`` keeps its requests for an approver to grant by id (D215)."""
+        """A run that ended ``needs_approval`` keeps its requests for an approver to grant by id."""
         if result.approvals_needed:
             Approvals(self._ctx).submit(result.approvals_needed)
 
@@ -657,10 +657,10 @@ class QueryAPI:
 
     def open_scope(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                    user_context: Optional[UserContext] = None) -> RunScope:
-        """Open a run's scope on the engine's bus and publish ``run.started`` (wave_a.md, section 3).
+        """Open a run's scope on the engine's bus and publish ``run.started``.
 
         ``run_query`` and ``stream_query`` open one themselves. A caller that
-        works in the run before the question runs (Wave C's rewrite) opens it
+        works in the run before the question runs (rewrite) opens it
         here, makes its model calls with ``scope.callbacks()`` inside
         ``scope.entered()``, then passes it as ``scope=``, or closes it with
         :meth:`close_scope` and a result built without a graph run.
@@ -688,7 +688,7 @@ class QueryAPI:
     def close_scope(self, scope: RunScope, result: QueryResult) -> Optional[Event]:
         """Close ``scope`` with ``run.finished``, the result's summary; ``run.failed`` if that cannot be built.
 
-        ``result`` may be one built without a graph run (Wave C's failed
+        ``result`` may be one built without a graph run (failed
         rewrite). A scope closes once; closing it again does nothing and
         returns None. Returns the ``run.finished`` event published.
         """
@@ -719,8 +719,8 @@ class QueryAPI:
         """
         Run a question as :meth:`run_query` does, yielding its events as they are published.
 
-        Yields this run's bus events from the caller-safe allow-list (D17,
-        ``nl2sql.events.STREAM_EVENTS``), in publish order: ``run.started``,
+        Yields this run's bus events from the caller-safe allow-list
+        (``nl2sql.events.STREAM_EVENTS``), in publish order: ``run.started``,
         ``node.started`` and ``node.finished`` per pipeline step,
         ``result.manifest`` once the aggregator has saved the results,
         ``answer.delta`` per piece of the answer as the model writes it,
@@ -728,7 +728,7 @@ class QueryAPI:
         ``run.finished`` or ``run.failed``. The stream's ``run.finished`` is
         the bus event's summary plus ``data.result``, the :class:`QueryResult`
         ``run_query`` would have returned, as JSON; the event published on the
-        bus never holds it (D15). ``run.failed`` means the run could not start,
+        bus never holds it. ``run.failed`` means the run could not start,
         or crashed outside the pipeline. A run that fails inside the pipeline
         -- a refusal, a provider error -- ends in ``run.finished`` with
         ``status: "error"``, as ``run_query`` returns it.
@@ -740,7 +740,7 @@ class QueryAPI:
         open scope already published (its ``run.started``); a closed one is a
         ``ValueError``, raised at the call. Whatever breaks, the stream ends
         with exactly one terminal event. ``names``
-        (internal) is the allow-list; Wave C's conversation stream adds its
+        (internal) is the allow-list; conversation stream adds its
         own events to it. ``plan``, ``approvals``, ``pinned``, ``choice`` and ``answer`` are as
         for :meth:`run_query`, and refused the same way, at the call; so is ``clarify``.
         ``llm_override`` is as for :meth:`run_query`; it is bound in the run's own thread, and a model chosen

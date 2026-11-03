@@ -8,8 +8,6 @@ schema. One compose file, `testbed/docker-compose.yml`, defines all of it,
 and the same file runs on your machine, on GitHub's runners in CI, and on one
 small GCP VM started on demand.
 
-The design is in [Phase 2, section 3](../architecture/phase2.md#3-the-real-database-test-bed).
-
 | Server | Sample database | Generated wide schema |
 |---|---|---|
 | PostgreSQL 16 | Pagila, in database `pagila` | database `wide`, schemas `sales_01` ... `ops_20` and `audit` |

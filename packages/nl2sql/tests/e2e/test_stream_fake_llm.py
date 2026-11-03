@@ -60,7 +60,7 @@ def _check_progress(events):
     assert "".join(d["text"] for d in deltas if d["field"] == "summary") == ANSWER["summary"]
     assert "".join(d["text"] for d in deltas if d["field"] == "content") == ANSWER["content"]
     assert names[-1] == "run.finished" and names.count("run.finished") == 1 and "run.failed" not in names
-    # Never operator data on the caller's stream (D17).
+    # Never operator data on the caller's stream.
     assert not set(names) & {"policy.decision", "hook.decision", "llm.call", "plan_cache.lookup"}
     final = events[-1][1]["result"]
     assert events[-1][1]["status"] == final["status"]

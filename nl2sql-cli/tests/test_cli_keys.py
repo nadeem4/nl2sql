@@ -1,4 +1,4 @@
-"""``nl2sql keys create``, ``list`` and ``revoke`` (docs/architecture/wave_c.md, section 9, row M1)."""
+"""``nl2sql keys create``, ``list`` and ``revoke``."""
 from __future__ import annotations
 
 import re

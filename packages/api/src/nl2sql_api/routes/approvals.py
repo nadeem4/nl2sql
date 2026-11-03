@@ -1,4 +1,4 @@
-"""The `approvals` namespace of `/api/v1` (docs/architecture/wave_d.md, D215).
+"""The `approvals` namespace of `/api/v1`.
 
 A run a hook held for approval stores a request; an approver (a role the hook names) grants or denies it; the asker then
 re-asks with `approval_ids`. Who may decide is the engine's rule: a caller without the role gets its 403, another

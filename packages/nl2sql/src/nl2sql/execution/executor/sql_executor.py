@@ -17,7 +17,6 @@ logger = get_logger("sql_executor")
 class _StreamFailed(Exception):
     """Raised into the artifact writer when the adapter reports a failure mid-result."""
 
-
 def _frames(adapter: Any, request: AdapterRequest, batch_size: int) -> Iterator[ResultFrame]:
     """The adapter's result, a batch at a time when it streams, else in one frame.
 

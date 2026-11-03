@@ -1,4 +1,4 @@
-"""``nl2sql knowledge show``, ``export`` and ``sources`` (docs/architecture/wave_b.md, section 3, K1).
+"""``nl2sql knowledge show``, ``export`` and ``sources``.
 
 The index is written here without embedding (a snapshot and a pointer), so no
 model is loaded.

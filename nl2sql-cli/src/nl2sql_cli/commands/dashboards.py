@@ -1,4 +1,4 @@
-"""``nl2sql dashboards``: dashboards from the terminal (docs/architecture/wave_c.md, section 6).
+"""``nl2sql dashboards``: dashboards from the terminal.
 
 * ``refresh`` -- re-run the stored plans of one dashboard (``--dashboard ID``, as ``--as`` builds the caller), or with
   ``--due`` every dashboard whose schedule is due, each as its stored owner (``run_scheduled``, so cron can drive

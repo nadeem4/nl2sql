@@ -43,7 +43,7 @@ third-party state store can keep it:
 
 ## Who sees and who decides
 
-Reading the queue takes the caller, with no default (as every Wave B read
+Reading the queue takes the caller, with no default (as every read
 does): a caller sees a proposal only when their scope reaches its datasource
 and every table in its `tables`, and `get` of one they cannot see is "not
 found", the same answer as an id that does not exist.
@@ -178,4 +178,4 @@ A refusal (`ReviewError`) prints its message and fix and exits 1.
 - Thumbs-up proposals: `packages/nl2sql/src/nl2sql/api/feedback_api.py`, `packages/nl2sql/src/nl2sql/feedback/proposals.py`
 - Corrections: `packages/nl2sql/src/nl2sql/feedback/corrections.py`, and `nl2sql feedback correct` in `nl2sql-cli/src/nl2sql_cli/commands/feedback.py`
 - The command: `nl2sql-cli/src/nl2sql_cli/commands/review.py`
-- The design: [Wave B, section 5](../architecture/wave_b.md#5-the-review-queue)
+- 

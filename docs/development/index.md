@@ -12,8 +12,7 @@ This guide focuses on **extension points**: adapters, executors, subgraphs, chun
 ## The registry
 
 Adapters, LLM providers, embeddings providers, secret providers, stores, policy
-checks, observers, hooks, scorers and chat tools are all found by name through `nl2sql.registry.Registry`
-([design](../architecture/configuration_v2.md#5-the-registry)). Each kind has an
+checks, observers, hooks, scorers and chat tools are all found by name through `nl2sql.registry.Registry`. Each kind has an
 entry point group, and the built-ins are declared in
 `packages/nl2sql/pyproject.toml` in the same groups a plugin uses:
 

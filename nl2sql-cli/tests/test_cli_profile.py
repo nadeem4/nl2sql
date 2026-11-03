@@ -1,4 +1,4 @@
-"""``nl2sql profile`` and ``nl2sql index --profile`` (docs/architecture/wave_b.md, section 6, P1).
+"""``nl2sql profile`` and ``nl2sql index --profile``.
 
 The index is written without embedding (a snapshot and a pointer), as in ``test_cli_knowledge``, so no model
 is loaded; ``index --profile`` runs with the indexing step replaced by that.

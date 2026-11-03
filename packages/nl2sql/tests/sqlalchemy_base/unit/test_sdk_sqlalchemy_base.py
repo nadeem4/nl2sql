@@ -1,7 +1,6 @@
 """The SQLAlchemy base in the SDK: reflect once, row estimates, type-aware profiling, issues.
 
-docs/architecture/phase2.md, section 7, "Profiling and row estimates" and
-"The SQLAlchemy base, public". The real servers are in ``tests/realdb``.
+Profiling and row estimates on the SQLAlchemy base. The real servers are in ``tests/realdb``.
 """
 import datetime
 import decimal
@@ -63,7 +62,7 @@ def _table(snapshot, name):
 def test_every_built_in_builds_on_the_sdk_base(adapter_cls):
     assert issubclass(adapter_cls, SQLAlchemyAdapter)
     for dead in ("dry_run", "explain", "cost_estimate", "exclude_schemas"):
-        assert not hasattr(adapter_cls, dead), f"{adapter_cls.__name__}.{dead} is gone (B24)"
+        assert not hasattr(adapter_cls, dead), f"{adapter_cls.__name__}.{dead} is gone"
 
 
 @pytest.mark.parametrize("model", [PostgresConnection, MysqlConnection, MssqlConnection])
@@ -141,7 +140,7 @@ def test_a_boolean_column_has_counts_but_no_min_or_max(tmp_path):
     assert table.columns["id"].statistics.max_value == 3
 
 
-# --- Sample values: off unless asked (owner decision 9, B23) ---------------
+# --- Sample values: off unless asked ---------------
 
 def test_no_values_without_sample_values(shop):
     adapter = _sqlite(shop)
@@ -161,7 +160,7 @@ def test_sample_values_collect_text_values(shop):
     assert orders.columns["total"].statistics.sample_values == []
 
 
-# --- Row counts: the catalog's estimate, COUNT(*) only without one (B22) ---
+# --- Row counts: the catalog's estimate, COUNT(*) only without one ---
 
 def test_sqlite_counts_rows_under_stats(shop):
     orders = _table(_sqlite(shop).fetch_schema_snapshot(IndexScope()), "orders")

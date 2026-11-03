@@ -15,8 +15,7 @@ a column, a code, a rule id, a datasource id) is at most ``NAME_MAX_CHARS``
 (255). ``notes`` is for
 people and never sent to a model.
 
-This module imports only pydantic and the standard library. See
-docs/architecture/wave_b.md, section 3, and decision D36.
+This module imports only pydantic and the standard library.
 """
 from __future__ import annotations
 
@@ -50,7 +49,6 @@ Text = Annotated[str, AfterValidator(_capped)]
 NAME_MAX_CHARS = 255
 """The longest a name may be: a table or column name, a code, a rule id, a datasource id."""
 
-
 def _name(value: str) -> str:
     if len(value) > NAME_MAX_CHARS:
         raise ValueError(f"is a name {len(value)} characters long; a name is at most {NAME_MAX_CHARS}")
@@ -59,7 +57,6 @@ def _name(value: str) -> str:
 
 Name = Annotated[str, AfterValidator(_name)]
 """A name in a glossary (a table, ``table.column``, a code, a rule id): at most ``NAME_MAX_CHARS`` characters."""
-
 
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -93,7 +90,6 @@ class ColumnKnowledge(_Model):
 ColumnNames = Union[Name, List[Name]]
 """``table.column``, or a list of them for a composite key."""
 
-
 class JoinKnowledge(_Model):
     """A join the database does not declare. ``from_`` is ``from`` in YAML."""
 
@@ -114,7 +110,7 @@ class Term(_Model):
 
 
 class Rule(_Model):
-    """A business rule in prose (D40), sent when a sub-query reads one of ``tables`` (empty: every sub-query)."""
+    """A business rule in prose, sent when a sub-query reads one of ``tables`` (empty: every sub-query)."""
 
     id: Name
     text: Text = Field(min_length=1)
@@ -157,7 +153,7 @@ class Glossary(_Model):
 
 @runtime_checkable
 class KnowledgeSource(Protocol):
-    """Where knowledge comes from. A source only reads (D36); the engine writes only ``glossary.yaml``.
+    """Where knowledge comes from. A source only reads; the engine writes only ``glossary.yaml``.
 
     - ``interface_version``: the version of this contract the source was
       written for. It is 1; the engine accepts exactly that.

@@ -1,5 +1,4 @@
-"""The `conversations` namespace of `/api/v1`: chats, their turns, chat tools and the report (docs/architecture/
-wave_d.md, "The routes" and A2a).
+"""The `conversations` namespace of `/api/v1`: chats, their turns, chat tools and the report.
 
 A thin layer over `engine.conversations` and `engine.chat_tools`: each handler passes the caller as `user_context=` and
 serves the facade's own models. The model decides what a turn does, so there is one `turns` route; a turn that

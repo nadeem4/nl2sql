@@ -108,7 +108,7 @@ results: { type: local, max_age_days: 30 }
 
 ## A results store of your own
 
-There is no built-in S3 or ADLS store (owner decision 6 in [the Phase 2 design](../architecture/phase2.md#owner-decisions)). A results store is the `ResultStore` protocol from `nl2sql_sdk.stores`: bytes in, bytes out, no Parquet knowledge. A sketch on S3 with `boto3`:
+There is no built-in S3 or ADLS store. A results store is the `ResultStore` protocol from `nl2sql_sdk.stores`: bytes in, bytes out, no Parquet knowledge. A sketch on S3 with `boto3`:
 
 ```python
 from datetime import datetime

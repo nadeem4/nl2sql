@@ -13,7 +13,7 @@ import { buildConnection, clearSecrets, fieldsOf, initialValues, validate } from
 
 // Connect: add a datasource, test it, index it, profile it and file its starter questions for review. Everything
 // here is an admin call; on the hosted demo, and for anyone who is not an admin, the routes answer 403 and the page
-// says so instead of showing a form that cannot work (D212). `caller` (from /meta) lets the page say so before asking;
+// says so instead of showing a form that cannot work. `caller` (from /meta) lets the page say so before asking;
 // a 403 from a route is still the server's final word.
 
 const OFF = "Adding a datasource needs an administrator, and the hosted demo does not allow it. Connect your own database from a local or self-hosted install.";

@@ -2,8 +2,7 @@
 
 The four interfaces are in ``nl2sql_sdk.stores``. The built-ins, ``chroma``,
 ``sqlite``, ``files`` and ``local``, are declared in the ``nl2sql.stores``
-entry point group like any plugin, and found through the registry. See
-docs/architecture/phase2.md, section 4.
+entry point group like any plugin, and found through the registry. 
 
 This module imports no store's library: a store is imported when it is built.
 """

@@ -169,7 +169,7 @@ Side effects:
      column, a date part, arithmetic, `COALESCE`, `DATE_DIFF`, a label grouped
      with its key, and a table with no known primary key are not rejected.
      Plain `GROUP BY first_name, last_name` without the key passes (an accepted
-     limit; C-W8).
+     limit).
    - `_unsupported_operators()` rejects a binary `op` the generator's
      `SqlVisitor` cannot render, with `INVALID_PLAN_STRUCTURE`. The schema's
      `op` Literal admits `NOT`, which belongs on a unary expression; every
@@ -204,7 +204,7 @@ Side effects:
      declared a date, but Orders.OrderKey is a number. Select a column that
      holds a date for this key." Every other pair is coerced by the
      aggregator; a type sqlglot cannot place, a column with no type and a
-     computed select item are not checked ([Wave A, D30](../wave_a.md#the-join-key-type-check)).
+     computed select item are not checked.
    - `_validate_buildable()` runs last and is the **buildability** check: it
      calls the generator's own `_build_query()` and throws the tree away. See
      below.

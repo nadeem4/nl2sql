@@ -1,4 +1,4 @@
-"""The `datasources` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", row A3): Connect and the reads
+"""The `datasources` namespace of `/api/v1`: Connect and the reads
 a page needs. Thin over ``engine.datasources``; the caller is passed to every read, so a datasource or a table the
 caller's scope hides is not found. A failure is the facade's named error, mapped by the envelope."""
 from dataclasses import asdict

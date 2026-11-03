@@ -3,8 +3,7 @@
 The registry imports an adapter only when a config names it, then checks
 ``interface_version`` and looks for each of ``driver_modules`` with
 ``importlib.util.find_spec`` before building it, reporting ``install_hint``
-if one is missing. See docs/architecture/configuration_v2.md, "Interfaces and
-versions".
+if one is missing. 
 """
 from importlib.metadata import entry_points
 

@@ -1,4 +1,4 @@
-// Knowledge: what the engine knows, the proposals waiting for review, and the drift check (A3).
+// Knowledge: what the engine knows, the proposals waiting for review, and the drift check.
 import { request } from "./http.js";
 
 export const showKnowledge = (datasourceId) =>

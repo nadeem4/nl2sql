@@ -1,4 +1,4 @@
-"""MCP over HTTP: the server of ``server.py`` behind bearer API keys (docs/architecture/wave_c.md, section 9).
+"""MCP over HTTP: the server of ``server.py`` behind bearer API keys.
 
 ``build_app(engine, identity)`` returns an ASGI app serving ``mcp.http.path`` over the SDK's streamable HTTP
 transport, stateless with JSON responses: each request stands alone, and a follow-up names its

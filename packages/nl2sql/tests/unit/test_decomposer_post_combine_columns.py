@@ -107,7 +107,7 @@ def test_a_good_answer_is_asked_for_once():
 
 
 def test_without_an_expected_schema_the_columns_are_unknown_and_nothing_is_rejected():
-    # A union: a join's keys must be in each side's expected_schema (D30).
+    # A union: a join's keys must be in each side's expected_schema.
     payload = _decomposition("bought_rock", expected_schema=())
     payload["combine_groups"][0].update(operation="union", join_keys=[])
     result, prompts = _run(payload)
@@ -116,7 +116,7 @@ def test_without_an_expected_schema_the_columns_are_unknown_and_nothing_is_rejec
     assert not result.get("errors")
 
 
-# --- a name both joined sides share (C-W7b) ---------------------------------------
+# --- a name both joined sides share ---------------------------------------
 
 
 def _ranked(left_columns, right_columns, sort_attribute, operation="join"):

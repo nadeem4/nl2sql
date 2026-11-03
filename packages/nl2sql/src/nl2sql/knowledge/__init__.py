@@ -1,4 +1,4 @@
-"""Knowledge: the glossary as the engine uses it (docs/architecture/wave_b.md, sections 3 and 4).
+"""Knowledge: the glossary as the engine uses it.
 
 The glossary's models and the ``KnowledgeSource`` interface are in the SDK
 (``nl2sql_sdk.knowledge``). Here:
@@ -15,6 +15,6 @@ The glossary's models and the ``KnowledgeSource`` interface are in the SDK
 - ``apply``: a proposal's change merged into a glossary, for the review
   queue's accept.
 
-Rendering for the prompts arrives with K2. Nothing here is imported by
+Rendering for the prompts is in the schema retriever. Nothing here is imported by
 ``import nl2sql``.
 """

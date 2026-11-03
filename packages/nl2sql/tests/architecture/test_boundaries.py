@@ -39,7 +39,7 @@ ENGINE = PACKAGES / "nl2sql" / "src" / "nl2sql"
 SDK = PACKAGES / "sdk" / "src" / "nl2sql_sdk"
 ADAPTERS = ENGINE / "adapters"
 REPO = PACKAGES.parent
-# The CLI app is its own distribution at the repository root, not under packages/ (wave_d.md, D227).
+# The CLI app is its own distribution at the repository root, not under packages/.
 CLI = REPO / "nl2sql-cli" / "src" / "nl2sql_cli"
 SOURCES = [ENGINE, SDK, PACKAGES / "api" / "src" / "nl2sql_api", CLI]
 SCRIPTS = REPO / "scripts"
@@ -220,7 +220,7 @@ def test_the_sdk_stores_module_imports_only_pydantic():
 
 def test_the_sdk_knowledge_module_imports_only_pydantic():
     """A knowledge-source plugin (a wiki, a catalog) installs the SDK for ``nl2sql_sdk.knowledge``, not the
-    engine (docs/architecture/wave_b.md, D36)."""
+    engine."""
     path = SDK / "knowledge.py"
     allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
     assert path.is_file(), "nl2sql_sdk/knowledge.py holds the glossary's models and KnowledgeSource."
@@ -233,7 +233,7 @@ def test_the_sdk_knowledge_module_imports_only_pydantic():
 
 def test_sdk_discovery_imports_only_pydantic():
     """An adapter author installs the SDK for ``nl2sql_sdk.discovery`` (``DiscoverableAdapter``), not the
-    engine (docs/architecture/wave_c.md, D120)."""
+    engine."""
     path = SDK / "discovery.py"
     allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
     assert path.is_file(), "nl2sql_sdk/discovery.py holds Found and DiscoverableAdapter."
@@ -380,7 +380,7 @@ def test_only_storage_imports_chromadb():
 
 # The SQLite adapter's driver is sqlite3: it reads a datasource, not the
 # engine's own state. Nothing else is excepted: an eval suite's expected rows
-# come through the datasource's adapter (D27).
+# come through the datasource's adapter.
 def test_only_storage_imports_sqlite3():
     """The engine keeps its state through ``StateStore``; SQLite is one state store among any."""
     offenders = []
@@ -406,10 +406,10 @@ def test_only_storage_imports_sqlite3():
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
                 "schema", "services", "datasources", "policies", "tracing", "storage", "runtime.py",
                 "public_api.py",
-                # Wave B (docs/architecture/wave_b.md, section 14): the profiler's probe and the cost
+                # The profiler's probe and the cost
                 # estimate are adapter methods, so none of these names a dialect either.
                 "knowledge", "review", "profiler", "clarify", "explain",
-                # Wave C (docs/architecture/wave_c.md, section 12): the conversation agent's prompt, the chart
+                # The conversation agent's prompt, the chart
                 # rules, the dashboard templates and the chat tools name no dialect either; a column's role
                 # and a chart's kind come from the plan and the result's types.
                 "conversations", "charts", "dashboards", "chat_tools"]
@@ -524,7 +524,7 @@ def test_bundled_adapter_dialects(name, dialect):
 # --------------------------------------------------------------------------
 
 def test_the_engine_has_no_cli_package():
-    """The CLI moved out of the engine to ``nl2sql-cli/`` (CL1, D227); nothing is left behind, and no alias."""
+    """The CLI moved out of the engine to ``nl2sql-cli/``; nothing is left behind, and no alias."""
     assert not (ENGINE / "cli").exists(), "nl2sql/cli/ moved to nl2sql-cli/src/nl2sql_cli/"
     assert CLI.is_dir() and (CLI / "main.py").is_file()
 
@@ -545,7 +545,7 @@ def test_the_engine_and_the_api_never_import_nl2sql_cli():
 
 
 def test_nl2sql_cli_imports_only_the_engine():
-    """The CLI sits on the engine's facade alone (D227, D231): not the SDK, and not the API, even lazily.
+    """The CLI sits on the engine's facade alone: not the SDK, and not the API, even lazily.
 
     ``nl2sql demo`` starts the web server as a child process (``python -m nl2sql_api serve``), so the API is an
     extra it finds with ``find_spec``, never an import. Its distribution names the engine and no other ``nl2sql-*``
@@ -564,9 +564,9 @@ def test_nl2sql_cli_imports_only_the_engine():
 
 
 def test_only_the_chat_package_imports_textual():
-    """The terminal app (``nl2sql chat``, T1) is the one user of ``textual``, and the rest of the CLI loads it lazily.
+    """The terminal app (``nl2sql chat``) is the one user of ``textual``, and the rest of the CLI loads it lazily.
 
-    ``textual`` is a normal dependency of ``nl2sql-cli`` (D231), but every other command starts without paying
+    ``textual`` is a normal dependency of ``nl2sql-cli``, but every other command starts without paying
     for it: ``commands/chat.py`` imports the app inside its function, never at module scope.
     """
     chat = CLI / "chat"
@@ -588,7 +588,7 @@ def test_the_cli_the_mcp_server_and_the_api_use_only_the_public_api():
 
     None of them reaches the runtime behind it (``engine._runtime``, the
     removed ``engine.context``, a namespace's ``_ctx``): what one of them needs
-    is a facade method every caller can use (owner decision, PR 10).
+    is a facade method every caller can use.
     """
     hidden = {"context", "_ctx", "_runtime"}
     offenders = []
@@ -655,13 +655,13 @@ def test_the_cli_and_the_api_import_only_the_public_nl2sql():
 
 
 def test_still_imported_from_inside_is_gone():
-    """The list of engine modules the playground and ``nl2sql demo`` still reached into was emptied and deleted (X1b)."""
+    """The list of engine modules the playground and ``nl2sql demo`` still reached into was emptied and deleted."""
     assert "STILL_IMPORTED_FROM_INSIDE" not in globals()
-    assert not (CLI / "demo").exists(), "nl2sql_cli/demo/ (the old playground) was deleted in X1b"
+    assert not (CLI / "demo").exists(), "nl2sql_cli/demo/ (the old playground) was deleted"
 
 
 def test_mcp_uses_only_the_public_api():
-    """The MCP server is a client of the facade (wave_a.md, section 12), and the only user of ``mcp``.
+    """The MCP server is a client of the facade, and the only user of ``mcp``.
 
     ``nl2sql/mcp/`` imports the top-level ``nl2sql`` and nothing else of the
     engine; ``mcp`` is the ``mcp`` extra, imported nowhere else.
@@ -677,7 +677,7 @@ def test_mcp_uses_only_the_public_api():
         "every caller can use. Nothing outside it imports mcp, the mcp extra.", offenders)
 
 
-# The apps, and the engine's reads that name an asker (wave_d.md, D204). `engine.results.<method>` and
+# The apps, and the engine's reads that name an asker. `engine.results.<method>` and
 # `engine.traces.get` return a run's rows or trace only to the caller who asked it; a call without
 # `user_context=` reads as the trusted operator. An app passes the caller on every call, so the CLI, the one
 # operator, says `user_context=None` where it means it.
@@ -697,7 +697,7 @@ def test_apps_always_pass_the_caller():
                 if "user_context" not in {k.arg for k in node.keywords}:
                     offenders.append(f"{_where(path)}:{node.lineno} {owner}.{method}(...) names no user_context")
     assert not offenders, _broke(
-        "Every app passes the caller to a read of a run's results or trace (D204): a call without user_context= "
+        "Every app passes the caller to a read of a run's results or trace: a call without user_context= "
         "is the trusted operator, who sees every run. The CLI says user_context=None where it means that.",
         offenders)
 
@@ -725,7 +725,7 @@ CHAT_TOOLS_INIT_MAY_IMPORT = {"nl2sql.common.strict", "nl2sql.conversations.mode
 
 
 def test_chat_tools_use_only_the_public_api():
-    """A chat tool gets the ``NL2SQL`` facade, not the runtime (wave_c.md, D109).
+    """A chat tool gets the ``NL2SQL`` facade, not the runtime.
 
     Each tool module imports the top-level ``nl2sql`` and its own interface module (``nl2sql.chat_tools``)
     and nothing else of the engine; the runner that builds tools lives in ``nl2sql/conversations/``.
@@ -750,7 +750,7 @@ NO_MODEL_PREFIXES = ("nl2sql.llm", "nl2sql.services", "nl2sql.agents", "langchai
 
 
 def test_charts_make_no_model_call():
-    """A chart is chosen by rules and its takeaway is a template (wave_c.md, D111): the chart code and the
+    """A chart is chosen by rules and its takeaway is a template: the chart code and the
     ``chart`` tool import no LLM client, callback or provider."""
     offenders = []
     for path in [*python_files(ENGINE / "charts"), CHAT_TOOLS / "chart.py"]:
@@ -763,7 +763,7 @@ def test_charts_make_no_model_call():
 
 def test_registry_tools_and_the_report_make_no_model_call():
     """The five built-in chat tools, the runner that calls them and the report transform what a conversation
-    already has (wave_c.md, D109, D114): none imports an LLM client, callback or provider. Only the agent loop
+    already has: none imports an LLM client, callback or provider. Only the agent loop
     in ``conversations/agent.py`` calls a model."""
     conversations = ENGINE / "conversations"
     offenders = []
@@ -778,7 +778,7 @@ def test_registry_tools_and_the_report_make_no_model_call():
 DASHBOARDS = ENGINE / "dashboards"
 # The one shape from the model-side packages a dashboard may import: QuestionUsage, a pydantic model of tokens.
 DASHBOARDS_MAY_IMPORT = {"nl2sql.services.callbacks.token_handler"}
-# The guided builder (DB1b) is the one dashboards module that asks the model, once, for new question text when the
+# The guided builder is the one dashboards module that asks the model, once, for new question text when the
 # caller types what matters; a refresh, an edit and a pin never reach it. It still runs no plan itself: new
 # questions go through the conversation's ask step.
 DASHBOARDS_MODEL_MODULES = {"builder.py"}
@@ -805,7 +805,7 @@ def test_the_run_query_scan_sees_a_call_that_may_replan_or_write_prose():
 
 
 def test_dashboards_make_no_model_call():
-    """A refresh re-runs stored plans and costs no tokens (wave_c.md, D132): ``nl2sql/dashboards/`` imports no LLM
+    """A refresh re-runs stored plans and costs no tokens: ``nl2sql/dashboards/`` imports no LLM
     client, callback or provider, and every ``run_query`` call in it passes ``plan=`` and ``answer=False``, so a
     call cannot replan the question or write prose."""
     offenders, calls = [], 0
@@ -828,7 +828,7 @@ DATA_ATTRIBUTES = {"ds_registry", "artifact_store", "get_adapter"}
 
 
 def test_every_entry_point_reaches_data_through_run_query():
-    """One access rule (wave_c.md, D135): the conversation loop, the dashboards and the MCP tools read data through the
+    """One access rule: the conversation loop, the dashboards and the MCP tools read data through the
     facade's methods, so the caller's scope, the hooks and the validator apply to all of them. Nothing in
     ``nl2sql/conversations/``, ``nl2sql/dashboards/`` or ``nl2sql/mcp/`` imports an adapter, a datasource, the executor
     or the result store, or reaches the datasource registry or the artifact store."""
@@ -922,7 +922,7 @@ OTEL_OBSERVER = ENGINE / "observers" / "otel.py"
 
 
 def test_only_the_otel_observer_imports_opentelemetry():
-    """OpenTelemetry is the ``otel`` extra (wave_a.md, D18): one observer among any."""
+    """OpenTelemetry is the ``otel`` extra: one observer among any."""
     offenders = [f"{_where(path)}:{lineno} {name}"
                  for path in python_files(*SOURCES) if path != OTEL_OBSERVER
                  for lineno, name, _ in imports(path)
@@ -987,7 +987,7 @@ def test_an_eval_name_loads_evaluation_on_demand():
 
 
 def test_gold_does_not_import_sqlite3():
-    """D27: no evaluation module runs SQL with a driver of its own; regenerate goes through the adapter."""
+    """No evaluation module runs SQL with a driver of its own; regenerate goes through the adapter."""
     offenders = [f"{_where(path)}:{lineno} {name}"
                  for path in python_files(ENGINE / "evaluation")
                  for lineno, name, _ in imports(path) if name.partition(".")[0] == "sqlite3"]
@@ -1032,9 +1032,9 @@ ACCESS_DECISIONS = [
     "pipeline/nodes/executor/node.py",
     "api/policy_api.py",
     "api/datasource_api.py",
-    "api/indexing_api.py",  # schema drift: a caller sees drift only in tables it may read (D1)
-    "review/queue.py",  # a proposal is visible only when the caller reaches every table it names (D60)
-    "feedback/corrections.py",  # a correction's SQL reads only tables the corrector may read (D55)
+    "api/indexing_api.py",  # schema drift: a caller sees drift only in tables it may read
+    "review/queue.py",  # a proposal is visible only when the caller reaches every table it names
+    "feedback/corrections.py",  # a correction's SQL reads only tables the corrector may read
 ]
 # The 0.5 access helpers. A second way to decide is how two nodes come to disagree.
 OLD_ACCESS_NAMES = {"table_allowed", "get_allowed_tables", "get_allowed_datasources", "RBAC", "RolePolicy"}
@@ -1071,19 +1071,19 @@ def test_every_access_decision_goes_through_scope():
         "executor from disagreeing about a table.", offenders)
 
 
-# Wave B's methods that show knowledge, proposals or schema (docs/architecture/wave_b.md, D60), by file and
-# class. Each takes the caller as a required keyword: no admin default, as Wave A's D33 made
+# Methods that show knowledge, proposals or schema, by file and
+# class. Each takes the caller as a required keyword: no admin default, as the access rule made
 # ``datasources.schema()`` do.
-WAVE_B_READ_METHODS = {
+KNOWLEDGE_READ_METHODS = {
     ("api/knowledge_api.py", "KnowledgeAPI"): ("sources", "show", "export", "reload", "profile", "save_choice"),
     ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "current", "export"),
     ("api/feedback_api.py", "FeedbackAPI"): ("correct",),  # checked as the corrector, so it names one
 }
 
 
-def test_wave_b_read_methods_require_a_caller():
+def test_knowledge_read_methods_require_a_caller():
     offenders = []
-    for (relative, class_name), methods in WAVE_B_READ_METHODS.items():
+    for (relative, class_name), methods in KNOWLEDGE_READ_METHODS.items():
         cls = next(n for n in _tree(ENGINE / relative).body if isinstance(n, ast.ClassDef) and n.name == class_name)
         found = {n.name: n for n in cls.body if isinstance(n, ast.FunctionDef)}
         for method in methods:
@@ -1103,15 +1103,15 @@ def test_wave_b_read_methods_require_a_caller():
                     offenders.append(f"{relative}: {class_name}.{method} annotates user_context as {text!r}; "
                                      "it is a UserContext, never Optional or None")
     assert not offenders, _broke(
-        "Every Wave B method that shows knowledge, proposals or schema takes the caller as a required "
-        "keyword (D60): an app that forgot the caller fails rather than seeing everything.", offenders)
+        "Every knowledge, review and profiler method that shows knowledge, proposals or schema takes the caller as a required "
+        "keyword: an app that forgot the caller fails rather than seeing everything.", offenders)
 
 
-# Wave C's methods that read or write something owned, scoped or privileged (docs/architecture/wave_c.md, D130),
+# Methods that read or write something owned, scoped or privileged,
 # by file and class: the caller is a required keyword-only argument, `user_context` (or `by`, for a writer or a
 # manager of keys) with no default, so an app that forgot it fails closed. Every other public method of these
-# classes is listed in WAVE_C_WITHOUT_A_CALLER, so a method added later must say which kind it is.
-WAVE_C_CALLER_METHODS = {
+# classes is listed in CONVERSATION_WITHOUT_A_CALLER, so a method added later must say which kind it is.
+CONVERSATION_CALLER_METHODS = {
     ("api/conversations_api.py", "ConversationsAPI"): ("user_context", (
         "start", "ask", "stream", "retry", "tool", "ask_only", "report", "get", "list", "delete")),
     ("api/workspaces_api.py", "WorkspacesAPI"): ("user_context", ("create", "rename", "list", "delete")),
@@ -1124,10 +1124,10 @@ WAVE_C_CALLER_METHODS = {
     ("api/datasource_api.py", "DatasourcesAPI"): ("user_context", ("diagram",)),
 }
 # `save` writes a datasource file: `by` must hold an admin role.
-WAVE_C_WRITERS = {("api/datasource_api.py", "DatasourcesAPI"): ("by", ("save",))}
+CONVERSATION_WRITERS = {("api/datasource_api.py", "DatasourcesAPI"): ("by", ("save",))}
 # The few that take no caller, and why: a list of names, the key lookups (they are how a caller is found, and
-# `record_denied` only audits a refusal), and the scheduler, which runs each dashboard as its stored owner (D134).
-WAVE_C_WITHOUT_A_CALLER = {
+# `record_denied` only audits a refusal), and the scheduler, which runs each dashboard as its stored owner.
+CONVERSATION_WITHOUT_A_CALLER = {
     ("api/chat_tools_api.py", "ChatToolsAPI"): ("list",),
     ("api/api_keys_api.py", "ApiKeysAPI"): ("verify", "check", "record_denied"),
     ("api/dashboards_api.py", "DashboardsAPI"): ("run_scheduled",),
@@ -1154,7 +1154,7 @@ def _caller_problem(node: ast.FunctionDef, parameter: str):
 
 def test_owned_and_privileged_methods_require_a_caller():
     offenders = []
-    for table in (WAVE_C_CALLER_METHODS, WAVE_C_WRITERS):
+    for table in (CONVERSATION_CALLER_METHODS, CONVERSATION_WRITERS):
         for (relative, class_name), (parameter, methods) in table.items():
             found = _methods(relative, class_name)
             for method in methods:
@@ -1162,7 +1162,7 @@ def test_owned_and_privileged_methods_require_a_caller():
                     offenders.append(f"{relative}: {class_name}.{method} is missing")
                 elif (problem := _caller_problem(found[method], parameter)):
                     offenders.append(f"{relative}: {class_name}.{method} {problem}")
-    for (relative, class_name), methods in WAVE_C_WITHOUT_A_CALLER.items():
+    for (relative, class_name), methods in CONVERSATION_WITHOUT_A_CALLER.items():
         found = _methods(relative, class_name)
         for method in methods:
             if method not in found:
@@ -1171,22 +1171,22 @@ def test_owned_and_privileged_methods_require_a_caller():
                 offenders.append(f"{relative}: {class_name}.{method} takes a caller, but is listed as having none")
     # Nothing public is unclassified.
     classified = {}
-    for table in (WAVE_C_CALLER_METHODS, WAVE_C_WRITERS):
+    for table in (CONVERSATION_CALLER_METHODS, CONVERSATION_WRITERS):
         for key, (_, methods) in table.items():
             classified.setdefault(key, set()).update(methods)
-    for key, methods in WAVE_C_WITHOUT_A_CALLER.items():
+    for key, methods in CONVERSATION_WITHOUT_A_CALLER.items():
         classified.setdefault(key, set()).update(methods)
     for (relative, class_name) in {k for k in classified if k[1] != "DatasourcesAPI"}:
         extra = set(_methods(relative, class_name)) - classified[(relative, class_name)]
         offenders += [f"{relative}: {class_name}.{m} is not classified as taking a caller or not" for m in sorted(extra)]
     assert not offenders, _broke(
-        "Every Wave C method that reads or writes something owned, scoped or privileged takes the caller as a "
-        "required keyword (user_context, or by for a writer), with no default and no Optional (D130): an app "
+        "Every conversation, dashboard and key method that reads or writes something owned, scoped or privileged takes the caller as a "
+        "required keyword (user_context, or by for a writer), with no default and no Optional: an app "
         "that forgot the caller fails rather than seeing or changing everything. Only run_scheduled, verify, check, record_denied and "
         "chat_tools.list take none.", offenders)
 
 
-# The writers of a file a person owns (D42, amended by Wave C's D123), and the only modules that may call each.
+# The writers of a file a person owns, and the only modules that may call each.
 # The glossary's is written by the review queue's accept alone; so is the curated section's, except that
 # `add_demo` (api/datasource_api.py) writes the demo's verified queries into it, only the entries the file lacks, with the same
 # hash check. A new project is
@@ -1217,8 +1217,7 @@ def test_only_accept_writes_a_persons_file():
                     offenders.append(f"{_where(path)}:{node.lineno} calls {name}")
     assert not offenders, _broke(
         "Only an accept writes a person's glossary or curated file (write_glossary is called from "
-        "nl2sql/review/accept.py alone, write_curated from there and from add_demo, under the hash check, "
-        "D42). write_project (new files only) and write_env_values (D123) are called from init_project, "
+        "nl2sql/review/accept.py alone, write_curated from there and from add_demo, under the hash check). write_project (new files only) and write_env_values are called from init_project, "
         "nl2sql launch and datasources.save, alone.", offenders)
 
 
@@ -1232,7 +1231,7 @@ def test_the_writers_of_a_persons_file_are_still_called_where_the_list_says():
                 name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
                 if name in called:
                     called[name].add(_where(path))
-    # nl2sql launch (L3) is not built yet: its callers are allowed but need not exist.
+    # nl2sql launch is not built yet: its callers are allowed but need not exist.
     missing = [f"{name} has no caller in {sorted(PERSONS_FILE_WRITERS[name] - {_LAUNCH})}"
                for name in PERSONS_FILE_WRITERS if not called[name] & (PERSONS_FILE_WRITERS[name] - {_LAUNCH})]
     assert not missing, _broke("PERSONS_FILE_WRITERS lists a writer none of its callers calls.", missing)
@@ -1279,7 +1278,7 @@ def test_every_provider_key_variable_is_read_through_the_llm_presets():
 
 # --------------------------------------------------------------------------
 # 12. No process globals: the environment is read from an allow-list and
-#     never written (docs/architecture/configuration_v2.md, sections 3 and 8)
+#     never written
 # --------------------------------------------------------------------------
 
 # Where ``os.environ``/``os.getenv`` may be read, and why. A folder entry ends
@@ -1292,18 +1291,17 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
     "nl2sql-cli/src/nl2sql_cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
-    "nl2sql-cli/src/nl2sql_cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate "
-                                                "(wave_c.md, section 7)",
-    "api/src/nl2sql_api/serve.py": "NL2SQL_MODE, the mode of this process (wave_d.md, D229)",
+    "nl2sql-cli/src/nl2sql_cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate",
+    "api/src/nl2sql_api/serve.py": "NL2SQL_MODE, the mode of this process",
 }
 
 # The one function that loads a .env file, and the entry points that call it.
 LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
 ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql-cli/src/nl2sql_cli/main.py",
-    "nl2sql-cli/src/nl2sql_cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
-    "nl2sql-cli/src/nl2sql_cli/commands/chat.py",  # --demo: the demo folder's own .env, read before the engine is built (wave_d.md, T1)
-    "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model (wave_d.md, A4b)
+    "nl2sql-cli/src/nl2sql_cli/commands/launch.py",  # reloads the .env it has just written
+    "nl2sql-cli/src/nl2sql_cli/commands/chat.py",  # --demo: the demo folder's own .env, read before the engine is built
+    "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model
 }
 
 _ENVIRON_WRITERS = {"pop", "popitem", "setdefault", "update", "clear", "__setitem__", "__delitem__"}
@@ -1383,19 +1381,19 @@ def test_database_url_is_read_only_by_launch():
                for node in ast.walk(_tree(path))
                if isinstance(node, ast.Constant) and node.value == "DATABASE_URL"}
     assert readers == {launch}, _broke(
-        "DATABASE_URL is read by nl2sql launch only (wave_c.md, section 7): it is offered as a candidate "
+        "DATABASE_URL is read by nl2sql launch only: it is offered as a candidate "
         "to scan(url=...). A library or another command that wants a connection URL takes it as a "
         "parameter or reads ${env:VAR} from nl2sql.yaml.", sorted(readers ^ {launch}))
 
 
 def test_the_environment_variable_is_read_only_at_the_entry_point():
-    """``NL2SQL_MODE`` is named in ``nl2sql_api/serve.py`` and nowhere else: the mode travels in ``Config`` (D229)."""
+    """``NL2SQL_MODE`` is named in ``nl2sql_api/serve.py`` and nowhere else: the mode travels in ``Config``."""
     entry = "api/src/nl2sql_api/serve.py"
     readers = {_where(path) for path in python_files(*SOURCES)
                for node in ast.walk(_tree(path))
                if isinstance(node, ast.Constant) and node.value == "NL2SQL_MODE"}
     assert readers == {entry}, _broke(
-        "NL2SQL_MODE is read by `nl2sql-api serve` only (wave_d.md, D229). It decides the mode once, with "
+        "NL2SQL_MODE is read by `nl2sql-api serve` only. It decides the mode once, with "
         "nl2sql.resolve_mode, and the result travels in Config.mode: the engine and the page read no environment.",
         sorted(readers ^ {entry}))
 
@@ -1439,3 +1437,43 @@ def test_no_tracked_file_holds_a_merge_conflict_marker():
         if marker.search(text):
             found.append(name)
     assert not found, f"Merge conflict markers in: {found}"
+
+
+# The plan lives outside the repo (CLAUDE.md, "How to change things"): code, tests and docs describe what is, in the
+# present tense, and cite neither the design documents nor the plan's row and decision ids.
+_DESIGN_DOC = re.compile(r"\b(?:wave_[a-d]|phase2|configuration_v2)(?:\.md)?\b")
+_PLAN_ID = re.compile(
+    r"(?<![\w.])\((?:[A-D]-[A-Z]+\d+[a-z]?|DB\d[a-e]?|CL\d[ab]?|X1[ab]|[A-Z]{1,2}\d{1,2}[a-z]?|D\d{1,3}[a-z]?)"
+    r"(?:,\s*[A-Z]{0,2}\d+[a-z]?)*\)")
+_PLAN_ID_OK = {"(S3)"}  # S3 is the storage service, not a row
+_PLAN_ID_SCANNED = (".py", ".md", ".js", ".jsx")
+# docs/benchmarks.md mirrors recorded runs; CLAUDE.md states the rule with examples.
+_PLAN_ID_SKIPPED = (
+    "docs/releases/", "benchmarks/", "docs/benchmarks.md", "CLAUDE.md", ".claude/",
+    "packages/nl2sql/tests/architecture/test_boundaries.py",
+)
+
+
+def test_no_tracked_file_cites_a_design_doc_or_a_plan_id():
+    """A design document or a plan row is not in the repo, so a citation of one points at nothing."""
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    offenders = []
+    for name in tracked:
+        if (not name.endswith(_PLAN_ID_SCANNED) or name.startswith(_PLAN_ID_SKIPPED)
+                or "CHANGELOG" in name or "node_modules" in name):
+            continue
+        try:
+            lines = (REPO / name).read_text(encoding="utf-8").splitlines()
+        except (UnicodeDecodeError, OSError):
+            continue
+        for number, line in enumerate(lines, 1):
+            found = [m.group(0) for m in _PLAN_ID.finditer(line) if m.group(0) not in _PLAN_ID_OK]
+            found += [m.group(0) for m in _DESIGN_DOC.finditer(line)]
+            if found:
+                offenders.append(f"{name}:{number} {', '.join(found)}")
+    assert not offenders, _broke(
+        "Code, tests and docs cite no design document (wave_*.md, phase2.md, configuration_v2.md) and no plan "
+        "row or decision id such as (D15), (K1) or (C-W4): the plan is not in the repo. Say what the code does "
+        "instead.", offenders)

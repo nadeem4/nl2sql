@@ -1,6 +1,6 @@
-"""The columns of a datasource as the starter dashboard reads them (docs/architecture/wave_c.md, section 6, D115).
+"""The columns of a datasource as the starter dashboard reads them.
 
-Three layers, no query and no model: Wave B's derived roles (a key is an ``identifier``, a temporal type a
+Three layers, no query and no model: derived roles (a key is an ``identifier``, a temporal type a
 ``date``), then its proposed heuristics (``find_roles``), then what the glossary says, which wins. The dashboard then
 reads each role as a **measure** (``money``, ``quantity``), a **time** (``date``), a **dimension** (``enum``, or a
 text column with 2 to ``max_categories`` distinct values) or an **identifier** (never charted). Only tables the

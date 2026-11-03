@@ -1,6 +1,6 @@
 """Each entry point calls ``engine.check()`` at startup and enforces ``required``.
 
-docs/architecture/configuration_v2.md, "Lifecycle": the CLI, ``nl2sql-api``
+The CLI, ``nl2sql-api``
 and the playground refuse to start on ``EngineNotReady``, and start degraded,
 printing the report, when an optional datasource fails. ``nl2sql-api``'s half
 of this is in packages/api/tests/test_startup.py.

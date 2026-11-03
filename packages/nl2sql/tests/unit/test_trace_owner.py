@@ -1,4 +1,4 @@
-"""Traces and ratings are bound to the caller who asked the run (docs/architecture/wave_d.md, B13 and row G1).
+"""Traces and ratings are bound to the caller who asked the run.
 
 The trace records its asker as ``owner``, exactly as the result manifest does (``ResultOwner``). ``traces.get``
 with a ``user_context`` answers only that asker, and another caller's run is None, as a missing one. With no

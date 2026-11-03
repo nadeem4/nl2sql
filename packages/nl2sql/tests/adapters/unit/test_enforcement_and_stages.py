@@ -1,7 +1,6 @@
-"""Honest enforcement and stages (B3): read-only sessions, statement timeouts, and which stage a connection failed at.
+"""Honest enforcement and stages: read-only sessions, statement timeouts, and which stage a connection failed at.
 
-docs/architecture/phase2.md, section 7, "Read-only and timeouts, honestly" and
-"test_connection: which stage failed". The same behaviour on the real servers
+Read-only and timeouts, and which stage a connection failed at. The same behaviour on the real servers
 is in ``tests/realdb/test_enforcement.py``.
 """
 from __future__ import annotations

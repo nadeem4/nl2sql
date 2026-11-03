@@ -23,7 +23,7 @@ request_llm: false              # callers may send their own key and models
 cors_origins: [https://app.example.com]
 ```
 
-Wave D adds the fields below. The engine validates them now; `nl2sql-api` starts reading them when its identity replaces `auth.py` (D0a-2), which also deletes `role_header`, `role` and `trust_body_role`.
+These fields are validated by the engine. The engine validates them now; `nl2sql-api` starts reading them when its identity replaces `auth.py`, which also deletes `role_header`, `role` and `trust_body_role`.
 
 ```yaml
 auth: none                      # api_keys | proxy | static | none (default none)

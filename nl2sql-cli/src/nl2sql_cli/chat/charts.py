@@ -1,4 +1,4 @@
-"""A ``ChartSpec`` as text: what a terminal can draw of the facade's chart (wave_d.md, section 7).
+"""A ``ChartSpec`` as text: what a terminal can draw of the facade's chart.
 
 Pure functions over the spec, so they need no terminal: ``widgets.py`` puts their output on screen.
 A ``line`` is one series per value of its split (or one for its measure), a ``bar`` is a row of block

@@ -141,7 +141,7 @@ def test_result_match_fails_an_allowed_case_that_returned_no_rows():
 
 
 def test_result_match_records_the_lenient_reading_beside_the_strict_one():
-    # A period label against a date is lenient-only (C-W7d: a reordering now passes strictly enough to count).
+    # A period label against a date is lenient-only (a reordering now passes strictly enough to count).
     case = _case({"admin": "allowed"}, rows=[{"year": "2009", "n": 5}])
     score = result_match.score(_run(case, "admin", _rows_result([["2009-01-01", 5]])))
     assert score.passed is False and score.detail["lenient"] is True
@@ -262,7 +262,7 @@ def test_routing_does_not_apply_to_a_refused_role():
     assert Routing().score(_run(_case({"v": "refused"}), "v", _refusal())).passed is None
 
 
-# --- C-W6a: extra columns pass; the preview size reaches the faithfulness check ----
+# --- extra columns pass; the preview size reaches the faithfulness check ----
 
 
 def test_result_match_passes_the_right_rows_with_extra_columns():
@@ -322,7 +322,7 @@ def test_faithfulness_accepts_the_preview_size_the_run_was_given():
     assert not Faithfulness().score(_run(case, "admin", result)).passed
 
 
-# --- C-W7a: a question is scored on its terminal result, not on the scans under it ----
+# --- a question is scored on its terminal result, not on the scans under it ----
 
 
 def _scan(sid, rows):

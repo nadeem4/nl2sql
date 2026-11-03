@@ -131,7 +131,6 @@ Side effects:
 
 ### Table recall on large schemas
 
-Wave C, C-W4 ([design](../wave_c.md#17-c-w4-table-recall-on-large-schemas)).
 A missing table guarantees a wrong answer; an extra one costs some prompt. On
 Pagila (29 tables) the question "top 5 films by revenue in the top category"
 never got `payment`: "revenue" is not near that table, and the chain is
@@ -178,8 +177,7 @@ The `planning` search returns `planning_k` (12) entries across all the tables
 found, so a table often arrives with a few columns and none of its keys. On
 Pagila (29 tables), the 0.9.0 smoke test's question about films in the Sports
 category got `film` without `film_id` or `title` and `category` without `name`,
-and no join or answer could be validated (bug B103 in
-[Wave C, section 14](../wave_c.md#14-bugs-wave-c-fixes)). So a table cut to
+and no join or answer could be validated. So a table cut to
 the search's columns also keeps (`_kept_columns`):
 
 - its primary key;
@@ -216,7 +214,7 @@ matched against snapshot tables by bare name or `schema.table`, case ignored.
 
 ### Knowledge
 
-Wave B (K2, [design](../wave_b.md#4-knowledge-in-the-prompts)). The
+The
 datasource's merged knowledge is first filtered to the caller's scope with
 `nl2sql.knowledge.scope.visible` (an item naming a table the caller cannot
 read, or whose text mentions one, is left out), then resolved against the
@@ -224,11 +222,11 @@ snapshot by `schema_knowledge()`:
 
 | Field of the schema block | What is sent |
 | --- | --- |
-| A table's `description` | The glossary's, else the database's comment (D38). Either is dropped when its text mentions a table the caller cannot read. |
+| A table's `description` | The glossary's, else the database's comment. Either is dropped when its text mentions a table the caller cannot read. |
 | A column's `description` | The same rule |
-| A column's `role` | The glossary's, else the one the snapshot proves: `identifier` for a primary or foreign key, `date` for a temporal type (D61) |
+| A column's `role` | The glossary's, else the one the snapshot proves: `identifier` for a primary or foreign key, `date` for a temporal type |
 | A column's `unit`, `grain`, `values` | The glossary's, when it sets them (`values` on `role: enum` only) |
-| `relationships` | The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its `cardinality` and `"source": "glossary"` (D46). The logical validator's join check matches it as it matches a foreign key. |
+| `relationships` | The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its `cardinality` and `"source": "glossary"`. The logical validator's join check matches it as it matches a foreign key. |
 
 `notes` are never sent. `knowledge_used` (`nl2sql/knowledge/match.py`):
 
@@ -281,8 +279,7 @@ Key contracts:
   load), it does what the no-candidates path does: every table the caller may
   read, a `SCHEMA_RETRIEVAL_FAILED` `RunWarning` with a fixed message (the
   exception detail goes to the log only), and no error. Planning against no
-  tables fails every attempt (bug B105 in
-  [Wave C, section 14](../wave_c.md#14-bugs-wave-c-fixes)).
+  tables fails every attempt.
 - Without one (the snapshot itself could not be read), it returns empty
   `relevant_tables` and a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` error with a
   fixed message, which is not retryable: the SQL agent ends the sub-query before the planner.

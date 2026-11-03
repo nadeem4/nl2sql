@@ -1,7 +1,6 @@
-"""Dashboards: a titled set of charts in a workspace, each keeping the typed plan that produced it
-(docs/architecture/wave_c.md, section 6).
+"""Dashboards: a titled set of charts in a workspace, each keeping the typed plan that produced it.
 
-These are the shapes only; ``engine.workspaces`` and ``engine.dashboards`` arrive with D1 to D4. In the
+These are the shapes; ``engine.workspaces`` and ``engine.dashboards`` fill them. In the
 code a chart's slot is a ``Tile``: "chart" and "tile" mean the same thing.
 """
 from __future__ import annotations
@@ -29,13 +28,13 @@ class Workspace(StrictModel):
     id: str
     name: str
     tenant_id: Optional[str] = None
-    user_id: Optional[str] = None  # the owner (D118)
+    user_id: Optional[str] = None  # the owner
     created_at: datetime
 
 
 class ChartPlan(StrictModel):
     """The typed plan behind a chart: a whole run (its decomposition and a plan per sub-query), or a
-    verified query. Exactly one; shaped on ``PinnedRun`` (A1)."""
+    verified query. Exactly one; shaped on ``PinnedRun``."""
 
     decomposition: Optional[Dict[str, Any]] = None  # DecomposerResponse as JSON: sub-queries, combine groups
     plans: Dict[str, Dict[str, Any]] = Field(default_factory=dict)  # sub_query_id -> PlanModel as JSON
@@ -108,7 +107,7 @@ class DashboardFilter(StrictModel):
 
 
 class ScheduleIdentity(StrictModel):
-    """D134: the owner, as they were when they set the schedule. Stored only on the schedule."""
+    """The owner, as they were when they set the schedule. Stored only on the schedule."""
 
     user_id: Optional[str] = None
     tenant_id: Optional[str] = None
@@ -131,7 +130,7 @@ class Dashboard(StrictModel):
     status: Literal["draft", "saved"]  # a draft is built in chat; pin saves it whole
     conversation_id: Optional[str] = None  # the conversation that built the draft
     tenant_id: Optional[str] = None
-    user_id: Optional[str] = None  # the owner (D118)
+    user_id: Optional[str] = None  # the owner
     tiles: List[Tile] = Field(default_factory=list)
     filters: List[DashboardFilter] = Field(default_factory=list)
     schedule: Optional[Schedule] = None
@@ -147,8 +146,8 @@ class TileRun(StrictModel):
     status: TileStatus
     trace_id: Optional[str] = None
     chart: Optional[ChartSpec] = None  # holds the rows, at most charts.max_points
-    explanation: Optional[str] = None  # Wave B's explanation of the run, for "why"
-    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # the result's columns; D2 fills it
+    explanation: Optional[str] = None  # explanation of the run, for "why"
+    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # the result's columns; a refresh fills it
     filtered: bool = False  # every active filter applied to this chart
     error: Optional[Dict[str, Any]] = None  # the QueryResult's first error, client-safe
     # What a person must approve before this chart runs (status ``needs_approval``): pass an ``Approval`` for
@@ -191,7 +190,7 @@ class DashboardInfo(StrictModel):
     updated_at: datetime
 
 
-# ---------------------------------------------------------------- edits (D133)
+# ---------------------------------------------------------------- edits
 # Every edit is a typed model. The facade's named methods build one each, ``dashboards.edit`` takes a list,
 # and the ``dashboard_edit`` chat tool takes the same list, so a person and the model change a dashboard in
 # the same ways. No edit calls a model. ``add_tile`` and ``replace_plan`` change what data a chart shows,
@@ -265,7 +264,7 @@ class ReplacePlan(StrictModel):
 
 class AddVerifiedTile(StrictModel):
     """A chart from a verified query (curated answer). No model and no conversation: the plan is the reviewed query
-    itself, checked as the caller like any tile (D244). Verified ids are unique per datasource only."""
+    itself, checked as the caller like any tile. Verified ids are unique per datasource only."""
 
     kind: Literal["add_verified_tile"] = "add_verified_tile"
     datasource_id: str
@@ -277,7 +276,7 @@ class AddVerifiedTile(StrictModel):
 
 class AddSavedTile(StrictModel):
     """A chart from one of the caller's saved answers. The tile copies the plan, so every viewer runs it in their
-    own scope and a shared dashboard never exposes the saved answer itself (D247)."""
+    own scope and a shared dashboard never exposes the saved answer itself."""
 
     kind: Literal["add_saved_tile"] = "add_saved_tile"
     saved_id: str

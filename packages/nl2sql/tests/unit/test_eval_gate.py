@@ -1,4 +1,4 @@
-"""``engine.evals.gate``: a report against a baseline report or record (wave_a.md, section 8, "The regression gate").
+"""``engine.evals.gate``: a report against a baseline report or record.
 
 The gate compares only runs of the same suite digest and mode, and it reads
 **execution accuracy** (``result_match`` and ``outcome``, the measure 0.6's
