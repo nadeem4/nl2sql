@@ -1,5 +1,7 @@
 # GeneratorNode
 
+Reference for the node that turns a validated plan into SQL, for contributors and adapter authors.
+
 ## Overview
 
 - Converts the AST plan into SQL using `sqlglot`.

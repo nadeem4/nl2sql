@@ -1,5 +1,7 @@
 # SchemaRetrieverNode
 
+Reference for the node that selects the tables and columns a sub-query is planned against, for contributors and operators.
+
 ## Overview
 
 - Retrieves schema context for a sub‑query using staged vector search and authoritative snapshots.

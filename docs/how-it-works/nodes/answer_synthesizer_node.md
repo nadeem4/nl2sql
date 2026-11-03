@@ -1,5 +1,7 @@
 # AnswerSynthesizerNode
 
+Reference for the node that turns the final result into a written answer, for contributors and operators tuning answers.
+
 ## Overview
 
 - Summarizes aggregated results into a user‑facing response using an LLM.

@@ -6,7 +6,7 @@ This documentation describes the **current runtime behavior** of NL2SQL as imple
 
 NL2SQL converts natural language requests into **validated SQL** across one or more datasources. The model emits a typed AST, never SQL text; the AST is checked against the retrieved schema and the caller's RBAC policy before any SQL is generated. The system is built for multi-datasource environments where correctness and inspectable failure matter more than conversational flexibility.
 
-Model output itself is not reproducible; see [Determinism](architecture/determinism.md) for exactly which parts of a run are stable and which are not.
+Model output itself is not reproducible; see [Determinism](how-it-works/determinism.md) for exactly which parts of a run are stable and which are not.
 
 ## Design philosophy
 
@@ -82,11 +82,11 @@ flowchart TD
 
 ## Navigate the docs
 
-- `architecture/overview.md` for end-to-end system architecture and subsystem boundaries.
-- `architecture/pipeline.md` for LangGraph pipeline flow, routing, and execution DAG behavior.
-- `architecture/graph_state.md`, `architecture/determinism.md`, and `architecture/invariants.md` for state, determinism, and enforced rules.
-- `architecture/failure_recovery.md` for failure domains and retry scope.
-- `schema/store.md` and `architecture/indexing.md` for schema contracts, chunking, and retrieval.
+- `how-it-works/overview.md` for end-to-end system architecture and subsystem boundaries.
+- `how-it-works/pipeline.md` for LangGraph pipeline flow, routing, and execution DAG behavior.
+- `how-it-works/graph_state.md`, `how-it-works/determinism.md`, and `how-it-works/invariants.md` for state, determinism, and enforced rules.
+- `how-it-works/failure_recovery.md` for failure domains and retry scope.
+- `schema/store.md` and `how-it-works/indexing.md` for schema contracts, chunking, and retrieval.
 - `execution/isolation.md` for what the runtime bounds, and what it does not.
 - `adapters/architecture.md` for plugin discovery and capability-based routing.
 - `observability/stack.md` and `observability/error-handling.md` for metrics, logging, and error contracts.

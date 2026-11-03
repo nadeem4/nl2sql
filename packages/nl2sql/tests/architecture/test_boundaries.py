@@ -1,6 +1,6 @@
 """The package boundaries, enforced by an AST scan of the source tree.
 
-Every rule here is written down in ``docs/architecture/invariants.md`` under
+Every rule here is written down in ``docs/how-it-works/invariants.md`` under
 "Package Boundaries Are One-Way" and "Dialect Knowledge Lives in the Adapter",
 and stated in short form in the repo's ``CLAUDE.md``. A failure message names
 the rule and the file that broke it.
@@ -32,7 +32,7 @@ from importlib.metadata import entry_points
 
 import pytest
 
-RULES = "docs/architecture/invariants.md"
+RULES = "docs/how-it-works/invariants.md"
 
 PACKAGES = pathlib.Path(__file__).resolve().parents[3]
 ENGINE = PACKAGES / "nl2sql" / "src" / "nl2sql"

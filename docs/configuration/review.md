@@ -6,7 +6,7 @@ thumbs-up on a generated answer files a proposed verified query, and so does a
 checked [correction](../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct)
 (`engine.feedback.correct`, origin `correction`); the [schema profiler](../schema/profiler.md) files its join candidates and
 column roles the same way (`nl2sql profile`, and with `--draft` the descriptions the profiler model drafts), a saved
-[clarification pick](#saving-a-clarification-pick) files a proposed term, and [`nl2sql launch`](../getting_started/launch.md)
+[clarification pick](#saving-a-clarification-pick) files a proposed term, and [`nl2sql launch`](../get-started/launch.md)
 files its five starter questions as proposed `example`s (origin `template`). Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.

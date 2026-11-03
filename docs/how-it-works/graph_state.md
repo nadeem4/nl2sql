@@ -1,5 +1,7 @@
 # GraphState Architecture
 
+The typed state that carries a question through the pipeline graph, for contributors writing or changing a node.
+
 ## Overview
 GraphState is the shared, typed state container for the NL2SQL pipeline's LangGraph execution. It exists to provide a single, structured place where node outputs, errors, reasoning, and subgraph artifacts accumulate as the graph runs. Its scope is the main pipeline graph built in `packages/nl2sql/src/nl2sql/pipeline/graph.py`, and it is the input/output contract for graph nodes declared in that graph.
 

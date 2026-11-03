@@ -130,9 +130,8 @@ fetches `k × 10` entries, keeps each query's best phrasing (by cosine
 similarity), and returns the best `k` (`CURATED_MATCH_TOP_K`, 5), each with its
 `score` and the phrasing that won. With no verified query entry among those
 datasources it returns nothing without embedding the question. Given an
-`explain` list, it appends a record shaped like the MMR one below. Nothing in
-the pipeline calls it yet; the matcher that will is described in
-[Curated Answers (design)](curated_answers.md).
+`explain` list, it appends a record shaped like the MMR one below. The curated matcher calls it; see
+[Curated Answers](curated_answers.md).
 
 ## Chunk → index mapping (actual)
 
@@ -186,7 +185,7 @@ flowchart TD
   **Switching the pointer is the commit.** A snapshot stored by a build that
   then fails is referenced by no pointer, so no reader ever sees it: readers
   resolve "live" through the pointer, never through the state store's newest
-  snapshot (bug B5). The failed build's entries are deleted by the next build
+  snapshot. The failed build's entries are deleted by the next build
   of that datasource.
 - **A run pins the pointers.** A run reads the pointers once, when it starts
   (`Runtime.pin_index()`, called by `run_with_graph`), as it pins its LLM set.
@@ -330,8 +329,8 @@ The schema retriever runs none of these when the schema has
 `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` tables or fewer (15 by default, so
 each of the demo's three schemas, at 11, 4 and 5 tables, is always sent whole);
 the resolver runs none when the request names a `datasource_id` or only one
-datasource is registered. The demo is no longer such a case: with three
-datasources registered, the resolver searches on every question.
+datasource is registered. The demo registers three
+datasources, so its resolver searches on every question.
 
 A datasource's `preferred_tables` change the order but not the searches: on
 either path they come first, and on the retrieval path a preferred table the

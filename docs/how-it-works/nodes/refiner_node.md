@@ -1,5 +1,7 @@
 # RefinerNode
 
+Reference for the node that turns a planning failure into feedback for the next attempt, for contributors.
+
 ## Overview
 
 - Generates corrective feedback for planning failures using an LLM.

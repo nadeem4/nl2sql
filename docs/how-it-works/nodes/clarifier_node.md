@@ -1,5 +1,7 @@
 # ClarifierNode
 
+Reference for the node that asks the user which reading of an ambiguous question they meant, for contributors and operators.
+
 ## Overview
 
 - Asks instead of guessing: when the planner read a phrase of the question in

@@ -1,5 +1,7 @@
 # SQL Agent Subgraph
 
+How one sub-query is planned, validated, generated and executed, for contributors.
+
 ## Overview
 - Purpose: plan, validate, generate, and execute SQL for a single sub-query.
 - Why it exists architecturally: isolates SQL-capable execution into a reusable subgraph that can be scheduled per scan node in the global execution DAG.

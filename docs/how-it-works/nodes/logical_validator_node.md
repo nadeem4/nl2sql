@@ -1,5 +1,7 @@
 # LogicalValidatorNode
 
+Reference for the node that checks a plan against the schema and policies before any SQL exists, for contributors and operators.
+
 ## Overview
 
 - Validates the AST plan (`PlanModel`) against schema and policies.

@@ -1,5 +1,7 @@
 # Curated Answers
 
+How the engine answers a question from a verified query the data team wrote before it asks the model to plan; for operators and contributors.
+
 ## Goal
 
 Before the model plans a query, check whether the business has already
@@ -8,11 +10,11 @@ so. If it has not, run today's pipeline unchanged.
 
 Curated answers come in three kinds:
 
-| Kind | What the data team writes | Where | Status |
+| Kind | What the data team writes | Where | Available |
 | --- | --- | --- | --- |
-| **Verified queries** | A SQL query with typed parameters, and the questions it answers | the `curated` section (`curated.yaml`) | Built |
-| **Preferred tables** | Views or tables the planner should reach for first | each datasource's `preferred_tables:` | Built |
-| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Not built, [deferred](#business-metrics-deferred) |
+| **Verified queries** | A SQL query with typed parameters, and the questions it answers | the `curated` section (`curated.yaml`) | Yes |
+| **Preferred tables** | Views or tables the planner should reach for first | each datasource's `preferred_tables:` | Yes |
+| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Not yet, see [Business metrics](#business-metrics-deferred) |
 
 A thumbs-up on a generated answer becomes a *proposal* for a verified query
 in the review queue, which a person reviews and accepts. Nothing writes
@@ -80,13 +82,13 @@ silently ignored one:
 
 - `CuratedFileConfig`: `version: int = 1`, `datasources: Dict[str, CuratedDatasource]`.
 - `CuratedDatasource`: `verified_queries: List[VerifiedQuery]`, `metrics: List[MetricDefinition]`
-  (parsed and validated so the format is fixed now, but not used until metrics are built).
+  (parsed and validated so the format is fixed, but not used yet).
 - `VerifiedQuery`: `id` (a slug, unique within its datasource), `description`,
   `questions` (at least one), `params: Dict[str, ParamSpec]`, `sql`.
 - `ParamSpec`: `type` (`int`, `float`, `string`, `date`), optional `default`,
   `min`/`max` (numbers and dates), `choices` (strings), and `example`.
 
-`example` is a refinement of the agreed design: it is the value used to fill a
+`example` is the value used to fill a
 placeholder before embedding and to run `nl2sql curated test` when a parameter
 has no default (`year` above). Without it a required parameter is embedded as
 its own name ("... in year").
@@ -195,9 +197,8 @@ model is `VerifiedQueryChunk(BaseChunk)` in `nl2sql/indexing/models.py`, beside
   default (`{n}` → `10`, `{year}` → `2012`), because a raw `{n}` embeds poorly.
   The description is embedded as one more entry of the same query.
 - **Metadata.** `{id, type: "curated.verified_query", datasource_id, query_id, schema_version}`,
-  and the `build_id` every entry gets. The agreed design called the key
-  `datasource`; it is `datasource_id`, the key every other chunk, the
-  active-build filter and index health already use.
+  and the `build_id` every entry gets. The key is `datasource_id`, the one every other chunk, the
+  active-build filter and index health use.
 - **Ids.** Deterministic, as `BaseChunk` requires:
   `curated.verified_query:<datasource_id>:<query_id>:<n>`.
 
@@ -436,8 +437,7 @@ generated SQL does not need:
   reading the stream at the ceiling. `ExecutorRequest` gains `max_rows`; the
   executor's `_Stream` stops after that many rows and the result is flagged
   `truncated` exactly as a capped generated result is. A query whose own
-  `LIMIT :n` is lower is never cut. This is a refinement of the agreed design,
-  which named the guard but not the mechanism.
+  `LIMIT :n` is lower is never cut.
 - **Result saving and paging.** The result is written with
   `artifact_store.write_batches()` and the manifest by the aggregator, so
   paging (`engine.results.page`) and CSV export (`engine.results.csv`) work for a

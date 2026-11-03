@@ -71,7 +71,7 @@ datasource marked `required: true` that cannot connect stops them with the
 report (exit 1); any other datasource that fails is printed and left out.
 
 `run` exits 1 when the run ends with an ERROR or CRITICAL error (a refusal
-included). More: [Demo guide](../getting_started/demo.md),
+included). More: [Demo guide](../get-started/demo.md),
 [Debugging a Run](../observability/debugging.md),
 [Feedback and Signals](../observability/feedback.md),
 [Evaluation](../evals/chinook-suite.md).

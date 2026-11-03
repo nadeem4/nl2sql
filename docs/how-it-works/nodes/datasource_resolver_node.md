@@ -1,5 +1,7 @@
 # DatasourceResolverNode
 
+Reference for the node that picks the datasources a question goes to and enforces access, for contributors and operators.
+
 ## Overview
 
 - Picks the datasources a question goes to: an explicit override, the only registered datasource, or routing (five signals fused with reciprocal rank fusion) when more than one is registered.

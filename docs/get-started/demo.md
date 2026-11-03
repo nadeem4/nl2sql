@@ -312,7 +312,7 @@ so the page looked fine while every question failed with
 - **Rebuilds never leave an empty index.** A datasource's new entries are
   written beside its current ones and switched in only when all are written;
   a failure keeps the previous entries answering questions. See
-  [Indexing](../architecture/indexing.md#rebuilding-without-an-empty-index).
+  [Indexing](../how-it-works/indexing.md#rebuilding-without-an-empty-index).
 - **Actionable errors.** With an empty index the resolver says
   "The vector index is empty ... Re-index with `nl2sql index`", and
   `nl2sql doctor` prints the engine's check, the index status included.
@@ -484,7 +484,7 @@ which reads it from the graph's own node names, and a test fails when a node is
 added, renamed or removed and the description does not follow. The per-node
 drill-down under **Debug** on the Ask page is unchanged; this page is the
 overview. The long version is in
-[Pipeline architecture](../architecture/pipeline.md).
+[Pipeline architecture](../how-it-works/pipeline.md).
 
 ### The Settings page
 
@@ -571,7 +571,7 @@ second settings store, and the browser keeps nothing but UI conveniences.
 local model and runs the engine's own vector search against the live index: the pool of nearest entries with their similarity, the entries MMR picks
 in order, the score each won with, and what was dropped. There is no
 re-ranking model; the "re-ranking" is MMR, explained in
-[Indexing](../architecture/indexing.md#retrieval-mmr-not-a-re-ranking-model).
+[Indexing](../how-it-works/indexing.md#retrieval-mmr-not-a-re-ranking-model).
 
 - **Knobs.** Picks (`k`, the pool is `4 * k`), lambda (the engine uses 0.7; 1
   is plain nearest-neighbour order, 0 favours entries unlike earlier picks),
@@ -689,7 +689,7 @@ command exits `1` after writing `recordings.json` with the rest. The file names
 the provider and the model that answered, and a replay reports that model --
 in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
 rather than the one the replaying config names. See
-[Determinism â†’ The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+[Determinism â†’ The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 The `.env` next to `nl2sql.yaml` is loaded by the CLI, `nl2sql-api` and
 `nl2sql demo` at startup, so `doctor` and `run` find a key kept only there; a
@@ -746,7 +746,7 @@ They are also indexed, per datasource, each question as an entry of its own
 beside the `schema.datasource` entry with the configured description. Routing
 votes with both, and with each datasource's tables and columns, which is how
 the resolver tells the three apart (see
-[Routing](../architecture/indexing.md#routing-five-signals-fused)). Re-index
+[Routing](../how-it-works/indexing.md#routing-five-signals-fused)). Re-index
 (`nl2sql index`) after editing them.
 
 Whether a given question is answered correctly depends on the model; see

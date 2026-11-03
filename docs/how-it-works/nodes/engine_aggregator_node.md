@@ -1,5 +1,7 @@
 # EngineAggregatorNode
 
+Reference for the node that combines sub-query results into the final result set, for contributors and operators.
+
 ## Overview
 
 - Executes the `ExecutionDAG` over persisted artifacts using the aggregation engine.

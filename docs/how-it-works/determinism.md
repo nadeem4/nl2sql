@@ -1,5 +1,7 @@
 # Determinism Architecture
 
+Which parts of a run are stable and which are not, for operators who need repeatable behaviour and contributors who change the pipeline.
+
 ## What "deterministic" means here
 
 The word is used narrowly and it does not mean "the same question gives the same

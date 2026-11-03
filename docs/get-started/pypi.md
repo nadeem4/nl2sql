@@ -265,7 +265,7 @@ A question repeated on the same day reuses its validated plan from the plan cach
 call, same SQL and rows; still validated every time), and
 `sub_query.plan_source` says `"cache"`. Turn it off with
 `settings.pipeline.plan_cache: false`; empty it with `nl2sql cache clear`. See
-[Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+[Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 ## Lifecycle (configure → check → index → query)
 

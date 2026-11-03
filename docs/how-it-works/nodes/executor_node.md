@@ -1,5 +1,7 @@
 # ExecutorNode
 
+Reference for the node that runs the generated SQL and saves the result, for contributors and operators.
+
 ## Overview
 
 - Delegates SQL execution to an executor service based on datasource capabilities.

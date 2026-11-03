@@ -338,7 +338,7 @@ the approver's re-run passes `approvals` only.
 The answer sanity checks (a missing filter value, a join that repeated the rows
 an aggregate counted, a column with no value) add theirs, and the answer
 synthesizer says them; see the
-[executor's sanity checks](../../architecture/nodes/executor_node.md#answer-sanity-checks).
+[executor's sanity checks](../../how-it-works/nodes/executor_node.md#answer-sanity-checks).
 `settings.pipeline.sanity_checks: false` turns those checks off.
 
 0.7 changed this shape: a warning was a dict with `error_code` and `severity`,
@@ -560,7 +560,7 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. `"dropped"` when a [hook](../../configuration/hooks.md) denied it with `scope="sub_query"`: the run went on without it. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
-| `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
+| `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
 | `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever; `None` when no term or rule matched, and for a plan served from the plan cache, which sent no prompt. |

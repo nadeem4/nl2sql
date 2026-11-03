@@ -1,5 +1,7 @@
 # CuratedMatcherNode
 
+Reference for the node that answers from a verified query before any planning, for contributors and data teams.
+
 ## Overview
 
 - Answers a question with a verified query from `curated.yaml` when one fits, before the model plans anything.

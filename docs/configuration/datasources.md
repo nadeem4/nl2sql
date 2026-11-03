@@ -120,7 +120,7 @@ limits:
   flagged as truncated and the answer says so. It is applied before results
   are combined, so a join input that reaches it is refused
   (`RESULT_TRUNCATED`) and a union input that reaches it is flagged with a
-  warning; see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine).
+  warning; see [row cap before a combine](../how-it-works/nodes/engine_aggregator_node.md#row-cap-before-a-combine).
 - `max_bytes`: passed to the adapter.
 
 There is one place for each limit: the 0.4 `options:` bag and the top-level

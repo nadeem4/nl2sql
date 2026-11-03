@@ -1,5 +1,7 @@
 # Main Pipeline Graph
 
+How the top-level pipeline graph is wired from its nodes, for contributors.
+
 ## Overview
 - Purpose: orchestrates the end-to-end NL2SQL pipeline as a LangGraph state machine.
 - Why it exists architecturally: central control plane that wires global nodes, subgraphs, and aggregation into a single execution DAG.

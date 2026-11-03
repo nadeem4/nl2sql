@@ -1,5 +1,7 @@
 # ASTPlannerNode
 
+Reference for the node that asks the model for a typed plan of the query, for contributors and operators tuning planning.
+
 ## Overview
 
 - Generates a structured SQL AST plan using an LLM with structured output: the planner's answer is a `PlannerAnswer`, the default plan (`PlanModel`) and, for an ambiguous question, up to two alternative readings.

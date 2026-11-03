@@ -66,7 +66,7 @@ class NL2SQL:
             ConfigError: one error listing every problem found.
         """
         # The runtime is imported here, not at the top of the module, so
-        # ``import nl2sql`` stays light (docs/architecture/invariants.md).
+        # ``import nl2sql`` stays light (docs/how-it-works/invariants.md).
         from nl2sql.runtime import Runtime
 
         self._attach(Runtime.from_config(config, registry))

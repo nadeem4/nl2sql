@@ -4,7 +4,7 @@ The rules a change has to keep, how to set up a checkout and how to run the test
 [CONTRIBUTING.md](https://github.com/nadeem4/nl2sql/blob/main/CONTRIBUTING.md) at the repository
 root. The short form of the rules is
 [CLAUDE.md](https://github.com/nadeem4/nl2sql/blob/main/CLAUDE.md); the reasoning behind each is in
-[Invariants](../architecture/invariants.md).
+[Invariants](../how-it-works/invariants.md).
 
 - [Testing Architecture](testing.md): the test markers and what each one needs.
 - [Real-Database Test Bed](test-bed.md): the Docker Compose test bed and its cloud twin.

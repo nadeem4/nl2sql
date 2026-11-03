@@ -6,7 +6,7 @@ lists the installed entry points and imports none of them; a name is imported,
 and checked, when ``load`` is asked for it. 
 
 This module imports only the standard library, so ``Registry.default()`` stays
-cheap: the import-time rule in docs/architecture/invariants.md.
+cheap: the import-time rule in docs/how-it-works/invariants.md.
 """
 from __future__ import annotations
 

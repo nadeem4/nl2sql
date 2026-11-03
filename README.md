@@ -68,7 +68,7 @@ databases, indexes them on your machine, starts the web app on
 environment (`OPENAI_API_KEY`, `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`) it
 answers live; without one it replays recorded answers and says so, and you can
 paste a key into Settings. The first run downloads a ~79 MB embedding model.
-Full guide: [Demo](https://nadeem4.github.io/nl2sql/getting_started/demo/).
+Full guide: [Demo](https://nadeem4.github.io/nl2sql/get-started/demo/).
 
 From a clone: `pip install -e packages/sdk -e packages/nl2sql -e packages/api -e "nl2sql-cli[web]"`.
 
@@ -90,13 +90,13 @@ The docs live at <https://nadeem4.github.io/nl2sql/>; in this repository they ar
 
 | Section | What is in it |
 | --- | --- |
-| [Get started](docs/getting_started/index.md) | Install from PyPI, Docker or source; the demo; the MCP server; `nl2sql launch` for your own database |
+| [Get started](docs/get-started/index.md) | Install from PyPI, Docker or source; the demo; the MCP server; `nl2sql launch` for your own database |
 | [Use it](docs/apps/web.md) | The web and terminal apps, conversations, charts, dashboards, evals |
 | [Configure](docs/configuration/system.md) | `nl2sql.yaml`, datasources, LLMs, policies, secrets, curated answers, the schema |
 | [Deploy and operate](docs/deployment/architecture.md) | Docker, Compose, Kubernetes, the hosted demo, security, observability |
 | [Extend](docs/extend/index.md) | Adapters, chunk types, the planner, execution backends |
 | [Reference](docs/reference/cli.md) | The [CLI](docs/reference/cli.md), the [Python](docs/api/index.md) and [REST](docs/api/rest/routes.md) APIs, [limitations](docs/reference/limitations.md), the glossary |
-| [How it works](docs/architecture/overview.md) | The pipeline, determinism, failure handling, invariants |
+| [How it works](docs/how-it-works/overview.md) | The pipeline, determinism, failure handling, invariants |
 | [Contribute](docs/contribute/index.md) | Tests, the test bed, releasing |
 | [Releases](docs/releases/index.md) and [Benchmarks](docs/benchmarks.md) | What changed, and how accurate it is |
 
@@ -133,7 +133,7 @@ Full history: [docs/benchmarks.md](docs/benchmarks.md)
 [`CLAUDE.md`](CLAUDE.md) is the short form of the rules a change has to keep:
 package boundaries, no dialect outside an adapter, validation before generation.
 Most are enforced by `packages/nl2sql/tests/architecture/test_boundaries.py`;
-the reasoning is in [Invariants](docs/architecture/invariants.md).
+the reasoning is in [Invariants](docs/how-it-works/invariants.md).
 
 Report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes. This
 project follows a [Code of Conduct](CODE_OF_CONDUCT.md).

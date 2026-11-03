@@ -286,7 +286,7 @@ different port).
 Each agent sends exactly the `temperature` its config names, and `seed=42`:
 
 - Omitted, it is `0.0`, sent with every call. This reduces variance; it does
-  not make output reproducible (see [Determinism](../architecture/determinism.md)).
+  not make output reproducible (see [Determinism](../how-it-works/determinism.md)).
 - `temperature: null` sends **no temperature parameter at all**, so the model
   uses its own default.
 
@@ -381,14 +381,14 @@ reloads its `llm` section from `nl2sql.yaml`, so the change applies to the
 next question. The page offers the providers and models in
 `VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
-[the Settings page](../getting_started/demo.md#the-settings-page).
+[the Settings page](../get-started/demo.md#the-settings-page).
 
 The playground's **Pipeline** page reads the same configuration back: it lists
 every step of a run and, for each of the seven a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by `GET /api/pipeline` from `engine.about()`, whose steps
 (`nl2sql.pipeline.steps`) take their seven model steps from `LLM_AGENTS` rather
-than repeating the table above. See [the Pipeline page](../getting_started/demo.md#the-pipeline-page).
+than repeating the table above. See [the Pipeline page](../get-started/demo.md#the-pipeline-page).
 
 On the **hosted demo** (`nl2sql-api serve --demo --hosted`) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
@@ -605,7 +605,7 @@ print(change.changes)  # {"default": {"old": "openai/gpt-5.4", "new": "anthropic
 - **Plans follow the model.** The plan cache key includes the planner's
   provider and model, so after a swap a plan written by another model is never
   served. Swapping back hits the old plans again. See
-  [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+  [Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 `replace` also takes the section as written in `nl2sql.yaml`, as a mapping,
 checked by the same rules as the file. A `${...}` reference is kept in a secret

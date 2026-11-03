@@ -155,7 +155,7 @@ so a test sets them on the runtime it builds:
 There is no process-global settings object to monkeypatch, and no module
 writes `os.environ`: a test sets what it needs in the config it builds. The
 architecture tests keep it that way
-([An Engine Owns Its Config](../architecture/invariants.md#an-engine-owns-its-config-no-process-globals)).
+([An Engine Owns Its Config](../how-it-works/invariants.md#an-engine-owns-its-config-no-process-globals)).
 
 ```mermaid
 flowchart TD

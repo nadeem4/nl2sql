@@ -19,7 +19,7 @@ Known limitations:
 - The hosted demo's rate limits are best-effort: they live in one process, and
   the per-session cap hangs on a cookie the visitor can clear.
 - The model's output is not reproducible; determinism is structural (fixed
-  topology, validation before generation, plan cache) ([Determinism](../architecture/determinism.md)).
+  topology, validation before generation, plan cache) ([Determinism](../how-it-works/determinism.md)).
 - The engine does not authenticate callers in the query path: it believes the
   `UserContext` it is given. The REST API resolves one from an API key, a
   trusted proxy's headers, a static role or the local operator
@@ -30,6 +30,6 @@ Known limitations:
 
 Roadmap: using the engine on your own database (bring-your-own-database setup
 beyond the bundled demo databases) is planned. `nl2sql init` and the adapters
-exist, and `nl2sql launch` ([Launch](../getting_started/launch.md)) walks you
+exist, and `nl2sql launch` ([Launch](../get-started/launch.md)) walks you
 from a database to a working project; it does not yet cover every datasource
 type or every setting.

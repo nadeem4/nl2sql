@@ -61,7 +61,7 @@ The `otel` observer records:
 - `nl2sql.plan_cache.lookups` (counter), attributes `result` (`hit` or `miss`)
   and `datasource_id`, from `plan_cache.lookup`. The per-question view is
   `QueryResult.usage.plan_cache_hits` and `sub_queries[].plan_source`; see
-  [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+  [Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 - `nl2sql.run.cost` (histogram, USD), attribute `status`, from
   `run.finished` when the run was priced.
 

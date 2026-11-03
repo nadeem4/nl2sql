@@ -1,5 +1,7 @@
 # Architectural Invariants
 
+The rules the codebase holds and where each is enforced, for contributors and anyone reviewing a change.
+
 ## Overview
 These invariants capture rules that are enforced by the code paths responsible for planning, validation, and execution. They exist to keep the system deterministic, secure, and stable under malformed input or misconfiguration.
 

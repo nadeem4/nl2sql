@@ -1,5 +1,7 @@
 # DecomposerNode
 
+Reference for the node that splits a question into sub-queries and combine steps, for contributors and operators.
+
 ## Overview
 
 - Decomposes the user query into datasource‑scoped sub‑queries and combination operations.
