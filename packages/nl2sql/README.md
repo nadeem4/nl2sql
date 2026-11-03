@@ -64,7 +64,7 @@ and `--no-browser`.
 
 **Answering a question needs a model:** `OPENAI_API_KEY`,
 `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment (Claude needs
-`pip install "nl2sql-engine[demo,anthropic]"`), a key saved in the project's
+`pip install "nl2sql-cli[web]" "nl2sql-engine[anthropic]"`), a key saved in the project's
 `.env`, a key pasted into the web app's Settings page, or a reachable Ollama.
 Without one the demo replays the recorded answers to its guided questions and
 says so.

@@ -35,7 +35,7 @@ Example (PowerShell), using a 3.13 interpreter:
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install `
-    -e packages/sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
+    -e packages/sdk -e "packages/nl2sql[postgres,duckdb]" -e packages/api -e "nl2sql-cli[web]"
 .\.venv\Scripts\python.exe -m pip install --group dev
 ```
 

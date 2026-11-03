@@ -155,7 +155,7 @@ stops it. Its flags are `--dir`, `--host`, `--port` and `--no-browser`.
    in the project's `.env`, a reachable Ollama on `localhost:11434`, else
    replay. The provider follows the key's shape: `sk-ant-...` is Anthropic,
    `sk-or-...` is OpenRouter, anything else is OpenAI. Claude needs the extra:
-   `pip install "nl2sql-engine[demo,anthropic]"`. With no key, paste one into
+   `pip install "nl2sql-cli[web]" "nl2sql-engine[anthropic]"`. With no key, paste one into
    the **Settings** page; the running demo switches to live without a restart.
 5. **Ask.** Chat with the data in plain English, or pick one of the guided
    questions. A run shows the answer, then the plan the model wrote, the checks
