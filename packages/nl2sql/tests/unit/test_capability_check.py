@@ -1,4 +1,4 @@
-"""One capability check, in the registry, that fails closed (boundary audit F12).
+"""One capability check, in the registry, that fails closed.
 
 The registry used to grant SUPPORTS_SQL to an adapter without ``capabilities``
 while the executor node denied one whose ``capabilities()`` raised. Now

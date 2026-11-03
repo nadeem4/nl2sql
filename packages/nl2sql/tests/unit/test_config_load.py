@@ -362,6 +362,10 @@ def test_unknown_key_without_a_close_match_has_no_suggestion(tmp_path):
     assert problems_of(error) == [("nl2sql.yaml", "storage.zzz", "Unknown key.")]
 
 
+def test_the_removed_feedback_setting_is_reported_as_an_unknown_key(tmp_path):
+    error = load_error(write(tmp_path, "nl2sql.yaml", MINIMAL + "settings:\n  feedback: { enabled: true }\n"))
+    assert problems_of(error) == [("nl2sql.yaml", "settings.feedback", "Unknown key.")]
+
 def test_unknown_agent_name_suggests_the_node_name(tmp_path):
     error = load_error(write(tmp_path, "nl2sql.yaml", MINIMAL.replace(
         "llm:        { provider: anthropic, model: claude-sonnet-5-5 }",

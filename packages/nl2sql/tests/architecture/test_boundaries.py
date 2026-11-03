@@ -1445,6 +1445,11 @@ _PLAN_ID = re.compile(
     r"(?<![\w.])\((?:[A-D]-[A-Z]+\d+[a-z]?|DB\d[a-e]?|CL\d[ab]?|X1[ab]|[A-Z]{1,2}\d{1,2}[a-z]?|D\d{1,3}[a-z]?)"
     r"(?:,\s*[A-Z]{0,2}\d+[a-z]?)*\)")
 _PLAN_ID_OK = {"(S3)"}  # S3 is the storage service, not a row
+# An id inside a sentence in parentheses, such as "(read from K1 and K2)" or "(boundary audit F12)". Only a group that
+# starts with a lowercase word counts, so a call such as f(Q1, tables) or a tuple such as (T0, T1) is left alone.
+_PLAN_ID_TOKEN = r"(?:[A-D]-[A-Z]+\d+[a-z]?|DB\d[a-e]?|CL\d[ab]?|X1[ab]|[A-Z]{1,2}\d{1,3}[a-z]?|D\d{1,3}[a-z]?)"
+_PLAN_ID_PROSE = re.compile(r"\((?=[a-z])[^()]*?(?<=[\s(])(" + _PLAN_ID_TOKEN + r")(?=[\s,;:.)])[^()]*\)")
+_PLAN_ID_PROSE_OK = {"S3", "L1", "L2"}  # the storage service and the vector norms
 _PLAN_ID_SCANNED = (".py", ".md", ".js", ".jsx")
 # docs/benchmarks.md mirrors recorded runs; CLAUDE.md states the rule with examples.
 _PLAN_ID_SKIPPED = (
@@ -1469,6 +1474,7 @@ def test_no_tracked_file_cites_a_design_doc_or_a_plan_id():
             continue
         for number, line in enumerate(lines, 1):
             found = [m.group(0) for m in _PLAN_ID.finditer(line) if m.group(0) not in _PLAN_ID_OK]
+            found += [m.group(0) for m in _PLAN_ID_PROSE.finditer(line) if m.group(1) not in _PLAN_ID_PROSE_OK]
             found += [m.group(0) for m in _DESIGN_DOC.finditer(line)]
             if found:
                 offenders.append(f"{name}:{number} {', '.join(found)}")
@@ -1476,3 +1482,18 @@ def test_no_tracked_file_cites_a_design_doc_or_a_plan_id():
         "Code, tests and docs cite no design document (wave_*.md, phase2.md, configuration_v2.md) and no plan "
         "row or decision id such as (D15), (K1) or (C-W4): the plan is not in the repo. Say what the code does "
         "instead.", offenders)
+
+
+def test_the_prose_plan_id_pattern_flags_sentences_and_spares_code():
+    flagged = ["# (read from K1 and K2)", "(boundary audit F12)", "x  # (see D15, and C-W4)", "(kept, B106)"]
+    spared = [
+        "f(Q1)", "render(Q1, tables)", "(Q1, Q2)", "(T0, T1)", "(squared L2)", "(stored in S3)", "(UTF8)",
+        "(HTTP 429)", "(sha256 of the file)", "(see ISO 8601)", "(const hash of ['#/chat/%E0%A4%A'])",
+        "(the number of columns)",
+    ]
+    for text in flagged:
+        match = _PLAN_ID_PROSE.search(text)
+        assert match and match.group(1) not in _PLAN_ID_PROSE_OK, text
+    for text in spared:
+        match = _PLAN_ID_PROSE.search(text)
+        assert not match or match.group(1) in _PLAN_ID_PROSE_OK, text

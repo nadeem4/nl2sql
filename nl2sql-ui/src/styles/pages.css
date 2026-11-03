@@ -185,18 +185,6 @@
 .rail::-webkit-scrollbar { width: 8px; }
 .rail::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 8px; border: 2px solid var(--paper); }
 .rail::-webkit-scrollbar-track { background: transparent; }
-/* A fade only on an edge with more past it; data-fade is set from the scroll
-   position (railFade.js), and only a wide window scrolls the rail at all. */
-@media (min-width: 1061px) {
-  .rail[data-fade] {
-    --fade-top: 0px; --fade-bottom: 0px;
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
-    mask-image: linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
-  }
-  .rail[data-fade~="top"] { --fade-top: 28px; }
-  .rail[data-fade~="bottom"] { --fade-bottom: 36px; }
-}
-
 /* The database switcher, up to four names: a segmented control. */
 .seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 2px; padding: 3px; margin: 0 0 var(--sp-3); border-radius: 9px; background: var(--well); }
 .seg-opt {
@@ -206,42 +194,14 @@
 }
 .seg-opt[data-on] { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 
-/* Table rows: 40px, the name and its row count; what it refers to is inside. */
-.tables { border-top-color: var(--hair); }
-.tables > li { border-bottom-color: var(--hair); }
-.table-head { min-height: 40px; align-items: center; padding: 0 var(--sp-2); }
-.table-head .flag { line-height: 20px; }
-.table-body .refs { display: block; margin: 0 0 6px; }
-
-/* The search index: one line at the rail's foot, opened when it needs you. */
-.rail .index { margin: var(--sp-5) 0 0; padding: 0; border-bottom: 0; }
-.idx {
-  display: flex; align-items: center; gap: 10px; padding: var(--sp-3) 14px; border-radius: 10px;
-  border: 1px solid var(--hair); background: var(--surface); font-size: var(--fs-2); color: var(--ink-2);
-}
-.idx::before { display: none; }
-.idx::after {
-  content: ""; flex: none; margin-left: auto; width: 6px; height: 6px;
-  border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
-  transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-state) ease;
-}
-.index-fold[open] > .idx::after { transform: translateY(1px) rotate(-135deg); }
-.idx b { color: var(--ink); font-weight: var(--fw-bold); }
-.idx[data-tone="warn"] .pulse { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
-.idx[data-tone="fault"] .pulse { background: var(--fault); box-shadow: 0 0 0 3px var(--fault-soft); }
-.idx[data-tone="quiet"] .pulse { background: var(--rule-strong); box-shadow: 0 0 0 3px var(--well); }
-.index-body { padding: var(--sp-4) 2px 0; }
-.index-title { font-size: var(--fs-3); font-weight: var(--fw-bold); margin-bottom: var(--sp-2); }
-
 @media (hover: hover) {
   .prov:not([data-on]):hover { border-color: var(--rule-strong); }
   .key-clear:hover { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ink); }
   .seg-opt:not([data-on]):hover { color: var(--ink); }
-  .idx:hover { border-color: var(--rule); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .prov, .key-clear, .seg-opt, .idx::after { transition: none; }
+  .prov, .key-clear, .seg-opt { transition: none; }
 }
 
 @media (max-width: 640px) {

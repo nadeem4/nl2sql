@@ -1,427 +1,47 @@
 # nl2sql-ui
 
-The React source of the web app. It talks to `nl2sql-api` through `src/api/http.js` (JSON and Server-Sent
-Events, with the tab's API key and model keys).
+The source of the NL2SQL web app: React and Vite, plain JSX and plain CSS, with no router library, state library, component kit or TypeScript. This README is for people changing that code. To use the app, read [Web app](../docs/apps/web.md).
 
-## Layout
+## How it is built and served
 
-`src/lib/` pure helpers, `src/components/` pieces shared by pages (`JobProgress`, `SqlCard`, `IndexPanel`, ...),
-`src/outputs/` what a result or tool output renders as, `src/pages/` one file per route (the pages not yet built are stubs
-until their row), `src/connect/`, `src/chat/`, `src/answers/` (My answers), `src/api/` one client file per area, `src/styles/` the stylesheet in
-cascade order (`index.css`), `src/router.js` the hash routes.
+`npm run build` writes `index.html` and hashed chunks into `packages/api/src/nl2sql_api/web/static/` (see `vite.config.js`). That folder is not committed. `nl2sql-api` serves the build and the API wheel and image carry it, so users need no Node toolchain.
 
-## Pages
+The page calls the REST API under `/api/v1` and nothing else, through `src/api/http.js` (JSON and Server-Sent Events). Pages are hash routes (`#/chat`, `#/dashboards`, ...) defined in `src/router.js`.
 
-Six pages, named across the top of each of them by one header nav
-(`.nav`, one `#nav-home`, `#nav-chat`, `#nav-approvals`, `#nav-pipeline`, `#nav-settings`,
-`#nav-retrieval` link each). Every page but Home states its title and one line
-saying what it does, then gives its content the full width; Home is its own
-hero.
+## Commands
 
-| Route | Page | What it holds |
-| --- | --- | --- |
-| `#/` | Home | `#home`: the front page (see [Home](#home) below) |
-| `#/chat` | Chat | the conversation list, the transcript and the composer |
-| `#/approvals` | Approvals | the requests waiting for a decision |
-| `#/pipeline` | What runs a question | `#pipeline-panel`: every step, and which five call a model |
-| `#/settings` | Settings | `#settings-panel`: keys and a model per step |
-| `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
-
-`src/router.js` is the whole of it: `pageFromHash` reads the hash, `navItems`
-builds the nav, and `createRouter` follows `hashchange`. A route nobody serves
-reads as `#/`, Home, so Back and Forward always land somewhere. A bare fragment
-from an older link (`#run`, `#question`, a station's id) named a place on the old Ask page
-when Ask was `#/`; Chat took that job, so it opens Chat. The nav links are
-plain `<a href="#/...">`, so the keyboard reaches them and the browser keeps
-the history; the current one carries `aria-current="page"` and the accent under
-the top bar's rule. Nothing in the page links to a bare fragment -- the skip
-control and the index warning's **Rebuild it** move focus instead -- because
-the hash belongs to the router.
-
-**The run is not lost.** The question, the answer, the Debug choice and every
-`/api` reply are held in `App`, above the page switch, so Settings and back
-leaves the run exactly as it was. Nothing extra is written to storage for it:
-the address bar already restores the page on a reload.
-
-**Where a page is off** (Settings, Retrieval and Rebuild share one gate: a demo
-project, on a loopback host or with `--allow-settings`), its nav item stays and
-is marked `off`; opening it is how you read the reason
-(`#settings-unavailable`, `#retrieval-unavailable`).
-
-**Hosted mode** (`nl2sql demo --hosted`, `meta.hosted`) is a third state, not a
-page that is off. Settings keeps its nav item unmarked and shows two blocks
-that write only to this tab's `sessionStorage`, never to the server:
-
-- `#hosted-key-heading`, one key per provider (`src/lib/hostedKey.js`), in a
-  raised card: a provider choice (OpenAI, Anthropic, OpenRouter, each saying
-  "key set" or "none"), a 44px mono `#hosted-key` and **Use this key**. A pasted
-  key is kept under the provider its own prefix names, even when another card
-  was chosen, and the page says so (`keyMismatch`). Each held key shows as
-  "Key ending …0f3a is active in this tab" (`#hosted-key-current`, the last four
-  characters only, `keyTail`) with its own **Clear** (`#hosted-clear-<provider>`).
-  Three facts -- Stored, Sent, Never -- stand for the privacy text, which is in
-  full behind **How your key is handled** (`#hosted-key-help`), with the limits
-  and how to run locally. `askHeaders` sends each as its own
-  `X-NL2SQL-Api-Key-<provider>` header on `/api/ask`. With exactly one key the
-  bare `X-NL2SQL-Api-Key` goes too, so the simple path is byte for byte what it
-  was.
-- `#hosted-models`, **Model for each step** (`src/lib/hostedModels.js`), a
-  `<details>` card, open from the start at 1060px and wider (where it sits
-  beside the key card) and shut on a narrower window; its summary says what the
-  steps will use. Each
-  of the seven model steps has a selector over the same catalogue the local page
-  offers, which hosted mode's `GET /api/settings` now carries (`nodes` and
-  `providers`, and still not a key of any kind). The choices travel as one
-  `X-NL2SQL-Models` header, `{"astplanner":"anthropic:claude-opus-5"}`, which
-  holds no secret. A step on a provider this tab has no key for says so
-  (`#hosted-model-<agent>-nokey`), and the server refuses the question by name.
-
-Nothing about a key or a choice is posted to the server, so there is no save to
-succeed or fail; the copy on the page says exactly that, plus the limits from
-`meta.limits` and how to run the demo locally instead. Rebuild and answer
-ratings are off, and the retrieval inspector stays on. See
-[Hosted demo](../docs/deployment/hosted-demo.md).
-
-**Hosted, before a key** (`needsKey` in `src/pages/firstRun.js`: `meta.hosted` and
-nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`
-above the question box: the pitch and `#first-run-why` (`firstRunCopy`), then
-the guided questions as chips headed **Try a recorded run**, moved up from
-under the question box so they lead. The ones the server has recordings for
-(`meta.recorded`, `isRecorded`) carry a dot and `data-recorded`. The key form
-sits in `#first-run-keyform`, a `<details>` folded under **Use your own key**
-when there are recordings and open when there are none: a provider choice,
-`#first-run-provider-<provider>`, the key, `#first-run-key`, **Use this key**,
-`#first-run-save`, and three facts (`#first-run-facts`: **Stored** in this tab
-only, **Sent** in a header with each question, **Never** written to disk, logs
-or traces). The provider follows the key's own prefix once one is typed, as the
-server reads it, and the key is kept exactly as the Settings form keeps it
-(`writeKeyFor` in `src/lib/hostedKey.js`); the keyboard then moves to `#question`.
-**Nothing is disabled** (`lockControls`): a recorded guided question answers
-from its recording, and the answer header carries a **Recorded run** badge
-(`#recorded-badge`, `recordedBadge`) whose title says it was not run just now;
-any other question comes back as a replay miss, shown as `#replay-miss` with
-**Add a key in Settings** (`#replay-miss-key`, `missPrompt`). The Cost & time
-station's footnote says a recorded run's token counts are placeholders.
-Saving a key here or in Settings clears all of it on the next render, with no reload:
-`App` holds the key in state, so nothing has to be reloaded to see it. In local
-mode none of this appears -- there a key is already configured, or replay
-answers from recordings, and a wall would be in the way of someone who has
-nothing to do.
-
-`src/router.test.js` covers the default route, deep links, an unknown route,
-Back and Forward, and that routing touches nothing but the hash.
-
-## Home
-
-`#/` (`src/pages/Home.jsx`, its words in `src/pages/home.js` so `npm test` can hold each
-claim against what the web app does). Top to bottom:
-
-- **The hero**: the one eyebrow on the page (**Questions in, rows out**), the
-  promise as the h1, one sentence a line on a wide window, a lede, then three
-  actions. **Try a sample question** (`#home-try`) opens Ask and asks the first
-  guided question the server has a recorded answer for (`sampleQuestion`), so
-  on the hosted demo it answers with no key; with nothing recorded it asks the
-  first guided question, which answers with the key prompt. **Use your own
-  key** (`#home-key`) is `#/settings`. **See how it works** (`#home-how`) moves
-  focus to the path below rather than linking to a fragment. Under them three
-  facts (`#home-facts`, `facts`); the third depends on the server, and only
-  says a key is optional where something answers without one.
-- **The path** (`#how`): Question, Plan, Check, SQL, Rows, drawn as the run
-  spine laid on its side and with its marks: round for a step a model decides,
-  square for code, and the checks as the gate bar. Its line draws and the marks
-  fill in order on load, the page's one moment of motion (held still under
-  reduced motion). On a phone it stands up, like the spine on Ask.
-- **Three features**, alternating sides: **Ask, and get rows back**, **Watch
-  the plan become SQL** and **See what it looked up**, each with two points,
-  a link into its page and a clip.
-- **More**: run it locally (`pip install "nl2sql-cli[web]"`, `nl2sql demo`),
-  the docs, the source; then a footer.
-
-**Clips** (`src/pages/Clip.jsx`): a muted, looping, inline webm over its poster in
-the one raised card, with a 44px Pause / Play button. It follows
-`prefers-color-scheme`, swapping to the `-dark` recording and poster; under
-reduced motion it holds the poster until Play. A clip with no video yet (the
-request fails) shows its poster alone, with no button. The files are served by
-the app at `/clips/<name>` from
-`packages/api/src/nl2sql_api/web/assets/clips/`, outside the
-bundle (which `npm run build` rewrites and which should not carry video) and
-named `<feature>[-dark].webm|jpg` for `ask`, `pipeline` and `retrieval`.
-
-They are recorded, not drawn:
+Run these in `nl2sql-ui/`:
 
 ```bash
-pip install playwright && python -m playwright install chromium
-python scripts/record_home_clips.py
+npm ci          # install
+npm run dev     # Vite dev server; it has no API proxy
+npm run build   # build into the API package
+npm test        # node --test "src/**/*.test.js"
 ```
 
-The script boots `nl2sql demo --hosted` with no key anywhere, drives each page
-in headless Chromium at 1280x800 and writes a webm and a poster per feature
-and theme (each well under 2 MB; a test holds that). Pipeline and Retrieval
-call no model, so they are always real. Ask shows a model's answer, so it is
-recorded only from a guided question with a shipped recording
-(`scripts/record_demo_answers.py`): the shipped clip replays the first guided
-question with one, under its "Recorded run" badge, and Pipeline's chips name
-the model those recordings were made with, tagged recorded. Without a recording it falls
-back to a "Clip coming" poster in both themes. Actions → **Record demo answers** → *Run workflow*
-with `record: clips` runs the same script in CI and opens a pull request.
+The dev server serves the page only. To exercise the real API, run `npm run build` and start `nl2sql-api`, or run `nl2sql demo` from `nl2sql-cli[web]`, which starts it for you.
 
-## What the page shows
+## Source layout
 
-- **Database and Search index** (the old Ask rail) are gone with the Ask page. `src/components/IndexPanel.jsx`
-  stays for the page that takes the index over.
+| Folder | What is in it |
+| --- | --- |
+| `src/api/` | One client file per API area, with `http.js` underneath. `fixtures/` holds sample responses for tests. |
+| `src/pages/` | One file per route, plus the small helpers each page needs. |
+| `src/chat/` | The conversation: turns, the run spine, clarification, approval, feedback, the why panel. |
+| `src/answers/` | My answers. |
+| `src/dashboards/` | Workspaces, the builder, generate, schedule, filters and tiles. |
+| `src/outputs/` | What a result or tool output renders as: tables, charts, reports, diagrams. |
+| `src/knowledge/` | Glossary, proposals and drift. |
+| `src/connect/` | The Connect page's steps and schema form. |
+| `src/evals/` | Reading an eval report. |
+| `src/components/` | Pieces shared by pages (`JobProgress`, `SqlCard`, `Ledger`, `NodeInspector`). |
+| `src/lib/` | Pure helpers: settings, hosted keys, run state, SQL highlighting. |
+| `src/styles/` | The stylesheet, split by area and listed in cascade order in `index.css`. |
 
-- **Status pill** (`.status`, top bar, on the same row as the wordmark and the
-  nav at 1061px and wider): the mode in a few words, from `modeStatus` in
-  `src/pages/status.js`, with a green dot when a question can be answered live and an
-  amber one when it cannot. **Live · configured model**; **Replay mode · 12 of
-  20 recorded** (`recorded_questions` from `/api/meta`) or **Replay mode · No
-  recordings**; hosted, **Hosted demo · Recorded runs** (or **Hosted demo · No
-  key yet** when nothing is recorded) until this tab has a key,
-  then **Hosted demo · OpenAI key in this tab** (or **2 keys**). The sentence
-  the old mode line carried -- how many questions replay answers and how to
-  get a key, or whose key answers and the hosted limits (`hostedNote` in
-  `src/pages/firstRun.js`) -- is kept whole as the pill's `title` and as
-  visually-hidden text a screen reader reads. A question replay has no answer
-  for shows "No recorded answer for this question. Add an API key to ask it
-  live." (`replay_miss` from `/api/ask`).
-- **Chat** (`#nav-chat`, route `#/chat` or `#/chat/<conversation id>`; `src/pages/Chat.jsx`): a list of your
-  conversations beside one transcript. A question goes to `POST /conversations/{id}/turns/stream` (`streamTurn`
-  in `src/api/chat.js`); `spineOf` in `src/chat/spine.js` folds the events into the live run spine, and the
-  last event, the stored turn, replaces it. A turn shows its answer and rows first, then the folds **Why this
-  answer**, **SQL**, **Plan** and **Trace and cost**, and **Did this answer it?** (`src/chat/Feedback.jsx`): **Yes** keeps the answer in My answers, **Not quite** opens a note.
-  A clarification shows one **Use this reading** button per option, an approval wait shows **Run it now** once
-  every request is granted, and the tool buttons (Chart, Diagram, Report, Pin to dashboard) call
-  `POST /conversations/{id}/tools/{name}`. A 409 (a turn is still running) is told to the asker. `turns.js` reads
-  a stored turn; the page keeps no other state. See [Web app](../docs/apps/web.md).
-- **Approvals** (`#nav-approvals`, route `#/approvals`; `src/pages/Approvals.jsx`): the pending requests, with
-  **Grant** and **Deny**; the nav item carries the count of requests waiting.
+Logic lives in plain `.js` files next to the `.jsx` that uses it, and each has a `*.test.js` beside it, so tests run under Node without a browser.
 
+## Related
 
-- **Pipeline** (`#nav-pipeline` in the header nav, route `#/pipeline`; the
-  page's content is `#pipeline-panel`): every step of a run in order, in three
-  phases -- Understand the question, Answer each sub-query (the SQL agent and
-  its own steps in a dashed bracket) and Combine and explain -- cut from the
-  step list itself by `pipelinePhases` in `src/pages/pipelinePhases.js`. The five
-  steps a model decides are raised rows with a round mark and a model chip;
-  code steps are compact rows with a square mark, under a legend (asks a model,
-  code, did not run, skipped; `stepStates`). Each step gives its name in plain
-  words, its graph node name in mono (the name the Debug ledger uses) and one
-  sentence on what it decides. While the list loads the page is a skeleton in
-  its final shape. The steps come from `GET /api/pipeline`, which
-  reads them from `nl2sql.pipeline.steps`; a test holds that list against the
-  graphs themselves, so the page cannot describe a pipeline that is not the one
-  running. Before a run each model step names the model it is set to use; after
-  one it names the model that answered and shows that step's input, cached and
-  output tokens, and every row gets a waterfall bar and its time (`waterfall`:
-  the timings say how long, not when, so bars are laid end to end in pipeline
-  order, nested steps inside the SQL agent's span, scaled to the run's total),
-  joined to `usage.nodes` and `timings` by node name. While the tab answers
-  from recordings (local replay mode, or the hosted demo with no key) and
-  after a recorded run, each model chip instead names the model the recordings
-  were made with (`recorded_with` from `GET /api/pipeline`), tagged
-  **recorded** (`recordingShown`, `stepChip`), never the config's fallback
-  model; a live run is never tagged. `src/pages/pipeline.js` and
-  `src/pages/pipelinePhases.js` do the joining and `npm test` covers them. The Debug
-  drill-down is unchanged; this page is the overview, not a replacement.
-
-- **Retrieval** (`#nav-retrieval` in the header nav, route `#/retrieval`; the
-  page's content is `#retrieval-panel`): the Retrieval inspector. Text to embed
-  (`#retrieval-query`), **Search** (`#retrieval-search`), picks `k`
-  (`#retrieval-k`, the pool is shown as `4 * k`), lambda (`#retrieval-lambda`),
-  a datasource filter (`#retrieval-datasource`) and one checkbox per entry type
-  (`#retrieval-type-table`, `-column`, `-datasource`, `-join`, `-metric`). It
-  posts to `POST /api/retrieval` with the role chosen in "Ask as" (`role`, as
-  `/api/ask` takes it), and the pool holds only what that role may read; after
-  the first search every knob, and a change of role, searches again. The result (`#retrieval-result`) is the pool nearest first, with
-  similarity (with a bar placed within the pool's own range, nearest full and
-  farthest empty, since raw cosines bunch together), MMR pick order, the
-  score each pick won with and its overlap with
-  earlier picks, each entry's embedded text, and **Copy as text**
-  (`#retrieval-copy`) for diffing two runs. The picks in order, and the
-  entries passed over, sit above the table as rows of mono chips. A failure shows `#retrieval-error`.
-  Where it is off (the same rule as Settings) it says why
-  (`#retrieval-unavailable`), and the nav marks it.
-- **Retrieval in the drill-down**: for `datasource_resolver` and
-  `schema_retriever`, the node drill-down also shows the run's retrieval record
-  from the trace: the text embedded, each search's pool with the picks marked,
-  the entries MMR passed over, and the tables sent to the planner; or why no
-  search ran.
-- **Settings** (`#nav-settings` in the header nav, route `#/settings`; the
-  page's content is `#settings-panel`): two raised cards, side by side at
-  1061px and wider, and a skeleton of them while `GET /api/settings` loads.
-  **API key** (`#settings-key`, a 44px mono input, and `#settings-save-key`) shows the key in use
-  only in masked form (`#settings-key-current`), with three facts (Stored, Sent,
-  Never) and the full text behind **How your key is handled** (`#settings-key-help`); saving one writes it to the
-  demo project's `.env` and turns replay into live without a restart, and
-  the status pill follows. **Model for each step** has one selector per LLM node
-  (`#model-datasourceresolver`, `#model-decomposer`, `#model-astplanner`,
-  `#model-refiner`, `#model-answersynthesizer`) with a Default option, and
-  **Save models** (`#settings-save-models`) writes the changed ones to
-  the demo project's `llm.yaml` (its `agents`).
-  Choosing a model that runs without a temperature shows
-  `#settings-temperature-note`. The model list comes from `GET /api/settings`;
-  the page names no model itself. When the server has settings off (a
-  non-loopback `--host` without `--allow-settings`) the page shows the reason
-  (`#settings-unavailable`) instead of a form, and the nav marks it.
-
-Every run station renders the `/api/ask` response (the `run.finished` event's `result` on
-`/api/ask/stream`), and while a streamed run is live, the events before it; the Rows station the
-saved result that response names, read through the engine's result routes;
-nothing is computed server-side for the page.
-
-## Rebuild
-
-```bash
-cd nl2sql-ui
-npm install
-npm test
-npm run build
-```
-
-`npm run build` writes `index.html` and hashed chunks to `packages/api/src/nl2sql_api/web/static/`. That folder is
-not committed: `nl2sql-api`'s image and wheel build it fresh, and CI's `web` job builds it to check it.
-
-`npm test` runs the pure helpers in `src/components/run.js` (SQL line breaks, the per-node
-ledger, refused-table parsing, the trace drill-down helpers), `src/lib/runState.js`
-(each station's state, live and queued while busy, its head, the answer
-header and its strip, the gate's timeline and reason, which error the fault
-box explains, Ask turning into Stop, the elapsed counter, the chip row),
-`src/pages/faults.js` (the fault box's words and action for each provider error), `src/lib/settings.js`
-(model options, which nodes changed, which chosen models run without a
-temperature), `src/components/indexHealth.js` (entry counts in plain words, the status
-line, relative build times), `src/router.js` (which page a hash names, the nav
-rows, and the router over `hashchange`), `src/pages/home.js` (the home page's words,
-its five steps, the sample question it asks and the facts it may claim),
-`src/pages/questions.js` (the guided
-questions grouped by datasource), `src/pages/firstRun.js` (what the hosted demo offers a
-visitor with no key: the recorded questions, the badge, the key prompt on a
-miss, and whose key answers once there is one),
-`src/pages/status.js` (what the top bar's status pill says in each mode, and the
-sentence it stands for),
-`src/connect/datasources.js` (the
-databases the switcher offers, whether it is a segmented control or a select,
-and which one a run was answered from), `src/pages/pipelinePhases.js` (the Pipeline
-page's three phases, each step's state and the waterfall bars),
-`src/pages/railFade.js` (which edges of the rail fade), `src/lib/hostedKey.js` (also the
-key's masked tail, the provider cards and a key pasted under the wrong
-provider), `src/components/indexHealth.js` (also the rail's one-line index summary and
-when it opens itself),
-`src/pages/retrieval.js` (the MMR summary line, picks
-in order, entries passed over, the copyable text form), `src/lib/sqlHighlight.js`
-(the SQL card's tokenizer), `src/lib/artifacts.js` (the rows bar and the ledger and
-pool bars, numeric columns), `src/outputs/results.js` (the result tabs, the page and
-CSV URLs, Previous and Next, the range line, the cut notice, the sub-query
-heads) and `src/chat/feedback.js`
-(when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
-
-## Look
-
-`src/styles/` is the stylesheet (`index.css` lists its files in cascade order; `base.css` holds the tokens), built on tokens declared on `:root`
-(light) and again under `prefers-color-scheme: dark`:
-
-- **Colour** (Porcelain): `--paper`, `--surface`, `--raised`, `--well`, three
-  inks, `--rule`/`--rule-strong`/`--hair`, one oxblood `--accent` used
-  sparingly, `--accent-fill` (ink: the primary button), `--ok` for passed
-  checks and a live status, `--warn`, and `--fault` for real faults. Every text
-  colour holds 4.5:1 on every ground in both themes.
-- **Type**: `--fs-1` to `--fs-6` (12 / 13.5 / 15 / 18 / 24 / 34px) and
-  `--fw-regular` / `--fw-medium` / `--fw-bold` (400 / 500 / 650). Home's h1
-  (`.home-title`, up to 54px) is the one other exception besides the answer
-  sentence below. No other size
-  is used, except the answer sentence on Ask: 28px (22px on a phone), so the
-  answer is the largest text in a run.
-- **Spacing**: `--sp-1` to `--sp-8` (4 / 8 / 12 / 16 / 24 / 32 / 48 / 72px).
-- **One raised tier** (`--raised`, 12px radius, a `--hair` border, `--shadow`),
-  and only for the composer, the answer header, the checks gate's body, the SQL
-  and rows, and the node inspector. Everything else sits flat on the paper.
-- **One button family**: primary (ink fill: Ask and Stop, Use this key,
-  Replace the key, a needed Rebuild), secondary (outline: Rebuild, the rating buttons) and ghost
-  (Close, Copy), 36px tall (44px on a coarse pointer), 8px radius. Hover
-  changes colour only, inside `@media (hover: hover)`; a press scales to .98.
-- Links share one style (accent, 1px underline at 3px offset), and every
-  `<summary>` uses one CSS caret instead of the browser's triangle.
-
-## Motion and touch
-
-The tokens are on `:root`, once: `--ease-out` (`cubic-bezier(.2,.7,.2,1)`),
-`--ease-in-out` (`cubic-bezier(.65,0,.35,1)`), and `--dur-press` 90ms,
-`--dur-state` 160ms, `--dur-page` 180ms, `--dur-enter` 320ms, `--dur-data`
-420ms. Only `transform` and `opacity` animate, and every animation sits inside
-`@media (prefers-reduced-motion: no-preference)`; `src/styles.test.js` reads the
-stylesheet and fails the build if either slips.
-
-- **Route change**: `swapView` in `src/router.js` runs the page swap inside
-  `document.startViewTransition` (React's `flushSync` puts the new page in the
-  DOM inside the callback). `main` (`view-transition-name: page`) fades out
-  and the new page fades in with a 4px rise over 180ms; the top bar has its
-  own name, so it stays still. No API, reduced motion or a refused transition
-  is an instant swap. Focus still moves to `#page` and the page starts at its
-  top.
-- **Nav**: one indicator (`.nav-ind`), a 1px bar moved and scaled to the
-  current tab (`indicatorTransform`), slides between tabs over 240ms. Until it
-  is placed the current tab's own accent border shows.
-- **A result arriving**: the stations rise 40ms apart (`--n`), each mark fills
-  just after its station, the row and ledger bars grow from `scaleX(0)` over
-  420ms, 30ms apart (`--i`, the row), and the gate's tiles settle from scale
-  .98.
-- **Touch**: under `(pointer: coarse)` the nav, the chips, the rail's table
-  rows, every button and the checkbox labels are at least 44px. The tap
-  highlight is off for the whole page, and every hover rule is inside
-  `(hover: hover)`.
-- **Scroll**: `scroll-behavior: smooth` on `html` only under no-preference.
-  After Ask, a phone brings the answer header up with `block: "nearest"`
-  (`runScroll`), so the question box does not jump away.
-- **Never**: bounce, parallax, a hover lift, glass or blur on content, glows,
-  or animating width, height or top.
-
-## Fonts and offline use
-
-The page makes no network request other than its own API routes: no CDN, no
-Google Fonts. The two typefaces are bundled at build time from `@fontsource`
-(dev dependencies), Latin subset only, and inlined into the page:
-
-- **Schibsted Grotesk** (variable) for the interface;
-- **Fragment Mono** for plans, SQL, table and column names, and numbers.
-
-Both are SIL Open Font License. The built page is about 350 KB (150 KB gzipped).
-
-## The mark
-
-The favicon is the plan spine: a teal root bar and stem with two indented ink
-steps, a typed plan in outline. Its one copy is
-[`docs/assets/favicon.svg`](../docs/assets/favicon.svg), which follows
-`prefers-color-scheme` (teal `#0c6a5c` and ink `#17201c` in light, `#62c7b1`
-and `#e2e9e5` in dark). `index.html` inlines it as a `data:` URI, so the icon
-costs no request either; the docs site names the file as `theme.favicon`, and
-`scripts/social_card.html` draws the same shapes at card scale. If you change
-the mark, change all three and run `npm run build`; the favicon tests in
-`packages/api/tests/test_web_routes.py` cover how the API serves the file.
-
-## Develop
-
-```bash
-npm run dev
-```
-
-Vite serves the page on its own port. Run `nl2sql demo --no-browser` alongside
-it and proxy or point `fetch` at `http://127.0.0.1:8765` to exercise the real
-API; the chat and approvals pages call the REST routes through `src/api/chat.js`
-(`/conversations`, `/approvals`, `/feedback`, `/traces/{id}`); the other pages still call
-`/api/meta`, `/api/schema`, `/api/trace/{id}`
-the settings routes (`GET /api/settings`, `POST /api/settings/key`,
-`POST /api/settings/models`) and the index routes (`GET /api/index`,
-`POST /api/index/rebuild`), the inspector's (`GET /api/retrieval`,
-`POST /api/retrieval`) and feedback's (`GET /api/feedback`, `POST /api/feedback`).
-The settings routes, Rebuild, the inspector and feedback refuse a request
-whose `Origin` is not the page's own, so use them from the page `nl2sql demo`
-serves, not from the Vite dev server.
-
-## Scope
-
-React and Vite only -- no router library (`src/router.js` is 144 lines over the
-hash), no state library, no component kit, no CSS framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
-one sitting. Light and dark follow `prefers-color-scheme`; motion is the page
-crossfade, the nav indicator and the run arriving in order, and is off under
-`prefers-reduced-motion` (see Motion and touch). The only
-browser storage is the Debug toggle; settings live in the demo project's files,
-and ratings in its schema store.
+- [Web app](../docs/apps/web.md): what each page does, for users.
+- [REST API](../docs/api/index.md): the routes the page calls.
+- [Contributing](../CONTRIBUTING.md): how CI runs the web tests.

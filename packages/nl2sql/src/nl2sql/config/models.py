@@ -521,10 +521,6 @@ class CuratedSettings(_Model):
     match_floor: float = Field(0.6, ge=0.0, le=1.0)
 
 
-class FeedbackSettings(_Model):
-    enabled: bool = True
-
-
 class KnowledgeSettings(_Model):
     """How much knowledge reaches a prompt (read by the knowledge sources and the schema retriever)."""
 
@@ -585,7 +581,6 @@ class Settings(_Model):
     # ``schema`` would shadow a BaseModel method, so the attribute is ``schema_``.
     schema_: SchemaSettings = Field(default_factory=SchemaSettings, alias="schema")
     curated: CuratedSettings = Field(default_factory=CuratedSettings)
-    feedback: FeedbackSettings = Field(default_factory=FeedbackSettings)
     knowledge: KnowledgeSettings = Field(default_factory=KnowledgeSettings)
     clarify: ClarifySettings = Field(default_factory=ClarifySettings)
     profiler: ProfilerSettings = Field(default_factory=ProfilerSettings)
