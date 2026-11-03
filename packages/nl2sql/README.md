@@ -4,6 +4,8 @@ The engine behind NL2SQL, for developers who embed it in Python or run it throug
 
 This distribution holds the pipeline, the `nl2sql` Python facade and the database adapters (PostgreSQL, MySQL, SQL Server, SQLite, DuckDB). The `nl2sql` command is the separate `nl2sql-cli` package and the REST server and web app are `nl2sql-api`.
 
+Requires Python 3.12 or newer.
+
 ## Try it
 
 Hosted demo on three sample databases, nothing to install: <https://nl2sql.codewithnk.com>. To run it yourself:
@@ -28,6 +30,10 @@ print(result.final_answer["summary"] if result.final_answer else result.errors)
 ```
 
 Your own config instead: `NL2SQL.from_config("nl2sql.yaml")`. Database drivers are extras (`pip install "nl2sql-engine[postgres]"`, `[mysql]`, `[mssql]`, `[duckdb]`, `[all]`); SQLite needs none.
+
+## Security
+
+The model returns a typed plan and never SQL; the plan is checked against the schema and the caller's role before any SQL is generated. The provider sees the question, the schema it needs and the result rows. Read the [security model](https://nadeem4.github.io/nl2sql/security/model/) before pointing it at real data.
 
 ## Documentation
 

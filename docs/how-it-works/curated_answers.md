@@ -14,7 +14,7 @@ Curated answers come in three kinds:
 | --- | --- | --- | --- |
 | **Verified queries** | A SQL query with typed parameters, and the questions it answers | the `curated` section (`curated.yaml`) | Yes |
 | **Preferred tables** | Views or tables the planner should reach for first | each datasource's `preferred_tables:` | Yes |
-| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Not yet, see [Business metrics](#business-metrics-deferred) |
+| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Parsed and validated; not used to answer questions |
 
 A thumbs-up on a generated answer becomes a *proposal* for a verified query
 in the review queue, which a person reviews and accepts. Nothing writes
@@ -70,7 +70,7 @@ datasources:
           GROUP BY c.CustomerId, customer, c.Country
           ORDER BY revenue DESC, c.CustomerId
           LIMIT :n
-    metrics:            # designed only; deferred
+    metrics:            # parsed and validated; not used to answer questions
       - name: revenue
         description: "Invoiced revenue, before refunds"
         expression: "SUM(InvoiceLine.UnitPrice * InvoiceLine.Quantity)"
@@ -82,7 +82,7 @@ silently ignored one:
 
 - `CuratedFileConfig`: `version: int = 1`, `datasources: Dict[str, CuratedDatasource]`.
 - `CuratedDatasource`: `verified_queries: List[VerifiedQuery]`, `metrics: List[MetricDefinition]`
-  (parsed and validated so the format is fixed, but not used yet).
+  (parsed and validated so the format is fixed, but not used to answer questions).
 - `VerifiedQuery`: `id` (a slug, unique within its datasource), `description`,
   `questions` (at least one), `params: Dict[str, ParamSpec]`, `sql`.
 - `ParamSpec`: `type` (`int`, `float`, `string`, `date`), optional `default`,
@@ -225,7 +225,7 @@ datasource's section of `curated.yaml`, as canonical JSON. `IndexHealth`
 reports "curated.yaml changed for 'chinook' since it was indexed; run
 `nl2sql index --refresh --datasource chinook`". `nl2sql doctor` and the
 facade's `engine.index.health()` show it. Only the verified queries are hashed:
-metrics are not indexed yet, so editing one asks for nothing.
+metrics are not indexed, so editing one asks for nothing.
 It is a warning, not a failure: the stale entries still point at queries that
 exist, and the matcher re-reads every query from the loaded file, never from
 the index. A query id that is in the index but no longer in the file is
@@ -305,7 +305,7 @@ reply from the preview, as today.
    fetched at `k × phrasings`, de-duplicated by `(datasource_id, query_id)`
    keeping each query's best cosine similarity, and cut to
    `CURATED_MATCH_TOP_K` (5). The search is recorded with the same record
-   `mmr_search()` writes, so the trace and the playground's retrieval view can
+   `mmr_search()` writes, so the trace and the Retrieval page can
    show it. If no allowed datasource has a verified query, there is no search
    and no embedding call.
 2. **Floor.** If the best similarity is below `CURATED_MATCH_FLOOR` (0.6), the
@@ -406,13 +406,13 @@ chosen, the access check refuses `Invoice`, the run falls back
 the usual `SECURITY_VIOLATION`. The refusal is the same one `viewer` gets
 today.
 
-### v1 limitation: one question, one query
+### One question, one query
 
 Matching runs once, on the whole question. A question with two parts ("top
 customers in 2012 and how many tickets did they open") is either not matched
 or matched to `none_of_these`, because the prompt asks for a query that
 answers the whole question, so it falls back to the generated pipeline.
-Matching each decomposed sub-query against verified queries is a later step.
+A decomposed sub-query is not matched against verified queries.
 
 ## The same guards as generated SQL
 
@@ -493,19 +493,16 @@ Every answer says where it came from:
 - The trace records the matcher as a node: the candidates with their
   similarities, the floor, the model's choice and reason, the params after
   checking, and the fallback reason code if it fell back.
-- The playground shows a badge on the answer, "Verified · top_customers_by_revenue",
-  with the params on hover. A generated answer shows no badge. Shown
-  beside the question, in the shape of the *Recorded run* label rather than
-  next to the plan-cache line, which only Debug shows: whether an answer was
-  verified matters to every reader. The Plan station, which has no plan to
-  show, names the query and its values instead.
+- **Why this answer** in the web app names the verified query used and its
+  values; a generated answer names the tables and the planner's choices
+  instead.
 
 ## Feedback proposals
 
 A thumbs-up on a generated answer files a `verified_query` proposal in the
 review queue. Nothing writes `curated.yaml` but an admin's accept (see
 [The review queue](../configuration/review.md)), so `curated.yaml` stays the
-single source of truth, in git. Neither the REST API nor the playground writes
+single source of truth, in git. Neither the REST API nor the web app writes
 it any other way.
 
 ## Demo

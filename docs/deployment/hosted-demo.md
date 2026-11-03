@@ -15,7 +15,6 @@ gate that protects it.
 | the API keys | saved to the project's `.env`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
 | a model per step | written to the project's `llm.yaml` | chosen in the browser tab, sent per request, saved nowhere |
 | Settings | writes `.env` and `llm.yaml` | writes nothing; the page keeps the keys and the choices |
-| Rebuild | on for an admin | refused |
 | Answer ratings | on | off |
 | Retrieval inspector | on | on, read only, at the hosted rate |
 | Pipeline page | on | on, read only: it names the steps and their models, never a key |
@@ -63,8 +62,8 @@ loads and names none). The hosted server's own config falls back to an OpenAI
 default, so without this a keyless visitor would be told a model produced the
 answer that did not. Instead, a keyless replay asks the replay server for the
 recorded model, which echoes it, so every call in the run's usage ledger -- and
-the Debug pane and the trace with it -- names `claude-opus-5`. `/api/meta` and
-`/api/pipeline` report the same `recorded_with`, and the Pipeline page shows
+the Debug pane and the trace with it -- names `claude-opus-5`. `GET /meta` and
+`GET /about` report the same `recorded_with`, and the Pipeline page shows
 that model on each model step, tagged **recorded**, until the visitor adds a
 key; then it shows the models their run will use, as before. Local replay mode
 (`nl2sql demo` with no key) does the same.
@@ -157,8 +156,8 @@ The visitor pastes a key on the **Settings** page, one per provider. From there:
    provider's own name. Closing the tab clears it. Nothing else in the page
    reads it.
 2. **It travels as a request header of its own**, `X-NL2SQL-Api-Key-<provider>`
-   (`X-NL2SQL-Api-Key-anthropic`), on `POST /api/ask` (or its streamed twin,
-   `POST /api/ask/stream`, which applies the same rules) and nowhere else. A
+   (`X-NL2SQL-Api-Key-anthropic`), on the question routes (`POST /query`, `POST /query/stream` and a conversation's `POST /conversations/{id}/turns`
+   and `.../turns/stream`, which apply the same rules) and nowhere else. A
    header rather than the body, because a body is what request logs and
    validation errors quote back; one header per provider, so a key never shares
    a header with anything else and nothing that parses or quotes a header can
@@ -317,21 +316,17 @@ environment and is not part of any response or log.
 ## What is off, and what is on
 
 **Off:** Settings *persistence* (choosing a model is on; it is only the saving
-that is off), Rebuild, and answer ratings. A server-side key is refused: it is the
+that is off), and answer ratings. A server-side key is refused: it is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.
 
-Rebuild being off is said on the page rather than left as a gap: the index
-panel reports that the index was built before the demo started and which
-databases it covers, and where the button would be it prints the server's own
-reason -- rebuilding writes to disk and the sample data never changes.
+The index was built before the demo started and nothing rebuilds it: the
+sample data never changes.
 
 **On:** the guided questions without a key, from recorded runs; asking them or
 any other question live with a key; a key per
-provider and a model per step (both kept by the browser), the schema view of
-any of the three databases (the rail's **Showing** switcher), which database
-answered a run, the per-node **Debug** drill-down with its traces, and the
-retrieval inspector read-only.
+provider and a model per step (both kept by the browser), which database answered a run, the per-node
+**Trace and cost** drill-down, and the Retrieval page read-only.
 
 ## Read-only sample data
 

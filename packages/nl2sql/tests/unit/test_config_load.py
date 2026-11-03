@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from nl2sql.config import Config, ConfigError, load_config
+from nl2sql.config.errors import MAPPING_PAGE
 
 MINIMAL = """\
 version: 2
@@ -107,14 +108,14 @@ def test_version_1_file_points_to_the_mapping(tmp_path):
     message = str(error)
     assert "is a 0.4 config file (`version: 1`)" in message
     assert "0.5 reads `nl2sql.yaml`" in message
-    assert "configuration/system#from-04" in message
+    assert MAPPING_PAGE in message
 
 
 def test_missing_version_points_to_the_mapping(tmp_path):
     error = load_error(write(tmp_path, "nl2sql.yaml", MINIMAL.replace("version: 2\n", "")))
     assert len(error.problems) == 1
     assert error.problems[0].path == "version"
-    assert "configuration/system#from-04" in str(error)
+    assert MAPPING_PAGE in str(error)
 
 
 def test_glossary_is_not_a_phase_1_section(tmp_path):
@@ -455,3 +456,20 @@ def test_datasource_domains_reject_non_string_items(tmp_path):
 
 def test_load_config_returns_a_config(tmp_path):
     assert isinstance(load_config(write(tmp_path, "nl2sql.yaml", MINIMAL)), Config)
+
+
+def test_the_mapping_page_and_anchor_exist():
+    """The error points at a heading that is really in the docs."""
+    import re
+    from pathlib import Path
+
+    from nl2sql.config.errors import MAPPING_PAGE
+
+    page, anchor = MAPPING_PAGE.split("#")
+    docs = Path(__file__).resolve().parents[4] / "docs"
+    text = (docs / f"{page}.md").read_text(encoding="utf-8")
+    slugs = []
+    for heading in re.findall(r"^#{1,6}\s+(.+?)\s*$", text, flags=re.M):
+        slug = re.sub(r"[^\w\s-]", "", heading.lower()).strip()
+        slugs.append(re.sub(r"[\s]+", "-", slug))
+    assert anchor in slugs, f"{page}.md has no heading that slugs to #{anchor}"

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
-MAPPING_PAGE = "configuration/system#from-04"
+MAPPING_PAGE = "releases/0.5.0#mapping-a-04-config"
 
 
 @dataclass(frozen=True)

@@ -589,20 +589,18 @@ publishing until the publisher entries are updated to match.
 
 #### Checklist before a new project's first release
 
-The SDK publishes as `nl2sql-sdk`. A project name PyPI has not seen needs its
+The CLI publishes as `nl2sql-cli`. A project name PyPI has not seen needs its
 own pending publisher. Do both before merging the first release PR that
-publishes the project (shown here for `nl2sql-sdk`):
+publishes the project (shown here for `nl2sql-cli`):
 
 - [ ] On PyPI, add a pending trusted publisher for the project:
       owner `nadeem4`, repository `nl2sql`, workflow `publish_pypi.yaml`,
-      environment `pypi-nl2sql-sdk`.
-- [ ] On GitHub, create the environment `pypi-nl2sql-sdk` under
+      environment `pypi-nl2sql-cli`.
+- [ ] On GitHub, create the environment `pypi-nl2sql-cli` under
       **Settings → Environments**.
 
 Without them that project's leg of the release fails. The `pypi` matrix is
-`fail-fast: false`, so the engine and API legs would still publish, and
-`nl2sql-engine` would land on PyPI depending on an `nl2sql-sdk` that is not
-there.
+`fail-fast: false`, so the other legs would still publish.
 
 ### GHCR package visibility
 

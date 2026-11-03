@@ -141,10 +141,8 @@ reads a secret from the provider whose `id` is `vault` (see
 
 ### Observers, hooks and evals
 
-Three sections added in release 0.7.
-They are accepted and validated now; the engine runs the hooks and the
-observers, and reads evals from the change named below. The observers
-are documented on their own page, [Observers](observers.md).
+Three sections. The engine runs the hooks and the observers and reads
+evals. The observers are documented on their own page, [Observers](observers.md).
 
 ```yaml
 # observers.yaml: where the engine's events go
@@ -215,9 +213,7 @@ Config(..., knowledge=[KnowledgeSourceConfig(type="yaml", path="glossary.yaml"),
 
 ### Conversations, chat tools, dashboards and MCP
 
-Four sections for release 0.9. They are
-accepted and validated now; the change named with each reads it. Each
-is optional, and absent, the defaults shown apply. Chart limits are
+Four sections. Each is optional, and absent, the defaults shown apply. Chart limits are
 `settings.charts` ([Settings](settings.md#charts)).
 
 ```yaml

@@ -73,8 +73,8 @@ and streams each slice out, so the result is never built in memory on the server
   token (letters, digits, `_` and `-`, so no `/`, `.` or `..`) are all
   `HTTP 404`, so a caller cannot tell one from the other or reach a path outside
   the run's folder.
-- A caller with a `user_id` (an API key, or a proxy that sets the user header) reads only its own runs. A
-  `static` caller has roles and no `user_id`, so its runs are anonymous: readable by any caller of the same tenant with the same
+- A caller with a `user_id` reads only its own runs. Every REST caller has one (an API key's user, the proxy's user header, `static` for all callers under `auth: static`, `local` under `auth: none`), so under `auth: static` all callers are one user and share their runs.
+- A run asked with no `user_id` (in process) is anonymous: readable by any caller of the same tenant with the same
   roles, and by no caller with other roles: a `viewer` holding an `admin` run's trace id
   gets `HTTP 404`. See [Who can read a run](../core/results.md#who-can-read-a-run).
 - The request body never names the caller: `user_context` is not a field of `POST /query`.

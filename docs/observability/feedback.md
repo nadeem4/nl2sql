@@ -12,12 +12,11 @@ too: see [the public facade](../api/core/public-facade.md#feedback).
 
 ## Rating an answer in the web app
 
-After a run, below **Cost & time**, the web app asks **Was this answer
-right?** with two buttons, **👍 Right** and **👎 Wrong**. A click saves the
-rating at once. A note is optional: pick **Wrong number**, **Wrong table**,
-**Wrong filter** or **Missing rows**, or type a few words (up to 280
-characters), then **Save note**. Rating the same run again replaces the earlier
-rating.
+Below an answered turn the web app asks **Did this answer it?** with two
+buttons, **Yes** and **Not quite**. **Yes** keeps the answer in **My answers**
+and rates the run up. **Not quite** rates the run down and opens a note and a
+corrected SQL, which **Send for review** files as a proposal. Rating the same
+run again replaces the earlier rating. See [Web app](../apps/web.md#chat).
 
 The server stores what *it* answered for that run, read from the run's own
 trace, so a caller cannot put a question or SQL into the table that the engine
@@ -32,9 +31,6 @@ never produced.
 A rating needs a kept trace (`engine.feedback.record` reads the run's own
 trace), so on the default `settings.traces.mode: on_failure` only failed runs
 can be rated; set `always` to rate successful ones.
-
-Feedback is on by default. `settings.feedback.enabled: false` turns it off: the
-control then says so and `POST /feedback` is refused.
 
 ## What is stored
 

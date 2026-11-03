@@ -198,8 +198,8 @@ flowchart TD
   each configured datasource in turn, and a failure keeps that datasource's
   previous build live and exits `1`.
 - `nl2sql.indexing.rebuild.rebuild_index`, behind `engine.index.build`, is the
-  one entry point for `nl2sql index`, the demo's startup repair, the
-  playground's Rebuild and the REST index routes. Its `on_datasource` callback
+  one entry point for `nl2sql index`, the demo's startup repair and the
+  REST index job (`POST /api/v1/jobs/index`). Its `on_datasource` callback
   gets an `IndexProgress` per datasource (`started`, then `done` with the entry
   counts or `failed` with the reason): `nl2sql index` prints a line from it.
 - **One build at a time.** `rebuild_index` holds the state store's `index`
@@ -237,8 +237,8 @@ indexed (its pointer's `curated_hash` differs from the file's) gets
 stale entries still name queries that exist. A `preferred_tables` entry missing
 from the datasource's live snapshot is a warning too. `nl2sql doctor` prints it
 under **Index**, `nl2sql demo` rebuilds at startup when it is not `ok`, and the
-playground and `GET /api/v1/index` show it (through
-`engine.index.health()`), the playground with a Rebuild button.
+`GET /api/v1/index` shows it (through
+`engine.index.health()`).
 
 ## Chunking strategy (as implemented)
 

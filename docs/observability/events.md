@@ -166,8 +166,8 @@ then exactly one of `run.finished` or `run.failed`.
 
 As Server-Sent Events, each event is `event: <name>` and one `data:` line
 holding the whole event as JSON. That is what `nl2sql-api`'s
-`POST /api/v1/query/stream` ([REST](../api/rest/query.md)) and the
-web app's `/api/ask/stream` send.
+`POST /api/v1/query/stream` ([REST](../api/rest/query.md)) and
+`POST /api/v1/conversations/{id}/turns/stream` send.
 
 The allow-list is one definition: the catalog entries marked `stream`
 (`nl2sql.events.STREAM_EVENTS`). An event added to the catalog joins the

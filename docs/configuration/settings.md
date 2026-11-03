@@ -195,7 +195,7 @@ Whether curated answers are on is not a setting: the
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `enabled` | `true` | Let the web app record a thumbs up or down, with an optional note, for a run. Stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
+| `enabled` | `true` | Reserved: the key is accepted and validated, and nothing reads it. Ratings of a run (**Yes** or **Not quite** in the web app) are stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
 
 ## `knowledge`, `clarify`, `profiler` and `review`
 

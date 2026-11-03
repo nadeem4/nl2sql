@@ -48,9 +48,9 @@ has no `user_id` and has the same roles, and by no named user. So a `viewer` hol
 reads nothing, while anonymous callers with the same roles share each other's results, because nothing else tells
 them apart.
 
-A REST caller identified by an API key or a trusted proxy header carries a `user_id`, so its runs are
-owned by that user. A caller on the `static` source has roles only, so its runs are anonymous in the sense
-above. See [REST identity](../rest/index.md#identity).
+Every REST request carries a `user_id` (see [REST identity](../rest/index.md#identity)): the API key's user, the
+trusted proxy's user header, `static` for every caller under `auth: static`, `local` under `auth: none`, and a
+per-visitor id on the hosted demo. So under `auth: static` all callers are one user and share their results.
 
 **Operator tools.** `nl2sql run`, `nl2sql trace`, `nl2sql eval`, the replay provider and the feedback tools read
 the result they were just given, traces and recordings, never `engine.results`, so they are unchanged. In-process

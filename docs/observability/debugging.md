@@ -52,7 +52,7 @@ Where the file went is reported back:
   `engine.traces.get(trace_id)` reads the trace from any store. A trace records its asker (`owner`); with a
   `user_context` only that asker reads it, and with none the caller is the in-process operator (`nl2sql trace`).
 - `nl2sql run` prints `Trace written to <path>`.
-- The web app shows a **Download trace** link under Cost & time when Debug is on.
+- The web app reads the trace with `GET /api/v1/traces/{trace_id}` when you open a node under **Trace and cost**.
 
 File names are `<UTC timestamp>_<trace_id>.json`, so a directory listing sorts
 by time.
@@ -344,22 +344,16 @@ served. It then compares the replayed `QueryResult` with the recorded one
 
 ## The web app
 
-With **Debug** on, the per-node table under **Cost & time** puts a bar beside
-each node's time, sized to the slowest node, so the slow step stands out. Each
-node name opens that node's record from the trace: every attempt and sub-query, its
-errors and warnings, what it read and returned, and for LLM nodes the exact
-prompt, the raw response and the parsed result. Long text is folded. For the
-`datasource_resolver` and `schema_retriever` nodes it also shows the retrieval
-record as a table: the pool nearest first, picks marked with their MMR order,
-dropped entries greyed, the picks in order as a row of chips, and a second row
-naming the entries MMR passed over because they repeat an earlier pick. The **Retrieval** inspector at the top of the page
-runs the same search for any text (see the
-[demo guide](../apps/web.md#home-pipeline-and-retrieval)). The page
-fetches the trace from `GET /api/trace/{trace_id}`, which reads it with
-`engine.traces.get`: any id that is not a plain token is rejected before the
-trace store sees it, and the `files` store reads only files directly inside its
-folder, so `../` or an absolute path never reaches the filesystem.
+Under an answered turn, **Trace and cost** shows the run's total cost and time and a table with one row per node:
+its tokens, cost and time. Selecting a node reads the run's trace (`GET /api/v1/traces/{trace_id}`) and opens that
+node's record: what it read and returned, and for LLM nodes the prompt and the response. For the `datasource_resolver`
+and `schema_retriever` nodes it also shows the retrieval record as a table: the pool nearest first, picks marked
+with their MMR order, and dropped entries greyed. The **Retrieval** page runs the same search for any text (see
+[Web app](../apps/web.md#home-pipeline-and-retrieval)).
 
-Below the run, **Was this answer right?** records a rating keyed by the same
-trace id; `nl2sql feedback stats` reads the ratings together with the traces in
-`<storage.path>/traces`. See [Feedback and Signals](feedback.md).
+A trace is readable only by the caller who asked the run: another caller's trace, an unknown one, and an id that is not
+a plain token are all a `404`, and the `files` store reads only files directly inside its folder, so `../` or an
+absolute path never reaches the filesystem.
+
+**Did this answer it?** records a rating keyed by the same trace id; `nl2sql feedback stats` reads the ratings
+together with the traces in `<storage.path>/traces`. See [Feedback and Signals](feedback.md).

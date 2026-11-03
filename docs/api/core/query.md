@@ -440,8 +440,7 @@ for event in engine.stream_query("Which genre sells the most tracks?",
 An `Event` (`nl2sql.Event`, from `nl2sql_sdk.events`) has a `name`, `at` (UTC),
 the run's `trace_id`, its `tenant_id` and a JSON-ready `data` dict;
 `event.sse()` is the event as one Server-Sent Event (`event: <name>`, and the
-whole event as JSON on the `data` line), which is how `nl2sql-api` and the
-web app send it.
+whole event as JSON on the `data` line), which is how `nl2sql-api` sends it.
 
 | name | data | when |
 | --- | --- | --- |
@@ -538,7 +537,7 @@ with open("genres.csv", "wb") as out:
 
 `nl2sql-api` serves these as
 [`GET /api/v1/results/{trace_id}/{result_id}`](../rest/results.md#get-apiv1resultstrace_idresult_id)
-and `.../{result_id}.csv`; the web app serves the same two under `/api/query/...`.
+and `.../{result_id}.csv`.
 
 ### SubQueryResult
 

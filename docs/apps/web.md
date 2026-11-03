@@ -197,7 +197,7 @@ step in `/about` runs on the `replay` provider.
 scope reaches. The datasource list comes from `/meta`. With no datasource it says there is nothing to search yet.
 
 **Hosted first run.** A hosted visitor without a key sees the guided questions replay recorded runs. A question with no
-recording comes back as a `REPLAY_MISS` error, and Chat then points to Settings to add a key. Chat labels a recorded answer **Recorded run** when every model call in its usage reports no token count and names the recording's model.
+recording comes back as a `REPLAY_MISS` error, and Chat then points to Settings to add a key.
 
 ## Source map
 
@@ -213,8 +213,9 @@ recording comes back as a `REPLAY_MISS` error, and Chat then points to Settings 
 
 ## Screenshots
 
-Captured from the playground on the demo project, asking about Chinook, with
-recorded model responses (so token counts are placeholders).
+Captured from the earlier front end on the demo project, asking about Chinook,
+with recorded model responses (so token counts are placeholders). The pages
+above describe the current app, which lays these out differently.
 
 **An answer:** the question, the plan the model wrote, the validator's checks,
 the generated SQL and the rows.
@@ -234,8 +235,8 @@ tokens and its time.
 
 ![The Pipeline page listing each step of a run, the seven marked as decided by a model, with tokens and time from the last run](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-pipeline.png)
 
-**Settings:** save an API key per provider and choose a provider and model for
-each LLM step. Written to the demo project's `.env` and `llm.yaml`.
+**Settings:** enter an API key per provider and choose a provider and model for
+each LLM step.
 
 ![The Settings page with the key form and a model per step](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-settings.png)
 
@@ -246,8 +247,8 @@ read are not shown. No LLM call.
 
 ![The Retrieval inspector page showing picks, similarity and MMR scores](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-retrieval.png)
 
-**Feedback:** rate an answer right or wrong, with an optional note. Stored in the
+**Feedback:** rate an answer, with an optional note. Stored in the
 project with the question, role and SQL, never the rows;
 `nl2sql feedback stats` reports the rates.
 
-![The "Was this answer right?" control after a thumbs-up](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-feedback.png)
+![The rating control after a thumbs-up](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-feedback.png)

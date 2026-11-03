@@ -19,40 +19,48 @@ To see it before installing anything, the same web app runs at
 ## What to expect
 
 !!! note "`nl2sql demo` is a launcher"
-    Since the web app moved into `nl2sql-api`, `nl2sql demo` only starts
-    `nl2sql-api serve --demo` in a child process, waits until it answers and
-    opens your browser (Ctrl+C stops both). Its flags are `--dir`, `--host`,
-    `--port` and `--no-browser`. The command takes no key,
-    recording or hosting options: put a key in the
-    environment or the project's `.env` (or paste it into Settings), and run the
-    public variant with `nl2sql-api serve --demo --hosted`. The web app guide is
-    [Web app](../apps/web.md).
+    `nl2sql demo` starts `nl2sql-api serve --demo` in a child process, waits
+    until the server answers and opens http://127.0.0.1:8765/ in your browser
+    (Ctrl+C stops both). Its flags are `--dir`, `--host`, `--port` and
+    `--no-browser`. The command takes no key, recording or hosting options: put
+    a key in the environment or the project's `.env`, or enter it in Settings,
+    and run the public variant with `nl2sql-api serve --demo --hosted`. The web
+    app guide is [Web app](../apps/web.md).
 
 After `pip install "nl2sql-cli[web]"` and `nl2sql demo`:
 
-1. **No questions at the terminal.** The command does not prompt. It looks for
-   a model key -- `OPENAI_API_KEY`, `OPENROUTER_API_KEY` or
-   `ANTHROPIC_API_KEY`, then a key saved in the project's `.env`, then an Ollama daemon
-   on `localhost:11434` -- and says which mode it chose: **Live mode** with
-   the provider, or **Replay mode** when it finds none.
+1. **No questions at the terminal.** The command does not prompt. The demo
+   project uses the first model key it finds (`OPENAI_API_KEY`,
+   `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`, in the environment or in the
+   `.env` next to the demo's `nl2sql.yaml`), then an Ollama daemon on
+   `localhost:11434` with a model pulled, and otherwise answers its guided
+   questions from recorded runs.
 2. **A project folder and an index.** The first time, it writes
    `./nl2sql-demo` (`--dir` changes it) with `nl2sql init --demo`, which copies
    in the three databases above; every start then builds the engine, calls
    `engine.check()`, and indexes the schemas on your machine when the index is
    missing, empty or out of date. The first run downloads a ~79 MB embedding model; indexing
    needs no key.
-3. **A local page.** It prints `Web app ready at http://127.0.0.1:8765/` and
-   opens that address in your browser (`--no-browser` skips it, `--port`
-   changes it). Ctrl+C stops it.
-4. **No key yet?** Paste an OpenAI or Anthropic key (or an OpenRouter one) into
-   [the Settings page](../apps/web.md#settings); the running demo switches to live
-   without a restart.
-5. **Ask.** Pick one of twenty guided questions or type your own, as `admin`,
-   `analyst` or `viewer`. A run shows the answer first, then the plan the model
-   wrote, the checks, the generated SQL, the rows, and cost and time.
-   **Debug** opens each step's model calls, prompts and responses, and
-   [the Pipeline page](../apps/web.md#home-pipeline-and-retrieval) lists every step and which a model
-   decides.
+3. **A local page.** The server starts without sign-in: you are the local
+   operator, with the admin roles. The page opens in your browser once the
+   server answers (`--no-browser` skips that, `--port` changes the port).
+   Ctrl+C stops it.
+4. **No key yet?** Open [Settings](../apps/web.md#settings) and enter an OpenAI,
+   Anthropic or OpenRouter key. It stays in that browser tab and is sent with
+   each question; nothing is written on the server.
+5. **Ask.** **Home** shows the guided questions the demo carries and **Chat**
+   answers them or your own. An answer shows the text and the rows first, then
+   the warnings, **Why this answer**, the **SQL** and **Plan**, and **Trace and
+   cost**; **Did this answer it?** keeps a good answer in **My answers**.
+   [The Pipeline page](../apps/web.md#home-pipeline-and-retrieval) lists every
+   step and which a model decides.
+
+The web app also has pages to build [dashboards](../apps/web.md#dashboards-and-workspaces),
+decide [approvals](../apps/web.md#approvals), add a database
+([Connect](../apps/web.md#connect-and-review)), review what the engine knows
+(Knowledge), run [evals](../apps/web.md#evals) and search the index
+([Retrieval](../apps/web.md#home-pipeline-and-retrieval)). Connect, Knowledge
+and Evals are for administrators, which is what you are on a local demo.
 
 The `nl2sql` command is the `nl2sql-cli` package and its `web` extra brings the
 web app. From a clone, install
@@ -159,13 +167,13 @@ year, sales by country, best-selling genres, top artists by tracks sold).
 `nl2sql.yaml` includes it as the `curated` section, so curated answers are
 on, and indexing embeds their questions
 beside the schema. A question one of them answers runs its SQL with the values
-bound instead of a generated plan, and the web app labels the answer
-**Verified ·** and the query's id. "What is the total revenue per year?" and
+bound instead of a generated plan, and **Why this answer** names the verified
+query used. "What is the total revenue per year?" and
 "Which genre sells the most tracks?" among the guided questions are two of
 them. See [Curated answers](../configuration/curated.md#in-the-demo).
 
-The keyless replay includes the matcher's recorded choices, so the badge
-appears without a key too, on the guided questions a verified query answers.
+The keyless replay includes the matcher's recorded choices, so a verified query
+answers without a key too, on the guided questions it covers.
 
 ### The roles
 
@@ -187,8 +195,10 @@ true`, so the demo's refusal names the role and table; outside the demo the
 message is the generic "You do not have permission to see the data this
 question requires." See
 [Security Model](../security/model.md#hidden-tables-and-strict-refusal).
-The web app's schema panel follows the **Ask as** role too: it lists only
-the tables that role may read (`engine.datasources.schema(..., user_context=)`).
+The web app runs the demo as the local operator with the admin roles, so to
+try the other roles use `nl2sql run --role viewer` or the REST API;
+`engine.datasources.schema(..., user_context=)` lists only the tables a role may
+read.
 
 ### Recorded answers, no key
 
@@ -243,22 +253,16 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   [LLM configuration â†’ Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
-- Indexing calls no model: the demo's own indexing (the first run, the startup
-  repair and the web app's Rebuild) reads the schema and the glossary and
+- Indexing calls no model: the demo's own indexing (the first run and the startup
+  repair) reads the schema and the glossary and
   embeds them, with the local embedding model by default. Descriptions a model
   drafts are proposals for review, not part of the index.
-- A key pasted into Settings is written into the project's `.env`, never into a YAML file. The provider follows the
-  key's shape: a key beginning `sk-or-` is OpenRouter and is stored as
-  `OPENROUTER_API_KEY` with `provider: openrouter`; a key beginning `sk-ant-`
-  is Anthropic and is stored as `ANTHROPIC_API_KEY` with `provider: anthropic`,
-  model `claude-opus-5` and `temperature: null` (install
-  `nl2sql-engine[anthropic]`); anything else is OpenAI. `llm.yaml` names no
-  key: the running engine is given it in memory, ahead of any key exported
-  for the same provider, and later runs read it from `.env`. The process
-  environment is never written. `.env` is covered by
-  `.gitignore`, but a key passed on the command line is visible in shell
-  history and to `ps`, so the environment variable remains the more private
-  route.
+- A key entered in Settings stays in that browser tab and is sent with each
+  question; nothing is written on the server. To keep a key for the server,
+  put it in the environment or in the `.env` next to `nl2sql.yaml`, which is
+  covered by `.gitignore`. A key passed on the command line is visible in
+  shell history and to `ps`, so the environment variable remains the more
+  private route.
 - So `nl2sql init --demo` and `nl2sql index` complete with no chat key at all,
   and `nl2sql index` exits `0`. It exits `1` if any datasource actually fails
   to index, which is safe to rely on in a script. A missing key surfaces when a
@@ -290,20 +294,17 @@ healthy, so run `nl2sql index` in the folder, or start a fresh one with
 
 ### Index health and repair
 
-The web app's schema panel reads the schema snapshot, for whichever database
-its **Showing** switcher names; the resolver, which
-picks the database for every question when more than one is registered, reads
-the separate vector index, and with three registered it searches on every
-question. After a run the answer header names the database it picked. The two
-can disagree: a folder once had its snapshot intact and 0 entries in its index,
-so the page looked fine while every question failed with
-`SCHEMA_RETRIEVAL_FAILED`. Three things now guard against that:
+The resolver, which picks the database for every question when more than one is
+registered, reads the vector index, and with three registered it searches on
+every question. The schema snapshot and the index can disagree: a folder once
+had its snapshot intact and 0 entries in its index, so the schema looked fine
+while every question failed with `SCHEMA_RETRIEVAL_FAILED`. Three things guard
+against that:
 
 - **Startup repair.** Every `nl2sql demo` start calls `engine.check()`, which
   reports what the index *contains*: the demo rebuilds it when it is missing or
   empty, or a datasource has no live build. A failed rebuild is
-  reported (the web app still starts, and offers Rebuild) rather than
-  ignored.
+  reported and the server still starts.
 - **Rebuilds never leave an empty index.** A datasource's new entries are
   written beside its current ones and switched in only when all are written;
   a failure keeps the previous entries answering questions. See
@@ -312,40 +313,14 @@ so the page looked fine while every question failed with
   "The vector index is empty ... Re-index with `nl2sql index`", and
   `nl2sql doctor` prints the engine's check, the index status included.
 
-### The search index panel
-
-The web app's left rail opens with the **Database** panel, and with the
-demo's three databases it carries a switcher for which of them to read: a
-segmented control while there are four or fewer, a **Showing** select beyond
-that. At the foot of the rail, **Search index** is one line when all is well --
-"Search index fresh. 186 entries, built 3 minutes ago." -- that opens to entries
-by type (datasource, tables, columns, relationships), the schema version they
-were built from, and when. One index holds every database, so with the demo's
-three the line inside says which they are -- "Covers chinook, support and
-webanalytics". With a single database both panels name it instead, and there
-is no switcher. When the index is empty, missing or out of date, or a rebuild
-is running or failed, the panel opens itself, a warning under the top bar says
-what that means for a question, and the panel's **Rebuild the index** button
-becomes the rail's one filled button. **Rebuild** is also always available on
-demand.
-
-- Rebuild re-reads one database's schema into a new snapshot and rebuilds its
-  entries beside the current ones; questions keep using the current entries
-  until the new ones are complete, and a question in flight finishes on the
-  entries it started with. That database is the demo's own, named in the button's help;
-  `nl2sql index` rebuilds all three.
-- It shows each step as it runs. The first run downloads the 79 MB embedding
-  model, so it can take a few minutes.
-- **Write descriptions with the LLM** is off by default because it spends
-  tokens on your key; it is unavailable in replay mode.
-- It has the Settings page's guardrails (so does the
-  [Retrieval inspector](../apps/web.md#home-pipeline-and-retrieval)): local only (on a non-loopback host it is off),
-  and only from the page itself.
-- On the [hosted demo](../deployment/hosted-demo.md) there is no button at all.
-  The panel says instead that the index was built before the demo started and
-  which databases it covers, and prints the server's own reason where the
-  button would be: rebuilding writes to disk, and the sample data never
-  changes.
+`GET /index` reports the index's health, the
+[Retrieval page](../apps/web.md#home-pipeline-and-retrieval) searches it, and
+`nl2sql index` rebuilds it for all three databases. A question in flight
+finishes on the entries it started with. The first run downloads the 79 MB
+embedding model, so it can take a few minutes. Descriptions a model drafts are
+proposals for review, not part of the index. On the
+[hosted demo](../deployment/hosted-demo.md) the index was built before the
+server started and nothing rebuilds it: the sample data never changes.
 
 ### Old demo folders
 
@@ -353,15 +328,15 @@ Demo folders are not upgraded in place: a folder keeps the defaults of the
 engine that wrote it (for example its default model). A new folder gets a
 `nl2sql-demo.json` stamp; when `nl2sql demo` starts in a folder stamped by an
 older engine, or in one with no stamp at all, it warns and suggests a fresh
-`--dir`. The web app's index panel repeats the
-warning.
+`--dir`.
 
 ### The web app
 
 Asking, the pipeline view, Settings, the retrieval inspector and answer ratings
-are pages of the web app, described in [Web app](../apps/web.md). Ratings are
-stored in the demo's state store (`.nl2sql/state.db`) with the question, role,
-SQL, the model per step and the engine version, never the rows; see
+are pages of the web app, described in [Web app](../apps/web.md). **Did this
+answer it?** files the rating through `POST /feedback`; it is stored in the
+demo's state store (`.nl2sql/state.db`) with the question, role, SQL, the model
+per step and the engine version, never the rows; see
 [Feedback and Signals](../observability/feedback.md).
 
 ## 3. Use the demo from the CLI
@@ -409,14 +384,13 @@ answers with `nl2sql trace replay <file>`. See
 
 Asking a question a second time on the same day reuses the first run's validated plan from the
 plan cache (in `.nl2sql/state.db`), so the SQL and rows are the same and the
-planner is not called; the web app's Debug view says "Plan from the plan
-cache". The plan is still validated for the role you ask as. To start fresh:
+planner is not called. The plan is still validated for the role you ask as. To start fresh:
 
 ```bash
 nl2sql cache clear
 ```
 
-The web app's ratings, and the guardrail rates over every rated run and
+The ratings, and the guardrail rates over every rated run and
 kept trace:
 
 ```bash
@@ -435,13 +409,13 @@ Recording (`scripts/record_demo_answers.py`) turns the cache off
 (`settings.pipeline.plan_cache` is off in the engine it builds; the files are
 not changed), so every planner
 answer is captured. It also stops with exit `1`, recording nothing, when the
-demo's indexing fails: a plain `nl2sql demo` keeps going and offers Rebuild,
+demo's indexing fails: a plain `nl2sql demo` keeps going,
 but answers recorded against no index would be the wrong ones. Only a
 question whose run succeeded (rows, an answer, no error) keeps its recordings;
 a failed run's are dropped, the question is listed as not recorded, and the
 command exits `1` after writing `recordings.json` with the rest. The file names
 the provider and the model that answered, and a replay reports that model --
-in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
+in the usage ledger and on the Pipeline page, tagged recorded --
 rather than the one the replaying config names. See
 [Determinism â†’ The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
@@ -457,9 +431,7 @@ other one that fails is printed and left out of routing.
 ## Sample questions
 
 The demo's datasource files carry twenty questions (`sample_questions`), the same
-ones the web app offers as guided questions -- a few as chips for the
-database the rail is showing, and all twenty behind **N more**, in one pile per
-database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
+ones the web app offers as guided questions, from `GET /meta`. Chinook's twelve come first, so the demo opens on familiar
 ground:
 
 - How many customers do we have, by country?
@@ -489,11 +461,9 @@ And four on `webanalytics`:
 - What is the bounce rate by device type?
 - How many purchases were there per month in 2013?
 
-None of them spans two databases, deliberately: the engine cannot answer such a
-question yet. The rail says so too, under the database switcher: each question
-is answered from one database, and joining across them is not supported. Clicking a
-question from another pile moves the switcher to that database, so the schema
-on the left is the one the question is about.
+None of them spans two databases, deliberately: the engine plans each
+sub-query against one datasource, so a question that has to read two of them at
+once is not answerable.
 
 They are also indexed, per datasource, each question as an entry of its own
 (`schema.datasource_example`, from `sample_questions` in its datasource file),

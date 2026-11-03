@@ -117,9 +117,8 @@ still refuses a plan on the table. See
 
 This is **table-level** access control. It is not column masking and not
 row-level security: a role that may read a table reads every column and every
-row of it. A downloaded trace of a *permitted* run holds real rows, and the
-web app serves any trace by id with no login, so restricting a trace to the
-user who produced it is left to a multi-user deployment.
+row of it. A trace of a *permitted* run holds real rows; it is readable
+only by the caller who asked the run.
 
 ## Security controls
 
@@ -179,8 +178,9 @@ user who produced it is left to a multi-user deployment.
   reads nothing; no caller is a `TypeError`, and a manifest that records no
   asker is refused. Callers with no `user_id` are anonymous: their runs are
   bound to the tenant and the same set of roles, so a `viewer` cannot read an
-  `admin` run, but anonymous callers with the same roles share results (the
-  `static` source gives every caller no user id). See
+  `admin` run, but anonymous callers with the same roles share results. Every
+  REST caller has a `user_id`, and under `auth: static` it is `static` for all of
+  them, so they share results. See
   [Who can read a run](../api/core/results.md#who-can-read-a-run).
 - **A supplied plan** (`run_query(plan=...)`) skips planning, not checking:
   its datasource is scope-checked, and the plan passes `plan.after` and the
