@@ -161,9 +161,9 @@ only these methods and namespaces, never the runtime behind them.
 `tests/architecture/test_boundaries.py` holds them to that, and
 `test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql`
 holds the playground, `nl2sql demo` and `nl2sql-api` to importing from the
-top-level `nl2sql` only (the playground and `nl2sql demo` keep a short, named
+top-level `nl2sql` only (the old playground keeps a short, named
 list of exceptions in that test, each with the reason and the change that
-removes it).
+removes it; `nl2sql demo` is now a launcher that imports nothing from the engine but `nl2sql.cli`).
 
 ### About
 

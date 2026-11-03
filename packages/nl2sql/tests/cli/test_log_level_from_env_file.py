@@ -50,22 +50,3 @@ def test_an_exported_level_wins_over_the_env_file(tmp_path, monkeypatch):
     runner.invoke(app, ["--config", str(config), "config", "check"])
 
     assert logging.getLogger().level == logging.ERROR
-
-
-def test_the_demo_logs_at_the_level_its_project_env_file_names(tmp_path, monkeypatch, demo_engines):
-    pytest.importorskip("fastapi")
-    for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
-        monkeypatch.setenv(name, "")
-        monkeypatch.delenv(name)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: None)
-    directory = tmp_path / "demo"
-    first = runner.invoke(app, ["demo", "--no-browser", "--dir", str(directory)])
-    assert first.exit_code == 0, first.output
-    with (directory / ".env").open("a", encoding="utf-8") as env:
-        env.write("\nNL2SQL_LOG_LEVEL=DEBUG\n")
-
-    second = runner.invoke(app, ["demo", "--no-browser", "--dir", str(directory)])
-
-    assert second.exit_code == 0, second.output
-    assert logging.getLogger().level == logging.DEBUG

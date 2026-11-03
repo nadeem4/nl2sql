@@ -14,7 +14,7 @@ from nl2sql import configure_logging, load_env_file
 from nl2sql.cli.commands.indexing import run_indexing
 from nl2sql.cli.commands.run import run_pipeline
 from nl2sql.cli.commands.info import list_available_adapters
-from nl2sql.cli.commands.demo import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION, demo_command
+from nl2sql.cli.commands.demo import demo_command
 from nl2sql.cli.commands.doctor import doctor_command
 from nl2sql.cli.commands.init import init_command
 from nl2sql.cli.commands.install import install_command
@@ -272,52 +272,12 @@ def init(
 @app.command()
 def demo(
     directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project (`nl2sql init --demo`: nl2sql.yaml, its files, the databases and the index)")] = pathlib.Path("nl2sql-demo"),
-    host: Annotated[str, typer.Option(help="Bind address. The default binds localhost only; 0.0.0.0 exposes the playground to your network")] = "127.0.0.1",
-    port: Annotated[int, typer.Option(help="Port to serve the playground on")] = 8765,
-    no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open a browser tab; just serve and print the URL")] = False,
-    record: Annotated[bool, typer.Option("--record", help="Record the sample questions through a real provider")] = False,
-    api_key: Annotated[Optional[str], typer.Option(
-        "--api-key",
-        help=(
-            "API key for live mode, saved into the demo project's .env so later runs "
-            "from that directory stay live. The provider follows the key shape: an sk-or- key "
-            "is OpenRouter, an sk-ant- key is Anthropic, anything else is OpenAI. Precedence: --api-key, then "
-            "OPENAI_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY in the environment, then .env, then Ollama, "
-            "then replay. A key on argv is visible in shell history and to ps, so the "
-            "environment variable is the more private route."
-        ),
-    )] = None,
-    allow_settings: Annotated[bool, typer.Option(
-        "--allow-settings",
-        help=(
-            "Turn on the playground's settings panel (API key, model per LLM node), Rebuild "
-            "and the Retrieval inspector even when --host is not a loopback address. Off by "
-            "default there because the playground has no login: anyone who can reach it could "
-            "swap in their own key, run up costs on yours, or read every index entry, column "
-            "statistics and sample values included."
-        ),
-    )] = False,
-    hosted: Annotated[bool, typer.Option(
-        "--hosted",
-        help=(
-            "Serve a public demo of the sample databases. The server holds no API key: every "
-            "visitor pastes their own, the browser keeps it and sends it with each question, and "
-            "it is used in memory for that question only -- never written to a file, an "
-            "environment variable, a log or a trace. Settings, Rebuild, feedback and --record are "
-            "refused, the sample databases are opened read-only, and questions are rate limited "
-            "per visitor and capped per session (--questions-per-minute, --questions-per-session)."
-        ),
-    )] = False,
-    questions_per_minute: Annotated[int, typer.Option(
-        "--questions-per-minute", min=1, help="Hosted mode: how many questions a minute one visitor may ask.",
-    )] = DEFAULT_QUESTIONS_PER_MINUTE,
-    questions_per_session: Annotated[int, typer.Option(
-        "--questions-per-session", min=1, help="Hosted mode: how many questions one browser session may ask.",
-    )] = DEFAULT_QUESTIONS_PER_SESSION,
+    host: Annotated[str, typer.Option(help="Bind address. The default binds localhost only")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to serve the web app on")] = 8765,
+    no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open a browser tab; just serve")] = False,
 ):
-    """One-command playground over the demo's sample databases (`nl2sql init --demo` into --dir)."""
-    demo_command(directory, host, port, no_browser, record, api_key, allow_settings, hosted,
-                 questions_per_minute=questions_per_minute, questions_per_session=questions_per_session)
+    """One-command web app over the demo's sample databases: starts `nl2sql-api serve --demo` (needs nl2sql-api)."""
+    demo_command(directory, host, port, no_browser)
 
 
 @app.command()

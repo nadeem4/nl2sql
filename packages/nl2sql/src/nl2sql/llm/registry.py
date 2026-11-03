@@ -156,6 +156,10 @@ class RunLLMs:
         self.release()
 
 
+class MissingApiKey(ValueError):
+    """A keyed provider with no key to resolve: a typed failure a turn can report instead of crashing."""
+
+
 class LLMRegistry:
     """One engine's LLM: the current ``LLMSet``, and the ``LLMClientCache`` its clients come from.
 
@@ -526,7 +530,7 @@ class LLMRegistry:
         if from_env:
             return from_env
 
-        raise ValueError(
+        raise MissingApiKey(
             f"LLM agent '{agent.name}' uses provider '{agent.provider}', which "
             f"requires an API key, but none could be resolved. Set {env_var} in the "
             "environment or in the .env next to nl2sql.yaml, or give it an api_key "

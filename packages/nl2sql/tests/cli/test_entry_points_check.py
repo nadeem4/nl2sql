@@ -62,14 +62,3 @@ def test_an_optional_datasource_that_fails_leaves_the_cli_running_degraded(tmp_p
     assert result.exit_code == 0, result.output
     assert len(called) == 1
     assert "lost: failed at database" in result.output.replace("\n", " ")
-
-
-def test_the_demo_refuses_to_start_when_a_required_datasource_fails(tmp_path):
-    from nl2sql.cli.commands.demo import start_engine
-
-    config = _project(tmp_path, required=True)
-
-    with pytest.raises(SystemExit) as exit_info:
-        start_engine(config)
-
-    assert exit_info.value.code == 1

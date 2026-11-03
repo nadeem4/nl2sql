@@ -241,12 +241,12 @@ def test_converted_recording_replays_every_guided_question():
 
     from langchain_openai import ChatOpenAI
 
-    from nl2sql.cli.commands.demo import RECORDINGS
+    import nl2sql.datasets
     from nl2sql.datasets.demo import DEMO_QUESTIONS
     from nl2sql.llm.wires import structured
     from nl2sql.pipeline.nodes.ast_planner.schemas import PlannerAnswer, PlanModel
 
-    path = Path(RECORDINGS) / "chinook.json"
+    path = Path(nl2sql.datasets.__file__).parent / "recordings" / "chinook.json"
     raw = json.loads(path.read_text(encoding="utf-8"))["recordings"]
     store = ReplayStore.load(path)
     assert "PlanModel" not in {r["name"] for r in raw}

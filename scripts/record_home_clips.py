@@ -1,10 +1,11 @@
-"""Records the playground home page's clips: one per feature, light and dark.
+"""Records the web app's home page clips: one per feature, light and dark.
 
 The home page (``nl2sql-ui/src/pages/Home.jsx``) shows a short clip of each page
-it describes -- Ask, Pipeline, Retrieval. This script boots the demo in hosted
-mode with no key at all, drives each page in headless Chromium, and writes a
+it describes -- Ask, Pipeline, Retrieval. This script boots ``nl2sql-api serve --demo``
+with no key at all (the replay provider; on loopback the caller is the operator, so
+Retrieval is open), drives each page in headless Chromium, and writes a
 muted webm and a poster jpg per feature and theme into
-``packages/nl2sql/src/nl2sql/cli/demo/playground/assets/clips/``::
+``packages/api/src/nl2sql_api/web/assets/clips/``::
 
     ask.webm  ask-dark.webm  ask.jpg  ask-dark.jpg  pipeline...  retrieval...
 
@@ -23,7 +24,7 @@ keyless guided question from the recordings the engine ships
 - **Pipeline** and **Retrieval** need no model at all (the step list, and a
   search of the index with the local embedder), so they are always real.
 
-``--url`` drives a playground that is already running instead of booting one.
+``--url`` drives a server that is already running instead of booting one.
 The ``Record home clips`` job in ``.github/workflows/record_demo.yml`` runs the
 same command in CI and opens a pull request with the result.
 """
@@ -44,7 +45,7 @@ import urllib.request
 from typing import Dict, List, Optional
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-OUT = ROOT / "packages" / "nl2sql" / "src" / "nl2sql" / "cli" / "demo" / "playground" / "assets" / "clips"
+OUT = ROOT / "packages" / "api" / "src" / "nl2sql_api" / "web" / "assets" / "clips"
 FEATURES = ("ask", "pipeline", "retrieval")
 THEMES = ("light", "dark")
 # 16:10, the frame the home page shows a clip in. Small enough to keep each
@@ -68,9 +69,9 @@ def clip_names(feature: str, theme: str) -> Dict[str, str]:
 
 def sample_question(meta: dict) -> Optional[str]:
     """The guided question the Ask clip asks: the first with a recorded answer."""
-    recorded = set(meta.get("recorded") or [])
-    for group in meta.get("question_groups") or []:
-        for question in group.get("questions") or []:
+    for datasource in meta.get("datasources") or []:
+        recorded = set(datasource.get("recorded") or [])
+        for question in datasource.get("sample_questions") or []:
             if question in recorded:
                 return question
     return None
@@ -115,12 +116,12 @@ def _get_json(url: str) -> dict:
 
 
 def boot_demo(directory: pathlib.Path, port: int) -> subprocess.Popen:
-    """``nl2sql demo --hosted`` with no key anywhere in its environment."""
+    """``nl2sql-api serve --demo`` with no key anywhere in its environment (so the replay provider answers)."""
     from nl2sql.llm.providers import PROVIDER_KEYS
 
     env = {k: v for k, v in os.environ.items() if k not in PROVIDER_KEYS}
-    command = [sys.executable, "-m", "nl2sql.cli.main", "demo", "--hosted", "--dir", str(directory),
-               "--port", str(port), "--no-browser"]
+    command = [sys.executable, "-m", "nl2sql_api", "serve", "--demo", "--dir", str(directory),
+               "--host", "127.0.0.1", "--port", str(port)]
     return subprocess.Popen(command, env=env)
 
 
@@ -128,23 +129,23 @@ def wait_until_up(base: str, timeout: float = 600.0) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            return _get_json(base + "api/meta")
+            return _get_json(base + "api/v1/meta")
         except Exception:
             time.sleep(1.0)
-    raise SystemExit(f"The playground at {base} did not come up within {int(timeout)}s.")
+    raise SystemExit(f"The server at {base} did not come up within {int(timeout)}s.")
 
 
 def _drive(page, feature: str, base: str, meta: dict, snap) -> None:
     """What each clip shows. ``snap`` takes the poster, at the moment that says the most."""
     if feature == "ask":
-        page.goto(base + "#/ask")
-        page.wait_for_selector("#question")
+        page.goto(base + "#/chat")
+        page.wait_for_selector("#chat-question")
         page.wait_for_timeout(600)
-        page.click("#question")
+        page.click("#chat-question")
         page.keyboard.type(sample_question(meta), delay=28)
         page.wait_for_timeout(300)
-        page.click("#ask")
-        page.wait_for_selector("#recorded-badge", timeout=120_000)
+        page.click("button.ask")
+        page.wait_for_selector(".pchip[data-recorded]", timeout=120_000)
         page.wait_for_timeout(900)
         snap()
         page.mouse.wheel(0, 520)
@@ -153,7 +154,7 @@ def _drive(page, feature: str, base: str, meta: dict, snap) -> None:
         page.wait_for_timeout(1400)
     elif feature == "pipeline":
         page.goto(base + "#/pipeline")
-        page.wait_for_selector("#pipeline-panel .psteps")
+        page.wait_for_selector(".pipeline .psteps")
         page.wait_for_timeout(1200)
         snap()
         for _ in range(3):
@@ -211,7 +212,7 @@ def record(base: str, out: pathlib.Path, meta: dict, features: List[str]) -> Dic
 def _parse(argv: Optional[List[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out", type=pathlib.Path, default=OUT, help="where the clips are written")
-    parser.add_argument("--url", default=None, help="a playground already running, instead of booting one")
+    parser.add_argument("--url", default=None, help="a server already running, instead of booting one")
     parser.add_argument("--dir", type=pathlib.Path, default=None,
                         help="demo project to boot (default: a fresh temporary one)")
     parser.add_argument("--features", default=",".join(FEATURES), help="comma-separated: ask,pipeline,retrieval")

@@ -840,6 +840,22 @@ def test_a_provider_failure_ends_the_turn_in_error_and_closes_the_scope_once(eng
     assert names.count("conversation.turn") == 1 and names[-1] == "conversation.turn" and "run.failed" not in names
 
 
+def test_a_keyed_provider_with_no_key_ends_the_turn_with_missing_llm(engine, model, monkeypatch):
+    from nl2sql.llm.registry import MissingApiKey
+
+    conversation = started(engine)
+
+    def keyless(self, *args: Any, **kwargs: Any):
+        raise MissingApiKey("LLM agent 'conversation' uses provider 'openai', which requires an API key")
+
+    monkeypatch.setattr(ConversationAgent, "decide", keyless)
+
+    turn = engine.conversations.ask(conversation.id, "Hi", user_context=ANA)
+
+    assert turn.status == "error" and turn.error["code"] == "MISSING_LLM"
+    assert "API key" in turn.error["message"]
+
+
 def test_deleting_a_conversation_whose_turn_is_running_is_busy_and_the_turn_still_stores(engine, model, runs):
     conversation = started(engine)
     inside, release = threading.Event(), threading.Event()

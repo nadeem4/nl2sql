@@ -245,9 +245,13 @@ the release decision.
    the docs to `gh-pages` and moves the `latest` alias onto it.
 5. **`pypi-smoke`** — `needs: pypi`. On a fresh runner, installs the release
    from PyPI itself, `pip install "nl2sql-engine[demo]==X.Y.Z"`, into an empty
-   virtualenv, boots `nl2sql demo --hosted` with no API key and checks the
-   page, `/api/health` (which must report `X.Y.Z`), `/api/meta`,
-   `/api/schema` and `/api/index`. This is
+   virtualenv, boots `nl2sql-api serve --demo --hosted` with no API key and
+   checks the page, `/api/v1/health` (which must report `X.Y.Z` for the engine and
+   the API), `/api/v1/meta`, each datasource's schema and `/api/v1/index`, then asks
+   the advertised questions through `POST /api/v1/query` (no server error, one
+   answered) and one turn that must end typed. Once the answers are
+   re-recorded (R1), add `--guided-turns`: every guided question and its scripted
+   follow-up as turns. This is
    `python scripts/fresh_install_check.py --pypi X.Y.Z`, the same check the
    `fresh-install` PR job runs on the wheels. PyPI accepts an upload at once,
    but the CDN in front of its index serves a new version a little later, so

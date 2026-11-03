@@ -230,7 +230,7 @@ How the engine uses it:
   the engine asks for): the price table's Claude rows say so, and an
   `llm.prices` row without its own `cache_write` gets it from the wire.
 
-`nl2sql demo --record` records Claude too: with an Anthropic key the recording
+`scripts/record_demo_answers.py` records Claude too: with an Anthropic key the recording
 proxy speaks Anthropic's Messages API to `https://api.anthropic.com`, and stores
 each answer under the same name and question an OpenAI one would get, so replay
 (which answers on the OpenAI wire) serves it unchanged. The hosted demo's shipped
@@ -390,7 +390,7 @@ asked. It is served by `GET /api/pipeline` from `engine.about()`, whose steps
 (`nl2sql.pipeline.steps`) take their seven model steps from `LLM_AGENTS` rather
 than repeating the table above. See [the Pipeline page](../getting_started/demo.md#the-pipeline-page).
 
-On the **hosted demo** (`nl2sql demo --hosted`) the same choice is offered and
+On the **hosted demo** (`nl2sql-api serve --demo --hosted`) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
 per step in their own browser tab, and both travel with each question: a key
 per provider in a header of its own, and the choices in one compact
@@ -688,6 +688,6 @@ rates, `verified`, `source` (`table` or `config`) and `citation`.
   read from the database or a description in the glossary.
 - `nl2sql init --provider` takes `openai`, `anthropic` or `openrouter`, the
   providers with a default model, and writes no key. For `openai_compatible`
-  or `ollama`, edit `llm.yaml` as shown above. `nl2sql demo --api-key`
+  or `ollama`, edit `llm.yaml` as shown above. The demo's key box
   picks the provider from the key's shape (`sk-ant-` is Anthropic, `sk-or-` is
   OpenRouter, anything else is OpenAI).

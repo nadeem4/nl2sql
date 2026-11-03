@@ -30,6 +30,24 @@ ENV_FILE = pathlib.Path(".env")
 AGENT_NODES = {key: node for node, key in LLM_AGENTS.items()}
 
 
+def key_from_env_file(path: pathlib.Path) -> Optional[str]:
+    """Returns a non-empty provider key recorded in ``path``, if there is one.
+
+    The file is read, not loaded: an empty ``OPENAI_API_KEY=`` line must never count as a key.
+    """
+    if not path.exists():
+        return None
+
+    from dotenv import dotenv_values
+
+    values = dotenv_values(path)
+    for name in PROVIDER_KEYS:
+        value = (values.get(name) or "").strip()
+        if value:
+            return value
+    return None
+
+
 def persist_api_key(path: pathlib.Path, key: str) -> None:
     """Records the key in the demo project's ``.env``, one key per provider.
 

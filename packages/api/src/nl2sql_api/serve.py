@@ -13,7 +13,7 @@ from typing import Optional, Sequence
 
 import uvicorn
 
-from nl2sql import (ConfigError, load_config, load_env_file, prepare_demo, provider_keys_in_environment,
+from nl2sql import (LLM, ConfigError, load_config, load_env_file, prepare_demo, provider_keys_in_environment,
                     resolve_mode)
 from nl2sql_api import identity
 from nl2sql_api.hosted import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION, Hosted, Limits, load_session_key
@@ -95,7 +95,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             if hosted is not None:
                 api = api.model_copy(update={"auth": "static", "static_role": hosted.role, "request_llm": True})
                 policies = loaded.policies.model_copy(update={"default_role": hosted.role})
-                return loaded.model_copy(update={"mode": mode, "api": api, "policies": policies})
+                # Replay whatever the project file says: prepare_demo keeps a file it finds (the Space's image
+                # is built with one), and a hosted server holds no key to answer with.
+                llm = LLM(provider="replay", model="recorded")
+                return loaded.model_copy(update={"mode": mode, "api": api, "policies": policies, "llm": llm})
             if args.demo:
                 api = api.model_copy(update={"auth": "none", "request_llm": True})
             return loaded.model_copy(update={"mode": mode, "api": api})

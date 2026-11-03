@@ -6,7 +6,7 @@ name: Record demo answers
 #
 # It spends money on the ANTHROPIC_API_KEY repository secret, so it only ever
 # runs by hand: Actions -> Record demo answers -> Run workflow. Nothing else
-# triggers it. With `record: clips` it instead records the playground home
+# triggers it. With `record: clips` it instead records the web app's home
 # page's clips (scripts/record_home_clips.py), which needs no key at all.
 
 on:
@@ -115,7 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          dir=packages/nl2sql/src/nl2sql/cli/demo/playground/assets/clips
+          dir=packages/api/src/nl2sql_api/web/assets/clips
           if [ -z "$(git status --porcelain -- "$dir")" ]; then
             echo "The clips are unchanged; no pull request."
             exit 0
@@ -125,8 +125,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git add -A -- "$dir"
-          git commit -m "chore(playground): record the home page's clips"
+          git commit -m "chore(web): record the home page's clips"
           git push origin "$branch"
           gh pr create --base main --head "$branch" \
-            --title "chore(playground): record the home page's clips" \
+            --title "chore(web): record the home page's clips" \
             --body "Recorded by the Record demo answers workflow (clips, run ${GITHUB_RUN_ID}) against the hosted demo with no key. Check each poster and clip before merging."

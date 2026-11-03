@@ -184,3 +184,12 @@ def test_provider_error_is_a_fatal_pipeline_error_that_names_no_node():
 
 def test_provider_error_is_none_for_a_failure_that_is_not_the_providers():
     assert provider_error("ast_planner", ValueError("bad plan")) is None
+
+
+def test_a_missing_api_key_is_a_typed_failure_not_a_crash():
+    from nl2sql.llm.registry import MissingApiKey
+
+    failure = classify_provider_error(MissingApiKey("LLM agent 'default' uses provider 'openai', which requires an API key"))
+    assert failure is not None and failure.code is ErrorCode.MISSING_LLM
+    assert "API key" in failure.message
+    assert isinstance(MissingApiKey("x"), ValueError)

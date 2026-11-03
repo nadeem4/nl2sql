@@ -66,20 +66,21 @@ def test_the_declared_port_is_the_one_the_container_listens_on():
     port = _front_matter()["app_port"]
     assert re.search(rf"^\s*PORT={port}\s*\\?$", dockerfile, re.MULTILINE)
     assert f"EXPOSE {port}" in dockerfile
-    assert f"{port}:{port}" in compose["services"]["playground"]["ports"]
+    assert f"{port}:{port}" in compose["services"]["space"]["ports"]
 
 
 def test_the_container_runs_hosted_mode_as_a_non_root_user():
     dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
     command = dockerfile[dockerfile.index("\nCMD "):]
 
-    assert "--hosted" in command
+    assert "nl2sql-api serve --demo --hosted" in command
+    assert "nl2sql demo" not in command
     assert "--questions-per-minute 6" in command and "--questions-per-session 30" in command
     assert "USER demo" in dockerfile
     assert "HEALTHCHECK" in dockerfile
     # The sample project and its index are built into the image, so the first
     # question does not wait for indexing or for a 79 MB model download.
-    assert "nl2sql init --demo /home/demo/demo" in dockerfile
+    assert "nl2sql init --demo --provider replay /home/demo/demo" in dockerfile
     assert "NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml" in dockerfile
     assert "nl2sql index" in dockerfile
 
@@ -115,12 +116,12 @@ def test_the_healthcheck_polls_the_health_route():
     dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
     healthcheck = dockerfile[dockerfile.index("HEALTHCHECK"):]
 
-    assert "/api/health" in healthcheck.split("\n\n")[0]
+    assert "/api/v1/health" in healthcheck.split("\n\n")[0]
 
 
 def test_compose_builds_with_the_same_single_argument():
     compose = yaml.safe_load((SPACE / "docker-compose.yml").read_text(encoding="utf-8"))
-    args = compose["services"]["playground"]["build"].get("args") or {}
+    args = compose["services"]["space"]["build"].get("args") or {}
 
     assert "NL2SQL_REF" not in args
 
@@ -168,7 +169,7 @@ def _install_instruction() -> str:
 def test_the_install_retries_a_bounded_number_of_times_without_pip_cache():
     shell = _install_instruction()
 
-    assert '--no-cache-dir "${NL2SQL_SPEC}"' in shell
+    assert '--no-cache-dir "${NL2SQL_API_SPEC}" "${NL2SQL_SPEC}"' in shell
     assert f"-ge {INSTALL_ATTEMPTS}" in shell
     assert f"sleep {INSTALL_DELAY_SEC}" in shell
 
@@ -229,3 +230,27 @@ def test_an_install_that_never_works_fails_the_build_after_the_last_attempt(tmp_
     assert code != 0
     assert count == INSTALL_ATTEMPTS
     assert len(sleeps) == INSTALL_ATTEMPTS - 1
+
+
+def test_the_api_is_pinned_beside_the_engine_by_the_publish_workflow():
+    dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+    workflow = (SPACE.parents[1] / ".github" / "workflows" / "publish_space.yml").read_text(encoding="utf-8")
+
+    assert dockerfile.count("\nARG NL2SQL_API_SPEC=") == 1
+    assert "^ARG NL2SQL_API_SPEC=" in workflow
+    assert 'api_spec="nl2sql-api==${TAG#v}"' in workflow
+
+
+def test_a_rehearsal_ships_the_api_wheel_it_built_because_a_git_archive_has_no_web_app():
+    """The web app is built, not committed: an archive of a commit has no `static/`, so the page would be a 503.
+
+    A no-tag dispatch builds the UI and the API wheel on the runner, puts the wheel in the Space root's
+    `wheels/` and points `NL2SQL_API_SPEC` at it; a release installs the PyPI wheel, which carries the page.
+    """
+    dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+    workflow = (SPACE.parents[1] / ".github" / "workflows" / "publish_space.yml").read_text(encoding="utf-8")
+
+    assert (SPACE / "wheels" / ".gitkeep").is_file()
+    assert "COPY wheels/ /tmp/wheels/" in dockerfile
+    assert "npm run build" in workflow and "python -m build --wheel packages/api" in workflow
+    assert "file:///tmp/wheels/" in workflow

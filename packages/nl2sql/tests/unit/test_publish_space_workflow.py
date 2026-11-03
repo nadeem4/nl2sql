@@ -380,3 +380,18 @@ def test_nothing_in_the_workflow_prints_the_token():
         assert "set -x" not in stripped, line
         if "HF_TOKEN" in stripped:
             assert not stripped.startswith(("echo ", "printf ")), line
+
+
+def test_an_untagged_run_refuses_the_public_space():
+    """A rehearsal (no tag) ships this branch's code; it may never reach the public Space."""
+    script = _step("Push deploy/huggingface")["run"]
+    guard = script.index('[ -z "$TAG" ] && [ "$SPACE_ID" = "nadeem4nk/nl2sql-demo" ]')
+
+    assert guard < script.index("git init")
+    assert "exit 1" in script[guard:guard + 400]
+
+
+def test_the_lfs_rule_is_added_to_gitattributes_only_when_absent():
+    script = _step("Push deploy/huggingface")["run"]
+
+    assert 'grep -qxF "$rule" .gitattributes || echo "$rule" >> .gitattributes' in script

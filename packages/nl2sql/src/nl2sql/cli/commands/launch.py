@@ -387,4 +387,4 @@ def launch_command(
     _say("\n[bold]Next[/bold]")
     if questions:
         _say(f"  nl2sql {escape(where)}run {escape(json.dumps(questions[0]))}")
-    _say(f"  nl2sql demo --dir {escape(folder.as_posix())}")
+    _say(f"  nl2sql-api serve --config {escape((folder / 'nl2sql.yaml').as_posix())}")

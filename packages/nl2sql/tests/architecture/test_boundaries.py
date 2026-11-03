@@ -646,14 +646,14 @@ def _outside_the_cli(path):
 def test_the_cli_imports_only_the_public_nl2sql():
     """The CLI is a client of the facade, like the API: ``from nl2sql import ...``, never the engine's internals.
 
-    The playground, ``cli/demo/`` and ``commands/demo.py`` are held to the older rule above until X1a/X1b
-    delete them (they are in ``STILL_IMPORTED_FROM_INSIDE``); nothing else is excepted.
+    The old playground, ``cli/demo/``, is held to the older rule above until X1b
+    deletes it (they are in ``STILL_IMPORTED_FROM_INSIDE``); nothing else is excepted.
     """
     offenders = []
     for path in python_files(CLI):
         relative = path.relative_to(CLI).as_posix()
-        # X1a turns demo.py into a launcher and X1b deletes demo/: both go before the CLI moves (CL1).
-        if relative.startswith("demo/") or relative == "commands/demo.py":
+        # X1b deletes demo/ (the old playground) before the CLI moves (CL1).
+        if relative.startswith("demo/"):
             continue
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name in _outside_the_cli(path)]
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
@@ -810,7 +810,7 @@ def test_every_entry_point_reaches_data_through_run_query():
 
 # Only these serve HTTP, and so only these import a web framework or server.
 WEB_SERVER_LIBRARIES = {"starlette", "uvicorn", "fastapi"}
-WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/", "nl2sql/src/nl2sql/cli/commands/demo.py")
+WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/")
 
 
 def test_only_mcp_and_the_demo_import_starlette_or_uvicorn():
@@ -818,9 +818,19 @@ def test_only_mcp_and_the_demo_import_starlette_or_uvicorn():
                  for path in python_files(ENGINE, SDK) if not _where(path).startswith(WEB_SERVER_MODULES)
                  for lineno, name, _ in imports(path) if name.partition(".")[0] in WEB_SERVER_LIBRARIES]
     assert not offenders, _broke(
-        "Only nl2sql/mcp/ (MCP over HTTP), nl2sql/cli/demo/ and nl2sql/cli/commands/demo.py import Starlette, "
+        "Only nl2sql/mcp/ (MCP over HTTP) and nl2sql/cli/demo/ (the old playground, until X1b) import Starlette, "
         "FastAPI or Uvicorn: the engine and the SDK stay free of a web framework. nl2sql-api is its own "
         "package.", offenders)
+
+
+def test_engine_never_imports_the_api():
+    """``nl2sql-api`` depends on the engine; the engine reaches the API only as a child process (``nl2sql demo``)."""
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(ENGINE, SDK)
+                 for lineno, name, _ in imports(path) if name.partition(".")[0] == "nl2sql_api"]
+    assert not offenders, _broke(
+        "Nothing in the engine or the SDK imports nl2sql_api: the dependency runs one way, API to engine. A command "
+        "that needs the server starts it as a child process (cli/commands/demo.py).", offenders)
 
 
 # --------------------------------------------------------------------------
@@ -1257,7 +1267,6 @@ READS_THE_ENVIRONMENT = {
 LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
 ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql/src/nl2sql/cli/main.py",
-    "nl2sql/src/nl2sql/cli/commands/demo.py",
     "nl2sql/src/nl2sql/cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
     "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model (wave_d.md, A4b)
 }

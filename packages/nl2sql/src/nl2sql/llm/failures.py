@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, ReplayMiss
 
 from .providers import PROVIDER_LABELS, UPSTREAMS
-from .registry import PROVIDER_PRESETS
+from .registry import PROVIDER_PRESETS, MissingApiKey
 
 __all__ = ["ProviderFailure", "classify_provider_error", "provider_error", "redact_keys"]
 
@@ -147,6 +147,8 @@ def classify_provider_error(exc: BaseException) -> Optional[ProviderFailure]:
     wrongly (or a model refusing a parameter), which its node explains better.
     """
     for candidate in _chain(exc):
+        if isinstance(candidate, MissingApiKey):  # a keyed provider and no key: say so, never a 500
+            return ProviderFailure(ErrorCode.MISSING_LLM, UNKNOWN_PROVIDER, str(candidate), "")
         if isinstance(candidate, ReplayMiss):  # the replay provider has no recording: not a vendor's answer
             return ProviderFailure(ErrorCode.REPLAY_MISS, PROVIDER_LABELS["replay"], candidate.message, "")
         sdk = _sdk_of(candidate)

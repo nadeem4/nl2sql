@@ -1,4 +1,4 @@
-# The nl2sql playground as a public demo (`nl2sql demo --hosted`).
+# The nl2sql web app as a public demo (`nl2sql-api serve --demo --hosted`).
 #
 # This folder is a Space root: it needs no build context from the repository,
 # so the whole deploy is this directory, copied to the Space's root by
@@ -34,6 +34,18 @@ FROM python:3.12-slim
 # release locally: --build-arg NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0".
 ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/nl2sql"
 
+# The web app is its own package (nl2sql-api), which the engine's `demo` extra
+# depends on. It is pinned beside the engine so the two always come from the
+# same place: a release pins `nl2sql-api==X.Y.Z`, a rehearsal the same commit's
+# archive. Given on the same command line, it is what the extra's requirement
+# resolves to.
+ARG NL2SQL_API_SPEC="nl2sql-api @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/api"
+
+# Empty on a release. A rehearsal (a dispatch with no tag) puts the API wheel it
+# built here, because the web app is built, not committed: a git archive of the
+# commit has no page to serve, and the wheel does.
+COPY wheels/ /tmp/wheels/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -47,9 +59,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 0.1.0, 0.1.1, 0.1.2" although the release had already installed it from PyPI.
 RUN pip install --upgrade pip \
     && attempt=1 \
-    && until pip install --no-cache-dir "${NL2SQL_SPEC}"; do \
+    && until pip install --no-cache-dir "${NL2SQL_API_SPEC}" "${NL2SQL_SPEC}"; do \
          if [ "$attempt" -ge 10 ]; then \
-           echo "pip could not install ${NL2SQL_SPEC} after $attempt attempts." >&2; \
+           echo "pip could not install ${NL2SQL_SPEC} and ${NL2SQL_API_SPEC} after $attempt attempts." >&2; \
            exit 1; \
          fi; \
          echo "Install attempt $attempt of 10 failed; the index may lag a new release. Retrying in 30s."; \
@@ -74,19 +86,19 @@ WORKDIR /home/demo/demo
 #
 # The archive the model was extracted from is 83 MB of the same bytes: chroma
 # reaches for it only when the extracted files are missing, so it goes.
-RUN nl2sql init --demo /home/demo/demo \
+RUN nl2sql init --demo --provider replay /home/demo/demo \
     && nl2sql index \
     && rm -f "$HOME/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx.tar.gz"
 
 EXPOSE 7860
 
-# Answers as soon as the playground is serving; this route reads nothing but
+# Answers as soon as the web app is serving; this route reads nothing but
 # process state, and reports the engine version the release pipeline waits for.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','7860')+'/api/health',timeout=4)"
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','7860')+'/api/v1/health',timeout=4)"
 
 # A shell, so $PORT is the container's rather than the build's; `exec`, so the
 # server is pid 1 and a stop signal reaches it instead of the shell. Hosted
 # mode holds no key of its own, and the limits are per visitor; see
 # docs/deployment/hosted-demo.md.
-CMD ["sh", "-c", "exec nl2sql demo --hosted --dir /home/demo/demo --host 0.0.0.0 --port \"$PORT\" --no-browser --questions-per-minute 6 --questions-per-session 30"]
+CMD ["sh", "-c", "exec nl2sql-api serve --demo --hosted --dir /home/demo/demo --host 0.0.0.0 --port \"$PORT\" --questions-per-minute 6 --questions-per-session 30"]

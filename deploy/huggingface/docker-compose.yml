@@ -9,7 +9,7 @@
 name: nl2sql-demo
 
 services:
-  playground:
+  space:
     build:
       context: .
       # The Dockerfile installs the tip of `main` by default. To run a release,
@@ -22,7 +22,7 @@ services:
     environment:
       PORT: "7860"
     # Hosted mode and the per-visitor limits are flags on the image's command
-    # (`nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30`);
+    # (`nl2sql-api serve --demo --hosted --questions-per-minute 6 --questions-per-session 30`);
     # a public demo must never be run without --hosted.
     # No volumes and no secrets on purpose: the sample data and its index are
     # baked into the image, and the server holds no API key.

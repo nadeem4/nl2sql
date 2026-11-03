@@ -1,31 +1,31 @@
 # Hosted demo
 
-`nl2sql demo --hosted` serves the playground as a **public demo of the sample
+`nl2sql-api serve --demo --hosted` serves the web app as a **public demo of the sample
 databases**, where the server holds no API key and every visitor brings their
 own.
 
-It is a third state, not a loosened `--allow-settings`. Locally, `nl2sql demo`
-saves your key to the demo project's `.env` and spends it on your
+It is a third state, not a loosened local server. Locally, `nl2sql demo`
+(the launcher for `nl2sql-api serve --demo`) saves your key to the demo project's `.env` and spends it on your
 questions; that is right on your own machine and wrong on a shared address.
 Hosted mode removes the key from the server entirely instead of relaxing the
 gate that protects it.
 
-| | local (`nl2sql demo`) | hosted (`nl2sql demo --hosted`) |
+| | local (`nl2sql demo`) | hosted (`nl2sql-api serve --demo --hosted`) |
 | --- | --- | --- |
 | the API keys | saved to the project's `.env`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
 | a model per step | written to the project's `llm.yaml` | chosen in the browser tab, sent per request, saved nowhere |
 | Settings | writes `.env` and `llm.yaml` | writes nothing; the page keeps the keys and the choices |
-| Rebuild | on (loopback, or `--allow-settings`) | refused |
-| Answer ratings | on (loopback, or `--allow-settings`) | off |
-| Retrieval inspector | on (loopback, or `--allow-settings`) | on, read only, at the hosted rate |
+| Rebuild | on for an admin | refused |
+| Answer ratings | on | off |
+| Retrieval inspector | on | on, read only, at the hosted rate |
 | Pipeline page | on | on, read only: it names the steps and their models, never a key |
-| `--record` | supported | refused before the server starts |
+| recording answers | `scripts/record_demo_answers.py` (a maintainer's script) | not offered |
 | a visitor with no key | replay mode, if no key is configured | the guided questions replay recorded runs; anything else asks for a key |
 | the sample databases | read-only | read-only |
 | limits | none | a rate limit per visitor and a cap per session |
 
 ```bash
-nl2sql demo --hosted --host 0.0.0.0 --port 7860 --questions-per-minute 6 --questions-per-session 30
+nl2sql-api serve --demo --hosted --host 0.0.0.0 --port 7860 --questions-per-minute 6 --questions-per-session 30
 ```
 
 There is no environment variable for it: hosted mode and its limits are flags
@@ -99,7 +99,7 @@ deliberate act, never part of CI. Either:
   It reads `ANTHROPIC_API_KEY` from the environment or, failing that, from the
   repository root's `.env` (read with python-dotenv, never loaded into the
   environment; nothing prints the key), builds a fresh demo project, and runs
-  `nl2sql demo --record` with that key passed as `--api-key` would pass it, so
+  the recorder with that key passed explicitly, so
   an exported OpenAI or OpenRouter key never wins. The script writes nothing to
   the environment. The demo records through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
@@ -112,7 +112,7 @@ deliberate act, never part of CI. Either:
   failed). The file is written with the runs that succeeded, and every question
   that was not recorded is listed with its error. It exits `0`
   when every guided question was recorded, `1` when some were not or when the
-  demo stopped before recording (its indexing failed: `nl2sql demo --record`
+  demo stopped before recording (its indexing failed: the recorder
   refuses to record answers given against no index, and nothing is written),
   `2` with no key or without `langchain-anthropic`
   (`pip install "nl2sql-engine[anthropic]"`). Its output is safe to redirect
@@ -175,7 +175,7 @@ The visitor pastes a key on the **Settings** page, one per provider. From there:
    in a response.
 
 A key sent without naming a provider has its provider read from its shape,
-exactly as `--api-key` does: `sk-ant-` is Anthropic, `sk-or-` is OpenRouter,
+by the engine's own rule: `sk-ant-` is Anthropic, `sk-or-` is OpenRouter,
 anything else is OpenAI. Such a key also moves the model to that provider's
 default when it differs from the server's configured one, since a `gpt-` model
 means nothing to Anthropic.
@@ -258,8 +258,8 @@ a visitor chose or changed, gets a new session, so no one can fix the token anot
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
 at a time, besides the limits below; going over any of them
 is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
-questions the session has asked (`limits`). The old `nl2sql demo --hosted` flags below stay until the CLI moves
-onto the API.
+questions the session has asked (`limits`). `nl2sql demo` is only a launcher for `nl2sql-api serve --demo` and takes `--dir`, `--host`, `--port` and `--no-browser`;
+the public variant, with its limits, is `nl2sql-api serve --demo --hosted`.
 
 `nl2sql-api serve` loads the `.env` beside the config (before it looks at the environment for a model key), except
 for a hosted server, which never loads one: it holds no model key, and a `.env` with one beside a hosted config is
@@ -317,8 +317,7 @@ environment and is not part of any response or log.
 ## What is off, and what is on
 
 **Off:** Settings *persistence* (choosing a model is on; it is only the saving
-that is off), Rebuild, answer ratings, and `--record` (refused
-before the server starts). `--api-key` is refused too: a server-side key is the
+that is off), Rebuild, and answer ratings. A server-side key is refused: it is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.
 
@@ -369,11 +368,11 @@ time and the first question is answered at once:
 
 The container runs as uid 1000 (not root), listens on `$PORT` (7860 by
 default, which is what a Space routes to), and carries a healthcheck that polls
-`/api/health`. That route reads nothing but process state and answers
-`{"status": "ok", "version": "X.Y.Z"}`, the installed `nl2sql-engine`
-version, in every mode; the release pipeline polls it on the live Space to
+`/api/v1/health`. That route reads nothing but process state and answers
+`{"status": "ok", "version": {"engine": "X.Y.Z", "api": "X.Y.Z"}}`, the installed
+`nl2sql-engine` and `nl2sql-api` versions, in every mode; the release pipeline polls it on the live Space to
 know the new version is the one being served. Its `CMD` runs
-`nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30`;
+`nl2sql-api serve --demo --hosted --questions-per-minute 6 --questions-per-session 30`;
 a public demo must never be started without `--hosted`.
 
 ```bash
@@ -438,8 +437,8 @@ flowchart LR
 ```
 
 1. **`pypi-smoke`** installs `nl2sql-engine[demo]==X.Y.Z` from PyPI into an
-   empty virtualenv on a fresh runner, boots this same `nl2sql demo --hosted`
-   with no key and checks it serves. The Space is never built on a version
+   empty virtualenv on a fresh runner, boots this same `nl2sql-api serve --demo --hosted`
+   with no key, asks every recorded guided question and its scripted follow-up, and checks it serves. The Space is never built on a version
    that does not install from PyPI.
 2. **`space`** calls [`publish_space.yml`][workflow] with the tag. It mirrors
    `deploy/huggingface/` onto the Space's root, pins the image to the release,
@@ -652,3 +651,5 @@ See [Demo](../getting_started/demo.md).
 [space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md
 [workflow]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml
 [publish]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_pypi.yaml
+
+The hosted server always answers on the `replay` provider, whatever its project file names: `nl2sql-api serve --demo --hosted` replaces the `llm` section at start, and the Space image is built with `nl2sql init --demo --provider replay`. A keyed provider with no key ends a turn with a `MISSING_LLM` error, never a 500.
