@@ -2124,6 +2124,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#evals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-map" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6327,6 +6349,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#evals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-map" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6360,7 +6404,7 @@ repository root, is built into the API package, and talks to nothing but the
 <a href="../../api/">REST API</a> through <code>nl2sql-ui/src/api/http.js</code>. Anything the
 page can do, an SDK or REST caller can do the same way.</p>
 <p>Pages are reached by hash route: <code>#/chat</code>, <code>#/approvals</code>, <code>#/settings</code>,
-<code>#/retrieval</code>, <code>#/pipeline</code>. A route nobody serves opens Home.</p>
+<code>#/retrieval</code>, <code>#/pipeline</code>, <code>#/evals</code>. A route nobody serves opens Home.</p>
 <h2 id="chat">Chat</h2>
 <p><code>#/chat</code> (and <code>#/chat/&lt;conversation id&gt;</code>) is a <a href="../../conversations/">conversation</a>
 with the model-led chat. The model decides which steps to take; the page shows
@@ -6508,6 +6552,22 @@ and one waiting for an approval offers <strong>Run again</strong> once it is gra
 <li><strong>Waiting for review</strong> (administrators; the page does not ask for these unless <code>/meta</code> says you are one, and a 403 still hides them): the proposals from profiling and starter questions, grouped by kind. Each shows everything accepting would write (a role, a unit, code values, text), and the counts and checks that back it, never rows of data. Accept or reject one or many; "Edit and accept" lets you change a proposal's text first. Accepting writes to the knowledge files; the page names the files and shows any proposal the server refused and why.</li>
 <li><strong>Drift</strong> (administrators): <strong>Check for drift</strong> compares each live database with its index and lists what changed (tables, columns, types, foreign keys) and what the change may break: verified queries, glossary items, policy rules and preferred tables. To bring a drifted index up to date, run <code>nl2sql index</code>.</li>
 </ul>
+<h2 id="evals">Evals</h2>
+<p><strong>Evals</strong> (<code>#/evals</code>) runs the suites named in <code>evals.suites</code> on the server and shows the report. It is for administrators: a report holds every role's cases, plans and SQL, so <code>GET /meta</code> (<code>caller.admin</code>) decides whether the page is listed: until <code>/meta</code> names the caller, or when it names none, the page is not listed. A caller who opens it anyway is told it is off.</p>
+<ol>
+<li>Pick a <strong>mode</strong>. <em>Plans only</em> and <em>Retrieval only</em> call no model. <em>Full</em> asks every case end to end, spends money, and needs a <strong>cost cap</strong> in dollars (the run stops when its model calls reach it).</li>
+<li>Tick the suites to run (all by default; each shows how many of its cases are approved).</li>
+<li><strong>Run</strong> starts <code>POST /jobs/eval</code>. The job shows its progress and can be cancelled.</li>
+</ol>
+<p>The report shows, for each configuration: accuracy with its interval, the generated path's accuracy, cost, latency (p50 and p95) and planner retries; accuracy by source (curated or generated) and the pass, fail, error and skip counts by role; and every case that did not pass, with its question, the reason each scorer gave and its SQL. A run that stopped at its cost cap, or was cancelled, says so, and a model call with no known price is counted so the cost reads as a floor.</p>
+<h2 id="settings">Settings</h2>
+<p><strong>Settings</strong> (<code>#/settings</code>) holds up to four cards, depending on the server and on who you are.</p>
+<ul>
+<li><strong>API key</strong> and <strong>Model for each step</strong> appear when the server lets a request bring its own model (<code>api.request_llm</code>, which <code>GET /meta</code> reports). The key and the choices stay in this browser tab (<code>sessionStorage</code>) and travel as headers with each question; nothing is written on the server. A step put on a provider needs a key for it in the same tab, or the question is refused. The providers, their models and the steps come from <code>GET /llm/providers</code> and <code>GET /llm</code>.</li>
+<li><strong>The server's model</strong> (administrators) edits the default model and the model of each step, and saves with <code>PATCH /settings/llm</code>, which sends only the models you changed. Everything else in the server's <code>llm</code> section (<code>base_url</code>, <code>headers</code>, <code>prices</code>, temperatures, a key held in a custom variable) stays as it was; where a step's provider changes, its key and <code>base_url</code> are cleared and the new provider's standard key variable is used. A provider whose key the server does not have is labelled "(no key)". The change is in memory and in this server process only, so with more than one worker a save reaches just the one that answered; <code>llm.yaml</code> is read again on a restart. The page no longer warns about models that ignore temperature 0, because <code>GET /llm/providers</code> does not say which they are.</li>
+<li><strong>API keys for this server</strong> (administrators) lists the keys the server issues, and creates one from a user id, roles, an optional tenant and an optional label (<code>POST /api-keys</code>). The new key's token is shown once and never again. <strong>Revoke</strong> ends a key (<code>DELETE /api-keys/{id}</code>).</li>
+</ul>
+<p>A caller who is not an administrator, on a server that does not take a key with a question, sees that there is nothing to set.</p>
 <h2 id="source-map">Source map</h2>
 <table>
 <thead>
@@ -6536,6 +6596,14 @@ and one waiting for an approval offers <strong>Run again</strong> once it is gra
 <tr>
 <td><code>src/pages/Approvals.jsx</code></td>
 <td>The approvals queue</td>
+</tr>
+<tr>
+<td><code>src/api/evals.js</code>, <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code></td>
+<td>Run a suite and read the report</td>
+</tr>
+<tr>
+<td><code>src/api/settings.js</code>, <code>src/pages/Settings.jsx</code>, <code>src/lib/settings.js</code></td>
+<td>The tab's keys and models, the server's model, API keys</td>
 </tr>
 </tbody>
 </table>

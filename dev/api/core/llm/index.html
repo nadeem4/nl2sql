@@ -4994,6 +4994,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmset_models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.set_models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6516,6 +6527,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmset_models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.set_models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6684,6 +6706,19 @@ config row). A model not listed is not priced: its calls' cost is <code>null</co
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># {'input': 5.0, 'cached_input': 0.5, 'cache_write': 6.25, 'output': 25.0, 'verified': True,</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1">#  'source': 'table', 'citation': 'Anthropic model table in the claude-api skill (cached 2026-06-24); ...'}</span>
 </code></pre></div>
+<h3 id="llmset_models">llm.set_models</h3>
+<p>Source: <code>packages/nl2sql/src/nl2sql/api/llm_api.py</code></p>
+<p>Signature:
+<code>set_models(changes: Mapping[str, Optional[Mapping[str, str]]], *, by: Optional[UserContext] = None, via: str = "python") -&gt; LLMChange</code></p>
+<p>Changes the model of some agents and keeps every other <code>llm</code> setting. <code>changes</code> maps an agent's name (as in
+<code>llm.list</code>, <code>default</code> included) to <code>{"provider", "model"}</code>, or to <code>None</code> to drop that agent's override so it
+inherits <code>default</code> (<code>default</code> itself cannot be dropped). Only <code>provider</code> and <code>model</code> change: <code>base_url</code>, <code>headers</code>,
+<code>prices</code>, temperatures and the rest stay. Where an entry's provider changes, its <code>api_key</code> and <code>base_url</code> are
+cleared (a cleared key is the new provider's standard variable). An agent with no provider of its own follows a new <code>default</code> provider and keeps its own model name, key and <code>base_url</code>; change that agent too if they belong to the old provider. Whether a provider changed is judged against the old <code>default</code>, whatever the order of <code>changes</code>. The result goes through <code>llm.replace</code>, so it is
+validated, atomic, logged, audited, in memory only and per process.</p>
+<p>Returns: <code>LLMChange</code>, as <code>llm.replace</code>.</p>
+<p>Raises: <code>ValueError</code> for an unknown agent or <code>default</code> given <code>None</code>; <code>ConfigError</code> as <code>llm.replace</code> (nothing changes).
+<code>nl2sql-api</code> answers <code>PATCH /api/v1/settings/llm</code> with it.</p>
 <h3 id="llmreplace">llm.replace</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/llm_api.py</code> (<code>Runtime.replace_llm</code> in

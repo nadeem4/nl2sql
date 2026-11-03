@@ -6575,7 +6575,7 @@ server on a config:</p>
 <tr>
 <td><a href="settings/">Settings and API keys</a></td>
 <td><code>routes/settings.py</code></td>
-<td>The agents' models (<code>/llm</code>, <code>/llm/providers</code>), replace the LLM (<code>PUT /settings/llm</code>), API keys (<code>/api-keys</code>) and the event catalog.</td>
+<td>The agents' models (<code>/llm</code>, <code>/llm/providers</code>), replace the LLM (<code>PUT /settings/llm</code>), change models only (<code>PATCH /settings/llm</code>), API keys (<code>/api-keys</code>) and the event catalog.</td>
 </tr>
 <tr>
 <td><a href="evals/">Evals</a></td>
@@ -6693,7 +6693,7 @@ reverse proxy on the same host or a DNS-rebinding page is not taken for the oper
 <ul>
 <li><code>POST /api/v1/datasources</code> and <code>DELETE /api/v1/datasources/{datasource_id}</code></li>
 <li>The Connect routes <code>GET /api/v1/datasource-types</code> and <code>POST /api/v1/datasources/test</code></li>
-<li><code>PUT /api/v1/settings/llm</code> and the <code>/api/v1/api-keys</code> routes</li>
+<li><code>PUT</code> and <code>PATCH /api/v1/settings/llm</code> and the <code>/api/v1/api-keys</code> routes</li>
 <li>Every <code>/api/v1/evals</code> route, <code>POST /api/v1/jobs/eval</code> and <code>POST /api/v1/jobs/demo</code></li>
 <li><code>POST /api/v1/jobs/index</code>, <code>POST /api/v1/jobs/profile</code>, <code>DELETE /api/v1/index</code> and <code>GET /api/v1/index/check</code></li>
 <li><code>POST /api/v1/knowledge/reload</code> and every <code>/api/v1/proposals</code> route</li>

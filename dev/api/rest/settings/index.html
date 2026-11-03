@@ -5369,6 +5369,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#patch-apiv1settingsllm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/v1/settings/llm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-apiv1llm" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6329,6 +6340,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#patch-apiv1settingsllm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/v1/settings/llm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-apiv1llm" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6463,6 +6485,20 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>HTTP 422
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>{"detail": "LLM has 1 problem:\n\n  LLM → llm.agents.ast_planer\n    Unknown key. Did you mean 'ast_planner'?"}
 </code></pre></div>
+<h3 id="patch-apiv1settingsllm"><code>PATCH /api/v1/settings/llm</code></h3>
+<p>Changes the provider and model of the named agents and nothing else, through <code>engine.llm.set_models</code> (see
+<a href="../../core/llm/#llmset_models">LLM API → llm.set_models</a>). Admin only. In memory and per process, like <code>PUT</code>: with
+more than one worker, a save reaches only the one that answered, and a restart reads <code>llm.yaml</code> again.</p>
+<p>Request body: an agent's name, as <code>GET /llm</code> lists it (<code>default</code> included), mapped to <code>{"provider", "model"}</code>, or to
+<code>null</code> to drop that agent's own model so it runs on <code>default</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">},</span><span class="w"> </span><span class="nt">"ast_planner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.5"</span><span class="p">},</span><span class="w"> </span><span class="nt">"refiner"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}</span>
+</code></pre></div>
+<p><code>base_url</code>, <code>headers</code>, <code>prices</code>, temperatures and every other setting stay. Where an agent's provider changes, its
+<code>api_key</code> and <code>base_url</code> are cleared, so it uses the new provider's standard key variable. Response (<code>200</code>): the same
+change as <code>PUT</code>, never a key.</p>
+<p>Errors: <code>401</code> and <code>403</code> as for <code>PUT</code>. A provider or model the server cannot use, a key that does not resolve, an
+unknown agent, or <code>default: null</code> -&gt; <code>HTTP 422</code> with the fixed message "That provider and model cannot be used on
+this server."; nothing changes.</p>
 <h3 id="get-apiv1llm"><code>GET /api/v1/llm</code></h3>
 <p>Any caller. Response: <code>{"llms": {...}}</code>, <code>engine.llm.list()</code>: each agent by its name in the <code>llm</code> section (<code>default</code>
 first) with its <code>provider</code>, <code>model</code>, <code>temperature</code> and <code>inherited</code> (True when it sets nothing of its own). Never a key.
