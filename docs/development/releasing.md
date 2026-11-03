@@ -1,6 +1,6 @@
 # Releasing
 
-The monorepo publishes three distributions to PyPI under **unified versioning**:
+The monorepo publishes four distributions to PyPI under **unified versioning**:
 they all carry the same version and are released together. Internal
 dependencies use compatible-release constraints (`~=0.1`), so a release only
 resolves for users if every package declares the same version.
@@ -11,7 +11,7 @@ owns both. Two steps are manual. First, the release page
 `docs/releases/X.Y.Z.md` is written with the release-notes skill and merged.
 A status check on the release PR stays red until it is. Second, the owner
 **merges the release pull request**.
-Everything after that runs on its own: the three packages go to PyPI, the API
+Everything after that runs on its own: the four packages go to PyPI, the API
 image to GHCR, the versioned docs to `gh-pages`, and the hosted demo on Hugging
 Face is rebuilt on the version just published. Each of those is checked from
 the outside before the release counts as done.
@@ -26,14 +26,14 @@ flowchart TD
     RN -->|release-notes status turns green| PR2[Release PR refreshed]
     PR2 -->|the owner merges it| TAG[Tag vX.Y.Z + GitHub Release]
     TAG --> NOTES[release-notes job: page summary<br/>above the generated changelog]
-    TAG -->|release_please.yml calls it with tag_name<br/>the tag itself cannot trigger it| B[publish_pypi.yaml: build 3 dists]
+    TAG -->|release_please.yml calls it with tag_name<br/>the tag itself cannot trigger it| B[publish_pypi.yaml: build 4 dists]
     B --> S{wheels install and import?}
     S -->|no| STOP[Nothing is published]
     S -->|yes| PY[PyPI via trusted publishing:<br/>one job per package,<br/>one environment each]
     PY --> GH[ghcr.io/nadeem4/nl2sql-api]
     PY --> D[mike deploy: versioned docs]
     PY --> PS[pypi-smoke: pip install the release<br/>from PyPI, boot the demo]
-    PS --> SP[publish_space.yml: Space pinned to<br/>nl2sql-engine demo == X.Y.Z]
+    PS --> SP[publish_space.yml: Space pinned to<br/>nl2sql-cli[web] == X.Y.Z]
     SP --> SS[space-smoke: the live Space<br/>reports version X.Y.Z]
 ```
 
@@ -94,9 +94,10 @@ version bump applied everywhere it appears:
 | `packages/sdk/pyproject.toml` | an `extra-files` `generic` updater |
 | `packages/nl2sql/pyproject.toml` | an `extra-files` `generic` updater |
 | `packages/api/pyproject.toml` | an `extra-files` `generic` updater |
+| `nl2sql-cli/pyproject.toml` | an `extra-files` `generic` updater (its version, and its `nl2sql-engine` and `nl2sql-api` pins) |
 | `.release-please-manifest.json` | release-please |
 
-The three package manifests carry a marker comment on their version line:
+The four package manifests carry a marker comment on their version line:
 
 ```toml
 version = "0.1.0" # x-release-please-version
@@ -201,7 +202,7 @@ the release decision.
 
 `publish_pypi.yaml` runs a chain of seven jobs:
 
-1. **`build`** — builds sdists and wheels for all three packages, then
+1. **`build`** — builds sdists and wheels for all four packages, then
    smoke-installs them into a clean virtualenv and runs `import nl2sql` and
    `nl2sql --help`. These are the same commands as the `build` job in
    `test.yml`. The `nl2sql-engine` wheel carries `LICENSE` and
@@ -212,7 +213,7 @@ the release decision.
 2. **`pypi`** — `needs: build`, so a wheel that does not install or import
    fails the gate and this never runs. It is a matrix job with one leg per
    package: each leg runs in its own GitHub Environment
-   (`pypi-nl2sql-engine`, `pypi-nl2sql-api`, `pypi-nl2sql-sdk`),
+   (`pypi-nl2sql-engine`, `pypi-nl2sql-api`, `pypi-nl2sql-sdk`, `pypi-nl2sql-cli`),
    stages only that package's sdist and wheel into an `upload/` directory and
    points `pypa/gh-action-pypi-publish` at it. One environment per package is
    what makes each PyPI trusted-publisher registration unique — see
@@ -221,7 +222,7 @@ the release decision.
    the root `Dockerfile` and pushes `ghcr.io/nadeem4/nl2sql-api` at both the
    tag and `latest`. The build context is the **repository root** (`context: .`)
    with the Dockerfile named explicitly (`file: Dockerfile`),
-   because the Dockerfile installs the three packages from their local sources
+   because the Dockerfile installs the SDK, engine, API and CLI from their local sources
    and its `COPY ./packages/...` paths resolve against the build context. A
    context of `packages/api` makes them resolve to
    `packages/api/packages/sdk`, which does not exist — that is what
@@ -240,7 +241,7 @@ the release decision.
         build, so re-running it would fail the same way. The first image built
         with the fix is published by the next release, `0.2.1`, which moves
         `ghcr.io/nadeem4/nl2sql-api:latest` onto it.
-4. **`docs`** — `needs: pypi`, likewise after all three uploads.
+4. **`docs`** — `needs: pypi`, likewise after all four uploads.
    `mike deploy --push --update-aliases $TAG latest` adds a versioned copy of
    the docs to `gh-pages` and moves the `latest` alias onto it.
 5. **`pypi-smoke`** — `needs: pypi`. On a fresh runner, installs the release
@@ -310,8 +311,8 @@ is no API token anywhere in the workflow and no secret to rotate.
     cost is that released artifacts carry no PEP 740 provenance. See
     [PyPI's note on reusable workflows](https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github).
 
-The three `pypi` legs run with `fail-fast: false`, so one package failing no
-longer cancels the other two and skips `ghcr` and `docs`.
+The four `pypi` legs run with `fail-fast: false`, so one package failing no
+longer cancels the others and skips `ghcr` and `docs`.
 
 ### Why the publish is chained to release-please, not to the tag
 
@@ -580,17 +581,17 @@ workflow it will accept uploads from. For a project that does not exist on PyPI
 yet this is a **pending publisher**, created at
 [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
 
-Add one for each of the three names — `nl2sql-engine`, `nl2sql-api` and
-`nl2sql-sdk`. The engine publishes as `nl2sql-engine` because the
+Add one for each of the four names — `nl2sql-engine`, `nl2sql-api`,
+`nl2sql-sdk` and `nl2sql-cli`. The engine publishes as `nl2sql-engine` because the
 `nl2sql` name on PyPI is already taken by an unrelated project; the import
 package is still `nl2sql`.
 
 !!! warning "The environment name is required and differs per package"
     PyPI keys a pending publisher on the tuple **(owner, repository, workflow,
-    environment)** and requires that tuple to be unique. All three of our
+    environment)** and requires that tuple to be unique. All four of our
     projects publish from the same owner, the same repository and the same
-    workflow file, so with the environment left blank all three tuples are
-    identical: the first registration succeeds and the next two are rejected
+    workflow file, so with the environment left blank all four tuples are
+    identical: the first registration succeeds and the others are rejected
     with *"A pending trusted publisher matching this configuration has already
     been registered for a different project name."*
 
@@ -600,13 +601,14 @@ package is still `nl2sql`.
     a mismatch fails the upload with an OIDC error rather than a helpful one.
 
 Owner `nadeem4`, repository `nl2sql` and workflow `publish_pypi.yaml` are the
-same on all three entries. Only the project name and the environment differ:
+same on all four entries. Only the project name and the environment differ:
 
 | PyPI Project Name | Environment name |
 | --- | --- |
 | `nl2sql-engine` | `pypi-nl2sql-engine` |
 | `nl2sql-api` | `pypi-nl2sql-api` |
 | `nl2sql-sdk` | `pypi-nl2sql-sdk` |
+| `nl2sql-cli` | `pypi-nl2sql-cli` |
 
 | Field | Value |
 | --- | --- |
@@ -674,8 +676,7 @@ finishes green, and `space-smoke` is skipped. See
 
 ## Package order
 
-The three matrix legs run in parallel, so ordering is not something the
-workflow manages. It matters when one leg fails and you re-publish by hand:
+The matrix legs upload one at a time in the order below (`max-parallel: 1`). It matters when one leg fails and you re-publish by hand:
 release in dependency order so no package is ever on PyPI referencing a version
 of its dependency that is not.
 
@@ -683,13 +684,16 @@ of its dependency that is not.
 flowchart TD
     SDK[nl2sql-sdk] --> CORE[nl2sql-engine]
     CORE --> API[nl2sql-api]
+    CORE --> CLI[nl2sql-cli]
+    API -.->|web extra| CLI
 ```
 
 1. `nl2sql-sdk` — no internal dependencies.
-2. `nl2sql-engine` — needs the SDK. Carries the engine, the CLI and all four dialect
+2. `nl2sql-engine` — needs the SDK. Carries the engine and the dialect
    adapters, so its extras (`nl2sql-engine[postgres]` and friends) add only database
    drivers from PyPI and cannot be broken by publish order.
 3. `nl2sql-api` — needs `nl2sql-engine`.
+4. `nl2sql-cli` — needs `nl2sql-engine`, and `nl2sql-api` for its `web` extra. It uploads last, after a step that checks the other two are on PyPI.
 
 PyPI never lets a version be re-uploaded. If a release goes out broken, yank it
 and ship the next patch version; do not try to replace it.

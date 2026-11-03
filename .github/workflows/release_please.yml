@@ -1,6 +1,6 @@
 # Runs on every push to main and maintains a single release pull request that
 # accumulates Conventional Commits into CHANGELOG.md and bumps the unified
-# version across all three package manifests. Merging that PR is the manual
+# version across all four package manifests. Merging that PR is the manual
 # release gate: it tags vX.Y.Z and publishes a GitHub Release.
 #
 # The tag alone cannot start the publish. GitHub refuses to trigger workflows

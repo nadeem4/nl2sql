@@ -10,7 +10,8 @@ visitor brings their own API key, see [Hosted demo](hosted-demo.md).
 
 ## Container requirements
 
-- Install `nl2sql-engine` and add adapters via extras (e.g. `nl2sql-engine[postgres]`).
+- Install `nl2sql-engine` and add adapters via extras (e.g. `nl2sql-engine[postgres]`). The repository's `Dockerfile`
+  also installs `nl2sql-cli`, so `docker compose run --rm api nl2sql index` works in the image.
 - Provide the config: `nl2sql.yaml` and the files it includes, at the path
   `NL2SQL_CONFIG` names. The `Dockerfile` at the repository root sets
   `NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml`, so mount a config folder there.

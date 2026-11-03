@@ -28,21 +28,20 @@ fails the suite rather than review.
 
 1. Clone the repository.
 2. Create and activate a virtual environment on a supported interpreter.
-3. Install the three packages in editable mode, plus the test tooling.
+3. Install the four packages in editable mode, plus the test tooling.
 
 Example (PowerShell), using a 3.13 interpreter:
 
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install `
-    -e packages/sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
+    -e packages/sdk -e "packages/nl2sql[postgres,duckdb]" -e packages/api -e nl2sql-cli
 .\.venv\Scripts\python.exe -m pip install --group dev
 ```
 
 The full suite is green only with those extras. `postgres` and `duckdb` supply
-the drivers the adapter tests import; `demo` supplies the FastAPI/uvicorn server
-behind `nl2sql demo`. Swap in `[all]` if you want every dialect driver — but
-note `all` covers adapters only, not `demo`, `aws`, `azure` or `hashicorp`.
+the drivers the adapter tests import; `nl2sql-cli` is the `nl2sql` command. Swap in `[all]` if you want every dialect driver — but
+note `all` covers adapters only, not `aws`, `azure` or `hashicorp`.
 There is deliberately no `sqlite` extra: that driver is in the standard library.
 
 The second command installs the PEP 735 `dev` group (`pip` 25.1 or newer):
@@ -187,7 +186,7 @@ mkdocs serve
 
 ## Releasing
 
-All three packages share one version and are released together. The checklist --
+All four packages share one version and are released together. The checklist --
 bumping the versions and what publishing a GitHub release triggers -- is in
 `docs/development/releasing.md`.
 
