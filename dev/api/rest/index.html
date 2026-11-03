@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6511,7 +6343,7 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
   <code>NL2SQL.from_config()</code> (the file <code>NL2SQL_CONFIG</code> names, else <code>./nl2sql.yaml</code>)
   and calls <code>engine.check()</code> before it serves. A <code>required</code> datasource that
   fails, or no datasource ready at all, raises <code>EngineNotReady</code>: the API logs
-  the report and starts anyway (D208), so a restart loop never hides the reason.
+  the report and starts anyway, so a restart loop never hides the reason.
   <code>GET /ready</code> then answers <code>503 not_ready</code> and an admin reads each failing
   datasource and its stage under <code>problems</code>; an optional one that fails leaves
   the others serving. Any other failure of <code>check()</code> closes the engine and stops
@@ -6707,7 +6539,7 @@ are unaffected by it; use authentication and network controls to restrict those.
 </tr>
 </tbody>
 </table>
-<p>Under <code>none</code>, <code>nl2sql-api serve</code> refuses to bind a host that is not loopback (D205), and a request whose <code>Host</code> is not
+<p>Under <code>none</code>, <code>nl2sql-api serve</code> refuses to bind a host that is not loopback, and a request whose <code>Host</code> is not
 <code>localhost</code>, <code>127.0.0.1</code> or <code>[::1]</code>, or that carries <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code>, is a <code>403</code>, so a
 reverse proxy on the same host or a DNS-rebinding page is not taken for the operator.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># api.yaml behind an authenticating proxy at 10.0.0.5.</span>

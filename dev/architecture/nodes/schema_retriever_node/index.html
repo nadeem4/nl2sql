@@ -437,79 +437,7 @@
 <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../configuration_v2/">
-<span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../phase2/">
-<span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_a/">
-<span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_b/">
-<span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_c/">
-<span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_d/">
-<span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -517,8 +445,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -529,8 +457,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_15">
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -567,8 +495,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -579,8 +507,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="true" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_16">
+<nav aria-expanded="true" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -3189,8 +3117,7 @@
 <li>On exception, see <a href="#error-handling">Error Handling</a>.</li>
 </ol>
 <h3 id="table-recall-on-large-schemas">Table recall on large schemas</h3>
-<p>Wave C, C-W4 (<a href="../../wave_c/#17-c-w4-table-recall-on-large-schemas">design</a>).
-A missing table guarantees a wrong answer; an extra one costs some prompt. On
+<p>A missing table guarantees a wrong answer; an extra one costs some prompt. On
 Pagila (29 tables) the question "top 5 films by revenue in the top category"
 never got <code>payment</code>: "revenue" is not near that table, and the chain is
 <code>film -&gt; inventory -&gt; rental -&gt; payment</code>. Past <code>full_snapshot_max_tables</code>, the
@@ -3234,8 +3161,7 @@ columns are always kept.</p>
 found, so a table often arrives with a few columns and none of its keys. On
 Pagila (29 tables), the 0.9.0 smoke test's question about films in the Sports
 category got <code>film</code> without <code>film_id</code> or <code>title</code> and <code>category</code> without <code>name</code>,
-and no join or answer could be validated (bug B103 in
-<a href="../../wave_c/#14-bugs-wave-c-fixes">Wave C, section 14</a>). So a table cut to
+and no join or answer could be validated. So a table cut to
 the search's columns also keeps (<code>_kept_columns</code>):</p>
 <ul>
 <li>its primary key;</li>
@@ -3269,7 +3195,7 @@ matched against snapshot tables by bare name or <code>schema.table</code>, case 
   scope denies is left out like any other.</li>
 </ul>
 <h3 id="knowledge">Knowledge</h3>
-<p>Wave B (K2, <a href="../../wave_b/#4-knowledge-in-the-prompts">design</a>). The
+<p>The
 datasource's merged knowledge is first filtered to the caller's scope with
 <code>nl2sql.knowledge.scope.visible</code> (an item naming a table the caller cannot
 read, or whose text mentions one, is left out), then resolved against the
@@ -3284,7 +3210,7 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <tbody>
 <tr>
 <td>A table's <code>description</code></td>
-<td>The glossary's, else the database's comment (D38). Either is dropped when its text mentions a table the caller cannot read.</td>
+<td>The glossary's, else the database's comment. Either is dropped when its text mentions a table the caller cannot read.</td>
 </tr>
 <tr>
 <td>A column's <code>description</code></td>
@@ -3292,7 +3218,7 @@ snapshot by <code>schema_knowledge()</code>:</p>
 </tr>
 <tr>
 <td>A column's <code>role</code></td>
-<td>The glossary's, else the one the snapshot proves: <code>identifier</code> for a primary or foreign key, <code>date</code> for a temporal type (D61)</td>
+<td>The glossary's, else the one the snapshot proves: <code>identifier</code> for a primary or foreign key, <code>date</code> for a temporal type</td>
 </tr>
 <tr>
 <td>A column's <code>unit</code>, <code>grain</code>, <code>values</code></td>
@@ -3300,7 +3226,7 @@ snapshot by <code>schema_knowledge()</code>:</p>
 </tr>
 <tr>
 <td><code>relationships</code></td>
-<td>The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its <code>cardinality</code> and <code>"source": "glossary"</code> (D46). The logical validator's join check matches it as it matches a foreign key.</td>
+<td>The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its <code>cardinality</code> and <code>"source": "glossary"</code>. The logical validator's join check matches it as it matches a foreign key.</td>
 </tr>
 </tbody>
 </table>
@@ -3347,8 +3273,7 @@ snapshot by <code>schema_knowledge()</code>:</p>
   load), it does what the no-candidates path does: every table the caller may
   read, a <code>SCHEMA_RETRIEVAL_FAILED</code> <code>RunWarning</code> with a fixed message (the
   exception detail goes to the log only), and no error. Planning against no
-  tables fails every attempt (bug B105 in
-  <a href="../../wave_c/#14-bugs-wave-c-fixes">Wave C, section 14</a>).</li>
+  tables fails every attempt.</li>
 <li>Without one (the snapshot itself could not be read), it returns empty
   <code>relevant_tables</code> and a <code>CRITICAL</code> <code>SCHEMA_RETRIEVAL_FAILED</code> error with a
   fixed message, which is not retryable: the SQL agent ends the sub-query before the planner.</li>

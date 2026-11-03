@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6385,7 +6217,7 @@
 <h1 id="events">Events</h1>
 <p>Everything the engine does is published as an <strong>event</strong> on its event bus: each
 step of a question, its result manifest, its answer as it is written, and how
-it ended; and, as Wave A lands, model calls, policy denials, hook decisions,
+it ended; and model calls, policy denials, hook decisions,
 index builds, purges and LLM swaps. Two readers see them:</p>
 <ul>
 <li><strong>The caller who asked the question</strong> sees their own run's events on
@@ -6394,7 +6226,6 @@ index builds, purges and LLM swaps. Two readers see them:</p>
 <li><strong>An operator</strong> sees every event of every run, and the engine's own, through
   <code>engine.events.subscribe</code>.</li>
 </ul>
-<p>The design is <a href="../../architecture/wave_a/#3-the-event-bus">Wave A, section 3</a>.</p>
 <h2 id="the-event">The event</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span>   <span class="c1"># nl2sql_sdk.events.Event: pydantic and the standard library only</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -6502,7 +6333,7 @@ that is not in it cannot be published.</p>
 <tr>
 <td><code>knowledge.used</code></td>
 <td><code>sub_query_id</code>, <code>datasource_id</code>, <code>terms</code> (name to match score), <code>rules</code> (ids), <code>dropped</code>, <code>digest</code></td>
-<td>no; not yet published (Wave B's K2)</td>
+<td>no; not yet published</td>
 </tr>
 <tr>
 <td><code>clarification.requested</code></td>
@@ -6594,7 +6425,7 @@ on the engine's bus directly.</p>
 </tr>
 </tbody>
 </table>
-<p>Release 0.9 (<a href="../../architecture/wave_c/">Wave C</a>) adds the events below. They are catalogued now; the change named
+<p>Release 0.9 adds the events below. They are catalogued now; the change named
 with each publishes it. None is on <code>stream_query</code>'s allow-list: <code>conversations.stream</code> adds the two conversation
 events to its own. The three marked <em>turn</em> belong to a conversation turn, which opens a scope of its own and so has a
 <code>trace_id</code>; none carries rows, a value of an argument, or a token.</p>
@@ -6610,52 +6441,52 @@ events to its own. The three marked <em>turn</em> belong to a conversation turn,
 <tr>
 <td><code>conversation.started</code></td>
 <td><code>conversation_id</code>, <code>user_id</code>, <code>datasource_id</code></td>
-<td><code>engine.conversations.start</code> (C1)</td>
+<td><code>engine.conversations.start</code></td>
 </tr>
 <tr>
 <td><code>conversation.step</code> (turn)</td>
 <td><code>conversation_id</code>, <code>turn</code>, <code>tool</code>, <code>status</code>, <code>trace_id</code> (an <code>ask</code> step's), <code>args</code> (argument names only)</td>
-<td>the model's loop finished one tool call (C1)</td>
+<td>the model's loop finished one tool call</td>
 </tr>
 <tr>
 <td><code>conversation.turn</code> (turn)</td>
 <td><code>conversation_id</code>, <code>turn</code>, <code>kind</code>, <code>status</code>, <code>trace_id</code>, <code>steps</code>, <code>stored</code> (the stored <code>Turn</code> as JSON, on the conversation stream only)</td>
-<td>a turn was stored (C1)</td>
+<td>a turn was stored</td>
 </tr>
 <tr>
 <td><code>chat_tool.called</code> (turn)</td>
 <td><code>tool</code>, <code>conversation_id</code>, <code>turn</code>, <code>ok</code>, <code>seconds</code>, <code>error_code</code></td>
-<td>a registry chat tool ran, in the model's loop or by name; in the turn's scope (C2)</td>
+<td>a registry chat tool ran, in the model's loop or by name; in the turn's scope</td>
 </tr>
 <tr>
 <td><code>dashboard.generated</code></td>
 <td><code>dashboard_id</code>, <code>datasource_id</code>, <code>tiles</code>, <code>skipped</code></td>
-<td><code>engine.dashboards.generate</code> (D3)</td>
+<td><code>engine.dashboards.generate</code></td>
 </tr>
 <tr>
 <td><code>dashboard.refreshed</code></td>
 <td><code>dashboard_id</code>, <code>trigger</code>, <code>counts</code> (charts per status), <code>filters</code> (ids, never values)</td>
-<td>a refresh, an open that refreshed, or a scheduled run (D2)</td>
+<td>a refresh, an open that refreshed, or a scheduled run</td>
 </tr>
 <tr>
 <td><code>dashboard.changed</code></td>
 <td><code>dashboard_id</code>, <code>change</code> (the edit kinds, a move being the kind <code>move</code>; <code>pinned</code>; <code>deleted</code>; <code>created</code>, a new draft), <code>by</code></td>
-<td>an edit, a pin, a delete or a new draft (D1, D4)</td>
+<td>an edit, a pin, a delete or a new draft</td>
 </tr>
 <tr>
 <td><code>dashboard.schedule_set</code></td>
 <td><code>dashboard_id</code>, <code>every_minutes</code>, <code>by</code></td>
-<td>a schedule was set; it saves a role snapshot (audited, D1)</td>
+<td>a schedule was set; it saves a role snapshot (audited)</td>
 </tr>
 <tr>
 <td><code>dashboard.schedule_stopped</code></td>
 <td><code>dashboard_id</code>, <code>reason</code></td>
-<td>a schedule stopped with a visible error (audited, D2)</td>
+<td>a schedule stopped with a visible error (audited)</td>
 </tr>
 <tr>
 <td><code>workspace.changed</code></td>
 <td><code>workspace_id</code>, <code>change</code> (<code>created</code>, <code>renamed</code>, <code>deleted</code>), <code>by</code></td>
-<td><code>engine.workspaces</code> (D1)</td>
+<td><code>engine.workspaces</code></td>
 </tr>
 <tr>
 <td><code>datasource.saved</code></td>
@@ -6687,7 +6518,7 @@ once per check, even when the plan names it twice. A scope asked only to filter 
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
 nobody asked for. Every catalogued event is published today except
-<code>run.limit_reached</code>, whose Wave A
+<code>run.limit_reached</code>, whose
 PR is named in its description. While a
 <a href="../../configuration/hooks/">hook</a> is attached at <code>answer.after</code>, a run
 publishes no <code>answer.delta</code> and sends <code>result.manifest</code> only after the hooks

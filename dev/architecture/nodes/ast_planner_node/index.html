@@ -437,79 +437,7 @@
 <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../configuration_v2/">
-<span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../phase2/">
-<span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_a/">
-<span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_b/">
-<span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_c/">
-<span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_d/">
-<span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -517,8 +445,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -529,8 +457,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_15">
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -567,8 +495,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -579,8 +507,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="true" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_16">
+<nav aria-expanded="true" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -3111,7 +3039,7 @@ validation and executed is reused
   appended (<code>... | today=2026-10-12</code>): the planner is told today's date and
   writes relative dates as literals, so a plan from another day misses. So are
   the planner's model and the datasource's knowledge digest
-  (<code>... | knowledge=&lt;sha256&gt;</code>, Wave B D57): a changed definition plans again,
+  (<code>... | knowledge=&lt;sha256&gt;</code>): a changed definition plans again,
   and swapping the glossary back hits the old entries.
   Normalisation case-folds, collapses whitespace and strips trailing <code>.?!,;:</code>;
   the match is exact. No <code>schema_version</code>, no caching.</li>
@@ -3123,7 +3051,7 @@ validation and executed is reused
 <li><strong>Written</strong> by <code>wrap_subgraph</code> (<code>pipeline/graph_utils.py</code>) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
   and plan-only runs are not stored. Nor is a plan whose planner answer
-  carried alternatives or an <code>ambiguous_phrase</code> (D47), keyed on
+  carried alternatives or an <code>ambiguous_phrase</code>, keyed on
   <code>alternatives_offered</code>, so a reading <code>plan.after</code> or the caller's scope
   dropped still keeps the plan out of the cache. <code>alternatives_offered</code>
   carries over to a retry: a question an earlier attempt read two ways is
@@ -3147,7 +3075,7 @@ validation and executed is reused
    validator then checks like any other; a deny returns <code>plan=None</code> with
    <code>HOOK_DENIED</code> (or <code>HOOK_FAILED</code>), which is never retried. Return
    <code>ASTPlannerResponse</code> with the plan, <code>planner_plan</code> and reasoning. Each
-   alternative passes <code>plan.after</code> the same way; the clarifier (L1) decides
+   alternative passes <code>plan.after</code> the same way; the clarifier decides
    whether to ask.</li>
 <li>On exception, emit <code>PLANNING_FAILURE</code> error and return <code>plan=None</code>.</li>
 </ol>

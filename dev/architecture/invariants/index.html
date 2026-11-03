@@ -3045,175 +3045,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -3252,10 +3084,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
             
   
   
@@ -3273,8 +3105,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3373,10 +3205,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
             
   
   
@@ -3394,8 +3226,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -10355,7 +10187,7 @@
 <hr />
 <h2 id="combine-groups-require-roles-and-typed-join-keys">Combine Groups Require Roles and Typed Join Keys</h2>
 <h3 id="definition_1">Definition</h3>
-<p>Combine groups with <code>compare</code> or <code>join</code> operations must include a role for every input, at most one left-hand input (<code>left</code>, <code>base</code> or <code>primary</code>) and one right-hand input (<code>right</code>, <code>compare</code> or <code>secondary</code>), and at least one join key pair; a group with only one side is refused by the decomposer node. Each key names a column in the <code>expected_schema</code> of its side's sub-query, that column declares a <code>dtype</code>, and the two sides' dtypes can be coerced to each other: a number or a boolean never joins a date (<a href="../wave_a/#the-join-key-type-check">Wave A, D30</a>). The aggregator casts both sides of each key to one type before the join, in polars; a value that does not convert joins nothing and is a <code>JOIN_KEY_UNCONVERTED</code> warning.</p>
+<p>Combine groups with <code>compare</code> or <code>join</code> operations must include a role for every input, at most one left-hand input (<code>left</code>, <code>base</code> or <code>primary</code>) and one right-hand input (<code>right</code>, <code>compare</code> or <code>secondary</code>), and at least one join key pair; a group with only one side is refused by the decomposer node. Each key names a column in the <code>expected_schema</code> of its side's sub-query, that column declares a <code>dtype</code>, and the two sides' dtypes can be coerced to each other: a number or a boolean never joins a date. The aggregator casts both sides of each key to one type before the join, in polars; a value that does not convert joins nothing and is a <code>JOIN_KEY_UNCONVERTED</code> warning.</p>
 <h3 id="enforcement-points_1">Enforcement Points</h3>
 <ul>
 <li><code>CombineGroup.validate_roles()</code> and <code>DecomposerResponse.validate_join_key_types()</code> in <code>nl2sql.pipeline.nodes.decomposer.schemas</code></li>
@@ -10364,7 +10196,7 @@
 <h3 id="failure-behavior_1">Failure Behavior</h3>
 <p>Raises <code>ValueError</code> when roles, join keys or their types are missing or cannot meet; parse-and-retry sends it back to the model.</p>
 <h3 id="why-it-exists_1">Why It Exists</h3>
-<p>Ensures combine operations are well-defined and deterministic for aggregation. A text key from one database joined to an integer from another used to fail in the aggregator, terminally, or match nothing (B30).</p>
+<p>Ensures combine operations are well-defined and deterministic for aggregation. A text key from one database joined to an integer from another used to fail in the aggregator, terminally, or match nothing.</p>
 <hr />
 <h2 id="decomposer-references-must-resolve">Decomposer References Must Resolve</h2>
 <h3 id="definition_2">Definition</h3>
@@ -10468,7 +10300,7 @@
 <hr />
 <h2 id="knowledge-is-data-the-validator-and-scope-decide">Knowledge Is Data: the Validator and Scope Decide</h2>
 <h3 id="definition_10">Definition</h3>
-<p>The glossary (Wave B's knowledge) reaches a model only as JSON values: inside
+<p>The glossary reaches a model only as JSON values: inside
 the schema block, and inside <code>[BUSINESS_CONTEXT]</code>, one JSON object on one line
 in the planner's and refiner's human messages, so a newline or a block marker
 in a definition stays inside one JSON string. Every item and the whole block
@@ -10666,8 +10498,8 @@ different <code>storage.path</code> values never share a store.</p>
 <li>Only <code>nl2sql/storage/</code> imports <code>chromadb</code> (or <code>langchain_chroma</code>). The engine embeds, ranks and filters through the <code>IndexStore</code> interface (<code>nl2sql_sdk.stores</code>), so a plugin index store works the same way as the built-in <code>chroma</code> one. The one exception is the local embedder, <code>nl2sql/embeddings/local.py</code>, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.</li>
 <li>Only <code>nl2sql/storage/</code> imports <code>sqlite3</code>. Schema snapshots, the plan cache, feedback and the index lock are reached through the <code>StateStore</code> interface, so a plugin state store works the same way as the built-in <code>sqlite</code> one. The SQLite adapter (its driver) reads a datasource, not the engine's state, and is exempt. An eval suite's expected rows come through the datasource's adapter, so nothing in <code>nl2sql/evaluation/</code> imports <code>sqlite3</code> (<code>test_gold_does_not_import_sqlite3</code>).</li>
 <li>The engine and the API never import the CLI (<code>nl2sql_cli</code>, the <code>nl2sql-cli</code> distribution in the repo's root <code>nl2sql-cli/</code>), and the engine has no <code>cli</code> package (<code>test_the_engine_has_no_cli_package</code>, <code>test_the_engine_and_the_api_never_import_nl2sql_cli</code>).</li>
-<li>The CLI imports only the top-level <code>nl2sql</code> and its own <code>nl2sql_cli</code> package, never <code>nl2sql_sdk</code> or <code>nl2sql_api</code> (<code>test_the_cli_and_the_api_import_only_the_public_nl2sql</code>, <code>test_nl2sql_cli_imports_only_the_engine</code>); its distribution depends on <code>nl2sql-engine</code> and <code>textual</code> only, and <code>nl2sql-api</code> is its <code>web</code> extra. <code>config check</code>, <code>init</code>, <code>doctor</code>, <code>--config</code> and the app callback are on the facade already (<code>check_config</code>, <code>init_project</code>, <code>load_config</code>, <code>load_env_file</code>, <code>configure_logging</code>, <code>KEYED_PROVIDERS</code>, <code>env_var_for_provider</code>, <code>api_key_from_env</code>, <code>ANTHROPIC_EXTRA_HINT</code>); the other commands are on it too (CL0b), so the rule has no exception list.</li>
-<li><code>nl2sql_api</code> imports only the top-level <code>nl2sql</code> namespace, with no exception list (<code>STILL_IMPORTED_FROM_INSIDE</code> went with the old playground, X1b; <code>test_still_imported_from_inside_is_gone</code>). In particular it never imports <code>nl2sql.feedback</code>, <code>nl2sql.tracing</code>, <code>nl2sql.pipeline</code>, <code>nl2sql.indexing</code> or <code>PROVIDER_PRESETS</code>: <code>engine.feedback</code>, <code>engine.traces.get</code>, <code>engine.about()</code>, <code>engine.index.inspect_defaults()</code> and <code>engine.llm.providers()</code> serve them. The CLI, the MCP server and <code>nl2sql_api</code> reach the engine only through <code>NL2SQL</code>'s public methods and namespaces, never the runtime behind them (<code>engine._runtime</code>, a namespace's <code>_ctx</code>). The MCP server (<code>nl2sql/mcp/</code>) imports only the top-level <code>nl2sql</code> and, under the same rule, never the runtime; it is the only code that imports <code>mcp</code>, the <code>mcp</code> extra (<code>test_mcp_uses_only_the_public_api</code>). The chat tools (<code>nl2sql/chat_tools/</code>, from Wave C) are held to the same rule: each tool module imports only the top-level <code>nl2sql</code> and its own interface module, and its <code>__init__</code> also the strict model base and the conversation shapes (<code>CHAT_TOOLS_INIT_MAY_IMPORT</code>; <code>test_chat_tools_use_only_the_public_api</code>). Only <code>nl2sql/mcp/</code> imports Starlette or Uvicorn (<code>test_only_mcp_imports_starlette_or_uvicorn</code>). Every app passes the caller to a result or trace read (<code>test_apps_always_pass_the_caller</code>; the CLI passes <code>user_context=None</code>, the operator at a terminal), and neither the REST API nor the MCP server ever acts <code>as_operator</code> (<code>test_the_rest_api_and_mcp_never_act_as_the_operator</code>). <code>nl2sql demo</code> (<code>cli/commands/demo.py</code>) is an ordinary CLI module: it starts <code>nl2sql-api serve --demo</code> as a child process and imports neither the API nor a web framework, and nothing in the engine or the SDK imports <code>nl2sql_api</code> (<code>test_engine_never_imports_the_api</code>). The SDK's <code>FastMCP</code> settings are pydantic-settings that read <code>FASTMCP_*</code> variables and the working directory's <code>.env</code>; the server passes every setting explicitly, so neither changes it, and nothing is written.</li>
+<li>The CLI imports only the top-level <code>nl2sql</code> and its own <code>nl2sql_cli</code> package, never <code>nl2sql_sdk</code> or <code>nl2sql_api</code> (<code>test_the_cli_and_the_api_import_only_the_public_nl2sql</code>, <code>test_nl2sql_cli_imports_only_the_engine</code>); its distribution depends on <code>nl2sql-engine</code> and <code>textual</code> only, and <code>nl2sql-api</code> is its <code>web</code> extra. <code>config check</code>, <code>init</code>, <code>doctor</code>, <code>--config</code> and the app callback are on the facade already (<code>check_config</code>, <code>init_project</code>, <code>load_config</code>, <code>load_env_file</code>, <code>configure_logging</code>, <code>KEYED_PROVIDERS</code>, <code>env_var_for_provider</code>, <code>api_key_from_env</code>, <code>ANTHROPIC_EXTRA_HINT</code>); the other commands are on it too, so the rule has no exception list.</li>
+<li><code>nl2sql_api</code> imports only the top-level <code>nl2sql</code> namespace, with no exception list (<code>STILL_IMPORTED_FROM_INSIDE</code> went with the old playground; <code>test_still_imported_from_inside_is_gone</code>). In particular it never imports <code>nl2sql.feedback</code>, <code>nl2sql.tracing</code>, <code>nl2sql.pipeline</code>, <code>nl2sql.indexing</code> or <code>PROVIDER_PRESETS</code>: <code>engine.feedback</code>, <code>engine.traces.get</code>, <code>engine.about()</code>, <code>engine.index.inspect_defaults()</code> and <code>engine.llm.providers()</code> serve them. The CLI, the MCP server and <code>nl2sql_api</code> reach the engine only through <code>NL2SQL</code>'s public methods and namespaces, never the runtime behind them (<code>engine._runtime</code>, a namespace's <code>_ctx</code>). The MCP server (<code>nl2sql/mcp/</code>) imports only the top-level <code>nl2sql</code> and, under the same rule, never the runtime; it is the only code that imports <code>mcp</code>, the <code>mcp</code> extra (<code>test_mcp_uses_only_the_public_api</code>). The chat tools (<code>nl2sql/chat_tools/</code>) are held to the same rule: each tool module imports only the top-level <code>nl2sql</code> and its own interface module, and its <code>__init__</code> also the strict model base and the conversation shapes (<code>CHAT_TOOLS_INIT_MAY_IMPORT</code>; <code>test_chat_tools_use_only_the_public_api</code>). Only <code>nl2sql/mcp/</code> imports Starlette or Uvicorn (<code>test_only_mcp_imports_starlette_or_uvicorn</code>). Every app passes the caller to a result or trace read (<code>test_apps_always_pass_the_caller</code>; the CLI passes <code>user_context=None</code>, the operator at a terminal), and neither the REST API nor the MCP server ever acts <code>as_operator</code> (<code>test_the_rest_api_and_mcp_never_act_as_the_operator</code>). <code>nl2sql demo</code> (<code>cli/commands/demo.py</code>) is an ordinary CLI module: it starts <code>nl2sql-api serve --demo</code> as a child process and imports neither the API nor a web framework, and nothing in the engine or the SDK imports <code>nl2sql_api</code> (<code>test_engine_never_imports_the_api</code>). The SDK's <code>FastMCP</code> settings are pydantic-settings that read <code>FASTMCP_*</code> variables and the working directory's <code>.env</code>; the server passes every setting explicitly, so neither changes it, and nothing is written.</li>
 <li>The runtime (<code>pipeline</code>, <code>execution</code>, <code>indexing</code>, <code>datasources</code>, <code>llm</code>, <code>policies</code>, <code>aggregation</code>, <code>schema</code>, <code>services</code>, <code>context</code>, <code>public_api</code>) never imports <code>nl2sql.evaluation</code> or <code>nl2sql.feedback</code> at module scope. A deferred import inside a function is fine.</li>
 <li>A provider's API-key environment variable is read in <code>nl2sql/llm/</code> only. <code>PROVIDER_PRESETS</code> (<code>llm/registry.py</code>) is the one table of keyed providers (the keyless <code>replay</code> provider is declared as an entry point and is not in it, since it has no key variable); everything the CLI, the web app, evaluation and the REST API know about providers derives from it through <code>llm/providers.py</code>.</li>
 </ul>
@@ -10711,7 +10543,7 @@ different <code>storage.path</code> values never share a store.</p>
 <ul>
 <li>There is no <code>settings</code> singleton. A module with no runtime takes the value it needs as a parameter (<code>run_date(today)</code>, <code>PlanCache(store, enabled=..., today=...)</code>).</li>
 <li>No module writes the process environment: no <code>os.environ</code> assignment, <code>pop</code> or <code>update</code>, no <code>os.putenv</code>. Keys and options travel in the <code>Config</code>. A key pasted into Settings and a key saved in the playground's settings panel are written to the demo's <code>.env</code> and given to the engine as a value in its LLM config, never put in <code>os.environ</code>; <code>nl2sql-api serve --hosted</code> refuses to start when a provider key variable is set rather than drop it.</li>
-<li>The environment is read from an allow-list only: <code>NL2SQL_CONFIG</code> (<code>nl2sql/config/</code>), <code>NL2SQL_MODE</code> (<code>nl2sql-api serve</code> alone), <code>NL2SQL_LOG_LEVEL</code> and <code>NL2SQL_LOG_FORMAT</code> (<code>configure_logging</code>), the provider key variables (<code>nl2sql/llm/</code>, through <code>PROVIDER_PRESETS</code>), <code>${env:VAR}</code> references (<code>nl2sql/config/</code> and the <code>env</code> secret provider), the trace redactor, which masks every value the environment holds, and, from Wave C, <code>DATABASE_URL</code>, read by <code>nl2sql-cli/src/nl2sql_cli/commands/launch.py</code> alone (<code>nl2sql launch</code> offers it as a candidate; it is also an entry point that loads the <code>.env</code> it has just written). Anything else is configuration and is written in <code>nl2sql.yaml</code>, as <code>${env:VAR}</code> where it should come from the environment.</li>
+<li>The environment is read from an allow-list only: <code>NL2SQL_CONFIG</code> (<code>nl2sql/config/</code>), <code>NL2SQL_MODE</code> (<code>nl2sql-api serve</code> alone), <code>NL2SQL_LOG_LEVEL</code> and <code>NL2SQL_LOG_FORMAT</code> (<code>configure_logging</code>), the provider key variables (<code>nl2sql/llm/</code>, through <code>PROVIDER_PRESETS</code>), <code>${env:VAR}</code> references (<code>nl2sql/config/</code> and the <code>env</code> secret provider), the trace redactor, which masks every value the environment holds, and, <code>DATABASE_URL</code>, read by <code>nl2sql-cli/src/nl2sql_cli/commands/launch.py</code> alone (<code>nl2sql launch</code> offers it as a candidate; it is also an entry point that loads the <code>.env</code> it has just written). Anything else is configuration and is written in <code>nl2sql.yaml</code>, as <code>${env:VAR}</code> where it should come from the environment.</li>
 <li>Only <code>nl2sql_cli/chat/</code> imports <code>textual</code> (<code>test_only_the_chat_package_imports_textual</code>), and no module scope outside it imports that package, so <code>import nl2sql</code> and every other command load no terminal toolkit.</li>
 <li>Only the entry points load a <code>.env</code> file: the CLI (<code>nl2sql chat --demo</code> among its commands), <code>nl2sql demo</code> and <code>nl2sql-api serve</code> (never for a hosted server, which holds no model key) call <code>nl2sql.config.load_env_file()</code>, which loads the <code>.env</code> next to <code>nl2sql.yaml</code> and never overrides a variable already set. It is the one place that calls <code>load_dotenv</code>. The library never reads a <code>.env</code>; a Python caller who wants one loads it before <code>NL2SQL.from_config()</code>.</li>
 <li>Runs that need different settings (evaluation, trace replay) take a run-scoped runtime with a derived config (<code>ctx.derive(...)</code>) instead of editing shared state.</li>
@@ -10792,12 +10624,12 @@ different <code>storage.path</code> values never share a store.</p>
 <h2 id="only-an-accept-writes-a-persons-file">Only an Accept Writes a Person's File</h2>
 <h3 id="definition_29">Definition</h3>
 <p>The engine rewrites two files a person owns, and only from the review queue's accept: the first <code>yaml</code> knowledge source's <code>glossary.yaml</code> and the <code>curated</code> section's own file. An accept needs <code>by</code> with one of <code>policies.admin_roles</code> (any caller under <code>allow_all</code>). For each file it takes the state store's lock <code>accept:&lt;real path&gt;</code>, refuses when the file's SHA-256 is no longer the one the engine loaded, applies every accepted item, runs the item's checks (the glossary's validation; the curated checks for a verified query), and rewrites the file once, canonically and atomically (a temporary file renamed over the real path, through a symlink). An inline <code>curated</code> section, a config built in code, or a project without a <code>yaml</code> knowledge source is never written. Nothing a model or a thumbs-up produced reaches either file, or a prompt, before an accept.</p>
-<p>Three more writers exist, none of which rewrites a person's work without the same checks (Wave C, D123). <code>write_project</code> writes a new project's files, and never overwrites one: a file that exists is an error and nothing is written. <code>engine.datasources.save</code> writes one <code>datasources/&lt;id&gt;.yaml</code>: it needs an admin <code>by</code>, records each datasource file's SHA-256 when the config is loaded and refuses (<code>FILE_CHANGED</code>) one that changed since, and a new file must not exist yet. <code>write_env_values</code> writes the <code>.env</code> beside <code>nl2sql.yaml</code> (replacing a line with the same name, keeping every other line, never <code>os.environ</code>). Neither a model nor a thumbs-up reaches any of them. <strong>A secret is never written into YAML:</strong> every secret field is written as a reference (D122), and a literal only where the caller allows a <code>.env</code>.</p>
+<p>Three more writers exist, none of which rewrites a person's work without the same checks. <code>write_project</code> writes a new project's files, and never overwrites one: a file that exists is an error and nothing is written. <code>engine.datasources.save</code> writes one <code>datasources/&lt;id&gt;.yaml</code>: it needs an admin <code>by</code>, records each datasource file's SHA-256 when the config is loaded and refuses (<code>FILE_CHANGED</code>) one that changed since, and a new file must not exist yet. <code>write_env_values</code> writes the <code>.env</code> beside <code>nl2sql.yaml</code> (replacing a line with the same name, keeping every other line, never <code>os.environ</code>). Neither a model nor a thumbs-up reaches any of them. <strong>A secret is never written into YAML:</strong> every secret field is written as a reference, and a literal only where the caller allows a <code>.env</code>.</p>
 <h3 id="enforcement-points_29">Enforcement Points</h3>
 <ul>
 <li><code>accept()</code> in <code>nl2sql.review.accept</code>, through <code>engine.proposals.accept</code> and <code>apply</code>; the admin check is <code>require_admin()</code> in <code>nl2sql.review.queue</code></li>
 <li><code>write_glossary()</code> in <code>nl2sql.knowledge.yaml_source</code> and <code>write_curated()</code> in <code>nl2sql.review.curated_file</code>: the hash check, the atomic rewrite</li>
-<li><code>test_only_accept_writes_a_persons_file</code> in <code>packages/nl2sql/tests/architecture/test_boundaries.py</code>: an AST scan allowing calls of the two writers only in <code>nl2sql/review/accept.py</code> (<code>write_curated</code> is also called by <code>add_demo</code> in <code>api/datasource_api.py</code>, which adds the demo's verified queries the file lacks, under the same hash check). The amended list (<code>PERSONS_FILE_WRITERS</code>, D123) also names <code>write_project</code> (only <code>config/project.py</code>, that is <code>init_project</code>, and <code>nl2sql launch</code>) and <code>write_env_values</code> (only <code>config/project.py</code>, <code>api/datasource_api.py</code>, that is <code>datasources.save</code>, and <code>nl2sql launch</code>); <code>test_the_writers_of_a_persons_file_are_still_called_where_the_list_says</code> keeps the list from going stale. <code>datasources.save</code> is a method name too common to scan for, so its guards are its <code>by</code> (<code>test_owned_and_privileged_methods_require_a_caller</code>) and its hash check (<code>test_datasources_save.py</code>)</li>
+<li><code>test_only_accept_writes_a_persons_file</code> in <code>packages/nl2sql/tests/architecture/test_boundaries.py</code>: an AST scan allowing calls of the two writers only in <code>nl2sql/review/accept.py</code> (<code>write_curated</code> is also called by <code>add_demo</code> in <code>api/datasource_api.py</code>, which adds the demo's verified queries the file lacks, under the same hash check). The amended list (<code>PERSONS_FILE_WRITERS</code>) also names <code>write_project</code> (only <code>config/project.py</code>, that is <code>init_project</code>, and <code>nl2sql launch</code>) and <code>write_env_values</code> (only <code>config/project.py</code>, <code>api/datasource_api.py</code>, that is <code>datasources.save</code>, and <code>nl2sql launch</code>); <code>test_the_writers_of_a_persons_file_are_still_called_where_the_list_says</code> keeps the list from going stale. <code>datasources.save</code> is a method name too common to scan for, so its guards are its <code>by</code> (<code>test_owned_and_privileged_methods_require_a_caller</code>) and its hash check (<code>test_datasources_save.py</code>)</li>
 <li><code>write_project</code>, <code>write_env_values</code> and <code>datasource_data</code> in <code>nl2sql.config.writer</code> and <code>config/project.py</code>: the secret written as a reference, the name <code>NL2SQL_&lt;PATH&gt;</code> and its collision check, the refusal of a literal (<code>SecretValueInConfig</code>) without an env file. <code>packages/nl2sql/tests/unit/test_config_writer.py</code> and <code>test_datasources_save.py</code>: every secret literal (connection, LLM, agent and embeddings keys, a secret provider) goes to <code>.env</code> as a reference and never to YAML, the other <code>.env</code> lines are kept, a changed file is refused</li>
 <li><code>packages/nl2sql/tests/unit/test_review_queue.py</code>: the admin role, the hash check, the lock, an inline section, the curated checks</li>
 </ul>
@@ -10818,13 +10650,13 @@ different <code>storage.path</code> values never share a store.</p>
 <li><code>test_other_users_conversation_is_not_found</code>, <code>test_turn_runs_with_the_callers_roles_not_the_starters</code>, <code>test_stored_turn_has_no_rows</code>, <code>test_model_never_sees_rows</code> in <code>packages/nl2sql/tests/unit/test_conversations.py</code>; <code>test_stored_dashboard_results_are_denied_after_access_is_lost</code>, <code>test_refresh_runs_as_the_caller</code>, <code>test_open_never_approves</code>, <code>test_scheduled_refresh_never_approves</code>, <code>test_schedule_stops_with_a_visible_error_when_a_check_fails</code> and <code>test_schedule_stops_when_the_identity_snapshot_expires</code> in <code>packages/nl2sql/tests/unit/test_dashboards_d2.py</code>; <code>test_owned_and_privileged_methods_require_a_caller</code>, <code>test_every_entry_point_reaches_data_through_run_query</code> and <code>test_dashboards_make_no_model_call</code> in the boundary test</li>
 </ul>
 <h3 id="failure-behavior_30">Failure Behavior</h3>
-<p><code>ConversationNotFound</code> for an id that is missing or another owner's, with the same message for both; <code>DashboardNotFound</code> likewise. <code>engine.answers</code> is owner-only too: another caller's saved answer, an admin's included, is <code>AnswerNotFound</code>, with no admin read (D247). A chart the caller can no longer read is <code>denied</code>, with no rows; a schedule that fails a check is <code>stopped</code>, with its code and message on the schedule.</p>
+<p><code>ConversationNotFound</code> for an id that is missing or another owner's, with the same message for both; <code>DashboardNotFound</code> likewise. <code>engine.answers</code> is owner-only too: another caller's saved answer, an admin's included, is <code>AnswerNotFound</code>, with no admin read. A chart the caller can no longer read is <code>denied</code>, with no rows; a schedule that fails a check is <code>stopped</code>, with its code and message on the schedule.</p>
 <h3 id="why-it-exists_30">Why It Exists</h3>
 <p>A conversation outlives the request that began it. If it carried the starter's roles, a person who lost access, or anyone who learned its id, would keep reading what the roles allowed.</p>
 <hr />
 <h2 id="results-belong-to-their-asker">Results Belong to Their Asker</h2>
 <h3 id="definition_31">Definition</h3>
-<p>A run records who asked it, <code>(tenant_id, user_id)</code> plus the sorted roles of an anonymous asker (<code>ResultOwner</code>), in its result manifest and in its trace (<code>owner</code>). Every read of the run's rows takes the caller as a required <code>user_context</code> and answers only that asker: <code>engine.results.manifest</code>, <code>page</code>, <code>csv</code> and <code>chart</code>. <code>engine.traces.get(trace_id, *, user_context=None)</code> answers only that asker too, with <code>None</code> for another caller's run (and for a trace that records no asker); <code>engine.feedback.record(trace_id, rating, *, user_context)</code> reads the trace as the caller and raises <code>TraceNotFound</code> for another caller's run. No <code>user_context</code> on <code>traces.get</code> is the trusted in-process operator, as <code>nl2sql trace</code> and <code>nl2sql run</code> need and as Wave A's approvals trust the context an in-process caller passes; the REST API, MCP and the terminal app always pass the caller. <code>engine.feedback.correct(..., user_context)</code> follows the same rule: it reads the run's trace as the caller, so another caller's run is <code>no_run</code> and is never rated down; only the in-process operator (<code>as_operator=True</code>, as <code>nl2sql feedback correct</code> passes) reads any run. A trace id appears in events, traces and logs, so it is never the access check.</p>
+<p>A run records who asked it, <code>(tenant_id, user_id)</code> plus the sorted roles of an anonymous asker (<code>ResultOwner</code>), in its result manifest and in its trace (<code>owner</code>). Every read of the run's rows takes the caller as a required <code>user_context</code> and answers only that asker: <code>engine.results.manifest</code>, <code>page</code>, <code>csv</code> and <code>chart</code>. <code>engine.traces.get(trace_id, *, user_context=None)</code> answers only that asker too, with <code>None</code> for another caller's run (and for a trace that records no asker); <code>engine.feedback.record(trace_id, rating, *, user_context)</code> reads the trace as the caller and raises <code>TraceNotFound</code> for another caller's run. No <code>user_context</code> on <code>traces.get</code> is the trusted in-process operator, as <code>nl2sql trace</code> and <code>nl2sql run</code> need and as approvals trust the context an in-process caller passes; the REST API, MCP and the terminal app always pass the caller. <code>engine.feedback.correct(..., user_context)</code> follows the same rule: it reads the run's trace as the caller, so another caller's run is <code>no_run</code> and is never rated down; only the in-process operator (<code>as_operator=True</code>, as <code>nl2sql feedback correct</code> passes) reads any run. A trace id appears in events, traces and logs, so it is never the access check.</p>
 <h3 id="enforcement-points_31">Enforcement Points</h3>
 <ul>
 <li><code>ResultOwner.of</code> in <code>nl2sql.execution.artifacts.results</code>: the one rule for who an owner is, used by the manifest writer, the results reader, the trace writer (<code>write_run_trace</code>) and <code>TracesAPI.get</code></li>

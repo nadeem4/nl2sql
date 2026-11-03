@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6516,11 +6348,10 @@
 
 <h1 id="dashboards">Dashboards</h1>
 <div class="admonition note">
-<p class="admonition-title">Partly built (Wave C, 0.9)</p>
-<p>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1), and so do <code>open</code>, <code>refresh</code>,
-stored results and schedules (D2), and so do filters and <code>filter_values</code> (D2b), <code>generate</code> and
-<code>suggest_questions</code>, the starter dashboard (D3), and building in chat (D4). The design is
-<a href="../architecture/wave_c/#6-dashboards">Wave C, section 6</a>.</p>
+<p class="admonition-title">Partly built (release 0.9)</p>
+<p>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work, and so do <code>open</code>, <code>refresh</code>,
+stored results and schedules, and so do filters and <code>filter_values</code>, <code>generate</code> and
+<code>suggest_questions</code>, the starter dashboard, and building in chat. </p>
 </div>
 <p>A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
 private workspace. Opening one serves stored results after the access check; refreshing re-runs the
@@ -6529,29 +6360,29 @@ stored plans as the caller with no model call. The methods are in
 <table>
 <thead>
 <tr>
-<th>Row</th>
-<th>What it adds</th>
+<th>Part</th>
+<th>What it covers</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>D1</td>
+<td>Store</td>
 <td>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits</td>
 </tr>
 <tr>
-<td>D2</td>
+<td>Refresh</td>
 <td><code>open</code>, <code>refresh</code>, stored results, schedules and <code>nl2sql dashboards refresh</code></td>
 </tr>
 <tr>
-<td>D2b</td>
-<td>Filters: <code>refresh(filters=...)</code> and <code>filter_values</code></td>
+<td>Filters</td>
+<td><code>refresh(filters=...)</code> and <code>filter_values</code></td>
 </tr>
 <tr>
-<td>D3</td>
+<td>Starter</td>
 <td>The starter dashboard: <code>generate</code> and <code>suggest_questions</code>, with no model</td>
 </tr>
 <tr>
-<td>D4</td>
+<td>In chat</td>
 <td>Building and editing a dashboard in a conversation (<code>dashboard_edit</code>, <code>dashboard_pin</code>) and <code>create_draft</code></td>
 </tr>
 </tbody>
@@ -6707,7 +6538,7 @@ stored query and its combine step; a verified chart re-runs its verified query w
 </tr>
 <tr>
 <td><strong>Caps</strong></td>
-<td>A chart stopped at a Wave A cap (<code>stopped</code>) ends the refresh; the rest are <code>stopped</code> too and keep their last result.</td>
+<td>A chart stopped at a cap (<code>stopped</code>) ends the refresh; the rest are <code>stopped</code> too and keep their last result.</td>
 </tr>
 <tr>
 <td><strong>No double runs</strong></td>
@@ -6814,7 +6645,7 @@ index.</p>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">suggest_questions</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>         <span class="c1"># the first five questions, nothing run</span>
 </code></pre></div>
 <p><strong>What it reads.</strong> Each column gets a role from the indexed snapshot alone (no query): what the schema proves (a
-key is an <em>identifier</em>, a date type a <em>date</em>), then Wave B's name and statistics rules (<code>money</code>, <code>quantity</code>,
+key is an <em>identifier</em>, a date type a <em>date</em>), then name and statistics rules (<code>money</code>, <code>quantity</code>,
 <code>enum</code>, a date held as text), and a role in <code>glossary.yaml</code> for that column wins over both. The dashboard reads
 them as a <strong>measure</strong> (<code>money</code>, <code>quantity</code>, on a number column), a <strong>time</strong> (<code>date</code>), a <strong>dimension</strong> (<code>enum</code>, or a
 text column with 2 to <code>charts.max_categories</code> (20) distinct values) or an <strong>identifier</strong>, which is never
@@ -6871,8 +6702,7 @@ If no chart is kept, a "General" workspace this call made is removed again. <cod
 least 1.</p>
 <p><strong>Where it lands.</strong> The dashboard is saved, owned by you, in <code>workspace_id</code> or your "General" workspace (made on
 first use), titled "<code>&lt;datasource&gt;</code> overview" unless you pass <code>title</code>. It has a <code>between</code> filter on the time column
-the trends use and an <code>in</code> filter on each dimension the distributions use (their values are applied by refresh,
-D2b). Layout follows the charts that were drawn: big numbers first, one column wide on one row; then lines (the
+the trends use and an <code>in</code> filter on each dimension the distributions use (their values are applied by refresh). Layout follows the charts that were drawn: big numbers first, one column wide on one row; then lines (the
 first four wide); then bars (two wide); tables last. It is an ordinary dashboard: rename, rearrange, remove, set
 a schedule, refresh, all by hand, exactly as for one built in chat.</p>
 <p>Each call publishes <code>dashboard.generated</code> (the counts, no titles) and the first run publishes

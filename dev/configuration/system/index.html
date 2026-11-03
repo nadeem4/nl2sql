@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6711,9 +6543,7 @@ gives exactly the same engine. Everything the engine needs is in it. Only
 the config path and the provider key variables are read directly (see
 <a href="#environment-variables">Environment variables</a>); any other value from the
 environment is written in the YAML as <code>${env:VAR}</code>.</p>
-<p>The design and its reasoning are in
-<a href="../../architecture/configuration_v2/">Configuration v2</a>. This page is the
-reference.</p>
+<p>This page is the reference.</p>
 <h2 id="nl2sqlyaml"><code>nl2sql.yaml</code></h2>
 <p><code>nl2sql init</code> writes a new project, with each section in its own file:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>init<span class="w"> </span>my-project<span class="w">              </span><span class="c1"># an example SQLite datasource, allow_all policies</span>
@@ -6982,9 +6812,9 @@ reads a secret from the provider whose <code>id</code> is <code>vault</code> (se
 </tbody>
 </table>
 <h3 id="observers-hooks-and-evals">Observers, hooks and evals</h3>
-<p>Three sections added in release 0.7 (<a href="../../architecture/wave_a/">Wave A</a>).
+<p>Three sections added in release 0.7.
 They are accepted and validated now; the engine runs the hooks and the
-observers, and reads evals from the Wave A change named below. The observers
+observers, and reads evals from the change named below. The observers
 are documented on their own page, <a href="../observers/">Observers</a>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># observers.yaml: where the engine's events go</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log</span>
@@ -7046,7 +6876,7 @@ are documented on their own page, <a href="../observers/">Observers</a>.</p>
 </code></pre></div>
 <h3 id="knowledge">Knowledge</h3>
 <p>The knowledge sources the glossary comes from, in precedence order (release
-0.8, <a href="../../architecture/wave_b/">Wave B</a>). The engine loads them when it is
+0.8). The engine loads them when it is
 built and on <code>engine.knowledge.reload()</code>; see <a href="../knowledge/">Knowledge</a> for
 the glossary, precedence and who sees what.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># knowledge.yaml: a list, in precedence order</span>
@@ -7076,8 +6906,8 @@ the glossary, precedence and who sees what.</p>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">Config</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">knowledge</span><span class="o">=</span><span class="p">[</span><span class="n">KnowledgeSourceConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"yaml"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"glossary.yaml"</span><span class="p">),</span> <span class="n">MySource</span><span class="p">()])</span>
 </code></pre></div>
 <h3 id="conversations-chat-tools-dashboards-and-mcp">Conversations, chat tools, dashboards and MCP</h3>
-<p>Four sections for release 0.9 (<a href="../../architecture/wave_c/">Wave C</a>). They are
-accepted and validated now; the Wave C change named with each reads it. Each
+<p>Four sections for release 0.9. They are
+accepted and validated now; the change named with each reads it. Each
 is optional, and absent, the defaults shown apply. Chart limits are
 <code>settings.charts</code> (<a href="../settings/#charts">Settings</a>).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># conversations.yaml (every value shown is the default)</span>
@@ -7120,19 +6950,19 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <tbody>
 <tr>
 <td><code>conversations</code></td>
-<td><code>Conversations</code>: strict keys; every count is at least 1, and <code>max_age_days: null</code> keeps conversations. Read by <code>engine.conversations</code> (C1). The <code>conversation</code> agent that leads a turn is one of the <a href="../llm/#per-node-models">LLM agents</a>.</td>
+<td><code>Conversations</code>: strict keys; every count is at least 1, and <code>max_age_days: null</code> keeps conversations. Read by <code>engine.conversations</code>. The <code>conversation</code> agent that leads a turn is one of the <a href="../llm/#per-node-models">LLM agents</a>.</td>
 </tr>
 <tr>
 <td><code>chat_tools</code></td>
-<td>A list of names: none twice, each a registered chat tool (<code>registry.add_chat_tool</code>, or an entry point). An unknown name is an error when the engine is built (<code>chat_tools[i]</code> in the report), with the closest registered name; <code>ask</code> and a plugin whose <code>args_model</code> does not forbid extra keys are errors too. Absent means the default tools (<code>chart</code>, <code>diagram</code> and <code>report</code>) that the registry has, so an engine on <code>Registry.empty()</code> starts with none and needs no <code>chat_tools: []</code>; a name you list must be registered. <code>[]</code> means none; <code>ask</code> is the conversation's own tool and is always on. Read by <code>engine.conversations</code> and <code>engine.chat_tools</code> (C2); see <a href="../../conversations/tools/">Chat tools</a>.</td>
+<td>A list of names: none twice, each a registered chat tool (<code>registry.add_chat_tool</code>, or an entry point). An unknown name is an error when the engine is built (<code>chat_tools[i]</code> in the report), with the closest registered name; <code>ask</code> and a plugin whose <code>args_model</code> does not forbid extra keys are errors too. Absent means the default tools (<code>chart</code>, <code>diagram</code> and <code>report</code>) that the registry has, so an engine on <code>Registry.empty()</code> starts with none and needs no <code>chat_tools: []</code>; a name you list must be registered. <code>[]</code> means none; <code>ask</code> is the conversation's own tool and is always on. Read by <code>engine.conversations</code> and <code>engine.chat_tools</code>; see <a href="../../conversations/tools/">Chat tools</a>.</td>
 </tr>
 <tr>
 <td><code>dashboards</code></td>
-<td><code>Dashboards</code>: strict keys; every value is at least 1. Read by <code>engine.dashboards</code> (D1 to D3).</td>
+<td><code>Dashboards</code>: strict keys; every value is at least 1. Read by <code>engine.dashboards</code>.</td>
 </tr>
 <tr>
 <td><code>answers</code></td>
-<td><code>Answers</code>: strict keys; <code>max_per_user</code> is at least 1. Read by <code>engine.answers</code> (DB1a): the save past the cap is refused with <code>AnswerLimitReached</code>, never by dropping an older answer.</td>
+<td><code>Answers</code>: strict keys; <code>max_per_user</code> is at least 1. Read by <code>engine.answers</code>: the save past the cap is refused with <code>AnswerLimitReached</code>, never by dropping an older answer.</td>
 </tr>
 <tr>
 <td><code>mcp</code></td>
@@ -7148,7 +6978,7 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <h3 id="mode">Mode</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_data</span><span class="w">    </span><span class="c1"># demo | your_data | hosted (default your_data)</span>
 </code></pre></div>
-<p>What the project is for: the bundled <code>demo</code>, your own data, or a <code>hosted</code> public demo (<a href="../../architecture/wave_d/">Wave D</a>, D229). It is a top-level key, not a section. The engine only validates it. <code>nl2sql.resolve_mode(flag, env, file)</code> picks the mode a process runs in: the launcher flag, else the value of <code>NL2SQL_MODE</code>, else this key. It is a pure function; the entry point reads the environment and passes the value in: <code>nl2sql-api serve</code> is the one place that reads <code>NL2SQL_MODE</code>, resolves it with the <code>--demo</code> and <code>--hosted</code> flags and the file, and builds the engine with the result in its <code>Config</code>. An unknown value is an error naming the three.</p>
+<p>What the project is for: the bundled <code>demo</code>, your own data, or a <code>hosted</code> public demo. It is a top-level key, not a section. The engine only validates it. <code>nl2sql.resolve_mode(flag, env, file)</code> picks the mode a process runs in: the launcher flag, else the value of <code>NL2SQL_MODE</code>, else this key. It is a pure function; the entry point reads the environment and passes the value in: <code>nl2sql-api serve</code> is the one place that reads <code>NL2SQL_MODE</code>, resolves it with the <code>--demo</code> and <code>--hosted</code> flags and the file, and builds the engine with the result in its <code>Config</code>. An unknown value is an error naming the three.</p>
 <h3 id="strict-keys-and-errors">Strict keys and errors</h3>
 <p>Every section forbids unknown keys and suggests the closest known one. Names
 resolved through the <a href="../../development/">registry</a> (<code>type:</code>,

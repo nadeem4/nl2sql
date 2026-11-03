@@ -437,79 +437,7 @@
 <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../configuration_v2/">
-<span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../phase2/">
-<span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_a/">
-<span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_b/">
-<span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_c/">
-<span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_d/">
-<span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -517,8 +445,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -529,8 +457,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_15">
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -567,8 +495,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -579,8 +507,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="true" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_16">
+<nav aria-expanded="true" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -3178,7 +3106,7 @@ was validated, not only what failed. The names are fixed and always in this orde
      column, a date part, arithmetic, <code>COALESCE</code>, <code>DATE_DIFF</code>, a label grouped
      with its key, and a table with no known primary key are not rejected.
      Plain <code>GROUP BY first_name, last_name</code> without the key passes (an accepted
-     limit; C-W8).</li>
+     limit).</li>
 <li><code>_unsupported_operators()</code> rejects a binary <code>op</code> the generator's
      <code>SqlVisitor</code> cannot render, with <code>INVALID_PLAN_STRUCTURE</code>. The schema's
      <code>op</code> Literal admits <code>NOT</code>, which belongs on a unary expression; every
@@ -3213,7 +3141,7 @@ was validated, not only what failed. The names are fixed and always in this orde
      declared a date, but Orders.OrderKey is a number. Select a column that
      holds a date for this key." Every other pair is coerced by the
      aggregator; a type sqlglot cannot place, a column with no type and a
-     computed select item are not checked (<a href="../../wave_a/#the-join-key-type-check">Wave A, D30</a>).</li>
+     computed select item are not checked.</li>
 <li><code>_validate_buildable()</code> runs last and is the <strong>buildability</strong> check: it
      calls the generator's own <code>_build_query()</code> and throws the tree away. See
      below.</li>

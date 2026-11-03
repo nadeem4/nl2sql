@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6847,7 +6679,7 @@ when the <code>SuppliedPlan</code> is built. What is not skipped:</p>
 </ul>
 <p>The sub-query's <code>plan_source</code> is <code>"supplied"</code>. The question is still asked:
 the answer is written for it (unless <code>answer=False</code>). The same entry serves
-the approved re-run (<code>"approved"</code>) and, in Wave B, a plan the asker chose
+the approved re-run (<code>"approved"</code>) and a plan the asker chose
 (<code>"chosen"</code>).</p>
 <p>A supplied verified query is run by the curated matcher with its values, and
 it never falls back to a model run (a dashboard refresh uses no tokens). The
@@ -6964,7 +6796,7 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>approvals_needed</code> | <code>List[ApprovalRequest]</code> | no | Set when <code>status</code> is <code>"needs_approval"</code>: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an <code>Approval</code> for each. |
 | <code>clarification</code> | <code>Optional[ClarificationRequest]</code> | no | Set when <code>status</code> is <code>"needs_clarification"</code>: the phrase, and two or three readings, each a label, a validated plan and its explanation. See <a href="#clarification">Clarification</a>. |
 | <code>explanation</code> | <code>Optional[Explanation]</code> | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a <code>success</code> or <code>plan_only</code> run's, and the successful steps of a partly failed one); <code>None</code> when no step did, when a hook ended the run, or when it cannot be rendered. See <a href="#explanation">Explanation</a>. |
-| <code>decomposition</code> | <code>Optional[DecomposerResponse]</code> | no | The run's whole decomposition (sub-queries and combine groups), set on every run that has one and withheld, like the data, when a hook ended the run. With each sub-query's <code>plan</code> it rebuilds the run: a dashboard chart stores both (<a href="../../../architecture/wave_c/">Wave C</a>). |</p>
+| <code>decomposition</code> | <code>Optional[DecomposerResponse]</code> | no | The run's whole decomposition (sub-queries and combine groups), set on every run that has one and withheld, like the data, when a hook ended the run. With each sub-query's <code>plan</code> it rebuilds the run: a dashboard chart stores both. |</p>
 <p><code>errors</code> holds the <code>ERROR</code> and <code>CRITICAL</code> entries, and the one <code>INFO</code> entry
 <code>NEEDS_CLARIFICATION</code> of a run that asked which reading was meant;
 <code>WARNING</code>-severity pipeline errors are appended to <code>warnings</code> as <code>RunWarning</code>s.</p>
@@ -6981,8 +6813,7 @@ on warnings alone) adds a <code>MISSING_SQL</code> error, so the run reports <co
 <code>"plan_only"</code> when no sub-query produced rows or an artifact (an
 <code>execute=False</code> run), otherwise <code>"success"</code>. A state with no sub-queries and no
 errors leaves it <code>None</code>. Hooks, approval and the caps
-that produce <code>"needs_approval"</code> and <code>"stopped"</code> arrive with release 0.7 (see
-<a href="../../../architecture/wave_a/">Wave A</a>).</p>
+that produce <code>"needs_approval"</code> and <code>"stopped"</code> arrive with release 0.7.</p>
 <p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
 result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
 combined result is listed in <code>result_manifest</code> and read back by the run's
@@ -7063,7 +6894,7 @@ nothing is stored. The engine checks, before anything runs:</p>
 </table>
 <p>A refused choice ends the run with that one error (<code>status</code> <code>"error"</code>) and
 calls no model. A <code>plan</code> or a <code>pinned</code> passed with a <code>choice</code> is a <code>ValueError</code>
-at the call. Otherwise the run enters at Wave A's pinned entry with one
+at the call. Otherwise the run enters at pinned entry with one
 sub-query, standalone: no resolver, decomposer or <code>datasources.after</code>. The
 planner step returns the chosen plan with <code>plan_source</code> <code>"chosen"</code> and no model
 call; then it is an ordinary run: <code>plan.after</code>, the validator with the
@@ -7122,8 +6953,7 @@ synthesizer says them; see the
 <p>0.7 changed this shape: a warning was a dict with <code>error_code</code> and <code>severity</code>,
 and is now a <code>RunWarning</code> with <code>code</code>, and <code>detail.recovered</code> where <code>severity</code>
 said <code>ERROR</code>. A run's state is never kept across an upgrade (a run that ended
-<code>needs_approval</code> is asked again, not resumed; see
-<a href="../../../architecture/wave_a/#7-approval">Wave A, D10</a>), so no older warning is
+<code>needs_approval</code> is asked again, not resumed), so no older warning is
 ever read back.</p>
 <h3 id="explanation">Explanation</h3>
 <p><code>QueryResult.explanation</code> answers "why this answer" for a business reader. It
@@ -7247,8 +7077,7 @@ scope filters it; without it, names are the split names and every join is a
 declared key. A run on the Chinook
 suite's gold plans renders as the files in
 <code>packages/nl2sql/tests/unit/explain/golden/</code>, which are compared on every
-test run, so a change to the wording is a reviewed diff. Design:
-<a href="../../../architecture/wave_b/#8-why-this-answer">Wave B, section 8</a>.</p>
+test run, so a change to the wording is a reviewed diff. </p>
 <h2 id="streaming-a-run">Streaming a run</h2>
 <h3 id="nl2sqlstream_query">NL2SQL.stream_query</h3>
 <p>Source:
@@ -7314,7 +7143,7 @@ playground send it.</p>
 <tr>
 <td><code>sanity.flagged</code>, <code>run.limit_reached</code></td>
 <td>see <a href="../../../observability/events/">Events</a></td>
-<td>Published by the sanity checks and the caps when they arrive (Wave A's S1 and E3).</td>
+<td>Published by the sanity checks and the caps when they arrive.</td>
 </tr>
 <tr>
 <td><code>run.finished</code></td>
@@ -7500,7 +7329,7 @@ and <code>.../{result_id}.csv</code>; the playground serves the same two under <
 <td><code>plan_source</code></td>
 <td><code>"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"</code></td>
 <td>no</td>
-<td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), <code>"verified"</code> when a verified query answered (no plan; <code>sql</code> is the verified query's own), <code>"supplied"</code> for a plan passed as <code>run_query(plan=...)</code>, <code>"approved"</code> for an approval's pinned plan (<code>"chosen"</code> is reserved for Wave B), otherwise <code>"llm"</code>. Only an <code>"llm"</code> plan is ever cached. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
+<td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), <code>"verified"</code> when a verified query answered (no plan; <code>sql</code> is the verified query's own), <code>"supplied"</code> for a plan passed as <code>run_query(plan=...)</code>, <code>"approved"</code> for an approval's pinned plan (<code>"chosen"</code> is reserved), otherwise <code>"llm"</code>. Only an <code>"llm"</code> plan is ever cached. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
 </tr>
 <tr>
 <td><code>row_cap</code></td>
@@ -7518,7 +7347,7 @@ and <code>.../{result_id}.csv</code>; the playground serves the same two under <
 <td><code>knowledge_used</code></td>
 <td><code>Optional[KnowledgeUsed]</code></td>
 <td>no</td>
-<td>The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever (Wave B's K2); <code>None</code> when no term or rule matched, and for a plan served from the plan cache, which sent no prompt.</td>
+<td>The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever; <code>None</code> when no term or rule matched, and for a plan served from the plan cache, which sent no prompt.</td>
 </tr>
 <tr>
 <td><code>estimate</code></td>

@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6347,7 +6179,7 @@
 <h1 id="saved-answers-api">Saved answers API</h1>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.answers</code>: a person's own record of "this answered my question". It stores the typed plan behind an
-answer, not SQL and not rows, and runs it again on request. Design: <a href="../../../architecture/wave_d/">Wave D, section 18</a>.</p>
+answer, not SQL and not rows, and runs it again on request. </p>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/answers_api.py</code> (<code>AnswersAPI</code>, internal)</li>
@@ -6399,20 +6231,20 @@ tile holds), <code>chart</code> (<code>auto</code> by default), <code>created_at
 <h2 id="behaviour">Behaviour</h2>
 <ul>
 <li><strong>Owner only.</strong> An answer is read, run, deleted and listed only by its owner. Another caller, an admin
-  included, gets <code>AnswerNotFound</code> (<code>ANSWER_NOT_FOUND</code>, 404) (D247).</li>
+  included, gets <code>AnswerNotFound</code> (<code>ANSWER_NOT_FOUND</code>, 404).</li>
 <li><strong><code>save</code> takes the plan from the stored step</strong>, the helper <code>AddTile</code> uses, so no model text becomes a plan. The
   step must have answered and kept a plan, and <code>trace_id</code> must be that step's run: otherwise <code>NotSavable</code>
   (<code>NOT_SAVABLE</code>, 422). A conversation that is not the caller's is <code>ConversationNotFound</code>.</li>
 <li><strong>It rates the run up</strong> through <code>engine.feedback</code>, which also files the run's <code>verified_query</code> proposal when it
-  can (origin <code>thumbs_up</code>). The answer is saved either way (D241): <code>proposed</code> is <code>False</code> and
+  can (origin <code>thumbs_up</code>). The answer is saved either way: <code>proposed</code> is <code>False</code> and
   <code>not_proposed_reason</code> says why (<code>verified</code>, <code>multiple_statements</code>, <code>failed</code>, <code>no_sql</code>, <code>no_trace</code> when the run's
   trace was not kept, and the other reasons <code>skip_reason</code> gives). <code>note</code> is stored on the rating.</li>
 <li><strong>A cross-database answer is filed under its first sub-query's datasource</strong>, so <code>list(datasource_id=...)</code> for its other datasources does not return it.</li>
 <li><strong>The cap never overflows.</strong> <code>save</code> counts and stores under the owner's lock; a save that meets another in flight raises <code>LockHeld</code> and can be retried. A verified answer whose source names no datasource is <code>NotSavable</code>.</li>
 <li><strong>Saving the same run twice</strong> is one answer and one proposal.</li>
 <li><strong>The cap.</strong> At most <code>answers.max_per_user</code> answers (default 100) per person. The next save is refused with
-  <code>AnswerLimitReached</code> (<code>ANSWER_LIMIT_REACHED</code>, 409) before anything is rated; deleting one frees a place (D242).</li>
-<li><strong><code>run</code> is a normal run as the viewer</strong> (D240): the plan goes through <code>plan.after</code>, the validator, the generator,
+  <code>AnswerLimitReached</code> (<code>ANSWER_LIMIT_REACHED</code>, 409) before anything is rated; deleting one frees a place.</li>
+<li><strong><code>run</code> is a normal run as the viewer</strong>: the plan goes through <code>plan.after</code>, the validator, the generator,
   the scope and the hooks, as for any run, and <code>approvals</code> are as <code>run_query</code> takes them. A plan the schema has
   outgrown comes back as a result with status <code>error</code> whose first error has <code>error_code</code> <code>TILE_NEEDS_FIXING</code>, as a
   dashboard tile reports it. The answer is kept.</li>

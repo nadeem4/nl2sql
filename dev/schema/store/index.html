@@ -955,175 +955,7 @@
   <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/configuration_v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/phase2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_a/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_b/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_c/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../architecture/wave_d/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -1159,10 +991,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
         
           
-          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
             
   
   
@@ -1180,8 +1012,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_15">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1277,10 +1109,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_10" >
         
           
-          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
             
   
   
@@ -1298,8 +1130,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -6660,15 +6492,15 @@ table, and the engine applies the pending ones when it starts
 <code>state.db</code> is adopted as it is; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the <code>locks</code> table;
 migration 4 adds the <code>schema_diffs</code> table; migration 5 adds the <code>proposals</code>
-table, the review queue (release 0.8, <a href="../../architecture/wave_b/#5-the-review-queue">Wave B</a>);
-migration 6 adds Wave C's five tables, below; migration 7 adds the <code>approvals</code> table and migration 8 the <code>saved_answers</code> table (Wave D), below. A 0.8 <code>state.db</code> is migrated in
+table, the review queue;
+migration 6 adds five tables, below; migration 7 adds the <code>approvals</code> table and migration 8 the <code>saved_answers</code> table, below. A 0.8 <code>state.db</code> is migrated in
 place and keeps its rows.</p>
 <h3 id="conversations-dashboards-and-api-keys">Conversations, dashboards and API keys</h3>
-<p>Release 0.9 (<a href="../../architecture/wave_c/#10-the-registry-and-the-state-store-after-wave-c">Wave C</a>).
+<p>Release 0.9.
 <code>StateStore</code> version 4 adds these methods. Each takes and returns a plain JSON
 document (<code>dict</code>), because the SDK holds none of the engine's models; the
 document carries the fields the store filters on. The engine methods that use
-them arrived in C1 and D1 to D4.</p>
+them are in the conversations, workspaces and dashboards services.</p>
 <table>
 <thead>
 <tr>
@@ -6715,7 +6547,7 @@ them arrived in C1 and D1 to D4.</p>
 and open only after the access check.</p>
 <p>Each document's timestamps are ISO 8601; a stamp with no zone is read as UTC.</p>
 <h3 id="approvals">Approvals</h3>
-<p>Wave D (<a href="../../architecture/wave_d/">D215</a>). <code>StateStore</code> version 5 adds the approval methods, one JSON document per
+<p><code>StateStore</code> version 5 adds the approval methods, one JSON document per
 approval request, in the <code>approvals</code> table that migration 7 creates (<code>CREATE TABLE IF NOT EXISTS</code>, so it is safe to
 run again).</p>
 <table>
@@ -6737,7 +6569,7 @@ run again).</p>
 </tbody>
 </table>
 <h3 id="saved-answers">Saved answers</h3>
-<p>Wave D (<a href="../../architecture/wave_d/">D238</a>). <code>StateStore</code> version 6 adds the saved-answer methods, one JSON document
+<p><code>StateStore</code> version 6 adds the saved-answer methods, one JSON document
 per answer, in the <code>saved_answers</code> table that migration 8 creates (<code>CREATE TABLE IF NOT EXISTS</code>).</p>
 <table>
 <thead>

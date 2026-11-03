@@ -437,79 +437,7 @@
 <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/configuration_v2/">
-<span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/phase2/">
-<span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/wave_a/">
-<span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/wave_b/">
-<span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/wave_c/">
-<span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../architecture/wave_d/">
-<span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -517,8 +445,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -529,8 +457,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_15">
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -567,8 +495,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
 <span class="md-ellipsis">
     
   
@@ -579,8 +507,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_16">
+<nav aria-expanded="false" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -2832,8 +2760,7 @@
 <article class="md-content__inner md-typeset">
 <h1 id="chat-tools">Chat tools</h1>
 <div class="admonition note">
-<p class="admonition-title">Wave C, 0.9: the runner and the five tools are built</p>
-<p>The design is <a href="../../architecture/wave_c/#4-chat-tools">Wave C, section 4</a>.</p>
+<p class="admonition-title">Release 0.9: the runner and the five tools are built</p>
 </div>
 <p>A chat tool turns something a conversation already has into something else, with no model call of its
 own. The five built-ins:</p>
@@ -2842,34 +2769,28 @@ own. The five built-ins:</p>
 <tr>
 <th>Tool</th>
 <th>Does</th>
-<th>Filled by</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>chart</code></td>
 <td>Draws an answer's data as a line, bar, big number or table (<a href="../../charts/">Charts</a>); args <code>turn</code>, <code>step</code>, <code>result_id</code>, <code>kind</code></td>
-<td>K1 (built)</td>
 </tr>
 <tr>
 <td><code>diagram</code></td>
 <td>Draws the tables of an answer, or of a datasource, as Mermaid (<a href="../../charts/diagrams/">Diagrams</a>); args <code>view</code> (<code>answer</code> or <code>schema</code>), <code>turn</code>, <code>step</code>, <code>datasource_id</code>, <code>tables</code></td>
-<td>K2 (built)</td>
 </tr>
 <tr>
 <td><code>report</code></td>
 <td>Writes the conversation's answered turns up as Markdown; args <code>turns</code>, <code>title</code></td>
-<td>C2 (built)</td>
 </tr>
 <tr>
 <td><code>dashboard_edit</code></td>
 <td>Builds or changes a dashboard (<a href="../../dashboards/#building-in-chat">Dashboards</a>); args <code>edits</code>, <code>dashboard_id</code>, <code>title</code>, <code>workspace_id</code></td>
-<td>D4 (built)</td>
 </tr>
 <tr>
 <td><code>dashboard_pin</code></td>
 <td>Saves the dashboard being built, whole; args <code>dashboard_id</code>, <code>workspace_id</code>, <code>title</code></td>
-<td>D4 (built)</td>
 </tr>
 </tbody>
 </table>
@@ -2960,7 +2881,7 @@ section says "Results expired." and keeps the text, the SQL and the trace. <code
 unknown one is a <code>ValueError</code>); the default is every answered turn. A conversation with nothing answered is a
 <code>ValueError</code>. Every turn is considered, and a question counts when its <code>ask</code> step succeeded, even if a later
 tool step in that turn failed. The <code>report</code> tool is the same call, so it covers earlier turns, not the one it
-is called in. A stored tool output never holds row data (D106): the <code>report</code> tool stores the report without
+is called in. A stored tool output never holds row data: the <code>report</code> tool stores the report without
 its row tables and chart takeaways, and a stored <code>chart</code> output has its spec and columns but <code>data.rows</code> is
 empty. Ask <code>conversations.report</code> again for the full report, and <code>engine.results.chart</code> to draw a chart;
 both read the rows from the results while their retention keeps them.</p>

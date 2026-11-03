@@ -663,79 +663,7 @@
 <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../configuration_v2/">
-<span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../phase2/">
-<span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../wave_a/">
-<span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../wave_b/">
-<span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../wave_c/">
-<span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../wave_d/">
-<span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -743,8 +671,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -755,8 +683,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_15">
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -793,8 +721,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -805,8 +733,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_16">
+<nav aria-expanded="false" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -3147,7 +3075,7 @@ glossary's descriptions in the table and column entries, its terms, its joins
 and its example questions (<a href="#knowledge-in-the-index">Knowledge in the index</a>).
 There is no symbolic index, behavioral index, or other catalog in the current
 implementation.</p>
-<p>The stored schema snapshot holds only what the database said (B31): a table or
+<p>The stored schema snapshot holds only what the database said: a table or
 column comment the adapter read. A person's words stay in the glossary, and a
 description a model drafts is a proposal in the review queue that reaches
 nothing until a person accepts it. <code>nl2sql index</code> calls no model.</p>
@@ -3202,7 +3130,7 @@ the datasource to have been indexed once; otherwise that datasource fails with
 a message saying to run <code>nl2sql index</code>.</p>
 <h3 id="knowledge-in-the-index">Knowledge in the index</h3>
 <p>Prompts read the in-memory knowledge, so an accepted change is effective in
-the next run. The index carries knowledge for ranking (D56): the chosen
+the next run. The index carries knowledge for ranking: the chosen
 descriptions and synonyms in the table and column entries, a <code>knowledge.term</code>
 entry per term, a relationship entry per glossary join that resolves (with its
 cardinality and <code>origin: glossary</code>), and the glossary's <code>examples</code> among the

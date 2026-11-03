@@ -437,79 +437,7 @@
 <span class="md-ellipsis">
     
   
-    Curated Answers (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../configuration_v2/">
-<span class="md-ellipsis">
-    
-  
-    Configuration v2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../phase2/">
-<span class="md-ellipsis">
-    
-  
-    Phase 2 (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_a/">
-<span class="md-ellipsis">
-    
-  
-    Wave A (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_b/">
-<span class="md-ellipsis">
-    
-  
-    Wave B (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_c/">
-<span class="md-ellipsis">
-    
-  
-    Wave C (design)
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../wave_d/">
-<span class="md-ellipsis">
-    
-  
-    Wave D (design)
+    Curated Answers
   
 
     
@@ -517,8 +445,8 @@
 </a>
 </li>
 <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -529,8 +457,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_15">
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -567,8 +495,8 @@
 </nav>
 </li>
 <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_16" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -579,8 +507,8 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="true" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
-<label class="md-nav__title" for="__nav_2_16">
+<nav aria-expanded="true" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
 <span class="md-nav__icon md-icon"></span>
             
   
@@ -2876,8 +2804,8 @@
   path from the planner to the generator still passes the validator.</li>
 <li>Makes no model call.</li>
 <li>Class: <code>ClarifierNode</code></li>
-<li>Source: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py</code></li>
-<li>Design: <a href="../../wave_b/#7-clarify-instead-of-guess">Wave B, section 7</a> (D47).</li>
+<li>Source: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py</code>
+-.</li>
 </ul>
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
@@ -2927,7 +2855,7 @@ for the datasource's knowledge digest.</p>
 <li>Otherwise <code>ast_planner_response</code> with <code>alternatives</code> cut to the readings that
   passed and were not merged. <code>alternatives_offered</code> (every reading the
   planner gave, set by the planner node) is left as it is, so an answer with
-  readings is never cached (D47), even when none was left for this caller.</li>
+  readings is never cached, even when none was left for this caller.</li>
 <li>When it asks, also one <code>PipelineError</code>: <code>NEEDS_CLARIFICATION</code>, severity
   <code>INFO</code>, never retried. Its <code>details</code> carry what the result needs to build the
   <code>ClarificationRequest</code>: <code>phrase</code>, <code>datasource_id</code>, <code>schema_version</code>,
@@ -2942,7 +2870,7 @@ for the datasource's knowledge digest.</p>
 <ol>
 <li>The planner named the phrase (<code>ambiguous_phrase</code>) and at least one
    alternative passed the checks and was not merged. A phrase the glossary
-   settles is not asked (D48): the flag and the alternatives are dropped and the
+   settles is not asked: the flag and the alternatives are dropped and the
    default plan goes on. A phrase is settled when a term's name equals it, or
    exactly one term lists it as a synonym (case-insensitive); "sales" listed by
    two terms stays open. The plan is still never cached, since the planner's
