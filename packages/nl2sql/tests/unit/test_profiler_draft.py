@@ -19,7 +19,7 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from typer.testing import CliRunner
 
 from nl2sql import InvalidArgument, NL2SQL, Embeddings, UserContext
-from nl2sql.cli.main import app
+from nl2sql_cli.main import app
 from nl2sql.evaluation.run import UnknownPriceError
 from nl2sql.testing.config import make_config
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule

@@ -82,7 +82,7 @@ export const MORE = [
   {
     label: "Run it on your machine",
     what: "Your own databases, no limits, and a key that never leaves your computer.",
-    code: ['pip install "nl2sql-engine[demo]"', "nl2sql demo"],
+    code: ['pip install "nl2sql-cli[web]"', "nl2sql demo"],
   },
   { label: "Read the docs", href: DOCS, what: "How the plan, the checks and the adapters fit together." },
   { label: "Source on GitHub", href: REPO, what: "The engine, the REST API and this playground." },

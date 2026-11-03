@@ -244,7 +244,7 @@ the release decision.
    `mike deploy --push --update-aliases $TAG latest` adds a versioned copy of
    the docs to `gh-pages` and moves the `latest` alias onto it.
 5. **`pypi-smoke`** — `needs: pypi`. On a fresh runner, installs the release
-   from PyPI itself, `pip install "nl2sql-engine[demo]==X.Y.Z"`, into an empty
+   from PyPI itself, `pip install "nl2sql-cli[web]==X.Y.Z"`, into an empty
    virtualenv, boots `nl2sql-api serve --demo --hosted` with no API key and
    checks the page, `/api/v1/health` (which must report `X.Y.Z` for the engine and
    the API), `/api/v1/meta`, each datasource's schema and `/api/v1/index`, then asks
@@ -261,7 +261,7 @@ the release decision.
    version that does not install from PyPI. Calls
    [`publish_space.yml`](../deployment/hosted-demo.md#deployed-by-the-release)
    with the tag, which pins the Space's image to
-   `nl2sql-engine[demo]==X.Y.Z`, pushes it and waits for the build. That
+   `nl2sql-cli[web]==X.Y.Z`, pushes it and waits for the build. That
    `pypi-smoke` installed the version is not proof that the Hub's builder
    will: on `v0.2.0` the Space build ran minutes later and its pip still saw
    only `0.1.x`. So the workflow first waits, up to 20 times 30 seconds, until

@@ -114,8 +114,8 @@ def test_api_image_installs_the_five_adapters_and_the_sql_server_driver():
 
     for needle in ("msodbcsql18", "unixodbc", "ACCEPT_EULA=Y", "postgres", "mysql", "mssql", "duckdb"):
         assert needle in text
-    # CL2 adds the CLI (D230); the image does not install it yet.
-    assert "nl2sql-cli" not in text
+    # The image runs `nl2sql init --demo` and `nl2sql index`, so it installs the CLI.
+    assert "COPY ./nl2sql-cli" in text and "./nl2sql-cli" in text.split("pip install")[-1]
 
 
 def test_api_image_runs_one_worker():

@@ -400,7 +400,7 @@ def _pointer_version(ctx) -> str:
 
 def test_enrich_option_is_gone():
     from nl2sql.api.indexing_api import IndexAPI
-    from nl2sql.cli.common.indexing import run_indexing
+    from nl2sql_cli.common.indexing import run_indexing
 
     for fn in (IndexAPI.build, rebuild_index, inspect.unwrap(run_indexing)):
         parameters = inspect.signature(fn).parameters
@@ -413,7 +413,7 @@ def test_enrich_option_is_gone():
 def test_the_cli_has_refresh_and_not_enrich_or_curated_only():
     from typer.testing import CliRunner
 
-    from nl2sql.cli import main
+    from nl2sql_cli import main
 
     result = CliRunner().invoke(main.app, ["index", "--help"])
     output = ANSI.sub("", result.output)  # Rich colours --help on CI

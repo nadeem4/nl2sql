@@ -7,7 +7,7 @@ files five starter questions, then lets you review what it found. Every step is 
 `engine.dashboards.suggest_questions`, `engine.proposals`), so Python and REST callers can do the same.
 
 ```bash
-pip install "nl2sql-engine[demo]"
+pip install "nl2sql-cli[web]"
 nl2sql launch my-project
 ```
 

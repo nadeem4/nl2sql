@@ -29,7 +29,7 @@ To see it before installing anything, the same playground runs at
     below still describe the old playground; the web app guide is
     [Web app](../apps/web.md).
 
-After `pip install "nl2sql-engine[demo]"` and `nl2sql demo`:
+After `pip install "nl2sql-cli[web]"` and `nl2sql demo`:
 
 1. **No questions at the terminal.** The command does not prompt. It looks for
    a model key -- `OPENAI_API_KEY`, `OPENROUTER_API_KEY` or
@@ -55,20 +55,19 @@ After `pip install "nl2sql-engine[demo]"` and `nl2sql demo`:
    [the Pipeline page](#the-pipeline-page) lists every step and which a model
    decides.
 
-The `demo` command and the `[demo]` extra arrive on PyPI with 0.2.0. If pip
-says `nl2sql-engine` has no `demo` extra, you have an earlier release: install
-from a clone with `pip install -e packages/sdk -e "packages/nl2sql[demo]"`.
+The `nl2sql` command is the `nl2sql-cli` package and its `web` extra brings the
+web app. From a clone, install
+`pip install -e packages/sdk -e packages/nl2sql -e packages/api -e "nl2sql-cli[web]"`.
 
 ## 1. Install the CLI
 
 ```bash
-# Install from PyPI. Add the `demo` extra if you also want the browser
-# playground that `nl2sql demo` serves; `[all]` covers drivers only.
-pip install nl2sql-engine
-pip install "nl2sql-engine[demo]"
+# Install from PyPI. The `web` extra brings the browser app that
+# `nl2sql demo` serves.
+pip install "nl2sql-cli[web]"
 
 # Or install from source (dev)
-pip install -e "packages/nl2sql[all,demo]"
+pip install -e packages/sdk -e "packages/nl2sql[all]" -e packages/api -e "nl2sql-cli[web]"
 ```
 
 ## 2. Write the demo project

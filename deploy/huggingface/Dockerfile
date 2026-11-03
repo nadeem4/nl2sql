@@ -17,12 +17,12 @@
 # own, per request, and writes it nowhere.
 FROM python:3.12-slim
 
-# What to install the engine from.
+# What to install the command line app (which brings the web app) from.
 #
 # A Space build takes no build arguments from us, so
 # .github/workflows/publish_space.yml rewrites this one line in the copy it
 # pushes. A release pins the version it just published:
-#   ARG NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
+#   ARG NL2SQL_SPEC="nl2sql-cli[web]==0.2.0"
 # so the public demo always runs a released version, the same bytes a user
 # gets from `pip install`. A dispatch with no tag (a rehearsal on a scratch
 # Space) pins a GitHub archive of the commit it was run from instead. Either
@@ -31,14 +31,18 @@ FROM python:3.12-slim
 #
 # The default here, the tip of `main` as a GitHub archive (so the image needs
 # no git), is only what a local `docker build` of this folder gets. To build a
-# release locally: --build-arg NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0".
-ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/nl2sql"
+# release locally: --build-arg NL2SQL_SPEC="nl2sql-cli[web]==0.2.0".
+ARG NL2SQL_SPEC="nl2sql-cli[web] @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=nl2sql-cli"
 
-# The web app is its own package (nl2sql-api), which the engine's `demo` extra
-# depends on. It is pinned beside the engine so the two always come from the
-# same place: a release pins `nl2sql-api==X.Y.Z`, a rehearsal the same commit's
-# archive. Given on the same command line, it is what the extra's requirement
-# resolves to.
+# The engine, pinned the same way: the CLI requires it at its own version, which
+# a rehearsal's archive of an unreleased commit does not find on PyPI.
+ARG NL2SQL_ENGINE_SPEC="nl2sql-engine @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/nl2sql"
+
+# The web app is its own package (nl2sql-api), which the CLI's `web` extra
+# depends on. It is pinned beside the CLI and the engine so all three always come
+# from the same place: a release pins `nl2sql-api==X.Y.Z`, a rehearsal the same
+# commit's archive. Given on the same command line, it is what the extra's
+# requirement resolves to.
 ARG NL2SQL_API_SPEC="nl2sql-api @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/api"
 
 # Empty on a release. A rehearsal (a dispatch with no tag) puts the API wheel it
@@ -59,9 +63,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 0.1.0, 0.1.1, 0.1.2" although the release had already installed it from PyPI.
 RUN pip install --upgrade pip \
     && attempt=1 \
-    && until pip install --no-cache-dir "${NL2SQL_API_SPEC}" "${NL2SQL_SPEC}"; do \
+    && until pip install --no-cache-dir "${NL2SQL_API_SPEC}" "${NL2SQL_ENGINE_SPEC}" "${NL2SQL_SPEC}"; do \
          if [ "$attempt" -ge 10 ]; then \
-           echo "pip could not install ${NL2SQL_SPEC} and ${NL2SQL_API_SPEC} after $attempt attempts." >&2; \
+           echo "pip could not install ${NL2SQL_SPEC}, ${NL2SQL_ENGINE_SPEC} and ${NL2SQL_API_SPEC} after $attempt attempts." >&2; \
            exit 1; \
          fi; \
          echo "Install attempt $attempt of 10 failed; the index may lag a new release. Retrying in 30s."; \

@@ -30,7 +30,7 @@ analytics). They are opened read-only. To ask questions of your own data, run
 it on your own machine:
 
 ```bash
-pip install "nl2sql-engine[demo]"
+pip install "nl2sql-cli[web]"
 nl2sql demo   # starts nl2sql-api serve --demo and opens the browser
 ```
 
@@ -118,12 +118,14 @@ recordings ship) and any other question answers with **Add a key in Settings**.
 
 ### Which engine version it builds
 
-The `Dockerfile`'s `ARG NL2SQL_SPEC=` and `ARG NL2SQL_API_SPEC=` lines name what
-the image installs: the engine and the web app (`nl2sql-api`). A release deploy
-rewrites both to the version it published:
+The `Dockerfile`'s `ARG NL2SQL_SPEC=`, `ARG NL2SQL_ENGINE_SPEC=` and
+`ARG NL2SQL_API_SPEC=` lines name what the image installs: the command line app
+(`nl2sql-cli`), the engine and the web app (`nl2sql-api`). A release deploy
+rewrites all three to the version it published:
 
 ```dockerfile
-ARG NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
+ARG NL2SQL_SPEC="nl2sql-cli[web]==0.2.0"
+ARG NL2SQL_ENGINE_SPEC="nl2sql-engine==0.2.0"
 ARG NL2SQL_API_SPEC="nl2sql-api==0.2.0"
 ```
 

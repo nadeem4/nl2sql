@@ -35,6 +35,7 @@ WHEELS = (
     "nl2sql_engine-0.2.0-py3-none-any.whl",
     "nl2sql_sdk-0.2.0-py3-none-any.whl",
     "nl2sql_api-0.2.0-py3-none-any.whl",
+    "nl2sql_cli-0.2.0-py3-none-any.whl",
     "nl2sql_engine-0.2.0.tar.gz",
 )
 
@@ -46,6 +47,7 @@ def test_find_wheels_names_each_distribution(check, tmp_path):
     assert wheels["engine"].name == "nl2sql_engine-0.2.0-py3-none-any.whl"
     assert wheels["sdk"].name == "nl2sql_sdk-0.2.0-py3-none-any.whl"
     assert wheels["api"].name == "nl2sql_api-0.2.0-py3-none-any.whl"
+    assert wheels["cli"].name == "nl2sql_cli-0.2.0-py3-none-any.whl"
 
 
 def test_find_wheels_does_not_confuse_api_with_sdk(check, tmp_path):
@@ -68,11 +70,12 @@ def test_find_wheels_refuses_two_versions_of_one_distribution(check, tmp_path):
                                 "nl2sql_sdk-1-py3-none-any.whl"))
 
 
-def test_install_args_install_the_engine_with_the_demo_extra(check, tmp_path):
+def test_install_args_install_the_cli_with_the_web_extra(check, tmp_path):
     dist = _dist(tmp_path, *WHEELS)
     args = check.wheel_install_args(check.find_wheels(dist), dist)
-    engine = str(dist / "nl2sql_engine-0.2.0-py3-none-any.whl")
-    assert f"{engine}[demo]" in args
+    cli = str(dist / "nl2sql_cli-0.2.0-py3-none-any.whl")
+    assert f"{cli}[web]" in args
+    assert str(dist / "nl2sql_engine-0.2.0-py3-none-any.whl") in args
     # The SDK is the engine's dependency at a version PyPI may not have yet,
     # so it comes from the same build, and so does anything else it finds.
     assert str(dist / "nl2sql_sdk-0.2.0-py3-none-any.whl") in args
@@ -80,7 +83,7 @@ def test_install_args_install_the_engine_with_the_demo_extra(check, tmp_path):
 
 
 def test_install_args_name_the_api_wheel(check, tmp_path):
-    # The demo extra is the web app, and the API is built at the same version
+    # The web extra is the web app, and the API is built at the same version
     # as the engine, which PyPI does not have until the release is published.
     dist = _dist(tmp_path, *WHEELS)
     args = check.wheel_install_args(check.find_wheels(dist), dist)
@@ -96,9 +99,9 @@ def test_wheel_version_reads_the_filename(check, tmp_path):
     assert check.wheel_version(tmp_path / "nl2sql_engine-0.2.0-py3-none-any.whl") == "0.2.0"
 
 
-def test_pypi_install_args_pin_the_published_version_with_the_demo_extra(check):
+def test_pypi_install_args_pin_the_published_version_with_the_web_extra(check):
     args = check.pypi_install_args("0.2.0")
-    assert "nl2sql-engine[demo]==0.2.0" in args
+    assert "nl2sql-cli[web]==0.2.0" in args
     # A cached index page from before the upload is what makes a just-published
     # version look missing; nothing local may stand in for PyPI either.
     assert "--no-cache-dir" in args

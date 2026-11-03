@@ -612,7 +612,7 @@ def test_decided_proposals_are_purged(engine):
 
 
 def _cli(folder: Path, *args: str):
-    from nl2sql.cli.main import app
+    from nl2sql_cli.main import app
 
     return CliRunner().invoke(app, ["--config", str(folder / "nl2sql.yaml"), *args])
 

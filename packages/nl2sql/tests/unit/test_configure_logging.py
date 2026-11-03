@@ -68,7 +68,7 @@ def test_an_unknown_format_is_refused(monkeypatch):
 def test_the_cli_takes_log_format_for_any_command(monkeypatch, tmp_path):
     from typer.testing import CliRunner
 
-    from nl2sql.cli.main import app
+    from nl2sql_cli.main import app
 
     monkeypatch.delenv("NL2SQL_LOG_FORMAT", raising=False)
     monkeypatch.chdir(tmp_path)
@@ -80,7 +80,7 @@ def test_the_cli_takes_log_format_for_any_command(monkeypatch, tmp_path):
 def test_the_cli_refuses_an_unknown_nl2sql_log_format_in_one_line(monkeypatch, tmp_path):
     from typer.testing import CliRunner
 
-    from nl2sql.cli.main import app
+    from nl2sql_cli.main import app
 
     monkeypatch.setenv("NL2SQL_LOG_FORMAT", "xml")
     monkeypatch.chdir(tmp_path)

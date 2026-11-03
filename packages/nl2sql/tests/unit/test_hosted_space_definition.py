@@ -97,7 +97,7 @@ def test_the_space_uses_the_05_config_only():
 def test_what_the_engine_is_installed_from_is_one_rewritable_line():
     """The publish workflow pins the image by rewriting `ARG NL2SQL_SPEC=`.
 
-    A release rewrites it to `nl2sql-engine[demo]==X.Y.Z`. It is declared
+    A release rewrites it to `nl2sql-cli[web]==X.Y.Z`. It is declared
     before the install, so rewriting it both pins the engine and busts the
     cache for every layer below. Nothing else feeds it: the old `NL2SQL_REF`
     is gone, so no deploy can pin only half of it.
@@ -144,7 +144,7 @@ def test_the_space_holds_no_api_key():
 
 # The release that published v0.2.0 pushed the Space minutes after PyPI took
 # the upload, and the Hugging Face builder's `pip install
-# "nl2sql-engine[demo]==0.2.0"` still saw only 0.1.x -- although a fresh
+# "nl2sql-cli[web]==0.2.0"` still saw only 0.1.x -- although a fresh
 # install from PyPI had already worked on a GitHub runner. The index a builder
 # sees can lag; the install retries, bounded, rather than failing the build.
 INSTALL_ATTEMPTS = 10
@@ -169,7 +169,7 @@ def _install_instruction() -> str:
 def test_the_install_retries_a_bounded_number_of_times_without_pip_cache():
     shell = _install_instruction()
 
-    assert '--no-cache-dir "${NL2SQL_API_SPEC}" "${NL2SQL_SPEC}"' in shell
+    assert '--no-cache-dir "${NL2SQL_API_SPEC}" "${NL2SQL_ENGINE_SPEC}" "${NL2SQL_SPEC}"' in shell
     assert f"-ge {INSTALL_ATTEMPTS}" in shell
     assert f"sleep {INSTALL_DELAY_SEC}" in shell
 
@@ -204,7 +204,7 @@ def _run_install(tmp_path: pathlib.Path, failures: int) -> tuple[int, int, list[
         "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
         "STATE": str(tmp_path),
         "FAILURES": str(failures),
-        "NL2SQL_SPEC": "nl2sql-engine[demo]==9.9.9",
+        "NL2SQL_SPEC": "nl2sql-cli[web]==9.9.9",
     }
     result = subprocess.run([sh, "-c", _install_instruction()], env=env, capture_output=True, text=True)
     count = int((tmp_path / "count").read_text().strip())
@@ -239,6 +239,15 @@ def test_the_api_is_pinned_beside_the_engine_by_the_publish_workflow():
     assert dockerfile.count("\nARG NL2SQL_API_SPEC=") == 1
     assert "^ARG NL2SQL_API_SPEC=" in workflow
     assert 'api_spec="nl2sql-api==${TAG#v}"' in workflow
+
+
+def test_the_engine_is_pinned_beside_the_cli_by_the_publish_workflow():
+    dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+    workflow = (SPACE.parents[1] / ".github" / "workflows" / "publish_space.yml").read_text(encoding="utf-8")
+
+    assert dockerfile.count("\nARG NL2SQL_ENGINE_SPEC=") == 1
+    assert "^ARG NL2SQL_ENGINE_SPEC=" in workflow
+    assert 'engine_spec="nl2sql-engine==${TAG#v}"' in workflow
 
 
 def test_a_rehearsal_ships_the_api_wheel_it_built_because_a_git_archive_has_no_web_app():

@@ -54,7 +54,7 @@ MAX_VISITORS = 5000
 RATE_MESSAGE = ("Too many questions in a row on the public demo. Wait a moment and ask again, or run the demo "
                 "locally for no limit at all.")
 SESSION_MESSAGE = ("This browser session has used its {cap} questions on the public demo. Run the demo locally "
-                   "(pip install \"nl2sql-engine[demo]\" && nl2sql demo) to keep going, against your own data.")
+                   "(pip install \"nl2sql-cli[web]\" && nl2sql demo) to keep going, against your own data.")
 JOB_MESSAGE = "This session already has a job running on the public demo. Wait for it to finish, or cancel it."
 STREAM_MESSAGE = "This session already has {cap} answers streaming on the public demo. Wait for one to finish."
 

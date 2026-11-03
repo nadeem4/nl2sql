@@ -12,7 +12,7 @@ Two copies are written, and a test holds them byte-identical:
 
 ``packages/api/src/nl2sql_api/web/assets/social-card.png``
     what ``nl2sql-api`` serves at ``/social-card.png``. It ships in the
-    wheel, so ``pip install "nl2sql-engine[demo]"`` has it too.
+    wheel, so ``pip install "nl2sql-cli[web]"`` has it too.
 
 The card borrows the web app's bundled fonts, so run ``npm ci`` in
 ``nl2sql-ui`` first, then::

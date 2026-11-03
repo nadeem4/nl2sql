@@ -135,7 +135,7 @@ claim against what the playground does). Top to bottom:
 - **Three features**, alternating sides: **Ask, and get rows back**, **Watch
   the plan become SQL** and **See what it looked up**, each with two points,
   a link into its page and a clip.
-- **More**: run it locally (`pip install "nl2sql-engine[demo]"`, `nl2sql demo`),
+- **More**: run it locally (`pip install "nl2sql-cli[web]"`, `nl2sql demo`),
   the docs, the source; then a footer.
 
 **Clips** (`src/pages/Clip.jsx`): a muted, looping, inline webm over its poster in

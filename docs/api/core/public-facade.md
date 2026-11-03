@@ -163,7 +163,7 @@ only these methods and namespaces, never the runtime behind them.
 holds the playground, `nl2sql demo` and `nl2sql-api` to importing from the
 top-level `nl2sql` only (the old playground keeps a short, named
 list of exceptions in that test, each with the reason and the change that
-removes it; `nl2sql demo` is now a launcher that imports nothing from the engine but `nl2sql.cli`).
+removes it; `nl2sql demo` is now a launcher that imports nothing from the engine but `nl2sql_cli`).
 
 ### About
 

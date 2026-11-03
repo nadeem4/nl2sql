@@ -1,0 +1,307 @@
+#!/usr/bin/env python3
+"""Unified CLI for the NL2SQL Ecosystem."""
+import click
+import typer
+import importlib.metadata
+import pathlib
+from typing import Optional, List
+from typing_extensions import Annotated
+
+# Core Library Imports
+from nl2sql import configure_logging, load_env_file
+
+# Local CLI Imports
+from nl2sql_cli.commands.indexing import run_indexing
+from nl2sql_cli.commands.run import run_pipeline
+from nl2sql_cli.commands.info import list_available_adapters
+from nl2sql_cli.commands.demo import demo_command
+from nl2sql_cli.commands.doctor import doctor_command
+from nl2sql_cli.commands.init import init_command
+from nl2sql_cli.commands.install import install_command
+from nl2sql_cli.commands.mcp import mcp_command
+from nl2sql_cli.commands.policy import app as policy_app
+from nl2sql_cli.commands.curated import app as curated_app
+from nl2sql_cli.commands.trace import app as trace_app, replay_command
+from nl2sql_cli.commands.cache import app as cache_app
+from nl2sql_cli.commands.config_check import app as config_app
+from nl2sql_cli.commands.feedback import app as feedback_app
+from nl2sql_cli.commands.eval import app as eval_app
+from nl2sql_cli.commands.storage import app as storage_app
+from nl2sql_cli.commands.knowledge import app as knowledge_app
+from nl2sql_cli.commands.review import app as review_app
+from nl2sql_cli.commands.keys import app as keys_app
+from nl2sql_cli.commands.dashboards import app as dashboards_app
+from nl2sql_cli.commands.launch import launch_command
+from nl2sql_cli.commands.profile import profile_command
+from nl2sql_cli.common.engine import build_engine
+from nl2sql_cli.console import configure_output_encoding
+from nl2sql_cli.types import RunConfig
+
+app = typer.Typer(
+    name="nl2sql",
+    help="Ask a database questions in plain English. Run `nl2sql demo` to try it.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+app.add_typer(config_app, name="config", help="Check the config without starting the engine (`nl2sql config check`).")
+app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
+app.add_typer(curated_app, name="curated", help="The curated answers file: `nl2sql curated validate`, `nl2sql curated test`.")
+app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
+app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
+app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
+app.add_typer(storage_app, name="storage", help="Retention for traces and results (`nl2sql storage purge`).")
+app.add_typer(eval_app, name="eval",
+              help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `seed`, `publish`.")
+app.add_typer(knowledge_app, name="knowledge", help="The glossary as the engine uses it (from 0.8).")
+app.add_typer(review_app, name="review", help="The review queue: proposed knowledge and verified queries to accept or reject.")
+app.add_typer(keys_app, name="keys", help="API keys for MCP over HTTP (from 0.9).")
+app.add_typer(dashboards_app, name="dashboards", help="Dashboards: `nl2sql dashboards refresh` (from 0.9).")
+app.command("launch", help="Find a database, connect it, index it and look at what was found (from 0.9).")(launch_command)
+app.command("profile", help="Profile the indexed schema and file what it finds for review (from 0.8).")(profile_command)
+
+
+def _version_callback(value: bool) -> None:
+    """Prints the installed distribution version and exits.
+
+    Eager, so `nl2sql --version` answers without a subcommand and without
+    reading a config.
+    """
+    if value:
+        typer.echo(importlib.metadata.version("nl2sql-engine"))
+        raise typer.Exit()
+
+
+@app.callback()
+def global_callback(
+    ctx: typer.Context,
+    config: Annotated[Optional[pathlib.Path], typer.Option(
+        "--config",
+        help="The nl2sql.yaml to read. Without it, NL2SQL_CONFIG, then ./nl2sql.yaml. "
+             "The .env next to it is loaded, never overriding a variable already set.",
+    )] = None,
+    log_format: Annotated[Optional[str], typer.Option(
+        "--log-format",
+        help="Log lines as text or json (one JSON object per line, with its trace_id). "
+             "Without it, NL2SQL_LOG_FORMAT, then text.",
+        click_type=click.Choice(["text", "json"]),
+    )] = None,
+    version: Annotated[bool, typer.Option("--version", help="Show the installed nl2sql-engine version and exit", callback=_version_callback, is_eager=True)] = False,
+):
+    """
+    NL2SQL CLI Entry Point.
+    """
+    ctx.obj = {"config": config}
+    load_env_file(config)
+    # After the .env, so a NL2SQL_LOG_LEVEL or NL2SQL_LOG_FORMAT written there
+    # applies. The library never configures logging on import: the entry
+    # point owns it.
+    try:
+        configure_logging(json_format=None if log_format is None else log_format == "json")
+    except ValueError as error:  # NL2SQL_LOG_FORMAT is neither text nor json
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
+def run(
+    ctx: typer.Context,
+    query: Annotated[str, typer.Argument(help="Natural language query")],
+    ds_id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
+    role: Annotated[str, typer.Option(help="Role ID for RBAC policies")] = "admin",
+    no_exec: Annotated[bool, typer.Option("--no-exec", help="Skip execution (plan & validate only)")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed reasoning")] = False,
+    show_perf: Annotated[bool, typer.Option("--show-perf", help="Show performance metrics")] = False,
+):
+    """
+    Answer a question against the configured datasources.
+    """
+
+    run_config = RunConfig(
+        query=query,
+        ds_id=ds_id,
+        role=role,
+        no_exec=no_exec,
+        verbose=verbose,
+        show_perf=show_perf
+    )
+    run_pipeline(run_config, build_engine(ctx))
+
+
+@app.command()
+def mcp(
+    ctx: typer.Context,
+    role: Annotated[Optional[List[str]], typer.Option(
+        "--role",
+        help="A role the MCP client asks as (repeatable). Without one, policies.default_role; "
+             "with neither, the server refuses to start.",
+    )] = None,
+    user: Annotated[Optional[str], typer.Option("--user", help="The user id the runs are recorded under.")] = None,
+    http: Annotated[bool, typer.Option(
+        "--http", help="Serve over HTTP with API keys (mcp.yaml) instead of stdio.")] = False,
+    host: Annotated[Optional[str], typer.Option("--host", help="With --http: the address (mcp.http.host).")] = None,
+    port: Annotated[Optional[int], typer.Option("--port", help="With --http: the port (mcp.http.port).")] = None,
+):
+    """
+    Serve the engine to an MCP client: ask, list_datasources, describe_table (the mcp extra). Over stdio
+    by default; with --http, over HTTP behind bearer API keys.
+    """
+    mcp_command(ctx, role or [], user, http, host, port)
+
+
+@trace_app.command("replay")
+def trace_replay(
+    ctx: typer.Context,
+    target: Annotated[str, typer.Argument(help="A trace file, or a trace id in the trace store")],
+):
+    """
+    Re-run a traced question feeding back the recorded LLM responses (no model calls).
+    """
+    replay_command(target, lambda: build_engine(ctx), ctx)
+
+
+index_app = typer.Typer(help="Index schemas and verified queries, one datasource at a time; `nl2sql index --check` "
+                             "measures schema drift; `nl2sql index prune`.")
+app.add_typer(index_app, name="index")
+
+
+@index_app.callback(invoke_without_command=True)
+def index(
+    ctx: typer.Context,
+    datasource: Annotated[Optional[List[str]], typer.Option(
+        "--datasource", "-d",
+        help="Re-index only this datasource (repeatable). Other datasources' entries are left untouched.",
+    )] = None,
+    refresh: Annotated[bool, typer.Option(
+        "--refresh",
+        help=(
+            "Write the entries again after a glossary or curated.yaml change. The schema is not read and no "
+            "model is called: the stored snapshot is used, and only the entries whose text changed are embedded."
+        ),
+    )] = False,
+    check: Annotated[bool, typer.Option(
+        "--check",
+        help=(
+            "Re-index nothing: compare each live database with the schema its index was built from and "
+            "print the drift. Exits 0 when nothing drifted, 1 when something did, 2 when a check failed."
+        ),
+    )] = False,
+    role: Annotated[Optional[List[str]], typer.Option(
+        "--role",
+        help="With --check: a role to check as (repeatable); drift shows only in the tables it may read.",
+    )] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="With --check: print the reports as JSON.")] = False,
+    profile: Annotated[bool, typer.Option(
+        "--profile",
+        help=(
+            "After indexing, run `nl2sql profile` on the same datasources and file the joins and column roles "
+            "it finds for review."
+        ),
+    )] = False,
+    as_: Annotated[Optional[List[str]], typer.Option(
+        "--as", help="With --profile: a role to profile as (repeatable). Without one, policies.default_role.",
+    )] = None,
+    user: Annotated[Optional[str], typer.Option("--user", help="With --profile: the caller's user id.")] = None,
+):
+    """
+    Index schemas and examples into the index of the configured embedding model, one datasource at a time.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+    if check:
+        if refresh or profile:
+            raise typer.BadParameter("--check re-indexes nothing, so it cannot be combined with --refresh "
+                                     "or --profile.")
+        from nl2sql_cli.common.indexing import run_drift_check
+
+        try:
+            engine = build_engine(ctx, check=False)
+        except typer.Exit:
+            raise typer.Exit(2)  # the config did not load: the check could not run
+        with engine:
+            raise typer.Exit(run_drift_check(engine, datasource or None, role or ["admin"], as_json))
+    if role or as_json:
+        raise typer.BadParameter("--role and --json go with --check.")
+    if profile and refresh:
+        raise typer.BadParameter("--refresh reads no schema, so there is nothing to profile.")
+    if (as_ or user) and not profile:
+        raise typer.BadParameter("--as and --user go with --profile.")
+    engine = build_engine(ctx)
+    if not profile:
+        run_indexing(engine, datasource_ids=datasource or None, refresh=refresh)
+        return
+    from nl2sql_cli.commands.profile import caller_or_exit, profile_datasources
+
+    with engine:
+        who = caller_or_exit(engine, as_, user)  # before the build: a bad --as should not cost an index
+        run_indexing(engine, datasource_ids=datasource or None)  # exits 1 if a datasource failed
+        profile_datasources(engine, who, datasource)
+
+
+@index_app.command("prune")
+def index_prune(ctx: typer.Context):
+    """
+    Drop the index of every other embedding model, including 0.5's collection. The current one is kept.
+    """
+    from nl2sql_cli.common.indexing import run_prune
+
+    run_prune(build_engine(ctx, check=False))
+
+
+@app.command()
+def doctor(ctx: typer.Context):
+    """
+    Diagnose the install: Python, packages and adapters, provider keys, and the configured engine's readiness.
+    """
+    doctor_command(ctx)
+
+
+@app.command()
+def init(
+    directory: Annotated[pathlib.Path, typer.Argument(help="The folder to write the config into")] = pathlib.Path("."),
+    demo: Annotated[bool, typer.Option("--demo", help="Write the demo: three sample SQLite databases, their roles and verified queries")] = False,
+    provider: Annotated[str, typer.Option("--provider", help="The LLM provider llm.yaml names, with its default model")] = "openai",
+    force: Annotated[bool, typer.Option("--force", help="Overwrite files that already exist")] = False,
+):
+    """
+    Write a new config: nl2sql.yaml and one file per section. Never writes a key.
+    """
+    init_command(directory, demo=demo, provider=provider, force=force)
+
+
+@app.command()
+def demo(
+    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project (`nl2sql init --demo`: nl2sql.yaml, its files, the databases and the index)")] = pathlib.Path("nl2sql-demo"),
+    host: Annotated[str, typer.Option(help="Bind address. The default binds localhost only")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to serve the web app on")] = 8765,
+    no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open a browser tab; just serve")] = False,
+):
+    """One-command web app over the demo's sample databases: starts `nl2sql-api serve --demo` (needs nl2sql-api)."""
+    demo_command(directory, host, port, no_browser)
+
+
+@app.command()
+def install(package: str):
+    """
+    Helper to install adapter packages (e.g. 'postgres').
+    """
+    install_command(package)
+
+
+@app.command("list-adapters")
+def list_adapters():
+    """
+    List all installed datasource adapters.
+    """
+    list_available_adapters()
+
+
+def main():
+    # Logging is configured in global_callback, once the .env is loaded.
+    # Before any command writes: rich emits symbols a legacy Windows code page
+    # cannot encode, and an unconfigured stream turns that into a crash.
+    configure_output_encoding()
+    app()
+
+if __name__ == "__main__":
+    main()

@@ -49,11 +49,11 @@ second only when a run is given its plan.
 Requires Python 3.12 or newer.
 
 ```bash
-pip install "nl2sql-engine[demo]"
+pip install "nl2sql-cli[web]"
 nl2sql demo
 ```
 
-`nl2sql demo` starts `nl2sql-api serve --demo` (the `demo` extra installs the
+`nl2sql demo` starts `nl2sql-api serve --demo` (the `nl2sql-cli[web]` extra installs the
 web app, `nl2sql-api`) and opens your browser. The server writes a demo project
 into `./nl2sql-demo`, copies in three SQLite databases --
 [Chinook](https://github.com/nadeem4/nl2sql/blob/main/THIRD_PARTY_NOTICES.md),
@@ -64,7 +64,7 @@ and `--no-browser`.
 
 **Answering a question needs a model:** `OPENAI_API_KEY`,
 `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment (Claude needs
-`pip install "nl2sql-engine[demo,anthropic]"`), a key saved in the project's
+`pip install "nl2sql-cli[web]" "nl2sql-engine[anthropic]"`), a key saved in the project's
 `.env`, a key pasted into the web app's Settings page, or a reachable Ollama.
 Without one the demo replays the recorded answers to its guided questions and
 says so.
@@ -123,7 +123,7 @@ validation error, and an unknown role is refused.
 
 ```bash
 pip install "nl2sql-engine[postgres]"        # or [mysql], [mssql], [duckdb]
-pip install "nl2sql-engine[all]"             # every database driver; not [demo] or [anthropic]
+pip install "nl2sql-engine[all]"             # every database driver; not [anthropic]
 ```
 
 SQLite needs no extra.
