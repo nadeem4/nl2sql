@@ -40,6 +40,7 @@ RUN apt-get update \
 COPY ./packages/sdk /app/packages/sdk
 COPY ./packages/nl2sql /app/packages/nl2sql
 COPY ./packages/api /app/packages/api
+COPY ./nl2sql-cli /app/nl2sql-cli
 # The page nl2sql-api serves, built in stage one.
 COPY --from=ui /build/packages/api/src/nl2sql_api/web/static /app/packages/api/src/nl2sql_api/web/static
 
@@ -47,7 +48,7 @@ RUN pip install -U pip setuptools wheel \
     && pip install \
         ./packages/sdk \
         "./packages/nl2sql[postgres,mysql,mssql,duckdb,anthropic,otel]" \
-        ./packages/api
+        ./packages/api \n        ./nl2sql-cli
 
 # Non-root. /data is the volume for storage.path (docs/deployment/compose.md).
 RUN useradd --create-home --uid 1000 nl2sql \
