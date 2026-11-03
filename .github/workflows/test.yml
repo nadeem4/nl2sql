@@ -338,9 +338,9 @@ jobs:
 
   # Installs the wheels `build` just made into an empty virtualenv the way a
   # user does -- `pip install "nl2sql-engine[demo]"` -- and boots
-  # `nl2sql demo --hosted`, the command the Hugging Face Space runs, with no
-  # API key. Passes only when the page, /api/meta, /api/schema and /api/index
-  # all answer from that install. scripts/fresh_install_check.py is the whole
+  # `nl2sql-api serve --demo --hosted`, the command the Hugging Face Space runs,
+  # with no API key. Passes only when the page, /api/v1/meta, the schema, the
+  # index and the guided questions all answer from that install. scripts/fresh_install_check.py is the whole
   # check, so it runs the same locally: `python scripts/fresh_install_check.py --build`.
   fresh-install:
     needs: build

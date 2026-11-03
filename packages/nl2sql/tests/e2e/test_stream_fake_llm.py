@@ -136,7 +136,8 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
     from fastapi.testclient import TestClient
 
     from nl2sql import NL2SQL
-    from nl2sql.cli.commands.demo import REPLAY_STREAM_DELAY, replay_recordings
+    import nl2sql.datasets
+    from pathlib import Path
     from nl2sql.datasets.demo import DEMO_QUESTIONS
     from nl2sql.cli.demo.llm_config import point_llm_config_at
     from nl2sql.cli.demo.playground.app import build_app
@@ -146,14 +147,14 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
 
     project = tmp_path / "demo"
     copy_demo(demo_project, project)
-    store = ReplayStore.load(replay_recordings(project / "nowhere"))
+    store = ReplayStore.load(Path(nl2sql.datasets.__file__).parent / "recordings" / "chinook.json")
     assert set(store.covered(DEMO_QUESTIONS)) == set(DEMO_QUESTIONS)
 
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     # As the Space runs it: the demo's own nl2sql.yaml, verified queries included.
     point_llm_config_at(project, None, provider="openai")
-    replay = FakeLLMServer(store.rules(), stream_delay=REPLAY_STREAM_DELAY / 10).start()
+    replay = FakeLLMServer(store.rules(), stream_delay=0.0012).start()
     finals = {}
     try:
         hosted = Hosted(enabled=True, limits=Limits(per_minute=100, per_session=100), replay=Replay(replay.base_url, store.covered(DEMO_QUESTIONS),

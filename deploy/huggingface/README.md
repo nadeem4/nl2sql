@@ -11,7 +11,7 @@ short_description: Ask a sample database in English, with your own API key
 thumbnail: https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png
 ---
 
-# nl2sql playground
+# nl2sql web app
 
 Ask three small sample databases in plain English and watch the whole run: the
 plan the model wrote, the checks it had to pass, the SQL, the rows, and what it
@@ -22,7 +22,7 @@ your own OpenAI, Anthropic or OpenRouter key, and it stays in that browser tab:
 it is sent with each question, used to answer that question, and stored nowhere
 on the server. Closing the tab clears it. Without a key, the guided questions
 still answer, from recorded runs labelled **Recorded run**; any other question
-asks for a key.
+asks for a key. A chat keeps its history, and a follow-up works the same way.
 
 **Your data never comes here.** The demo answers only from the three sample
 databases baked into the image (a music store, its help desk and its website
@@ -31,7 +31,7 @@ it on your own machine:
 
 ```bash
 pip install "nl2sql-engine[demo]"
-nl2sql demo
+nl2sql demo   # starts nl2sql-api serve --demo and opens the browser
 ```
 
 Questions are limited to 6 a minute and 30 a browser session. Settings are not
@@ -99,13 +99,13 @@ git subtree push --prefix deploy/huggingface space main
 The Space builds on push; watch the log on its **Logs** tab. A first build takes
 a few minutes (installing the engine, generating the sample databases, indexing
 them and baking in the embedding model). Once the build is green the
-playground is live at <https://nl2sql.codewithnk.com> and at
+web app is live at <https://nl2sql.codewithnk.com> and at
 <https://nadeem4nk-nl2sql-demo.hf.space>. The first is the Space's custom
 domain: *Settings* -> *Custom domain* on the Space, plus a DNS `CNAME` from
 `nl2sql` to `hf.space`; Hugging Face issues the certificate.
 
 To deploy again after a change here, run the same `git subtree push`. Note that
-a change to the *engine* or the *playground* does not touch this folder, so it
+a change to the *engine* or the *web app* does not touch this folder, so it
 gives the push nothing to commit and the Space does not rebuild -- edit the
 `ARG NL2SQL_SPEC=` line to the release you want, which is what the workflow
 does for you. If the push is refused because the Space has commits of its own,
@@ -118,18 +118,20 @@ recordings ship) and any other question answers with **Add a key in Settings**.
 
 ### Which engine version it builds
 
-The `Dockerfile`'s `ARG NL2SQL_SPEC=` line names what the image installs. A
-release deploy rewrites it to the version it published:
+The `Dockerfile`'s `ARG NL2SQL_SPEC=` and `ARG NL2SQL_API_SPEC=` lines name what
+the image installs: the engine and the web app (`nl2sql-api`). A release deploy
+rewrites both to the version it published:
 
 ```dockerfile
 ARG NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
+ARG NL2SQL_API_SPEC="nl2sql-api==0.2.0"
 ```
 
 `SOURCE_SHA` at the Space root is the repository commit the deploy came from.
 In the repository the spec is a GitHub archive of `main` and `SOURCE_SHA` says
 `main`, which is what a local `docker build` and a hand-made
-`git subtree push` get. `/api/health` on the running Space reports the
-installed version.
+`git subtree push` get. `/api/v1/health` on the running Space reports the
+installed engine and API versions.
 
 ### Settings on the Space
 
@@ -137,17 +139,17 @@ None are required. The image's command and the demo's config set them all:
 
 | Setting | Where | Default | What it does |
 | --- | --- | --- | --- |
-| `--hosted` | the `CMD` | on | hosted mode; never run a public Space without it |
+| `--hosted` | the `CMD` (`nl2sql-api serve --demo --hosted`) | on | hosted mode; never run a public Space without it |
 | `PORT` | a Space variable | `7860` | the port the Space routes to (`app_port` above must match) |
 | `--questions-per-minute` | the `CMD` | `6` | rate limit per visitor |
 | `--questions-per-session` | the `CMD` | `30` | cap per browser session |
 | `NL2SQL_CONFIG` | the image | `/home/demo/demo/nl2sql.yaml` | the config `nl2sql init --demo` wrote |
 | `settings.pipeline.timeout_s` | `settings.yaml` | `300` | how long one question may run |
-| `settings.traces.mode` | `settings.yaml` | `always` | what the playground's **Debug** drill-down reads. Every question writes a trace file to the container's own disk, which is wiped whenever the Space restarts; set it to `on_failure` to keep only the runs that went wrong |
+| `settings.traces.mode` | `settings.yaml` | `always` | what the web app's **Debug** drill-down reads. Every question writes a trace file to the container's own disk, which is wiped whenever the Space restarts; set it to `on_failure` to keep only the runs that went wrong |
 
 **Never add an API key as a Space secret.** The whole point of hosted mode is
 that the server has none; a key here would be spent by every visitor, and
-`nl2sql demo --hosted` refuses to start when a provider key variable is set
+`nl2sql-api serve --demo --hosted` refuses to start when a provider key variable is set
 rather than use it.
 
 ## Testing the same image locally

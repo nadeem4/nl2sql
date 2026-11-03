@@ -1,6 +1,6 @@
 # Hosted demo
 
-`nl2sql demo --hosted` serves the playground as a **public demo of the sample
+`nl2sql-api serve --demo --hosted` serves the web app as a **public demo of the sample
 databases**, where the server holds no API key and every visitor brings their
 own.
 
@@ -10,7 +10,7 @@ questions; that is right on your own machine and wrong on a shared address.
 Hosted mode removes the key from the server entirely instead of relaxing the
 gate that protects it.
 
-| | local (`nl2sql demo`) | hosted (`nl2sql demo --hosted`) |
+| | local (`nl2sql demo`) | hosted (`nl2sql-api serve --demo --hosted`) |
 | --- | --- | --- |
 | the API keys | saved to the project's `.env`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
 | a model per step | written to the project's `llm.yaml` | chosen in the browser tab, sent per request, saved nowhere |
@@ -25,7 +25,7 @@ gate that protects it.
 | limits | none | a rate limit per visitor and a cap per session |
 
 ```bash
-nl2sql demo --hosted --host 0.0.0.0 --port 7860 --questions-per-minute 6 --questions-per-session 30
+nl2sql-api serve --demo --hosted --host 0.0.0.0 --port 7860 --questions-per-minute 6 --questions-per-session 30
 ```
 
 There is no environment variable for it: hosted mode and its limits are flags
@@ -258,8 +258,8 @@ a visitor chose or changed, gets a new session, so no one can fix the token anot
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
 at a time, besides the limits below; going over any of them
 is `429 LIMIT_REACHED` with a `Retry-After` header. `GET /api/v1/meta` tells a visitor the limits and how many
-questions the session has asked (`limits`). The old `nl2sql demo --hosted` flags below stay until the CLI moves
-onto the API.
+questions the session has asked (`limits`). `nl2sql demo` is only a launcher for `nl2sql-api serve --demo`; it has
+no `--hosted` flag, nor `--questions-per-minute`, `--api-key`, `--record` or `--allow-settings`.
 
 `nl2sql-api serve` loads the `.env` beside the config (before it looks at the environment for a model key), except
 for a hosted server, which never loads one: it holds no model key, and a `.env` with one beside a hosted config is
@@ -369,11 +369,11 @@ time and the first question is answered at once:
 
 The container runs as uid 1000 (not root), listens on `$PORT` (7860 by
 default, which is what a Space routes to), and carries a healthcheck that polls
-`/api/health`. That route reads nothing but process state and answers
-`{"status": "ok", "version": "X.Y.Z"}`, the installed `nl2sql-engine`
-version, in every mode; the release pipeline polls it on the live Space to
+`/api/v1/health`. That route reads nothing but process state and answers
+`{"status": "ok", "version": {"engine": "X.Y.Z", "api": "X.Y.Z"}}`, the installed
+`nl2sql-engine` and `nl2sql-api` versions, in every mode; the release pipeline polls it on the live Space to
 know the new version is the one being served. Its `CMD` runs
-`nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30`;
+`nl2sql-api serve --demo --hosted --questions-per-minute 6 --questions-per-session 30`;
 a public demo must never be started without `--hosted`.
 
 ```bash
@@ -438,8 +438,8 @@ flowchart LR
 ```
 
 1. **`pypi-smoke`** installs `nl2sql-engine[demo]==X.Y.Z` from PyPI into an
-   empty virtualenv on a fresh runner, boots this same `nl2sql demo --hosted`
-   with no key and checks it serves. The Space is never built on a version
+   empty virtualenv on a fresh runner, boots this same `nl2sql-api serve --demo --hosted`
+   with no key, asks every recorded guided question and its scripted follow-up, and checks it serves. The Space is never built on a version
    that does not install from PyPI.
 2. **`space`** calls [`publish_space.yml`][workflow] with the tag. It mirrors
    `deploy/huggingface/` onto the Space's root, pins the image to the release,

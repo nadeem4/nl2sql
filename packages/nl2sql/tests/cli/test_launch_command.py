@@ -116,7 +116,15 @@ def test_launch_finds_the_file_and_writes_a_project(folder, index, llm_server):
     assert [d.id for d in config.datasources] == ["shop"]
     assert (folder / "datasources" / "shop.yaml").is_file() and (folder / "glossary.yaml").is_file()
     assert index.calls == [["shop"]]
-    assert 'nl2sql --config' in _out(result) and "demo --dir" in _out(result)
+    assert 'nl2sql --config' in _out(result)
+
+
+def test_launch_prints_the_serve_command(folder, index, llm_server):
+    result = _launch(folder, "--yes", input=NEW_PROJECT)
+
+    assert result.exit_code == 0, _out(result)
+    assert f"nl2sql-api serve --config {(folder / 'nl2sql.yaml').as_posix()}" in _out(result).replace(chr(10), "")
+    assert "demo --dir" not in _out(result)
 
 
 def test_launch_into_an_existing_project_saves_one_datasource(folder, index, llm_server, monkeypatch):
@@ -259,19 +267,6 @@ def test_an_existing_file_is_never_overwritten(folder, index, llm_server):
     assert result.exit_code == 1 and "glossary.yaml" in _out(result)
     assert (folder / "glossary.yaml").read_text(encoding="utf-8") == "mine: true\n"
     assert not (folder / "nl2sql.yaml").exists()
-
-
-def test_demo_serves_a_launched_folder_without_a_warning(folder, index, llm_server, capsys):
-    from nl2sql.cli.commands.demo import prepare_project
-    from nl2sql.cli.demo.stamp import outdated_warning
-
-    assert _launch(folder, "--yes", input=NEW_PROJECT).exit_code == 0
-    capsys.readouterr()
-
-    assert prepare_project(folder) == folder / "nl2sql.yaml"
-
-    assert outdated_warning(folder) is None
-    assert "created by" not in capsys.readouterr().out
 
 
 def test_demo_still_warns_for_a_stamp_from_an_older_version(tmp_path):

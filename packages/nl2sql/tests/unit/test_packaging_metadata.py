@@ -39,8 +39,21 @@ def test_engine_dependencies_name_what_the_code_imports():
     names = [d.split(">")[0].split("=")[0].split("<")[0].split("~")[0].strip() for d in deps]
     # typer dropped the [all] extra; installing it only warns.
     assert "typer" in names and not any(d.startswith("typer[") for d in deps)
-    # cli/commands/demo.py and cli/demo/manager.py import dotenv.
+    # cli/demo/ (until X1b) and nl2sql.config.load_env_file import dotenv.
     assert "python-dotenv" in names
+
+
+def test_the_demo_extra_is_the_api_at_this_release():
+    """`pip install "nl2sql-engine[demo]"` brings the web app; the engine itself ships no server for it."""
+    project = _project("nl2sql")
+    api = Requirement(next(d for d in project["optional-dependencies"]["demo"]))
+
+    assert project["optional-dependencies"]["demo"] == [f"nl2sql-api~={project['version']}"]
+    assert api.name == "nl2sql-api"
+    assert "fastapi" not in " ".join(project["optional-dependencies"]["demo"])
+    package_data = tomllib.loads((ENGINE / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"][
+        "package-data"]
+    assert not [name for name in package_data if name.startswith("nl2sql.cli.demo")]
 
 
 PACKAGES = ["nl2sql", "api", "sdk"]
@@ -152,3 +165,15 @@ def test_the_mysql_extras_install_cryptography_for_mysql_8_logins(extra):
     requirements = [Requirement(r) for r in _project("nl2sql")["optional-dependencies"][extra]]
     pymysql = next(r for r in requirements if r.name == "pymysql")
     assert "rsa" in pymysql.extras
+
+
+def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_one_at_a_time():
+    """The engine's demo extra needs the API, which needs the engine and the SDK: upload what is depended on first."""
+    import re
+    from pathlib import Path
+
+    workflow = (Path(__file__).resolve().parents[4] / ".github" / "workflows" / "publish_pypi.yaml").read_text(encoding="utf-8")
+
+    assert "max-parallel: 1" in workflow
+    order = re.findall(r"- package: (nl2sql-[a-z]+)", workflow)
+    assert order == ["nl2sql-sdk", "nl2sql-api", "nl2sql-engine"]

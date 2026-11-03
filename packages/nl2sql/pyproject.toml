@@ -47,7 +47,7 @@ dependencies = [
     # typer no longer has an [all] extra; asking for it only warns.
     "typer>=0.9.0",
     # nl2sql.config.load_env_file loads the .env next to nl2sql.yaml for the
-    # entry points, and cli/commands/demo.py reads the demo's .env directly.
+    # entry points.
     "python-dotenv>=1.0.0",
     "inquirerpy>=0.3.4",
     # cli/main.py and cli/commands/policy.py import it directly; it used to
@@ -67,9 +67,9 @@ dependencies = [
 anthropic = ["langchain-anthropic>=1.7,<2"]
 aws = ["boto3"]
 azure = ["azure-identity", "azure-keyvault-secrets"]
-# The browser playground `nl2sql demo` serves. The built page ships inside the
-# wheel, so this extra adds only the server.
-demo = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+# The web app `nl2sql demo` starts: `nl2sql-api` serves it and carries the built page. The API depends on this
+# package too, so the two are released together and `publish_pypi.yaml` uploads the API first (wave_d.md, X1a).
+demo = ["nl2sql-api~=0.9.1"] # x-release-please-version
 duckdb = ["duckdb", "duckdb-engine"]
 hashicorp = ["hvac"]
 # `nl2sql mcp`: the engine as an MCP server over stdio, on the official SDK
@@ -171,7 +171,3 @@ include = ["nl2sql*"]
 "nl2sql.datasets" = ["*.sqlite", "*.yaml", "README.md", "recordings/*.json"]
 "nl2sql.evaluation" = ["suites/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
-# The committed single-page build of the old playground (its source is now nl2sql-ui/, whose build goes to nl2sql-api): the wheel must carry the finished
-# page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain. The card
-# the link preview names sits beside it rather than in `static/`.
-"nl2sql.cli.demo.playground" = ["static/*", "assets/*", "assets/clips/*"]

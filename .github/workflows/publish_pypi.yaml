@@ -129,14 +129,19 @@ jobs:
       # nowhere. Each leg is an independent upload to an independent project;
       # let the survivors finish and re-publish only what actually failed.
       fail-fast: false
+      # One leg at a time, the SDK first, then the API, then the engine: the
+      # engine's `demo` extra requires nl2sql-api, which requires the engine
+      # and the SDK, so a version is installable only once all three are up.
+      # In this order each upload finds what it depends on already published.
+      max-parallel: 1
       matrix:
         include:
-          - package: nl2sql-engine
-            stem: nl2sql_engine
-          - package: nl2sql-api
-            stem: nl2sql_api
           - package: nl2sql-sdk
             stem: nl2sql_sdk
+          - package: nl2sql-api
+            stem: nl2sql_api
+          - package: nl2sql-engine
+            stem: nl2sql_engine
     environment: pypi-${{ matrix.package }}
     permissions:
       id-token: write
@@ -267,7 +272,7 @@ jobs:
 
   # The release as a user gets it: `pip install "nl2sql-engine[demo]==X.Y.Z"`
   # from PyPI itself into an empty virtualenv on a fresh runner, then the same
-  # key-free boot of `nl2sql demo --hosted` the `fresh-install` job in test.yml
+  # key-free boot of `nl2sql-api serve --demo --hosted` the `fresh-install` job in test.yml
   # runs on the wheels. PyPI accepts an upload at once but its CDN serves the
   # new version a little later, so the install is retried (10 tries, 30s
   # apart). This also gates the Space: it never builds a version that does not
@@ -310,7 +315,7 @@ jobs:
   # The Space can report RUNNING on its new build before the router sends
   # traffic to it, and it serves the previous image until then. So the release
   # is checked where visitors meet it: the public URL, polled until
-  # /api/health reports this version, then the page and /api/meta; then the
+  # /api/v1/health reports this version, then the page, /api/v1/meta and the guided questions; then the
   # same on the custom domain, unless SPACE_CUSTOM_DOMAIN is empty.
   space-smoke:
     needs: space

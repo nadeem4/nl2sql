@@ -78,10 +78,11 @@ Three more jobs test the package rather than the source tree:
   virtualenv and runs `import nl2sql` and `nl2sql --help`.
 - **`fresh-install`** takes those wheels and installs them the way a user
   does, `pip install "nl2sql-engine[demo]"`, into an empty virtualenv outside
-  the checkout. It then boots `nl2sql demo --hosted` (the command the Hugging
-  Face Space runs) with no API key, and passes only when the playground page,
-  `/api/meta`, `/api/schema` and `/api/index` all answer from that install. It
-  is what catches a wheel that imports but ships without the built playground,
+  the checkout. It then boots `nl2sql-api serve --demo --hosted` (the command the Hugging
+  Face Space runs) with no API key, and passes only when the web app page,
+  `/api/v1/meta`, each datasource's schema, `/api/v1/index`, the recorded guided questions
+  and their scripted follow-up all answer from that install. It
+  is what catches a wheel that imports but ships without the built web app,
   the sample databases or a dependency the demo extra forgot.
   `scripts/fresh_install_check.py` is the whole check, so it runs the same on a
   laptop:

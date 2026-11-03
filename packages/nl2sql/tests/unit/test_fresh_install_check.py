@@ -50,9 +50,9 @@ def test_find_wheels_names_each_distribution(check, tmp_path):
 
 def test_find_wheels_does_not_confuse_api_with_sdk(check, tmp_path):
     # `nl2sql_a*` matches both; the stem has to be matched whole.
-    wheels = check.find_wheels(_dist(tmp_path, "nl2sql_engine-1-py3-none-any.whl",
-                                     "nl2sql_sdk-1-py3-none-any.whl"))
-    assert "api" not in wheels
+    wheels = check.find_wheels(_dist(tmp_path, *WHEELS))
+    assert wheels["api"].name.startswith("nl2sql_api-")
+    assert wheels["sdk"].name.startswith("nl2sql_sdk-")
 
 
 def test_find_wheels_refuses_a_dist_without_the_engine(check, tmp_path):
@@ -79,12 +79,17 @@ def test_install_args_install_the_engine_with_the_demo_extra(check, tmp_path):
     assert args[args.index("--find-links") + 1] == str(dist)
 
 
-def test_install_args_leave_the_api_out(check, tmp_path):
-    # A user installs the engine with its demo extra; the REST API is a
-    # separate distribution they do not need for the playground.
+def test_install_args_name_the_api_wheel(check, tmp_path):
+    # The demo extra is the web app, and the API is built at the same version
+    # as the engine, which PyPI does not have until the release is published.
     dist = _dist(tmp_path, *WHEELS)
     args = check.wheel_install_args(check.find_wheels(dist), dist)
-    assert not any("nl2sql_api" in a for a in args)
+    assert str(dist / "nl2sql_api-0.2.0-py3-none-any.whl") in args
+
+
+def test_find_wheels_refuses_a_dist_without_the_api(check, tmp_path):
+    with pytest.raises(SystemExit, match="nl2sql_api"):
+        check.find_wheels(_dist(tmp_path, "nl2sql_engine-1-py3-none-any.whl", "nl2sql_sdk-1-py3-none-any.whl"))
 
 
 def test_wheel_version_reads_the_filename(check, tmp_path):
@@ -133,19 +138,18 @@ def test_demo_env_embeds_locally(check):
     assert check.demo_env({})["EMBEDDING_PROVIDER"] == "local"
 
 
-def test_demo_command_is_hosted_headless_and_on_the_given_port(check, tmp_path):
-    cmd = check.demo_command(tmp_path / "nl2sql", tmp_path / "demo", 8765)
-    assert cmd[0] == str(tmp_path / "nl2sql")
-    assert cmd[1] == "demo"
-    assert "--hosted" in cmd and "--no-browser" in cmd
+def test_demo_command_is_the_api_serving_the_hosted_demo_on_the_given_port(check, tmp_path):
+    cmd = check.demo_command(tmp_path / "nl2sql-api", tmp_path / "demo", 8765)
+    assert cmd[0] == str(tmp_path / "nl2sql-api")
+    assert cmd[1:4] == ["serve", "--demo", "--hosted"]
     assert cmd[cmd.index("--port") + 1] == "8765"
     assert cmd[cmd.index("--host") + 1] == "127.0.0.1"
     assert cmd[cmd.index("--dir") + 1] == str(tmp_path / "demo")
 
 
 def test_venv_executable_follows_the_platform(check, tmp_path):
-    assert check.venv_executable(tmp_path, "nl2sql", windows=True) == tmp_path / "Scripts" / "nl2sql.exe"
-    assert check.venv_executable(tmp_path, "nl2sql", windows=False) == tmp_path / "bin" / "nl2sql"
+    assert check.venv_executable(tmp_path, "nl2sql-api", windows=True) == tmp_path / "Scripts" / "nl2sql-api.exe"
+    assert check.venv_executable(tmp_path, "nl2sql-api", windows=False) == tmp_path / "bin" / "nl2sql-api"
 
 
 # --- what a healthy playground looks like -------------------------------------
@@ -163,10 +167,24 @@ def test_page_problems_reject_an_error_status(check):
     assert check.page_problems(500, '<div id="root"></div>')
 
 
+HOSTED_META = {"mode": "hosted", "start": "hosted",
+               "datasources": [{"id": "chinook", "sample_questions": ["a", "b"], "recorded": ["b"]}]}
+
+
 def test_meta_problems_want_hosted_mode_and_datasources(check):
-    assert check.meta_problems({"hosted": True, "mode": "hosted", "datasources": ["chinook"]}) == []
-    assert check.meta_problems({"hosted": False, "mode": "replay", "datasources": ["chinook"]})
-    assert check.meta_problems({"hosted": True, "mode": "hosted", "datasources": []})
+    assert check.meta_problems(HOSTED_META) == []
+    assert check.meta_problems({**HOSTED_META, "mode": "demo", "start": None})
+    assert check.meta_problems({**HOSTED_META, "datasources": []})
+
+
+def test_meta_problems_want_a_recorded_question(check):
+    unrecorded = {**HOSTED_META, "datasources": [{"id": "chinook", "sample_questions": ["a"], "recorded": []}]}
+    assert check.meta_problems(unrecorded)
+
+
+def test_recorded_questions_lists_what_the_keyless_demo_can_answer(check):
+    assert check.recorded_questions(HOSTED_META) == [("chinook", "b")]
+    assert check.recorded_questions({}) == []
 
 
 def test_schema_problems_want_tables(check):
@@ -174,15 +192,23 @@ def test_schema_problems_want_tables(check):
     assert check.schema_problems({"tables": []})
 
 
-def test_health_problems_want_the_expected_version(check):
-    assert check.health_problems({"status": "ok", "version": "0.2.0"}, "0.2.0") == []
-    assert check.health_problems({"status": "ok", "version": "0.1.2"}, "0.2.0")
-    assert check.health_problems({"status": "starting", "version": "0.2.0"}, "0.2.0")
+def test_health_problems_want_the_expected_version_of_both_packages(check):
+    ok = {"status": "ok", "version": {"engine": "0.2.0", "api": "0.2.0"}}
+    assert check.health_problems(ok, "0.2.0") == []
+    assert check.health_problems({"status": "ok", "version": {"engine": "0.1.2", "api": "0.2.0"}}, "0.2.0")
+    assert check.health_problems({"status": "ok", "version": {"engine": "0.2.0", "api": "0.1.2"}}, "0.2.0")
+    assert check.health_problems({**ok, "status": "starting"}, "0.2.0")
 
 
 def test_index_problems_want_an_ok_index(check):
-    assert check.index_problems({"health": {"status": "ok"}}) == []
-    assert check.index_problems({"health": {"status": "empty", "problems": ["no entries"]}})
+    assert check.index_problems({"status": "ok"}) == []
+    assert check.index_problems({"status": "empty", "problems": ["no entries"]})
+
+
+def test_turn_problems_want_an_answered_turn_with_a_reply(check):
+    assert check.turn_problems({"status": "answered", "reply": "Rock."}, "a question") == []
+    assert check.turn_problems({"status": "error", "error": {"code": "X"}}, "a question")
+    assert check.turn_problems({"status": "answered", "reply": ""}, "a question")
 
 
 # --- waiting for the server ---------------------------------------------------
@@ -213,10 +239,14 @@ def test_wait_until_up_fails_when_the_server_dies(check):
                             clock=clock.time, sleep=clock.sleep, interval=1)
 
 
+def _health(version):
+    return {"status": "ok", "version": {"engine": version, "api": version}}
+
+
 def test_wait_for_version_waits_out_the_old_build(check):
     # The Space keeps serving the previous image until the new one is up.
     clock = _Clock()
-    seen = iter([None, {"status": "ok", "version": "0.1.2"}, {"status": "ok", "version": "0.2.0"}])
+    seen = iter([None, _health("0.1.2"), _health("0.2.0")])
     check.wait_for_version(lambda: next(seen), "0.2.0", timeout=600,
                            clock=clock.time, sleep=clock.sleep, interval=30)
     assert clock.now == 60
@@ -225,7 +255,7 @@ def test_wait_for_version_waits_out_the_old_build(check):
 def test_wait_for_version_names_what_it_last_saw(check):
     clock = _Clock()
     with pytest.raises(SystemExit, match="0.1.2"):
-        check.wait_for_version(lambda: {"status": "ok", "version": "0.1.2"}, "0.2.0", timeout=60,
+        check.wait_for_version(lambda: _health("0.1.2"), "0.2.0", timeout=60,
                                clock=clock.time, sleep=clock.sleep, interval=30)
 
 
@@ -235,3 +265,37 @@ def test_wait_until_up_gives_up_at_the_deadline(check):
         check.wait_until_up(lambda: False, alive=lambda: True, timeout=10,
                             clock=clock.time, sleep=clock.sleep, interval=1)
     assert clock.now >= 10
+
+
+def test_the_follow_up_is_the_one_the_recorder_scripts(check):
+    recorder = (SCRIPT.parent / "record_demo_answers.py").read_text(encoding="utf-8")
+    assert f"{check.FOLLOW_UP[0]!r}".replace("'", '"') in recorder
+    assert f"{check.FOLLOW_UP[1]!r}".replace("'", '"') in recorder
+
+
+class _Scripted:
+    """A stand-in client: records what it was sent and answers every turn."""
+
+    def __init__(self, status="answered"):
+        self.sent, self.status = [], status
+
+    def post(self, path, body, timeout=0):
+        self.sent.append(body.get("text", body))
+        if path.endswith("/conversations"):
+            return {"id": "c1"}
+        return {"status": self.status, "reply": "An answer."}
+
+
+def test_check_conversation_asks_each_recorded_question_and_the_scripted_follow_up(check):
+    meta = {"datasources": [{"id": "chinook", "recorded": [check.FOLLOW_UP[0], "Other?"]}]}
+    client = _Scripted()
+
+    assert check.check_conversation(client, meta) == []
+    asked = [m for m in client.sent if isinstance(m, str)]
+    assert asked == [check.FOLLOW_UP[0], check.FOLLOW_UP[1], "Other?"]
+
+
+def test_check_conversation_reports_a_turn_that_did_not_answer(check):
+    meta = {"datasources": [{"id": "chinook", "recorded": ["Other?"]}]}
+
+    assert check.check_conversation(_Scripted(status="error"), meta)
