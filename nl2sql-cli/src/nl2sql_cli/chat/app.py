@@ -35,6 +35,14 @@ class ConversationItem(ListItem):
         self.conversation_id = conversation_id
 
 
+class ApproveButton(Button):
+    """The button shown under one ``needs_approval`` result; it remembers the requests it was shown for."""
+
+    def __init__(self, requests: List[Any]) -> None:
+        super().__init__("Approve and run", classes="approve")
+        self.requests = requests
+
+
 class ChatApp(App[None]):
     TITLE = "nl2sql chat"
     CSS = """
@@ -99,13 +107,21 @@ class ChatApp(App[None]):
         self._greet()
         self.query_one("#composer").focus()
 
+    def _safe(self, call: Callable[[], Any], default: Any = None) -> Any:
+        """Run an engine call from a key or message handler: an error is shown in the transcript, never a crash."""
+        try:
+            return call()
+        except Exception as error:  # every NL2SQLError, and a store or driver failure
+            self._fail(error)
+            return default
+
     def _greet(self) -> None:
         roles = ", ".join(self.user.roles) or "no role"
         self._add(Note(f"Asking as {self.user.user_id or 'anonymous'} ({roles}). /help lists the commands.", classes="muted"))
 
     def _guided_questions(self) -> List[str]:
         found: List[str] = []
-        for datasource in self.engine.datasources.list():
+        for datasource in self._safe(lambda: self.engine.datasources.list(user_context=self.user), []):
             if self.datasource_id in (None, datasource.id):
                 found += [q for q in datasource.sample_questions if q not in found]
         return found
@@ -113,7 +129,7 @@ class ChatApp(App[None]):
     def _load_conversations(self) -> None:
         listing = self.query_one("#conversations", ListView)
         listing.clear()
-        for info in self.engine.conversations.list(user_context=self.user):
+        for info in self._safe(lambda: self.engine.conversations.list(user_context=self.user), []):
             listing.append(ConversationItem(info.id, info.title))
 
     # ------------------------------------------------------------------ the transcript
@@ -221,18 +237,21 @@ class ChatApp(App[None]):
         if roles and not set(roles) & set(self.user.roles):
             self._add(Note(f"Only {', '.join(roles)} can approve this. An approver can list it with /approvals.", classes="muted"))
         else:
-            self._add(Button("Approve and run", classes="approve"))
+            self._add(ApproveButton(self._approvals))
 
     @on(Button.Pressed, ".approve")
     def _approve(self, event: Button.Pressed) -> None:
-        event.button.disabled = True
-        requests = list(self._approvals)
-        self._run(lambda: self._grant_and_retry(requests), "Approving")
+        button = event.button
+        if self._busy or not isinstance(button, ApproveButton) or self._conversation_id is None:
+            return
+        button.disabled = True
+        requests, conversation_id = list(button.requests), self._conversation_id
+        self._run(lambda: self._grant_and_retry(conversation_id, requests), "Approving")
 
-    def _grant_and_retry(self, requests: List[Any]) -> Turn:
+    def _grant_and_retry(self, conversation_id: str, requests: List[Any]) -> Turn:
         for request in requests:
             self.engine.approvals.grant(request.id, by=self.user)
-        return self.engine.conversations.retry(self._conversation_id, user_context=self.user,
+        return self.engine.conversations.retry(conversation_id, user_context=self.user,
                                                approvals=[request.id for request in requests])
 
     # ------------------------------------------------------------------ input
@@ -259,8 +278,9 @@ class ChatApp(App[None]):
                 self._add(Note("Ask a question first: a tool works on a conversation.", classes="muted"))
                 return
             self._add(Note(f"You: /{name}", classes="you"))
+            conversation_id = self._conversation_id
             tool_args = {"kind": args[0]} if name == "chart" and args else {}
-            self._run(lambda: self.engine.conversations.tool(self._conversation_id, name, tool_args, user_context=self.user),
+            self._run(lambda: self.engine.conversations.tool(conversation_id, name, tool_args, user_context=self.user),
                       f"Running {name}")
         elif name == "help":
             self._add(Note(HELP, classes="muted"))
@@ -276,7 +296,9 @@ class ChatApp(App[None]):
             self._save(args)
 
     def _list_approvals(self) -> None:
-        records = self.engine.approvals.list(user_context=self.user)
+        records = self._safe(lambda: self.engine.approvals.list(user_context=self.user))
+        if records is None:
+            return
         if not records:
             self._add(Note("No approvals are waiting.", classes="muted"))
         for record in records:
@@ -299,7 +321,11 @@ class ChatApp(App[None]):
         if self._conversation_id is None:
             self._add(Note("Ask a question first: a report is made from a conversation.", classes="muted"))
             return
-        self._report = self.engine.conversations.report(self._conversation_id, user_context=self.user)
+        conversation_id = self._conversation_id
+        report = self._safe(lambda: self.engine.conversations.report(conversation_id, user_context=self.user))
+        if report is None:
+            return
+        self._report = report
         self._add(Markdown(self._report))
         self._add(Note("/save FILE writes this report to a file.", classes="muted"))
 
@@ -339,8 +365,9 @@ class ChatApp(App[None]):
         engine = self.engine.conversations
         if self._conversation_id is None:
             self._conversation_id = engine.start(user_context=self.user, datasource_id=self.datasource_id).id
+        conversation_id = self._conversation_id
         stored = None
-        for event in engine.stream(self._conversation_id, text, user_context=self.user, choice=choice):
+        for event in engine.stream(conversation_id, text, user_context=self.user, choice=choice):
             if event.name == "node.started":
                 self.call_from_thread(self._status, f"Running {event.data.get('node')}...")
             elif event.name == "conversation.step":
@@ -371,7 +398,14 @@ class ChatApp(App[None]):
         self.query_one("#conversations").focus()
 
     def action_new(self) -> None:
+        if self._busy:
+            self._add(Note("A turn is still running.", classes="muted"))
+            return
+        self._reset()
+
+    def _reset(self) -> None:
         self._conversation_id, self._last, self._table, self._request = None, None, None, None
+        self._pick, self._report, self._approvals = None, None, []
         self.query_one("#transcript").remove_children()
         self._refresh_side()
         self._greet()
@@ -383,7 +417,9 @@ class ChatApp(App[None]):
         if offset is None:
             self._status("That is every row.")
             return
-        page = self.engine.results.page(run_id, result_id, offset, PAGE, user_context=self.user)
+        page = self._safe(lambda: self.engine.results.page(run_id, result_id, offset, PAGE, user_context=self.user))
+        if page is None:
+            return
         table.add_rows([tuple("" if cell is None else str(cell) for cell in row) for row in page.rows])
         table.styles.height = min(table.row_count + 2, 14)
         self._table = (table, run_id, result_id, page.next_offset)
@@ -429,8 +465,13 @@ class ChatApp(App[None]):
         item = event.item
         if not isinstance(item, ConversationItem):
             return
-        conversation = self.engine.conversations.get(item.conversation_id, user_context=self.user)
-        self.action_new()
+        if self._busy:
+            self._add(Note("A turn is still running.", classes="muted"))
+            return
+        conversation = self._safe(lambda: self.engine.conversations.get(item.conversation_id, user_context=self.user))
+        if conversation is None:
+            return
+        self._reset()
         self._conversation_id = conversation.id
         for turn in conversation.turns:
             self._show_turn(turn, with_question=True)

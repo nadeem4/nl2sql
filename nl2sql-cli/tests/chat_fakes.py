@@ -5,6 +5,8 @@ The app only calls the public facade, so these classes answer the same calls (``
 """
 from __future__ import annotations
 
+import threading
+
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
@@ -70,6 +72,7 @@ class FakeConversations:
         self.script = list(script)
         self.calls: List[tuple] = []
         self.pending: Optional[ClarificationRequest] = None
+        self.gate: Optional[threading.Event] = None  # when set, a stream waits for it: a turn that is still running
 
     def _next(self) -> Turn:
         return self.script.pop(0)
@@ -86,6 +89,8 @@ class FakeConversations:
 
     def stream(self, conversation_id, text=None, *, user_context, choice=None, execute=True, llm_override=None):
         self.calls.append(("stream", text, choice, user_context))
+        if self.gate is not None:
+            self.gate.wait(10)
         stored = self._next()
         yield Event(name="conversation.step", at=NOW, data={"tool": "ask", "status": "ok", "turn": 1})
         yield Event(name="conversation.turn", at=NOW, data={"stored": stored.model_dump(mode="json")})
@@ -118,11 +123,18 @@ class FakeEngine:
         self.approvals = SimpleNamespace(grant=self._grant, list=self._list_approvals)
         self.knowledge = SimpleNamespace(
             save_choice=lambda choice, *, user_context, term=None: self.saved_choices.append(choice))
-        self.datasources = SimpleNamespace(list=lambda: [SimpleNamespace(
-            id="chinook", sample_questions=["How many customers are there?", "Revenue by year?"])])
+        self.datasource_calls: List[Any] = []
+        self.page_error: Optional[Exception] = None
+        self.datasources = SimpleNamespace(list=self._datasources)
+
+    def _datasources(self, *, user_context=None):
+        self.datasource_calls.append(user_context)
+        return [SimpleNamespace(id="chinook", sample_questions=["How many customers are there?", "Revenue by year?"])]
 
     def _page(self, run_id, result_id, offset=0, limit=100, *, user_context):
         self.page_calls.append((run_id, result_id, offset, user_context))
+        if self.page_error is not None and offset:
+            raise self.page_error
         return next(p for p in self.pages if p.offset == offset)
 
     def _grant(self, request_id, *, by):

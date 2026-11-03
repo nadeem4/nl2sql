@@ -19,7 +19,9 @@ nl2sql chat --datasource chinook       # one datasource only
 | `--datasource ID` | Start conversations on this datasource and offer only its starter questions |
 
 The app takes its keys from the environment and the project's `.env`, like every command; it never asks for
-one. Every call it makes names the caller, so the policy of the role holds here as it does in the REST API.
+one. Every call it makes names the caller. The role is the one you name with `--as` (as with `nl2sql run --role`, it
+is self-asserted: this is a local tool for the person at the keyboard), and the policy of that role applies.
+While a turn runs, `Ctrl+N`, `/new` and opening another conversation wait until it ends.
 
 ## The screen
 

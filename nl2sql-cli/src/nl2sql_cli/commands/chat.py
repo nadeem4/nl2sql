@@ -23,7 +23,7 @@ def chat_command(ctx: typer.Context, demo: bool, directory: pathlib.Path, role: 
 
     if demo:
         config_path = prepare_demo(directory)
-        load_env_file(pathlib.Path(config_path).parent)
+        load_env_file(config_path)
         engine = NL2SQL(load_config(config_path))
     else:
         engine = build_engine(ctx)

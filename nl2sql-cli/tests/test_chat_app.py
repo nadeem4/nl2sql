@@ -8,7 +8,7 @@ import sys
 from chat_fakes import FakeEngine, approval_request, ask, chart_step, clarification, result, turn
 from textual.widgets import DataTable, Markdown, OptionList, Sparkline
 
-from nl2sql import ChartData, ChartSpec, Encoding, InvalidArgument, UserContext
+from nl2sql import ChartData, ChartSpec, Encoding, InvalidArgument, ResultNotFound, UserContext
 from nl2sql_cli.chat.app import ChatApp
 
 
@@ -256,3 +256,52 @@ def test_the_cli_main_and_import_nl2sql_load_no_textual():
         out = subprocess.run([sys.executable, "-c", f"import sys; {statement}; print('textual' in sys.modules)"],
                              capture_output=True, text=True, check=True).stdout.strip()
         assert out == "False", statement
+
+
+def test_the_starter_questions_are_asked_for_the_caller():
+    engine = FakeEngine([])
+
+    async def scenario(app, pilot):
+        await settle(app, pilot)
+
+    run(engine, scenario)
+    assert [u.user_id for u in engine.datasource_calls] == ["ana"]
+
+
+def test_a_result_that_is_gone_is_shown_not_a_crash():
+    engine = FakeEngine([turn(ask())])
+    engine.page_error = ResultNotFound("The result is gone.")
+
+    async def scenario(app, pilot):
+        await say(app, pilot, "customers by country")
+        await pilot.press("pagedown")
+        await settle(app, pilot)
+        assert app.is_running
+        assert "Error" in transcript(app)
+
+    run(engine, scenario)
+
+
+def test_new_is_refused_while_a_turn_runs():
+    import threading
+
+    engine = FakeEngine([turn(ask())])
+    engine.conversations.gate = gate = threading.Event()
+
+    async def scenario(app, pilot):
+        composer = app.query_one("#composer")
+        composer.value = "customers by country"
+        composer.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        while not any(c[0] == "stream" for c in engine.conversations.calls):
+            await pilot.pause(0.05)
+        await pilot.press("ctrl+n")
+        await pilot.pause()
+        assert "You: customers by country" in transcript(app)  # not cleared
+        assert "still running" in transcript(app)
+        gate.set()
+        await settle(app, pilot)
+        assert len(app.query(DataTable)) == 1  # the answer landed in the conversation it was asked in
+
+    run(engine, scenario)
