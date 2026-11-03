@@ -395,9 +395,8 @@ steps, a typed plan in outline. Its one copy is
 and `#e2e9e5` in dark). `index.html` inlines it as a `data:` URI, so the icon
 costs no request either; the docs site names the file as `theme.favicon`, and
 `scripts/social_card.html` draws the same shapes at card scale. If you change
-the mark, change all three and run `npm run build`; a test in
-`tests/unit/test_playground_app.py` fails if any of them, or the built page,
-drifts from the file.
+the mark, change all three and run `npm run build`; the favicon tests in
+`packages/api/tests/test_web_routes.py` cover how the API serves the file.
 
 ## Develop
 
