@@ -209,3 +209,17 @@ def test_hosted_makes_its_session_key_under_the_storage_path_and_demo_alone_does
     assert not key.exists()
     serve.main(["serve", "--demo", "--hosted", "--dir", str(tmp_path / "demo")])
     assert key.exists() and len(key.read_bytes()) == 32
+
+
+def test_hosted_ends_on_replay_even_when_the_project_file_names_a_keyed_provider(tmp_path, served):
+    """The Space's image is built with a project already on disk; prepare_demo keeps a file it finds."""
+    from nl2sql import LLM
+
+    config, _ = _project(tmp_path, served)
+    config = config.model_copy(update={"llm": LLM(provider="openai", model="gpt-x")})
+    serve.main(["serve", "--demo", "--hosted"])
+    adjusted = served["adjust"](config)
+    assert (adjusted.llm.provider, adjusted.llm.agents) == ("replay", {})
+    unhosted = _project(tmp_path, served)[0].model_copy(update={"llm": LLM(provider="openai", model="gpt-x")})
+    serve.main(["serve", "--demo"])
+    assert served["adjust"](unhosted).llm.provider == "openai"

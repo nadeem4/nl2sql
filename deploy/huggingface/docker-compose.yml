@@ -9,7 +9,7 @@
 name: nl2sql-demo
 
 services:
-  playground:
+  space:
     build:
       context: .
       # The Dockerfile installs the tip of `main` by default. To run a release,

@@ -652,3 +652,5 @@ See [Demo](../getting_started/demo.md).
 [space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md
 [workflow]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml
 [publish]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_pypi.yaml
+
+The hosted server always answers on the `replay` provider, whatever its project file names: `nl2sql-api serve --demo --hosted` replaces the `llm` section at start, and the Space image is built with `nl2sql init --demo --provider replay`. A keyed provider with no key ends a turn with a `MISSING_LLM` error, never a 500.

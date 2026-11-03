@@ -66,7 +66,7 @@ def test_the_declared_port_is_the_one_the_container_listens_on():
     port = _front_matter()["app_port"]
     assert re.search(rf"^\s*PORT={port}\s*\\?$", dockerfile, re.MULTILINE)
     assert f"EXPOSE {port}" in dockerfile
-    assert f"{port}:{port}" in compose["services"]["playground"]["ports"]
+    assert f"{port}:{port}" in compose["services"]["space"]["ports"]
 
 
 def test_the_container_runs_hosted_mode_as_a_non_root_user():
@@ -80,7 +80,7 @@ def test_the_container_runs_hosted_mode_as_a_non_root_user():
     assert "HEALTHCHECK" in dockerfile
     # The sample project and its index are built into the image, so the first
     # question does not wait for indexing or for a 79 MB model download.
-    assert "nl2sql init --demo /home/demo/demo" in dockerfile
+    assert "nl2sql init --demo --provider replay /home/demo/demo" in dockerfile
     assert "NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml" in dockerfile
     assert "nl2sql index" in dockerfile
 
@@ -121,7 +121,7 @@ def test_the_healthcheck_polls_the_health_route():
 
 def test_compose_builds_with_the_same_single_argument():
     compose = yaml.safe_load((SPACE / "docker-compose.yml").read_text(encoding="utf-8"))
-    args = compose["services"]["playground"]["build"].get("args") or {}
+    args = compose["services"]["space"]["build"].get("args") or {}
 
     assert "NL2SQL_REF" not in args
 

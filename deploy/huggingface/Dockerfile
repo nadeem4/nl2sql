@@ -86,7 +86,7 @@ WORKDIR /home/demo/demo
 #
 # The archive the model was extracted from is 83 MB of the same bytes: chroma
 # reaches for it only when the extracted files are missing, so it goes.
-RUN nl2sql init --demo /home/demo/demo \
+RUN nl2sql init --demo --provider replay /home/demo/demo \
     && nl2sql index \
     && rm -f "$HOME/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx.tar.gz"
 

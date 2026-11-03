@@ -323,7 +323,40 @@ def check_conversation(client: Client, meta: Mapping) -> List[str]:
     return problems
 
 
-def check_web_app(base: str, version: str) -> List[str]:
+def check_queries(client: Client, meta: Mapping) -> List[str]:
+    """Asks the advertised questions through ``POST /query``: none may be a 5xx and at least one must answer.
+
+    A hosted visitor's role can refuse some of them, so a typed error on one is fine. One turn is asked too and
+    must end with a typed error or an answer, never a 5xx. The recordings are one-question; the guided turns
+    (``check_conversation``) wait for the re-recorded set, behind ``--guided-turns``.
+    """
+    problems: List[str] = []
+    answered, first = 0, None
+    try:
+        for datasource, question in recorded_questions(meta):
+            first = first or (datasource, question)
+            result = client.post("/api/v1/query", {"question": question, "datasource_id": datasource})
+            answered += result.get("status") == "success"
+        if first and not answered:
+            problems.append("every advertised question was refused or failed: the keyless demo answered none")
+        if first:
+            conversation = client.post("/api/v1/conversations", {"datasource_id": first[0]})
+            turn = client.post(f"/api/v1/conversations/{conversation['id']}/turns", {"text": first[1]})
+            if turn.get("status") != "answered" and not (turn.get("error") or {}).get("code"):
+                problems.append(f"a turn ended {turn.get('status')!r} with no typed error code")
+    except urllib.error.HTTPError as error:
+        problems.append(f"{error.url} answered HTTP {error.code}; a question must end typed, never a server error")
+    return problems
+
+
+def check_answers(client: Client, meta: Mapping, guided_turns: bool = False) -> List[str]:
+    problems = check_queries(client, meta)
+    if guided_turns:
+        problems += check_conversation(client, meta)
+    return problems
+
+
+def check_web_app(base: str, version: str, guided_turns: bool = False) -> List[str]:
     problems = page_problems(*_get(base + "/"))
     client = Client(base)
     problems += health_problems(client.get("/api/v1/health"), version)
@@ -333,11 +366,11 @@ def check_web_app(base: str, version: str) -> List[str]:
     for datasource in meta.get("datasources") or []:
         problems += schema_problems(client.get(f"/api/v1/datasources/{datasource['id']}/schema"))
     if not problems:
-        problems += check_conversation(client, meta)
+        problems += check_answers(client, meta, guided_turns)
     return problems
 
 
-def boot_and_check(nl2sql_api: Path, work: Path, version: str, timeout: float) -> None:
+def boot_and_check(nl2sql_api: Path, work: Path, version: str, timeout: float, guided_turns: bool = False) -> None:
     port = _free_port()
     base = f"http://{HOST}:{port}"
     log_path = work / "demo.log"
@@ -348,7 +381,7 @@ def boot_and_check(nl2sql_api: Path, work: Path, version: str, timeout: float) -
                                 env=demo_env(os.environ), stdout=log, stderr=subprocess.STDOUT)
     try:
         wait_until_up(_answers(base + "/api/v1/health"), alive=lambda: proc.poll() is None, timeout=timeout)
-        problems = check_web_app(base, version)
+        problems = check_web_app(base, version, guided_turns)
     except BaseException:
         print(log_path.read_text(encoding="utf-8", errors="replace")[-6000:])
         raise
@@ -365,7 +398,7 @@ def boot_and_check(nl2sql_api: Path, work: Path, version: str, timeout: float) -
           f"the guided questions at {base}")
 
 
-def check_live(url: str, version: str, timeout: float) -> None:
+def check_live(url: str, version: str, timeout: float, guided_turns: bool = False) -> None:
     """Waits for a deployed web app (the Space) to serve ``version``, then checks it."""
     base = url.rstrip("/")
 
@@ -376,7 +409,7 @@ def check_live(url: str, version: str, timeout: float) -> None:
             return None
 
     wait_for_version(health, version, timeout=timeout)
-    problems = check_web_app(base, version)
+    problems = check_web_app(base, version, guided_turns)
     if problems:
         raise SystemExit(f"{base} serves {version} but is unhealthy:\n  - " + "\n  - ".join(problems))
     print(f"OK: {base} serves {version}, its page, its API and the guided questions")
@@ -395,13 +428,16 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument("--attempts", type=int, default=10, help="with --pypi: install attempts (default 10, 30s apart)")
     parser.add_argument("--timeout", type=float, default=900,
                         help="seconds to wait for the web app to serve (default 900; the first run downloads a model)")
+    parser.add_argument("--guided-turns", action="store_true",
+                        help="also ask every guided question and the follow-up as conversation turns (R1 turns this on "
+                             "once the answers are re-recorded)")
     parser.add_argument("--keep", action="store_true", help="keep the virtualenv and demo folder afterwards")
     args = parser.parse_args(argv)
 
     if args.url:
         if not args.expect_version:
             parser.error("--url needs --expect-version")
-        check_live(args.url, args.expect_version, args.timeout)
+        check_live(args.url, args.expect_version, args.timeout, args.guided_turns)
         return
 
     if args.pypi:
@@ -416,7 +452,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     work = Path(tempfile.mkdtemp(prefix="nl2sql-fresh-install-"))
     try:
         nl2sql_api = install(work / "venv", install_args, attempts=attempts)
-        boot_and_check(nl2sql_api, work, version, args.timeout)
+        boot_and_check(nl2sql_api, work, version, args.timeout, args.guided_turns)
     finally:
         if args.keep:
             print(f"Kept {work}")

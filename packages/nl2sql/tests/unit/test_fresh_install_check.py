@@ -330,3 +330,59 @@ def test_a_post_waits_out_the_hosted_rate_limit_and_tries_again(check, monkeypat
     client.opener = _Opener()
     assert client.post("/p", {}) == {"ok": True}
     assert len(calls) == 3 and len(waits) == 2
+
+
+class _Queries:
+    """A stand-in client for /query and one turn: answers by question, or raises a 5xx."""
+
+    def __init__(self, results, turn=None, fail_with=None):
+        self.results, self.turn, self.fail_with, self.sent = results, turn, fail_with, []
+
+    def post(self, path, body, timeout=0):
+        import io
+        import urllib.error
+
+        if self.fail_with:
+            raise urllib.error.HTTPError(path, self.fail_with, "boom", {}, io.BytesIO(b"{}"))
+        self.sent.append(path)
+        if path.endswith("/query"):
+            return self.results[body["question"]]
+        if path.endswith("/conversations"):
+            return {"id": "c1"}
+        return self.turn
+
+
+_META = {"datasources": [{"id": "chinook", "recorded": ["a?", "b?"]}]}
+_OK = {"status": "success"}
+
+
+def test_check_queries_needs_one_answer_and_no_server_error(check):
+    client = _Queries({"a?": {"status": "error", "errors": [{"code": "SECURITY_VIOLATION"}]}, "b?": _OK},
+                      turn={"status": "error", "error": {"code": "REPLAY_MISS"}})
+
+    assert check.check_queries(client, _META) == []
+
+
+def test_check_queries_reports_when_nothing_was_answered(check):
+    client = _Queries({"a?": {"status": "error"}, "b?": {"status": "error"}},
+                      turn={"status": "error", "error": {"code": "REPLAY_MISS"}})
+
+    assert any("answered none" in p for p in check.check_queries(client, _META))
+
+
+def test_check_queries_reports_a_server_error_and_an_untyped_turn(check):
+    assert any("500" in p for p in check.check_queries(_Queries({}, fail_with=500), _META))
+    client = _Queries({"a?": _OK, "b?": _OK}, turn={"status": "error"})
+
+    assert any("typed error" in p for p in check.check_queries(client, _META))
+
+
+def test_guided_turns_are_checked_only_when_asked(check, monkeypatch):
+    calls = []
+    monkeypatch.setattr(check, "check_conversation", lambda client, meta: calls.append("turns") or [])
+    monkeypatch.setattr(check, "check_queries", lambda client, meta: calls.append("queries") or [])
+
+    check.check_answers(None, {}, guided_turns=False)
+    check.check_answers(None, {}, guided_turns=True)
+
+    assert calls == ["queries", "queries", "turns"]
