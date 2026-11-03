@@ -14,6 +14,7 @@ from nl2sql import configure_logging, load_env_file
 from nl2sql_cli.commands.indexing import run_indexing
 from nl2sql_cli.commands.run import run_pipeline
 from nl2sql_cli.commands.info import list_available_adapters
+from nl2sql_cli.commands.chat import chat_command
 from nl2sql_cli.commands.demo import demo_command
 from nl2sql_cli.commands.doctor import doctor_command
 from nl2sql_cli.commands.init import init_command
@@ -278,6 +279,19 @@ def demo(
 ):
     """One-command web app over the demo's sample databases: starts `nl2sql-api serve --demo` (needs nl2sql-api)."""
     demo_command(directory, host, port, no_browser)
+
+
+@app.command()
+def chat(
+    ctx: typer.Context,
+    demo: Annotated[bool, typer.Option("--demo", help="Chat on the demo project (written to --dir if it is not there)")] = False,
+    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where the demo project is (with --demo)")] = pathlib.Path("nl2sql-demo"),
+    role: Annotated[Optional[str], typer.Option("--as", help="Ask as this role (default: the policy's default role)")] = None,
+    user: Annotated[Optional[str], typer.Option("--user", help="Ask as this user (default: the operating-system user)")] = None,
+    datasource: Annotated[Optional[str], typer.Option("--datasource", help="Chat on this datasource only")] = None,
+):
+    """A terminal chat over your data: ask, follow up, see why, chart, approve. Keyboard only."""
+    chat_command(ctx, demo, directory, role, user, datasource)
 
 
 @app.command()

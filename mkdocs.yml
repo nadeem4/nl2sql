@@ -98,6 +98,7 @@ nav:
     - Launch: getting_started/launch.md
   - Apps:
     - Web app: apps/web.md
+    - Terminal app: apps/terminal.md
   - Conversations:
     - Conversations: conversations/index.md
     - Chat tools: conversations/tools.md

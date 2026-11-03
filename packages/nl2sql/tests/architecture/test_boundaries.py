@@ -563,6 +563,23 @@ def test_nl2sql_cli_imports_only_the_engine():
     assert project["optional-dependencies"]["web"][0].startswith("nl2sql-api~="), project["optional-dependencies"]
 
 
+def test_only_the_chat_package_imports_textual():
+    """The terminal app (``nl2sql chat``, T1) is the one user of ``textual``, and the rest of the CLI loads it lazily.
+
+    ``textual`` is a normal dependency of ``nl2sql-cli`` (D231), but every other command starts without paying
+    for it: ``commands/chat.py`` imports the app inside its function, never at module scope.
+    """
+    chat = CLI / "chat"
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(*SOURCES, CLI) if not path.is_relative_to(chat)
+                 for lineno, name, module_scope in imports(path)
+                 if name.partition(".")[0] == "textual"
+                 or (module_scope and name.startswith("nl2sql_cli.chat"))]
+    assert not offenders, _broke(
+        "Only nl2sql_cli/chat/ imports textual, and nothing outside it imports nl2sql_cli.chat at module scope, so "
+        "`import nl2sql_cli` and every other command load no terminal-UI library.", offenders)
+
+
 MCP_SERVER = ENGINE / "mcp"
 
 
@@ -1285,6 +1302,7 @@ LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
 ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql-cli/src/nl2sql_cli/main.py",
     "nl2sql-cli/src/nl2sql_cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
+    "nl2sql-cli/src/nl2sql_cli/commands/chat.py",  # --demo: the demo folder's own .env, read before the engine is built (wave_d.md, T1)
     "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model (wave_d.md, A4b)
 }
 
