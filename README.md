@@ -127,16 +127,13 @@ Full history: [docs/benchmarks.md](docs/benchmarks.md)
 Requires Python 3.12 or newer.
 
 ```bash
-pip install "nl2sql-engine[demo]"
+pip install "nl2sql-cli[web]"
 nl2sql demo
 ```
 
-> The `demo` command, the `[demo]` extra and most of what this README describes
-> are on `main` and arrive on PyPI with 0.2.0 (at the time of writing the latest
-> release is 0.1.2). If `pip install "nl2sql-engine[demo]"` warns that the
-> extra does not exist, install from a clone:
-> `pip install -e packages/sdk -e "packages/nl2sql[demo]"`
-> (add `-e packages/api` for the REST server).
+> The `nl2sql` command lives in its own package, `nl2sql-cli`; its `web` extra
+> brings the web app. To install from a clone:
+> `pip install -e packages/sdk -e packages/nl2sql -e packages/api -e "nl2sql-cli[web]"`.
 
 ### What to expect
 

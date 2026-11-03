@@ -162,7 +162,7 @@ function HostedKeyForm({ apiKeys, onKey, limits, reason }) {
             : ""}
           . To ask questions of your own data, with no limits and a key that stays on your machine,
           run it locally:{" "}
-          <code>pip install "nl2sql-engine[demo]"</code> then <code>nl2sql demo</code>.
+          <code>pip install "nl2sql-cli[web]"</code> then <code>nl2sql demo</code>.
         </p>
       </details>
     </form>

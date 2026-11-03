@@ -347,12 +347,13 @@ read-only everywhere.
 Space root rather than a repository build: it needs no build context, so the
 whole deploy is that one folder, copied to the Space's root.
 
-It installs whatever the one build argument `NL2SQL_SPEC` names. On the Space
-that is always **a released version from PyPI**,
-`nl2sql-engine[demo]==X.Y.Z`, written into the copy of the `Dockerfile` the
+It installs whatever the build arguments `NL2SQL_SPEC` (the command line app and,
+through its `web` extra, the web app), `NL2SQL_ENGINE_SPEC` and `NL2SQL_API_SPEC`
+name. On the Space that is always **a released version from PyPI**,
+`nl2sql-cli[web]==X.Y.Z` beside `nl2sql-engine==X.Y.Z` and `nl2sql-api==X.Y.Z`, written into the copy of the `Dockerfile` the
 release pushes. The checked-in default is a GitHub archive of the tip of
 `main`, which is only what a local `docker build` gets; pass
-`--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"` to build a release
+`--build-arg NL2SQL_SPEC="nl2sql-cli[web]==X.Y.Z" --build-arg NL2SQL_ENGINE_SPEC="nl2sql-engine==X.Y.Z" --build-arg NL2SQL_API_SPEC="nl2sql-api==X.Y.Z"` to build a release
 locally. Then it runs `nl2sql init --demo /home/demo/demo` and `nl2sql index`
 **at build time**, with `NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml` set in the
 image so every command and the server read that config. That bakes three
@@ -436,7 +437,7 @@ flowchart LR
     SP --> SS[space-smoke: the live URL<br/>reports X.Y.Z]
 ```
 
-1. **`pypi-smoke`** installs `nl2sql-engine[demo]==X.Y.Z` from PyPI into an
+1. **`pypi-smoke`** installs `nl2sql-cli[web]==X.Y.Z` from PyPI into an
    empty virtualenv on a fresh runner, boots this same `nl2sql-api serve --demo --hosted`
    with no key, asks every recorded guided question and its scripted follow-up, and checks it serves. The Space is never built on a version
    that does not install from PyPI.
@@ -474,7 +475,7 @@ rewritten:
 
 | At the Space root | What the deploy writes |
 | --- | --- |
-| `Dockerfile` | its `ARG NL2SQL_SPEC=` line: `nl2sql-engine[demo]==X.Y.Z` for a release, or a GitHub archive of the commit for a tagless run by hand |
+| `Dockerfile` | its `ARG NL2SQL_SPEC=` line (and `NL2SQL_ENGINE_SPEC`, `NL2SQL_API_SPEC`): `nl2sql-cli[web]==X.Y.Z` for a release, or a GitHub archive of the commit for a tagless run by hand |
 | `SOURCE_SHA` | the full sha of the repository commit the deploy came from -- the tagged commit, on a release |
 
 The `Dockerfile` rewrite is what makes the Space **run the release**: the same
@@ -640,7 +641,7 @@ Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:
 
 ```bash
-pip install "nl2sql-engine[demo]"
+pip install "nl2sql-cli[web]"
 nl2sql demo
 ```
 

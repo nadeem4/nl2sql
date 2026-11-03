@@ -176,6 +176,6 @@ A refusal (`ReviewError`) prints its message and fix and exits 1.
 - The review file: `packages/nl2sql/src/nl2sql/review/review_file.py`
 - The facade: `packages/nl2sql/src/nl2sql/api/proposals_api.py`
 - Thumbs-up proposals: `packages/nl2sql/src/nl2sql/api/feedback_api.py`, `packages/nl2sql/src/nl2sql/feedback/proposals.py`
-- Corrections: `packages/nl2sql/src/nl2sql/feedback/corrections.py`, and `nl2sql feedback correct` in `packages/nl2sql/src/nl2sql/cli/commands/feedback.py`
-- The command: `packages/nl2sql/src/nl2sql/cli/commands/review.py`
+- Corrections: `packages/nl2sql/src/nl2sql/feedback/corrections.py`, and `nl2sql feedback correct` in `nl2sql-cli/src/nl2sql_cli/commands/feedback.py`
+- The command: `nl2sql-cli/src/nl2sql_cli/commands/review.py`
 - The design: [Wave B, section 5](../architecture/wave_b.md#5-the-review-queue)

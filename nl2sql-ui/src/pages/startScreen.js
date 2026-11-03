@@ -15,7 +15,7 @@ export const SELF_HOST_GUIDE = `${DOCS}deployment/compose/`;
 
 // The run-it-yourself steps the hosted "Connect" shows: install and launch, then Compose, then the guide.
 export const HOSTED_STEPS = [
-  { label: "Install it and start the demo on your machine", code: ['pip install "nl2sql-engine[demo]"', "nl2sql demo"] },
+  { label: "Install it and start the demo on your machine", code: ['pip install "nl2sql-cli[web]"', "nl2sql demo"] },
   { label: "Or self-host it with Docker Compose", code: ["docker compose up -d --build"] },
   { label: "The self-hosting guide has the rest", href: SELF_HOST_GUIDE },
 ];

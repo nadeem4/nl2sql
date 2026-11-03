@@ -213,7 +213,7 @@ def test_every_built_in_secret_provider_loads(name):
 def test_list_adapters_shows_a_missing_driver_with_its_hint(monkeypatch):
     from typer.testing import CliRunner
 
-    from nl2sql.cli.main import app
+    from nl2sql_cli.main import app
 
     _plugin(monkeypatch, "nl2sql_snowflake_fake", Adapter=_adapter(
         drivers=("nl2sql_no_such_driver",), hint="pip install nl2sql-snowflake"))

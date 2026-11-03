@@ -537,7 +537,7 @@ def test_profile_report_and_accept_report_shapes():
 # ---------------------------------------------------------------- the facade and the CLI
 
 def test_the_cli_has_the_knowledge_review_and_profile_groups():
-    from nl2sql.cli.main import app
+    from nl2sql_cli.main import app
 
     commands = typer.main.get_command(app).commands
     assert {"knowledge", "review", "profile"} <= set(commands)

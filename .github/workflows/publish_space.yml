@@ -13,7 +13,8 @@
 # looks for both, and then waits for the build.
 #
 # The mirror pins what the image installs by rewriting the Dockerfile's
-# `ARG NL2SQL_SPEC=` line: to `nl2sql-engine[demo]==X.Y.Z` for a release, or to
+# `ARG NL2SQL_SPEC=` line: to `nl2sql-cli[web]==X.Y.Z` for a release (with `ARG NL2SQL_ENGINE_SPEC=` and
+# `ARG NL2SQL_API_SPEC=` beside it), or to
 # a GitHub archive of the checked-out commit when dispatched with no tag. It
 # also writes that commit to SOURCE_SHA. A new release always changes the pin,
 # so the Hub always has a new commit to rebuild on.
@@ -229,10 +230,12 @@ jobs:
 
           source_sha="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
           if [ -n "$TAG" ]; then
-            spec="nl2sql-engine[demo]==${TAG#v}"
+            spec="nl2sql-cli[web]==${TAG#v}"
+            engine_spec="nl2sql-engine==${TAG#v}"
             api_spec="nl2sql-api==${TAG#v}"
           else
-            spec="nl2sql-engine[demo] @ https://github.com/$GITHUB_REPOSITORY/archive/$source_sha.tar.gz#subdirectory=packages/nl2sql"
+            spec="nl2sql-cli[web] @ https://github.com/$GITHUB_REPOSITORY/archive/$source_sha.tar.gz#subdirectory=nl2sql-cli"
+            engine_spec="nl2sql-engine @ https://github.com/$GITHUB_REPOSITORY/archive/$source_sha.tar.gz#subdirectory=packages/nl2sql"
             api_spec="nl2sql-api @ https://github.com/$GITHUB_REPOSITORY/archive/$source_sha.tar.gz#subdirectory=packages/api"
           fi
           {
@@ -283,6 +286,8 @@ jobs:
           # that builds something else.
           sed -i "s|^ARG NL2SQL_SPEC=.*|ARG NL2SQL_SPEC=\"$spec\"|" Dockerfile
           grep -qxF "ARG NL2SQL_SPEC=\"$spec\"" Dockerfile
+          sed -i "s|^ARG NL2SQL_ENGINE_SPEC=.*|ARG NL2SQL_ENGINE_SPEC=\"$engine_spec\"|" Dockerfile
+          grep -qxF "ARG NL2SQL_ENGINE_SPEC=\"$engine_spec\"" Dockerfile
           sed -i "s|^ARG NL2SQL_API_SPEC=.*|ARG NL2SQL_API_SPEC=\"$api_spec\"|" Dockerfile
           grep -qxF "ARG NL2SQL_API_SPEC=\"$api_spec\"" Dockerfile
           echo "The image installs: $spec"

@@ -77,7 +77,7 @@ Three more jobs test the package rather than the source tree:
   `nl2sql-api` wheel must carry `static/index.html`), installs them into a clean
   virtualenv and runs `import nl2sql` and `nl2sql --help`.
 - **`fresh-install`** takes those wheels and installs them the way a user
-  does, `pip install "nl2sql-engine[demo]"`, into an empty virtualenv outside
+  does, `pip install "nl2sql-cli[web]"`, into an empty virtualenv outside
   the checkout. It then boots `nl2sql-api serve --demo --hosted` (the command the Hugging
   Face Space runs) with no API key, and passes only when the web app page,
   `/api/v1/meta`, each datasource's schema, `/api/v1/index`, the recorded guided questions

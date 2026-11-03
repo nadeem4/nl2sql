@@ -155,7 +155,8 @@ def test_every_deploy_writes_its_source_sha_into_the_space_root():
 def test_a_release_pins_the_image_to_the_version_it_published():
     mirror = _step("Push deploy/huggingface")["run"]
 
-    assert 'nl2sql-engine[demo]==${TAG#v}' in mirror
+    assert 'nl2sql-cli[web]==${TAG#v}' in mirror
+    assert 'nl2sql-engine==${TAG#v}' in mirror
 
 
 def test_a_release_waits_for_pypis_index_to_list_the_version_before_pushing():

@@ -12,9 +12,10 @@ fails the suite rather than review.
 
 ## Monorepo layout
 
-- `packages/nl2sql`: Engine and pipeline, the CLI (`nl2sql.cli`), and the
+- `packages/nl2sql`: Engine and pipeline, and the
   database adapters (`nl2sql.adapters.*`, including the SQLAlchemy base).
 - `packages/api`: FastAPI REST service.
+- `nl2sql-cli`: the `nl2sql` command (`nl2sql-cli`, imported as `nl2sql_cli`), built on the engine.
 - `packages/sdk`: the SDK (`nl2sql-sdk`, imported as `nl2sql_sdk`): the interfaces an extension implements, today the adapter contracts.
 - `docs/`: MkDocs documentation.
 

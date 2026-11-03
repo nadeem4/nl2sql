@@ -18,7 +18,7 @@ from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.testing.fake_llm import FakeLLMServer
 
-CLI = [sys.executable, "-m", "nl2sql.cli.main"]
+CLI = [sys.executable, "-m", "nl2sql_cli.main"]
 
 # The variables a 0.4 run read; none of them means anything to 0.5, so a test
 # environment drops them rather than let one leak in from the shell.

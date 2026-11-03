@@ -19,7 +19,7 @@ pip install "nl2sql-engine[duckdb]"
 
 # The browser playground behind `nl2sql demo` (adds fastapi + uvicorn).
 # `[all]` does NOT include it -- `all` covers database drivers only.
-pip install "nl2sql-engine[demo]"
+pip install "nl2sql-cli[web]"
 ```
 
 Running a query needs an LLM key; only indexing is key-free. See

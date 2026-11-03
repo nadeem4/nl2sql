@@ -37,23 +37,52 @@ def test_the_engine_wheel_carries_the_license_and_notices():
 def test_engine_dependencies_name_what_the_code_imports():
     deps = _project("nl2sql")["dependencies"]
     names = [d.split(">")[0].split("=")[0].split("<")[0].split("~")[0].strip() for d in deps]
-    # typer dropped the [all] extra; installing it only warns.
-    assert "typer" in names and not any(d.startswith("typer[") for d in deps)
     # nl2sql.config.load_env_file imports dotenv.
     assert "python-dotenv" in names
 
 
-def test_the_demo_extra_is_the_api_at_this_release():
-    """`pip install "nl2sql-engine[demo]"` brings the web app; the engine itself ships no server for it."""
-    project = _project("nl2sql")
-    api = Requirement(next(d for d in project["optional-dependencies"]["demo"]))
+CLI_PROJECT = ROOT / "nl2sql-cli" / "pyproject.toml"
 
-    assert project["optional-dependencies"]["demo"] == [f"nl2sql-api~={project['version']}"]
-    assert api.name == "nl2sql-api"
-    assert "fastapi" not in " ".join(project["optional-dependencies"]["demo"])
-    package_data = tomllib.loads((ENGINE / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"][
-        "package-data"]
-    assert not [name for name in package_data if name.startswith("nl2sql.cli.demo")]
+
+def _cli() -> dict:
+    return tomllib.loads(CLI_PROJECT.read_text(encoding="utf-8"))["project"]
+
+
+def test_nl2sql_command_is_installed_by_nl2sql_cli():
+    """The ``nl2sql`` script moved with the CLI (D227, D231); the engine installs no command and has no ``demo`` extra."""
+    import importlib
+
+    assert _cli()["name"] == "nl2sql-cli"
+    assert _cli()["scripts"] == {"nl2sql": "nl2sql_cli.main:main"}
+    module, _, function = _cli()["scripts"]["nl2sql"].partition(":")
+    assert callable(getattr(importlib.import_module(module), function))
+    engine = _project("nl2sql")
+    assert "scripts" not in engine
+    assert not {"demo", "tui"} & set(engine["optional-dependencies"])
+
+
+def test_the_cli_depends_on_the_engine_and_textual_and_the_api_is_its_web_extra():
+    """D231: the engine is its one repository dependency, Textual is a plain dependency, the API is the ``web`` extra."""
+    cli = _cli()
+    engine = Version(_project("nl2sql")["version"])
+    requirements = {Requirement(d).name: Requirement(d) for d in cli["dependencies"]}
+
+    assert str(requirements["nl2sql-engine"].specifier) == f"~={engine}"
+    assert "textual" in requirements and not requirements["textual"].extras
+    assert not {name for name in requirements if name.startswith("nl2sql")} - {"nl2sql-engine"}
+    assert set(cli["optional-dependencies"]) == {"web"}
+    assert cli["optional-dependencies"]["web"] == [f"nl2sql-api~={engine}"]
+    # The release-please marker on each of the CLI's version and pins, so CL2's updater bumps them.
+    marked = [line for line in CLI_PROJECT.read_text(encoding="utf-8").splitlines() if "x-release-please-version" in line]
+    assert len(marked) == 3 and any("nl2sql-engine" in line for line in marked) and any("nl2sql-api" in line for line in marked)
+    assert cli["version"] == str(engine)
+
+
+def test_the_engine_declares_no_cli_dependencies():
+    """rich and typer are the CLI's; the engine imports neither."""
+    names = {Requirement(d).name for d in _project("nl2sql")["dependencies"]}
+    assert not {"rich", "typer", "inquirerpy"} & names
+    assert {"rich", "typer"} <= {Requirement(d).name for d in _cli()["dependencies"]}
 
 
 PACKAGES = ["nl2sql", "api", "sdk"]

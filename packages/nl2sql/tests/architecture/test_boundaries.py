@@ -27,6 +27,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import tomllib
 from importlib.metadata import entry_points
 
 import pytest
@@ -37,8 +38,10 @@ PACKAGES = pathlib.Path(__file__).resolve().parents[3]
 ENGINE = PACKAGES / "nl2sql" / "src" / "nl2sql"
 SDK = PACKAGES / "sdk" / "src" / "nl2sql_sdk"
 ADAPTERS = ENGINE / "adapters"
-SOURCES = [ENGINE, SDK, PACKAGES / "api" / "src" / "nl2sql_api"]
 REPO = PACKAGES.parent
+# The CLI app is its own distribution at the repository root, not under packages/ (wave_d.md, D227).
+CLI = REPO / "nl2sql-cli" / "src" / "nl2sql_cli"
+SOURCES = [ENGINE, SDK, PACKAGES / "api" / "src" / "nl2sql_api", CLI]
 SCRIPTS = REPO / "scripts"
 
 
@@ -520,22 +523,44 @@ def test_bundled_adapter_dialects(name, dialect):
 #    tests/unit/test_cli_demo_boundaries.py, long since folded in here)
 # --------------------------------------------------------------------------
 
-CLI = ENGINE / "cli"
+def test_the_engine_has_no_cli_package():
+    """The CLI moved out of the engine to ``nl2sql-cli/`` (CL1, D227); nothing is left behind, and no alias."""
+    assert not (ENGINE / "cli").exists(), "nl2sql/cli/ moved to nl2sql-cli/src/nl2sql_cli/"
+    assert CLI.is_dir() and (CLI / "main.py").is_file()
 
 
-def test_nothing_outside_the_cli_imports_the_cli():
-    """The engine is a library first: the CLI, the API and the MCP server are its callers."""
+def test_the_engine_and_the_api_never_import_nl2sql_cli():
+    """The engine is a library first: the CLI, the API and the MCP server are its callers, and it never names them."""
     offenders = [
         f"{_where(path)}:{lineno} {name}"
         for path in python_files(*SOURCES)
         if not path.is_relative_to(CLI)
         for lineno, name, _ in imports(path)
-        if name == "nl2sql.cli" or name.startswith("nl2sql.cli.")
+        if name in {"nl2sql_cli", "nl2sql.cli"} or name.startswith(("nl2sql_cli.", "nl2sql.cli."))
     ]
     assert not offenders, _broke(
-        "Nothing outside nl2sql/cli/ imports the CLI. Knowledge an SDK or REST caller also "
+        "Nothing outside nl2sql-cli/ imports the CLI. Knowledge an SDK or REST caller also "
         "needs -- providers, models, key variables -- belongs in the engine (nl2sql/llm/), "
         "with the CLI reading it from there.", offenders)
+
+
+def test_nl2sql_cli_imports_only_the_engine():
+    """The CLI sits on the engine's facade alone (D227, D231): not the SDK, and not the API, even lazily.
+
+    ``nl2sql demo`` starts the web server as a child process (``python -m nl2sql_api serve``), so the API is an
+    extra it finds with ``find_spec``, never an import. Its distribution names the engine and no other ``nl2sql-*``
+    package but that extra.
+    """
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(CLI) for lineno, name, _ in imports(path)
+                 if name.partition(".")[0] in {"nl2sql_sdk", "nl2sql_api"}]
+    project = tomllib.loads((REPO / "nl2sql-cli" / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    named = {re.split(r"[\s<>=~!\[;]", d, maxsplit=1)[0] for d in project["dependencies"]}
+    assert not offenders, _broke(
+        "nl2sql_cli imports only the top-level nl2sql: the SDK is for adapter authors and the API is a child process.",
+        offenders)
+    assert {n for n in named if n.startswith("nl2sql")} == {"nl2sql-engine"}, named
+    assert project["optional-dependencies"]["web"][0].startswith("nl2sql-api~="), project["optional-dependencies"]
 
 
 MCP_SERVER = ENGINE / "mcp"
@@ -550,7 +575,7 @@ def test_the_cli_the_mcp_server_and_the_api_use_only_the_public_api():
     """
     hidden = {"context", "_ctx", "_runtime"}
     offenders = []
-    for path in python_files(ENGINE / "cli", MCP_SERVER, PACKAGES / "api" / "src" / "nl2sql_api"):
+    for path in python_files(CLI, MCP_SERVER, PACKAGES / "api" / "src" / "nl2sql_api"):
         for node in ast.walk(_tree(path)):
             if isinstance(node, ast.Attribute) and node.attr in hidden:
                 offenders.append(f"{_where(path)}:{node.lineno} .{node.attr}")
@@ -577,7 +602,7 @@ def _engine_imports(path: pathlib.Path):
 
 
 def _outside_the_cli(path):
-    """The ``nl2sql`` modules a file imports, relative imports resolved, that are not ``nl2sql`` or ``nl2sql.cli``.
+    """The ``nl2sql`` modules a file imports, relative imports resolved, other than ``nl2sql`` itself.
 
     ``imports`` yields ``from nl2sql import X`` as ``nl2sql`` and ``nl2sql.X``; the second is a facade
     export, not a module, so it is skipped when the same line also imported the bare ``nl2sql``.
@@ -586,7 +611,6 @@ def _outside_the_cli(path):
     facade_lines = {lineno for lineno, name, _ in found if name == "nl2sql"}
     return [(lineno, name) for lineno, name, _ in found
             if name.partition(".")[0] == "nl2sql" and name != "nl2sql"
-            and name != "nl2sql.cli" and not name.startswith("nl2sql.cli.")
             and not (lineno in facade_lines and name.count(".") == 1)]
 
 
@@ -598,7 +622,7 @@ def test_the_cli_and_the_api_import_only_the_public_nl2sql():
     ``engine.about()``, ``engine.index``, ``engine.llm.providers()``), so
     ``nl2sql.feedback``, ``nl2sql.tracing``, ``nl2sql.pipeline``,
     ``nl2sql.indexing`` and ``PROVIDER_PRESETS`` are out of reach. The CLI
-    also keeps to its own ``nl2sql.cli`` package and never names ``nl2sql_sdk``.
+    (``nl2sql_cli``, its own distribution) also never names ``nl2sql_sdk``.
     """
     api = PACKAGES / "api" / "src" / "nl2sql_api"
     offenders = [f"{_where(path)}:{lineno} {name}"
@@ -608,7 +632,7 @@ def test_the_cli_and_the_api_import_only_the_public_nl2sql():
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
                       if name.partition(".")[0] == "nl2sql_sdk"]
     assert not offenders, _broke(
-        "The CLI and nl2sql-api import only the top-level nl2sql (the CLI also its own nl2sql.cli package), never "
+        "The CLI and nl2sql-api import only the top-level nl2sql (the CLI is its own package, nl2sql_cli), never "
         "the engine's internals, and the CLI never nl2sql_sdk. There is no list of exceptions: what a command or a "
         "route needs is a facade method or export every caller can use.", offenders)
 
@@ -616,7 +640,7 @@ def test_the_cli_and_the_api_import_only_the_public_nl2sql():
 def test_still_imported_from_inside_is_gone():
     """The list of engine modules the playground and ``nl2sql demo`` still reached into was emptied and deleted (X1b)."""
     assert "STILL_IMPORTED_FROM_INSIDE" not in globals()
-    assert not (CLI / "demo").exists(), "nl2sql/cli/demo/ (the old playground) was deleted in X1b"
+    assert not (CLI / "demo").exists(), "nl2sql_cli/demo/ (the old playground) was deleted in X1b"
 
 
 def test_mcp_uses_only_the_public_api():
@@ -1156,7 +1180,7 @@ def test_owned_and_privileged_methods_require_a_caller():
 # file it replaces (held by test_datasources_save.py).
 _ACCEPT = "nl2sql/src/nl2sql/review/accept.py"
 _PROJECT = "nl2sql/src/nl2sql/config/project.py"
-_LAUNCH = "nl2sql/src/nl2sql/cli/commands/launch.py"
+_LAUNCH = "nl2sql-cli/src/nl2sql_cli/commands/launch.py"
 PERSONS_FILE_WRITERS = {
     "write_glossary": {_ACCEPT},
     "write_curated": {_ACCEPT, "nl2sql/src/nl2sql/api/datasource_api.py"},
@@ -1250,8 +1274,8 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/secrets/providers/env.py": "the env secret provider: ${env:...}",
     "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
-    "nl2sql/src/nl2sql/cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
-    "nl2sql/src/nl2sql/cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate "
+    "nl2sql-cli/src/nl2sql_cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
+    "nl2sql-cli/src/nl2sql_cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate "
                                                 "(wave_c.md, section 7)",
     "api/src/nl2sql_api/serve.py": "NL2SQL_MODE, the mode of this process (wave_d.md, D229)",
 }
@@ -1259,8 +1283,8 @@ READS_THE_ENVIRONMENT = {
 # The one function that loads a .env file, and the entry points that call it.
 LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
 ENTRY_POINTS_LOADING_DOTENV = {
-    "nl2sql/src/nl2sql/cli/main.py",
-    "nl2sql/src/nl2sql/cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
+    "nl2sql-cli/src/nl2sql_cli/main.py",
+    "nl2sql-cli/src/nl2sql_cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
     "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model (wave_d.md, A4b)
 }
 
@@ -1336,7 +1360,7 @@ def test_environment_reads_only_from_the_allow_list():
 
 def test_database_url_is_read_only_by_launch():
     """``DATABASE_URL`` is the one environment variable an entry point offers as a candidate; nothing else names it."""
-    launch = "nl2sql/src/nl2sql/cli/commands/launch.py"
+    launch = "nl2sql-cli/src/nl2sql_cli/commands/launch.py"
     readers = {_where(path) for path in python_files(*SOURCES)
                for node in ast.walk(_tree(path))
                if isinstance(node, ast.Constant) and node.value == "DATABASE_URL"}

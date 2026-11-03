@@ -71,7 +71,7 @@ def test_openrouter_and_ollama_build_through_openai_compatible(monkeypatch):
 
 
 def test_init_provider_openrouter_still_works(tmp_path):
-    from nl2sql.cli.main import app
+    from nl2sql_cli.main import app
     from nl2sql.config import load_config
 
     result = CliRunner().invoke(app, ["init", str(tmp_path), "--provider", "openrouter"])

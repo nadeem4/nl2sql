@@ -496,6 +496,6 @@ def test_the_operator_may_correct_any_run(engine):
 def test_the_cli_corrects_as_the_operator(tmp_path):
     import inspect
 
-    from nl2sql.cli.commands import feedback
+    from nl2sql_cli.commands import feedback
 
     assert "as_operator=True" in inspect.getsource(feedback.correct_command)

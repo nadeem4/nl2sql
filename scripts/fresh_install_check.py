@@ -1,7 +1,7 @@
 """Installs nl2sql the way a user does and boots the demo, with no API key.
 
 What it proves that the unit tests cannot: that the *built* wheels install
-into an empty virtualenv with the ``demo`` extra (which brings the web app,
+into an empty virtualenv with the CLI's ``web`` extra (which brings the web app,
 ``nl2sql-api``), that the web app ships inside the wheel, and that
 ``nl2sql-api serve --demo --hosted`` scaffolds the sample databases, indexes
 them with the local embedder and serves a page and an API that answer, down to
@@ -43,11 +43,11 @@ from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 REPO = Path(__file__).resolve().parent.parent
-PACKAGES = ("packages/sdk", "packages/nl2sql", "packages/api")
+PACKAGES = ("packages/sdk", "packages/nl2sql", "packages/api", "nl2sql-cli")
 
 # Wheel filename stem -> the name this script uses for it. Matched whole, up to
 # the `-` before the version, so one stem never matches another that it prefixes.
-STEMS = {"nl2sql_engine": "engine", "nl2sql_sdk": "sdk", "nl2sql_api": "api"}
+STEMS = {"nl2sql_engine": "engine", "nl2sql_sdk": "sdk", "nl2sql_api": "api", "nl2sql_cli": "cli"}
 
 # The text app.py serves when the React build is missing from the wheel.
 UNBUILT_PAGE = "has not been built"
@@ -58,7 +58,7 @@ HOST = "127.0.0.1"
 # --- which wheels, installed how ----------------------------------------------
 
 def find_wheels(dist: Path) -> Dict[str, Path]:
-    """The engine, SDK and API wheels in ``dist``, by short name."""
+    """The engine, SDK, API and CLI wheels in ``dist``, by short name."""
     found: Dict[str, List[Path]] = {}
     for wheel in sorted(Path(dist).glob("*.whl")):
         stem = wheel.name.split("-", 1)[0]
@@ -75,13 +75,14 @@ def find_wheels(dist: Path) -> Dict[str, Path]:
 
 
 def wheel_install_args(wheels: Mapping[str, Path], dist: Path) -> List[str]:
-    """``pip install`` arguments for the engine with its demo extra, as a user installs it.
+    """``pip install`` arguments for the CLI with its web extra, as a user installs it.
 
-    The SDK and API wheels are named too: the engine pins the first and its
-    ``demo`` extra the second to the same version, which PyPI does not have
-    until the release is published.
+    The engine, SDK and API wheels are named too: the CLI pins the engine and its
+    ``web`` extra the API to the same version, and the engine pins the SDK, none of
+    which PyPI has until the release is published.
     """
-    return ["--find-links", str(dist), f"{wheels['engine']}[demo]", str(wheels["sdk"]), str(wheels["api"])]
+    return ["--find-links", str(dist), f"{wheels['cli']}[web]", str(wheels["engine"]), str(wheels["sdk"]),
+            str(wheels["api"])]
 
 
 def wheel_version(wheel: Path) -> str:
@@ -95,7 +96,7 @@ def pypi_install_args(version: str) -> List[str]:
     No cache: an index page cached from before the upload is what makes a
     version published a minute ago look missing.
     """
-    return ["--no-cache-dir", f"nl2sql-engine[demo]=={version}"]
+    return ["--no-cache-dir", f"nl2sql-cli[web]=={version}"]
 
 
 def retry(action: Callable[[], None], attempts: int, delay: float,

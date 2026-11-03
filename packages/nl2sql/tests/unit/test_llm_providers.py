@@ -60,7 +60,7 @@ def _imports(path: pathlib.Path):
 def test_evaluation_never_imports_the_cli():
     offenders = [f"{path.relative_to(SRC)}: {name}"
                  for path in (SRC / "evaluation").rglob("*.py")
-                 for name in _imports(path) if name.startswith("nl2sql.cli")]
+                 for name in _imports(path) if name.startswith("nl2sql_cli")]
     assert offenders == []
 
 
