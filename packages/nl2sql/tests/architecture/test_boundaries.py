@@ -1451,6 +1451,8 @@ _PLAN_ID_TOKEN = r"(?:[A-D]-[A-Z]+\d+[a-z]?|DB\d[a-e]?|CL\d[ab]?|X1[ab]|[A-Z]{1,
 _PLAN_ID_PROSE = re.compile(r"\((?=[a-z])[^()]*?(?<=[\s(])(" + _PLAN_ID_TOKEN + r")(?=[\s,;:.)])[^()]*\)")
 _PLAN_ID_PROSE_OK = {"S3", "L1", "L2"}  # the storage service and the vector norms
 _PLAN_ID_SCANNED = (".py", ".md", ".js", ".jsx")
+# The shipped eval suites are yaml with long comments; other yaml is data and not scanned.
+_PLAN_ID_SCANNED_FILES = tuple(f"packages/nl2sql/src/nl2sql/evaluation/suites/{n}.yaml" for n in ("chinook", "clarify", "pagila"))
 # docs/benchmarks.md mirrors recorded runs; CLAUDE.md states the rule with examples.
 _PLAN_ID_SKIPPED = (
     "docs/releases/", "benchmarks/", "docs/benchmarks.md", "CLAUDE.md", ".claude/",
@@ -1465,7 +1467,7 @@ def test_no_tracked_file_cites_a_design_doc_or_a_plan_id():
     ).stdout.splitlines()
     offenders = []
     for name in tracked:
-        if (not name.endswith(_PLAN_ID_SCANNED) or name.startswith(_PLAN_ID_SKIPPED)
+        if (not name.endswith(_PLAN_ID_SCANNED + _PLAN_ID_SCANNED_FILES) or name.startswith(_PLAN_ID_SKIPPED)
                 or "CHANGELOG" in name or "node_modules" in name):
             continue
         try:
