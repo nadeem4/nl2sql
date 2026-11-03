@@ -296,8 +296,15 @@ class Client:
     def post(self, path: str, body: Mapping, timeout: float = 300.0) -> Mapping:
         request = urllib.request.Request(self.base + path, data=json.dumps(body).encode(),
                                          headers={"Content-Type": "application/json"}, method="POST")
-        with self.opener.open(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8", "replace"))
+        # The hosted demo allows a few questions a minute; wait the limit out.
+        for attempt in range(12):
+            try:
+                with self.opener.open(request, timeout=timeout) as response:
+                    return json.loads(response.read().decode("utf-8", "replace"))
+            except urllib.error.HTTPError as error:
+                if error.code != 429 or attempt == 11:
+                    raise
+                time.sleep(10)
 
 
 # The scripted follow-up that scripts/record_demo_answers.py records after its question (FOLLOW_UPS there).

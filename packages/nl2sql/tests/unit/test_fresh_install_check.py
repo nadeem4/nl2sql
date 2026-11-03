@@ -299,3 +299,34 @@ def test_check_conversation_reports_a_turn_that_did_not_answer(check):
     meta = {"datasources": [{"id": "chinook", "recorded": ["Other?"]}]}
 
     assert check.check_conversation(_Scripted(status="error"), meta)
+
+
+def test_a_post_waits_out_the_hosted_rate_limit_and_tries_again(check, monkeypatch):
+    import io
+    import urllib.error
+
+    calls = []
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b'{"ok": true}'
+
+    class _Opener:
+        def open(self, request, timeout=None):
+            calls.append(1)
+            if len(calls) < 3:
+                raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, io.BytesIO(b"{}"))
+            return _Response()
+
+    waits = []
+    monkeypatch.setattr(check.time, "sleep", waits.append)
+    client = check.Client("http://x")
+    client.opener = _Opener()
+    assert client.post("/p", {}) == {"ok": True}
+    assert len(calls) == 3 and len(waits) == 2
