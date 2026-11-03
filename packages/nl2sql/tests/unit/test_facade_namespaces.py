@@ -267,6 +267,7 @@ def test_llm_set_models_clears_key_and_base_url_only_where_the_provider_changes(
 
 
 def test_llm_set_models_result_does_not_depend_on_the_order_of_changes(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-oai-test")  # the agent keeps no key of the new default
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     default = {"provider": "anthropic", "model": "claude-x"}
     planner = {"provider": "openai", "model": "gpt-plan2"}  # the old default's provider: nothing to clear
