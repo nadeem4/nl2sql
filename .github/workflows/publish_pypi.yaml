@@ -82,7 +82,7 @@ jobs:
 
       - name: Build all distributions
         run: |
-          for pkg in packages/sdk packages/nl2sql packages/api; do
+          for pkg in packages/sdk packages/nl2sql packages/api nl2sql-cli; do
             python -m build "$pkg" --outdir dist
           done
 
@@ -98,7 +98,7 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
-          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_sdk-*.whl dist/nl2sql_engine-*.whl dist/nl2sql_api-*.whl
+          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_sdk-*.whl dist/nl2sql_engine-*.whl dist/nl2sql_api-*.whl dist/nl2sql_cli-*.whl
           /tmp/smoke/bin/python -c "import nl2sql"
           /tmp/smoke/bin/nl2sql --help
 
@@ -115,23 +115,23 @@ jobs:
   #
   # One leg per package, each in its own GitHub Environment. PyPI requires a
   # pending trusted publisher to be unique on (owner, repository, workflow,
-  # environment); with three projects publishing from one repo and one workflow
-  # the environment is the only field left to differ, so the second and third
+  # environment); with four projects publishing from one repo and one workflow
+  # the environment is the only field left to differ, so the later
   # registrations are rejected without it. The environment names below are the
   # contract with PyPI and must match the pending publisher entries exactly.
   pypi:
     needs: build
     runs-on: ubuntu-latest
     strategy:
-      # One package failing must not cancel the other two mid-release. With the
+      # One package failing must not cancel the others mid-release. With the
       # default fail-fast, the SDK leg failing on v0.1.1 cancelled the
       # engine and api legs and skipped `ghcr` and `docs`, so the release landed
       # nowhere. Each leg is an independent upload to an independent project;
       # let the survivors finish and re-publish only what actually failed.
       fail-fast: false
-      # One leg at a time, the SDK first, then the API, then the engine: the
-      # engine's `demo` extra requires nl2sql-api, which requires the engine
-      # and the SDK, so a version is installable only once all three are up.
+      # One leg at a time, the SDK first, then the API, the engine, the CLI: the
+      # API requires the engine and the SDK, the CLI the engine (and, with its
+      # `web` extra, the API), so a version is installable only once all four are up.
       # In this order each upload finds what it depends on already published.
       max-parallel: 1
       matrix:
@@ -142,6 +142,8 @@ jobs:
             stem: nl2sql_api
           - package: nl2sql-engine
             stem: nl2sql_engine
+          - package: nl2sql-cli
+            stem: nl2sql_cli
     environment: pypi-${{ matrix.package }}
     permissions:
       id-token: write
@@ -164,7 +166,7 @@ jobs:
           ls -1 upload/
 
       # The legs are independent (fail-fast is off), so the engine leg looks for
-      # its own dependency: its `demo` extra needs the same version of nl2sql-api.
+      # its own dependency: the same version of nl2sql-api.
       - name: Check the API is on PyPI
         if: matrix.package == 'nl2sql-engine'
         run: |
@@ -173,6 +175,18 @@ jobs:
           version="${version%%-*}"
           curl -fsS --retry 10 --retry-delay 15 --retry-all-errors "https://pypi.org/pypi/nl2sql-api/$version/json" > /dev/null \
             || { echo "nl2sql-api $version is not on PyPI; not uploading an engine that cannot install its demo extra."; exit 1; }
+
+      # The CLI leg is last: `pip install "nl2sql-cli[web]"` needs the engine and the API at its own version.
+      - name: Check the engine and the API are on PyPI
+        if: matrix.package == 'nl2sql-cli'
+        run: |
+          wheel="$(ls upload/*.whl | head -n 1)"
+          version="${wheel#upload/nl2sql_cli-}"
+          version="${version%%-*}"
+          for package in nl2sql-engine nl2sql-api; do
+            curl -fsS --retry 10 --retry-delay 15 --retry-all-errors "https://pypi.org/pypi/$package/$version/json" > /dev/null \
+              || { echo "$package $version is not on PyPI; not uploading a CLI that cannot install."; exit 1; }
+          done
 
       # `attestations` defaults to true in the action, and that is what broke
       # v0.1.1. Do not re-enable it while this workflow is reached through

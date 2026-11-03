@@ -76,6 +76,11 @@ def test_the_cli_depends_on_the_engine_and_textual_and_the_api_is_its_web_extra(
     marked = [line for line in CLI_PROJECT.read_text(encoding="utf-8").splitlines() if "x-release-please-version" in line]
     assert len(marked) == 3 and any("nl2sql-engine" in line for line in marked) and any("nl2sql-api" in line for line in marked)
     assert cli["version"] == str(engine)
+    # ...and release-please is told to edit that file, so all four packages release together.
+    config = json.loads((ROOT / "release-please-config.json").read_text(encoding="utf-8"))
+    extra = [f["path"] for p in config["packages"].values() for f in p.get("extra-files", [])]
+    assert "nl2sql-cli/pyproject.toml" in extra
+    assert all(f["type"] == "generic" for p in config["packages"].values() for f in p["extra-files"])
 
 
 def test_the_engine_declares_no_cli_dependencies():
@@ -196,8 +201,8 @@ def test_the_mysql_extras_install_cryptography_for_mysql_8_logins(extra):
     assert "rsa" in pymysql.extras
 
 
-def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_one_at_a_time():
-    """The engine's demo extra needs the API, which needs the engine and the SDK: upload what is depended on first."""
+def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_then_the_cli_one_at_a_time():
+    """The API needs the engine and the SDK, the CLI needs the engine (its `web` extra, the API): upload what is depended on first."""
     import re
     from pathlib import Path
 
@@ -205,7 +210,7 @@ def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_one_at_a_time():
 
     assert "max-parallel: 1" in workflow
     order = re.findall(r"- package: (nl2sql-[a-z]+)", workflow)
-    assert order == ["nl2sql-sdk", "nl2sql-api", "nl2sql-engine"]
+    assert order == ["nl2sql-sdk", "nl2sql-api", "nl2sql-engine", "nl2sql-cli"]
 
 
 def test_the_engine_upload_waits_for_the_api_to_be_on_pypi():
@@ -220,3 +225,38 @@ def test_the_engine_upload_waits_for_the_api_to_be_on_pypi():
     # PyPI's JSON API can lag a fresh upload: the check retries before it fails the release.
     assert "--retry-all-errors" in workflow[check:check + 1200]
     assert check < workflow.index("Publish ${{ matrix.package }} to PyPI")
+
+
+def _publish() -> str:
+    return (ROOT / ".github" / "workflows" / "publish_pypi.yaml").read_text(encoding="utf-8")
+
+
+def test_publish_uploads_four_distributions():
+    """Build, smoke-install and upload all four, each from its own environment, in the CLI's own directory."""
+    workflow = _publish()
+
+    assert "for pkg in packages/sdk packages/nl2sql packages/api nl2sql-cli; do" in workflow
+    assert "dist/nl2sql_cli-*.whl" in workflow
+    assert "package: nl2sql-cli" in workflow and "stem: nl2sql_cli" in workflow
+    # The environment is the contract with PyPI's trusted publisher entry (releasing.md).
+    assert "environment: pypi-${{ matrix.package }}" in workflow
+    assert "nl2sql-cli[web]" in (ROOT / "scripts" / "fresh_install_check.py").read_text(encoding="utf-8")
+
+
+def test_the_cli_upload_waits_for_the_engine_and_the_api_to_be_on_pypi():
+    """`pip install nl2sql-cli[web]` needs both at the release version."""
+    workflow = _publish()
+    check = workflow.index("Check the engine and the API are on PyPI")
+
+    assert "matrix.package == 'nl2sql-cli'" in workflow[check - 200:check + 400]
+    assert "for package in nl2sql-engine nl2sql-api; do" in workflow[check:check + 1500]
+    assert "https://pypi.org/pypi/$package/$version/json" in workflow[check:check + 1500]
+    assert check < workflow.index("Publish ${{ matrix.package }} to PyPI")
+
+
+def test_the_pypi_smoke_installs_the_cli_with_its_web_extra_and_runs_the_command():
+    workflow = _publish()
+
+    assert "scripts/fresh_install_check.py --pypi" in workflow
+    assert "nl2sql_cli-*.whl" in workflow
+    assert "bin/nl2sql --help" in workflow

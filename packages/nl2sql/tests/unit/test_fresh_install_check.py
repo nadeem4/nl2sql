@@ -155,6 +155,18 @@ def test_venv_executable_follows_the_platform(check, tmp_path):
     assert check.venv_executable(tmp_path, "nl2sql-api", windows=False) == tmp_path / "bin" / "nl2sql-api"
 
 
+def test_install_checks_the_nl2sql_command_the_cli_wheel_installs(check, tmp_path, monkeypatch):
+    """The CLI wheel is what installs `nl2sql` (D227): a release without a working command fails the check."""
+    calls = []
+    monkeypatch.setattr(check, "_run", lambda cmd, **kw: calls.append([str(c) for c in cmd]))
+
+    api = check.install(tmp_path / "venv", ["nl2sql-cli[web]==1"])
+
+    assert api == check.venv_executable(tmp_path / "venv", "nl2sql-api")
+    command = str(check.venv_executable(tmp_path / "venv", "nl2sql"))
+    assert [command, "--help"] in calls
+
+
 # --- what a healthy playground looks like -------------------------------------
 
 def test_page_problems_accept_the_built_page(check):

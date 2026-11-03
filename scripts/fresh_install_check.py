@@ -275,11 +275,12 @@ def build(dist: Path) -> None:
 
 
 def install(venv: Path, args: List[str], attempts: int = 1, delay: float = 30) -> Path:
-    """Installs ``args`` into a new virtualenv; returns its ``nl2sql-api`` executable."""
+    """Installs ``args`` into a new virtualenv, checks its ``nl2sql`` command; returns its ``nl2sql-api`` executable."""
     _run([sys.executable, "-m", "venv", str(venv)])
     python = venv_executable(venv, "python")
     _run([str(python), "-m", "pip", "install", "--quiet", "--upgrade", "pip"])
     retry(lambda: _run([str(python), "-m", "pip", "install", *args]), attempts=attempts, delay=delay)
+    _run([str(venv_executable(venv, "nl2sql")), "--help"])
     return venv_executable(venv, "nl2sql-api")
 
 
