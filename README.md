@@ -394,7 +394,7 @@ error is one envelope, `{"error": {"code", "message", "fix", "details", "request
 
 The routes that change the process (`POST /api/v1/datasources`, `DELETE /api/v1/datasources/{id}`, and the
 Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasources/test`,
-`PUT /api/v1/settings/llm`, the `/api/v1/api-keys` and `/api/v1/evals` routes, `POST /api/v1/jobs/index`,
+`PUT` and `PATCH /api/v1/settings/llm`, the `/api/v1/api-keys` and `/api/v1/evals` routes, `POST /api/v1/jobs/index`,
 `POST /api/v1/jobs/profile`, `POST /api/v1/jobs/eval`, `POST /api/v1/jobs/demo`, `DELETE /api/v1/index`,
 `GET /api/v1/index/check`, `POST /api/v1/knowledge/reload` and every `/proposals` route)
 also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403.
@@ -494,6 +494,7 @@ also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP
 | `POST` | `/api/v1/proposals/reject` | Reject proposals by id, with a reason (admin) |
 | `POST` | `/api/v1/proposals/examples` | File starter questions as `example` proposals (admin) |
 | `PUT` | `/api/v1/settings/llm` | Replace the whole `llm` section in the running process (the body is the section as JSON; a bad one is a 422) |
+| `PATCH` | `/api/v1/settings/llm` | Change only the provider and model of named agents; every other `llm` setting stays (admin) |
 | `GET` | `/api/v1/llm` | Each agent and the model it runs on |
 
 ```bash
@@ -546,7 +547,7 @@ still validated for the caller's role.
 
 Everything else on `NL2SQL` is a namespace: `engine.datasources` (list, get,
 add, remove, schema, test), `engine.index` (build, health, clear, inspect,
-inspect_defaults), `engine.llm` (list, get, providers, prices, replace),
+inspect_defaults), `engine.llm` (list, get, providers, prices, replace, set_models),
 `engine.policies` (roles, allows, allowed, validate), `engine.curated`
 (validate, test), `engine.results` (manifest, page, csv), `engine.feedback`
 (record, list, stats, export, clear), `engine.traces` (get, replay) and

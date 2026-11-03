@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { callerOf, mayAdminister } from "./caller.js";
+import { callerOf, isAdmin, mayAdminister } from "./caller.js";
 
 const meta = JSON.parse(readFileSync(new URL("../api/fixtures/Meta.json", import.meta.url), "utf8"));
 
@@ -22,4 +22,10 @@ test("admin routes are offered unless /meta says the caller is not an admin", ()
   assert.equal(mayAdminister(null), true); // unknown: the server's 403 decides
   assert.equal(mayAdminister({ id: "ada", admin: true }), true);
   assert.equal(mayAdminister({ id: "static", admin: false }), false);
+});
+
+test("admin-only pages need a caller known to be an admin", () => {
+  assert.equal(isAdmin(null), false); // unknown: nothing admin is offered
+  assert.equal(isAdmin({ id: null, admin: false }), false);
+  assert.equal(isAdmin({ id: "ada", admin: true }), true);
 });

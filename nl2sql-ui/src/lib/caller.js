@@ -11,3 +11,6 @@ export function callerOf(meta) {
 // Whether to offer what only an admin may do. Unknown offers it: the flag decides what to show, and the route's 403
 // stays the server's final word.
 export const mayAdminister = (caller) => caller === null || caller.admin;
+
+// Whether the caller is known to be an admin. For pages that are only for admins: unknown offers nothing.
+export const isAdmin = (caller) => Boolean(caller && caller.admin);

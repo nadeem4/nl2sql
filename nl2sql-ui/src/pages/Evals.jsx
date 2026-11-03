@@ -3,7 +3,7 @@ import { listSuites, startEval } from "../api/evals.js";
 import { cancelJob, followJob } from "../api/jobs.js";
 import JobProgress from "../components/JobProgress.jsx";
 import { money, percent, reportView } from "../evals/report.js";
-import { mayAdminister } from "../lib/caller.js";
+import { isAdmin } from "../lib/caller.js";
 
 // Evals: run the configured suites on the server and read the report. Every call is an admin call (a report holds
 // every role's cases, plans and SQL), so a caller who is not an admin is told so instead of being shown a form that
@@ -102,7 +102,7 @@ function Report({ report }) {
 }
 
 export default function Evals({ caller = null }) {
-  const admin = mayAdminister(caller);
+  const admin = isAdmin(caller);
   const [suites, setSuites] = useState(null);
   const [picked, setPicked] = useState({});
   const [mode, setMode] = useState("plans");

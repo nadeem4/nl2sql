@@ -64,7 +64,7 @@ A relative `storage.path`, and a relative SQLite or DuckDB file in a
 datasource's `connection`, are read from the folder of `nl2sql.yaml` when the
 config was loaded from a file, and from the working directory when it was
 built in code. `engine.config` is the current frozen `Config`, with secrets as
-references only; `datasources.add`, `datasources.remove` and `llm.replace` are
+references only; `datasources.add`, `datasources.remove`, `llm.replace` and `llm.set_models` are
 the calls that change it.
 
 Each engine owns its config: nothing is process-global and nothing writes
@@ -124,7 +124,7 @@ engine.check(); engine.close(); engine.config; engine.about(); engine.clear_plan
 
 engine.datasources   # list, get, types, test, add, remove, schema
 engine.index         # build, health, clear, inspect, inspect_defaults
-engine.llm           # list, get, providers, prices, replace
+engine.llm           # list, get, providers, prices, replace, set_models
 engine.policies      # roles, allows, allowed, validate
 engine.curated       # validate, test
 engine.results       # manifest, page, csv

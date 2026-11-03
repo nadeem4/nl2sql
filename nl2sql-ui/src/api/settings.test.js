@@ -2,18 +2,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  createApiKey, getIndex, getLlm, getProviders, listApiKeys, replaceLlm, revokeApiKey,
+  createApiKey, getIndex, getLlm, getProviders, listApiKeys, revokeApiKey, setModels,
 } from "./settings.js";
 
 let calls;
-function fakeFetch(status = 200) {
+function fakeFetch(status = 200, answer = "{}") {
   calls = [];
   globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.fetch = async (url, init) => {
     calls.push({ url: String(url), method: init.method, body: init.body ? JSON.parse(init.body) : undefined });
     return status === 204
       ? new Response(null, { status })
-      : new Response("{}", { status, headers: { "content-type": "application/json" } });
+      : new Response(answer, { status, headers: { "content-type": "application/json" } });
   };
 }
 
@@ -28,10 +28,19 @@ test("the reads", async () => {
   ]);
 });
 
-test("replacing the LLM sends the section as the body", async () => {
+test("getLlm unwraps the agents from the route's {llms: ...} body", async () => {
+  fakeFetch(200, JSON.stringify({ llms: { default: { provider: "openai", model: "m", temperature: 0, inherited: false } } }));
+  const llms = await getLlm();
+  assert.deepEqual(Object.keys(llms), ["default"]);
+  assert.equal(llms.default.model, "m");
+});
+
+test("changing models patches only the changes", async () => {
   fakeFetch();
-  await replaceLlm({ provider: "openai", model: "m" });
-  assert.deepEqual(calls[0], { url: "/api/v1/settings/llm", method: "PUT", body: { provider: "openai", model: "m" } });
+  await setModels({ default: { provider: "openai", model: "m" }, refiner: null });
+  assert.deepEqual(calls[0], {
+    url: "/api/v1/settings/llm", method: "PATCH", body: { default: { provider: "openai", model: "m" }, refiner: null },
+  });
 });
 
 test("a new API key names the user, the roles, the tenant and the label", async () => {

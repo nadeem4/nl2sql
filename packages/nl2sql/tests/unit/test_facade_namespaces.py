@@ -228,6 +228,52 @@ def test_llm_get_returns_one_agent(tmp_path):
             engine.llm.get("planner")
 
 
+SETTINGS_RICH = {"provider": "openai", "model": "gpt-test", "api_key": "sk-test", "base_url": "http://gw.local/v1",
+                 "headers": {"X-Org": "acme"}, "max_tokens": 900,
+                 "prices": {"gpt-test": {"input": 1.0, "output": 2.0}},
+                 "agents": {"ast_planner": {"model": "gpt-planner", "temperature": None, "base_url": "http://p.local"},
+                            "refiner": {"model": "gpt-refine"}}}
+
+
+def test_llm_set_models_changes_only_provider_and_model(tmp_path):
+    with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
+        change = engine.llm.set_models({"default": {"provider": "openai", "model": "gpt-new"},
+                                        "ast_planner": {"provider": "openai", "model": "gpt-plan2"}})
+        llm = engine.config.llm
+
+    assert isinstance(change, LLMChange)
+    assert (llm.model, llm.base_url, llm.max_tokens, dict(llm.headers)) == ("gpt-new", "http://gw.local/v1", 900,
+                                                                             {"X-Org": "acme"})
+    assert set(llm.prices) == {"gpt-test"}
+    planner = llm.agents["ast_planner"]
+    assert (planner.model, planner.temperature, planner.base_url) == ("gpt-plan2", None, "http://p.local")
+    assert llm.agents["refiner"].model == "gpt-refine"
+
+
+def test_llm_set_models_none_removes_an_agent_override(tmp_path):
+    with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
+        engine.llm.set_models({"refiner": None})
+        assert "refiner" not in engine.config.llm.agents
+        assert engine.llm.get("refiner")["inherited"] is True
+
+
+def test_llm_set_models_clears_key_and_base_url_only_where_the_provider_changes(tmp_path):
+    with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
+        engine.llm.set_models({"ast_planner": {"provider": "openai", "model": "gpt-x"}})
+        assert engine.config.llm.agents["ast_planner"].base_url == "http://p.local"
+        with pytest.raises(ConfigError):  # anthropic's standard key variable is not set here
+            engine.llm.set_models({"ast_planner": {"provider": "anthropic", "model": "claude-x"}})
+        assert engine.config.llm.agents["ast_planner"].model == "gpt-x"
+
+
+def test_llm_set_models_rejects_an_unknown_agent_or_a_removed_default(tmp_path):
+    with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
+        with pytest.raises(ValueError, match="Unknown agent 'planner'"):
+            engine.llm.set_models({"planner": {"provider": "openai", "model": "x"}})
+        with pytest.raises(ValueError, match="default"):
+            engine.llm.set_models({"default": None})
+
+
 def test_llm_replace_swaps_the_whole_section(tmp_path):
     with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
         change = engine.llm.replace(LLM(provider="openai", model="gpt-other", api_key="sk-test"))

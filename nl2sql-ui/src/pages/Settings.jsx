@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { createApiKey, getLlm, getProviders, listApiKeys, replaceLlm, revokeApiKey } from "../api/settings.js";
-import { PROVIDER_NAMES, llmSection, modelGroups, parseRoles, serverRows, stepRows } from "../lib/settings.js";
+import { createApiKey, getLlm, getProviders, listApiKeys, revokeApiKey, setModels } from "../api/settings.js";
+import { PROVIDER_NAMES, modelChanges, modelGroups, parseRoles, serverRows, stepRows } from "../lib/settings.js";
 import { keyMismatch, keyTail, looksLikeKey, providerCards, providerForKey } from "../lib/hostedKey.js";
 import { providersNeeded } from "../lib/hostedModels.js";
-import { mayAdminister } from "../lib/caller.js";
+import { isAdmin } from "../lib/caller.js";
 
 // Settings. Two kinds of thing live here. When the server lets a request bring its own model (api.request_llm, D210)
 // the page keeps the visitor's keys and the model for each step in this tab and sends them with each question. For an
@@ -228,8 +228,8 @@ function HostedModelsForm({ llms, providers, apiKeys, models, onModel }) {
   );
 }
 
-// The server's own LLM, for an administrator: the default and the agents that do not inherit it. Saving replaces the
-// whole section in memory; llm.yaml is read again on a restart.
+// The server's own LLM, for an administrator: the default and the agents that do not inherit it. Saving changes only
+// the models chosen (every other llm setting stays), in memory and in this process; llm.yaml is read again on a restart.
 function ServerLlm({ llms, providers, onSaved }) {
   const rows = serverRows(llms);
   const names = Object.fromEntries(stepRows(llms).map((r) => [r.agent, r]));
@@ -237,7 +237,7 @@ function ServerLlm({ llms, providers, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
   const [fault, setFault] = useState(null);
-  const groups = modelGroups(providers, llms.default.model);
+  const groups = modelGroups(providers, llms.default.model, { markMissingKeys: true });
   const dirty = Object.keys(edits).length > 0;
   // The default has no "inherit" choice: its selector lists the models, not "Default (...)".
   const defaultGroups = groups.slice(1);
@@ -249,9 +249,9 @@ function ServerLlm({ llms, providers, onSaved }) {
     setFault(null);
     setStatus(null);
     try {
-      await replaceLlm(llmSection(llms, providers, edits));
+      await setModels(modelChanges(llms, edits));
       setEdits({});
-      setStatus("Saved in memory. A restart reads llm.yaml again.");
+      setStatus("Saved in memory, in this server process only. A restart reads llm.yaml again.");
       await onSaved();
     } catch (err) {
       setFault(message(err));
@@ -427,7 +427,7 @@ const KEY_REASON = "This server lets a request bring its own model key.";
 
 // `caller` and `requestLlm` come from GET /meta; the rest is this tab's keys and step choices.
 export default function Settings({ caller = null, requestLlm = false, apiKeys, onKey, limits, stepModels, onStepModel }) {
-  const admin = mayAdminister(caller);
+  const admin = isAdmin(caller);
   const [llms, setLlms] = useState(null);
   const [providers, setProviders] = useState(null);
   const [error, setError] = useState(null);
