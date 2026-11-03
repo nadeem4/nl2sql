@@ -3611,7 +3611,7 @@ that, which is why it exists.</p>
 <p>Both show the same 1200x630 card:</p>
 <p><img alt='The link preview card: the nl2sql playground wordmark, the line "Ask a database in plain English, the model plans, the code writes the SQL", and a fragment of a plan turning into SQL' src="../../assets/social-card.png"/></p>
 <p><strong>The app's tags</strong> are added to the built page's <code>&lt;head&gt;</code> by
-<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/cli/demo/playground/preview.py"><code>preview.py</code></a> as each request goes out, not baked into the bundle. A
+<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/api/src/nl2sql_api/preview.py"><code>preview.py</code></a> as each request goes out, not baked into the bundle. A
 crawler runs no JavaScript, so a tag React adds on mount is a tag nobody sees;
 and <code>og:image</code> and <code>og:url</code> have to be absolute, while the same page is the
 Space, a container and <code>http://127.0.0.1:8000</code>. So the host comes off the
@@ -3627,14 +3627,14 @@ served by the app at <code>/social-card.png</code> and ships in the wheel, so a
 Space, so it works before the Space has built and while it is asleep.</p>
 <h3 id="regenerating-the-card">Regenerating the card</h3>
 <p>The card is rendered from <code>scripts/social_card.html</code>, which uses the
-playground's own colours and both of its typefaces. Edit that file, then:</p>
+web app's own colours and both of its typefaces. Edit that file, then:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="nb">cd</span><span class="w"> </span>nl2sql-ui<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
 <a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>python<span class="w"> </span>scripts/render_social_card.py
 </code></pre></div>
 <p>Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
 both places that need them: <code>docs/assets/social-card.png</code>, which the Space's
 <code>thumbnail</code> reads, and
-<code>packages/nl2sql/src/nl2sql/cli/demo/playground/assets/social-card.png</code>, which
+<code>packages/api/src/nl2sql_api/web/assets/social-card.png</code>, which
 the app serves. A test holds the two byte-identical, so regenerating into only
 one of them fails rather than going out half-changed.</p>
 <p>A card validator needs a public URL, so the check that the card really unfurls
