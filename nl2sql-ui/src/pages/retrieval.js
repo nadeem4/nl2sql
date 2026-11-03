@@ -1,5 +1,5 @@
 // Pure helpers over one retrieval record: an MMR search's pool, picks and
-// scores, as the run trace and `POST /api/retrieval` return it. No React here,
+// scores, as the run trace and `POST /index/inspect` return it. No React here,
 // so `npm test` covers them with node's own test runner.
 
 const TYPE_NAMES = {
@@ -104,4 +104,26 @@ export function asText(search) {
     e.label || e.id,
   ].join("  "));
   return [...head, "", "  #  result     sim     mmr  type        entry", ...rows].join("\n");
+}
+
+// The inspector's options: the server's defaults (GET /index/inspect) and the datasources `GET /meta` lists for the
+// caller, which is who the search runs as.
+export function retrievalOptions(defaults, meta) {
+  const { types, ...knobs } = defaults;
+  return {
+    defaults: knobs,
+    types,
+    datasources: ((meta && meta.datasources) || []).map((d) => d.id),
+  };
+}
+
+// The body of POST /index/inspect. There is no role: the search runs as the caller.
+export function inspectBody({ query, k, lambda, types, datasource }) {
+  return {
+    query: query.trim(),
+    k: Number(k),
+    lambda_mult: Number(lambda),
+    types,
+    datasource_id: datasource || null,
+  };
 }

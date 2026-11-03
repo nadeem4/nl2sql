@@ -1,15 +1,13 @@
 // The guided questions, in piles rather than one list.
 //
 // The demo registers three databases, so twenty guided questions run together
-// unless each pile says which database it asks about. `/api/meta` groups them
-// (`question_groups`); a server that sends none is one database's worth, and
-// the page then shows the flat list under the dataset and prints no label.
+// unless each pile says which database it asks about. `GET /meta` lists each
+// datasource the caller may reach with its `sample_questions`; one pile per
+// datasource, and none for a datasource that has no questions.
 
 export function guidedGroups(meta) {
-  if (!meta) return [];
-  const groups = Array.isArray(meta.question_groups) ? meta.question_groups : [];
-  const source = groups.length ? groups : [{ datasource: meta.dataset, questions: meta.questions }];
-  return source
-    .filter((group) => group && group.questions && group.questions.length)
-    .map((group) => ({ datasource: group.datasource, questions: group.questions }));
+  const sources = meta && Array.isArray(meta.datasources) ? meta.datasources : [];
+  return sources
+    .filter((d) => d && d.sample_questions && d.sample_questions.length)
+    .map((d) => ({ datasource: d.id, questions: d.sample_questions }));
 }

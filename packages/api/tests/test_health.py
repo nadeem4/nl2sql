@@ -155,7 +155,7 @@ def test_meta_without_a_caller_lists_no_datasource(stub):
     response = client.get(f"{API}/meta")
 
     assert response.status_code == 200
-    assert response.json() == {"mode": "demo", "auth": "api_keys", "request_llm": True}
+    assert response.json() == {"mode": "demo", "auth": "api_keys", "request_llm": True, "start": "choose"}
     assert engine.datasources.calls == []
 
 
@@ -163,6 +163,27 @@ def test_meta_reports_the_mode(stub):
     for mode in ("demo", "hosted", "your_data"):
         client, _ = stub(CheckReport(), authenticated=False, mode=mode)
         assert client.get(f"{API}/meta").json()["mode"] == mode
+
+
+DATASOURCE = {"id": "ds", "type": "sqlite", "connection": {"database": "ds.db"}}
+
+
+def test_meta_start_says_choose_for_an_empty_project(stub):
+    client, _ = stub(CheckReport(), authenticated=False, mode="your_data", datasources=[])
+
+    assert client.get(f"{API}/meta").json()["start"] == "choose"
+
+
+def test_meta_start_is_null_once_the_project_has_a_datasource(stub):
+    for mode in ("demo", "your_data"):
+        client, _ = stub(CheckReport(), authenticated=False, mode=mode, datasources=[DATASOURCE])
+        assert client.get(f"{API}/meta").json()["start"] is None
+
+
+def test_meta_start_says_hosted_on_the_hosted_demo(stub):
+    client, _ = stub(CheckReport(), authenticated=False, mode="hosted", datasources=[DATASOURCE])
+
+    assert client.get(f"{API}/meta").json()["start"] == "hosted"
 
 
 def test_meta_lists_sample_questions_and_recorded(stub):

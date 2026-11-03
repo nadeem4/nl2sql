@@ -18,5 +18,6 @@
   ],
   "mode": "your_data",
   "recorded_with": "anthropic/claude-sonnet-5-5",
-  "request_llm": false
+  "request_llm": false,
+  "start": "choose"
 }

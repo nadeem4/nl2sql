@@ -2,7 +2,7 @@
 //
 // The hosted demo answers live on the visitor's own key (`hostedKey.js`). A
 // visitor without one is not locked out: the guided questions the server has
-// recordings for (`meta.recorded`) replay a real earlier run, labelled as one,
+// recordings for (each datasource's `recorded` in `GET /meta`) replay a real earlier run, labelled as one,
 // and any other question comes back as a replay miss that asks for a key. So
 // the page says what is on offer above the question box and keeps every
 // control open.
@@ -22,7 +22,13 @@ function held(apiKey) {
 // True when the Ask page should show the first-run block: on the hosted demo,
 // until a key is in this tab. Any one key ends it, since any one can answer.
 export function needsKey(meta, apiKey) {
-  return Boolean(meta && meta.hosted) && !held(apiKey).length;
+  return Boolean(meta && meta.mode === "hosted") && !held(apiKey).length;
+}
+
+// Every guided question the server has a recording for, across the datasources the caller may reach.
+export function recordedQuestions(meta) {
+  const sources = meta && Array.isArray(meta.datasources) ? meta.datasources : [];
+  return sources.flatMap((d) => d.recorded || []);
 }
 
 // Whether the question box, Ask and the guided questions are held closed.
@@ -35,15 +41,13 @@ export function lockControls() {
 
 // Whether `question` has a recorded answer a keyless visitor is served.
 export function isRecorded(meta, question) {
-  const recorded = (meta && meta.recorded) || [];
-  return recorded.includes((question || "").trim());
+  return recordedQuestions(meta).includes((question || "").trim());
 }
 
 // The first-run block's words. With recordings the guided questions lead and
 // the key form waits, folded; without them the key is the only way in.
 export function firstRunCopy(meta) {
-  const recorded = ((meta && meta.recorded) || []).length;
-  if (recorded) {
+  if (recordedQuestions(meta).length) {
     return {
       why: "Pick a guided question below to see a recorded run: the plan, the checks, the SQL and the rows from an "
         + "earlier live run, replayed without a key. To ask your own question, add your API key.",
@@ -58,11 +62,11 @@ export function firstRunCopy(meta) {
   };
 }
 
-// What a replay miss says. Hosted, it points at Settings, where the key goes;
-// in local replay mode there is no tab-held key, so it only says what happened.
-export function missPrompt(result, meta) {
-  if (!result || !result.replay_miss) return null;
-  if (meta && meta.hosted) {
+// What a replay miss says (an error with the code `REPLAY_MISS`). Hosted, it points at Settings, where the key goes;
+// elsewhere there is no tab-held key, so it only says what happened.
+export function missPrompt(error, meta) {
+  if (!error || error.code !== "REPLAY_MISS") return null;
+  if (meta && meta.mode === "hosted") {
     return {
       text: "This question has no recorded answer. Add your own API key to ask it live; it stays in this browser tab.",
       action: { route: "#/settings", label: "Add a key in Settings" },
@@ -71,9 +75,14 @@ export function missPrompt(result, meta) {
   return { text: "No recorded answer for this question. Add an API key to ask it live.", action: null };
 }
 
-// The label a replayed answer carries, so nobody mistakes it for a live run.
-export function recordedBadge(result) {
-  if (!result || !result.recorded) return null;
+// The label a replayed answer carries, so nobody mistakes it for a live run. The replay provider reports no token
+// usage and names every call with the model the recordings were made with (`recorded_with` in GET /meta), so a run
+// whose every call is that and nothing else is a recorded one. The server adds no flag.
+export function recordedBadge(result, recordedWith) {
+  const calls = (result && result.usage && result.usage.calls) || [];
+  const model = recordedWith && recordedWith.model;
+  if (!model || !calls.length) return null;
+  if (!calls.every((c) => c.model === model && c.usage_reported === false)) return null;
   return {
     label: "Recorded run",
     title: "Replayed from a recording of an earlier live run; not run just now. Token counts are placeholders.",

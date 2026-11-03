@@ -26,9 +26,9 @@ test("the three sources are offered, and the model one is held closed with its r
 });
 
 test("only a hosted visitor without a key is blocked from the model source", () => {
-  assert.ok(askedBlock({ hosted: true }, {}));
-  assert.equal(askedBlock({ hosted: true }, { anthropic: "sk-x" }), null);
-  assert.equal(askedBlock({ hosted: false }, {}), null);
+  assert.ok(askedBlock({ mode: "hosted" }, {}));
+  assert.equal(askedBlock({ mode: "hosted" }, { anthropic: "sk-x" }), null);
+  assert.equal(askedBlock({ mode: "demo" }, {}), null);
   assert.equal(askedBlock(null, {}), null);
 });
 

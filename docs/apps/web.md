@@ -173,6 +173,33 @@ The report shows, for each configuration: accuracy with its interval, the genera
 
 A caller who is not an administrator, on a server that does not take a key with a question, sees that there is nothing to set.
 
+## Home, Pipeline and Retrieval
+
+**Home** says what the engine does (the five steps a question travels, a clip of each page) and, while the project has
+nothing to ask yet, shows the **start screen** above that story. `GET /meta` decides it with `start`:
+
+| `start` | When | What Home shows |
+|---|---|---|
+| `choose` | The served project has no datasource | Two cards. **Try the demo** (administrators) runs `POST /jobs/demo`, shows its progress, then opens Chat on a sample question. **Connect your database** opens the Connect page. Someone who is not an administrator is told an administrator can do either, and is offered neither. |
+| `hosted` | The hosted demo | **Ask a sample question** opens Chat. **Connect your database** only explains: the hosted server connects nothing, so it shows the steps to run nl2sql yourself (install and `nl2sql demo`, or Docker Compose) and links the [self-hosting guide](../deployment/compose.md). No route is called. |
+| `null` | A datasource exists | No start screen. |
+
+**Try a sample question** asks the first guided question that has a recorded answer, so it works without a key. The
+guided questions and the recordings come from each datasource in `GET /meta` (`sample_questions`, `recorded`); the
+recording's model is `recorded_with`.
+
+**Pipeline** (`#/pipeline`) lists every step of a run from `GET /about`, and marks which a model decides. A page answers
+from recordings (it says so on each model step) when the visitor is on the hosted demo with no key, or when every model
+step in `/about` runs on the `replay` provider.
+
+**Retrieval** (`#/retrieval`) searches the live index with no model and no key: `GET /index/inspect` gives the defaults
+(k, lambda, the entry types) and `POST /index/inspect` runs one search as the caller, so it shows only what the caller's
+scope reaches. The datasource list comes from `/meta`. With no datasource it says there is nothing to search yet.
+
+**Hosted first run.** A hosted visitor without a key sees the guided questions replay recorded runs. A question with no
+recording comes back as a `REPLAY_MISS` error, and the page then points to Settings to add a key. A recorded answer is
+labelled **Recorded run** when every model call in its usage reports no token count and names the recording's model.
+
 ## Source map
 
 | Path | What it holds |

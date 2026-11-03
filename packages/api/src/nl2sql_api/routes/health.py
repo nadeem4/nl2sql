@@ -80,8 +80,10 @@ def readiness_check(request: Request, engine: Engine, user: Visitor):
 
 @router.get("/meta", response_model=Dict[str, Any], summary="What this server is")
 def meta(request: Request, engine: Engine, user: Visitor):
-    """Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`) and
-    `request_llm`, which is what a page needs to decide whether to ask for a sign-in or a key. With a caller, also
+    """Without a caller: the `mode` (`demo`, `your_data` or `hosted`), the identity source (`auth`), `request_llm`,
+    which is what a page needs to decide whether to ask for a sign-in or a key, and `start`, which screen the web app
+    opens on: `"hosted"` on the hosted demo, `"choose"` while the project has no datasource, else null. With a caller,
+    also
     `caller` (`{"user_id", "admin"}`: who the caller is and whether it holds a role in `policies.admin_roles`, the
     check the admin routes make; on the hosted demo `user_id` is a one-way id of the session, never its cookie), and
     `datasources`: each one the caller may reach, with its `id`, `description`, `sample_questions` and `recorded`
@@ -89,7 +91,9 @@ def meta(request: Request, engine: Engine, user: Visitor):
     recordings came from (or null). On the hosted demo, also `limits`: `questions_per_minute`,
     `questions_per_session`, `asked` (this session's count), and `jobs` and `streams` (the most at once)."""
     config = engine.config
-    body: Dict[str, Any] = {"mode": config.mode, "auth": config.api.auth, "request_llm": config.api.request_llm}
+    start = "hosted" if config.mode == "hosted" else None if config.datasources else "choose"
+    body: Dict[str, Any] = {"mode": config.mode, "auth": config.api.auth, "request_llm": config.api.request_llm,
+                            "start": start}
     if user is None:
         return body
     hosted = getattr(request.app.state, "hosted", None)
