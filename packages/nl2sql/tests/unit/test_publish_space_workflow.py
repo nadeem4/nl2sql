@@ -175,7 +175,10 @@ def test_a_release_waits_for_pypis_index_to_list_the_version_before_pushing():
     assert "steps.token.outputs.present == 'true'" in wait["if"]
     assert "inputs.tag != ''" in wait["if"]
     run = wait["run"]
-    assert "https://pypi.org/simple/nl2sql-engine/" in run
+    # The Space installs `nl2sql-cli[web]`, which needs the engine and the API at that version too.
+    assert "https://pypi.org/simple/$package/" in run
+    for package in ("nl2sql-engine", "nl2sql-api", "nl2sql-cli"):
+        assert package in run
     assert "${TAG#v}" in run
     # Bounded, so a version that never appears fails the job instead of hanging it.
     assert re.search(r"seq 1 \d+", run)

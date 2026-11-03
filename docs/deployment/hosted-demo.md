@@ -432,7 +432,7 @@ with nothing to do by hand. Merging the release pull request tags `vX.Y.Z`, and
 
 ```mermaid
 flowchart LR
-    PY[pypi: the three packages<br/>reach PyPI] --> PS[pypi-smoke: install X.Y.Z<br/>from PyPI, boot the demo]
+    PY[pypi: the four packages<br/>reach PyPI] --> PS[pypi-smoke: install X.Y.Z<br/>from PyPI, boot the demo]
     PS --> SP[space: publish_space.yml<br/>pins and pushes the Space]
     SP --> SS[space-smoke: the live URL<br/>reports X.Y.Z]
 ```

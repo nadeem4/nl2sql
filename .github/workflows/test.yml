@@ -313,6 +313,10 @@ jobs:
       - name: Import the API inside the image
         run: docker run --rm nl2sql-api:ci python -c "import nl2sql, nl2sql_api.main"
 
+      # `docker compose run --rm api nl2sql index` (D230).
+      - name: The nl2sql command is installed
+        run: docker run --rm nl2sql-api:ci nl2sql --help
+
       - name: The SQL Server driver is installed
         run: docker run --rm nl2sql-api:ci python -c "import pyodbc; d = pyodbc.drivers(); print(d); assert any('ODBC Driver 18' in x for x in d)"
 

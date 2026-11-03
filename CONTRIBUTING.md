@@ -28,7 +28,7 @@ fails the suite rather than review.
 
 1. Clone the repository.
 2. Create and activate a virtual environment on a supported interpreter.
-3. Install the three packages in editable mode, plus the test tooling.
+3. Install the four packages in editable mode, plus the test tooling.
 
 Example (PowerShell), using a 3.13 interpreter:
 
@@ -40,9 +40,8 @@ py -3.13 -m venv .venv
 ```
 
 The full suite is green only with those extras. `postgres` and `duckdb` supply
-the drivers the adapter tests import; `demo` supplies the FastAPI/uvicorn server
-behind `nl2sql demo`. Swap in `[all]` if you want every dialect driver — but
-note `all` covers adapters only, not `demo`, `aws`, `azure` or `hashicorp`.
+the drivers the adapter tests import; `nl2sql-cli` is the `nl2sql` command. Swap in `[all]` if you want every dialect driver — but
+note `all` covers adapters only, not `aws`, `azure` or `hashicorp`.
 There is deliberately no `sqlite` extra: that driver is in the standard library.
 
 The second command installs the PEP 735 `dev` group (`pip` 25.1 or newer):
@@ -109,8 +108,8 @@ npm run build
 
 The build writes `index.html` and its chunks under
 `packages/api/src/nl2sql_api/web/static/`, which version control ignores: the
-API image and the wheel build it fresh. `nl2sql demo` still serves the single
-page committed in the engine package until X1b removes it.
+API image and the wheel build it fresh. `nl2sql demo` (with `nl2sql-cli[web]`)
+starts `nl2sql-api`, which serves that build.
 
 ### Real databases
 
@@ -187,7 +186,7 @@ mkdocs serve
 
 ## Releasing
 
-All three packages share one version and are released together. The checklist --
+All four packages share one version and are released together. The checklist --
 bumping the versions and what publishing a GitHub release triggers -- is in
 `docs/development/releasing.md`.
 
