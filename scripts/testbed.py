@@ -16,8 +16,7 @@ environment; they are never written to a file, put on a command line or
 printed, and this process's environment is never changed.
 
 The VM, its firewall rule and the nightly stop job are created once, by hand:
-docs/testing/test-bed.md, "The GCP VM". The design is
-docs/architecture/phase2.md, section 3.
+docs/testing/test-bed.md, "The GCP VM".
 """
 from __future__ import annotations
 
@@ -97,7 +96,6 @@ STDIN_THROUGH = {"CLOUDSDK_SSH_PUTTY_FORCE_CONNECT": "false"}
 
 class TestbedError(Exception):
     """A step failed; the message names it and never holds a password."""
-
 
 @dataclass(frozen=True)
 class Target:

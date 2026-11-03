@@ -1,4 +1,4 @@
-// A saved result and what is drawn from it (wave_d.md, "Charts, diagrams and reports"): its rows a page at a time, its
+// A saved result and what is drawn from it: its rows a page at a time, its
 // CSV, and its chart. A run's rows are read for the caller only; the server answers another caller's run as not found.
 import { download, request } from "./http.js";
 

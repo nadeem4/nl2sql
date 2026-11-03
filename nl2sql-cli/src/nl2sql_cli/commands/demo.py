@@ -1,6 +1,6 @@
 """`nl2sql demo`: start `nl2sql-api serve --demo` and open the browser on it.
 
-The web app and the server live in ``nl2sql-api`` (wave_d.md, D211). This command only checks that package is
+The web app and the server live in ``nl2sql-api``. This command only checks that package is
 installed, runs ``python -m nl2sql_api serve --demo`` as a child process, opens the page once the server answers,
 and forwards Ctrl+C to the child. It imports nothing of the API.
 """

@@ -1,6 +1,6 @@
-"""``nl2sql index --check``: the drift check for a cron job or a CI step (D1).
+"""``nl2sql index --check``: the drift check for a cron job or a CI step.
 
-docs/architecture/wave_a.md, section 10: it prints the reports and exits 0
+It prints the reports and exits 0
 when nothing drifted, 1 when something did, 2 when a check failed. It never
 re-indexes. The index is written here without embedding (a snapshot and a
 pointer), so no model is loaded.

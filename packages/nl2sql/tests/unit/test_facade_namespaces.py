@@ -1,4 +1,4 @@
-"""The facade's namespaces: one test per method in docs/architecture/configuration_v2.md, section 7.
+"""The facade's namespaces: one test per method.
 
 Each builds a real engine on a ``make_config`` folder with a small SQLite
 database and a fake embedder, so nothing is downloaded and no model is called.
@@ -617,7 +617,7 @@ def test_a_token_cancelled_before_the_build_stops_before_the_model_loads(engine)
 
 
 def test_datasource_info_lists_sample_questions(tmp_path):
-    """The datasource's own ``sample_questions`` first, then the glossary ``examples`` a person accepted (D222)."""
+    """The datasource's own ``sample_questions`` first, then the glossary ``examples`` a person accepted."""
     glossary = tmp_path / "glossary.yaml"
     glossary.write_text("version: 1\ndatasources:\n  shop:\n    examples:\n"
                         "      - Who bought the most?\n      - How many customers?\n", encoding="utf-8")

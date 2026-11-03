@@ -1,4 +1,4 @@
-"""Clarify instead of guess: the clarifier and the result (docs/architecture/wave_b.md, section 7; D47, L1).
+"""Clarify instead of guess: the clarifier and the result.
 
 The logical validator's "valid" edge goes to the clarifier. It validates each
 of the planner's alternatives with the validator's own checks (the caller's
@@ -147,7 +147,7 @@ def test_two_valid_options_end_the_run_with_a_request(monkeypatch):
     [error] = result.errors
     assert error["error_code"] == ErrorCode.NEEDS_CLARIFICATION.value
     assert error["severity"] == ErrorSeverity.INFO.value
-    # A step that did not run is not explained (X1): the options carry the explanations.
+    # A step that did not run is not explained: the options carry the explanations.
     assert result.explanation is None
     assert result.sub_queries[0].status == "needs_clarification" and result.sub_queries[0].sql == ""
 
@@ -345,7 +345,7 @@ def test_public_run_query_takes_clarify():
         assert parameter.default is True and parameter.kind is inspect.Parameter.KEYWORD_ONLY
 
 
-# ---------------------------------------------------------------- after review (#339)
+# ---------------------------------------------------------------- after review
 
 
 def _retrying_agent(monkeypatch):
@@ -431,7 +431,7 @@ def test_the_clarifier_keeps_what_the_planner_offered(monkeypatch):
 
     response = state["ast_planner_response"]
     assert response.alternatives == []
-    # K2's plan cache reads alternatives_offered ("never cache an answer with readings", D47): the clarifier
+    # K2's plan cache reads alternatives_offered ("never cache an answer with readings"): the clarifier
     # cuts only alternatives, so the dropped readings still keep the plan out of the cache.
     assert response.alternatives_offered == offered
 
@@ -514,7 +514,7 @@ def test_the_rendered_planner_prompt_does_not_depend_on_clarify():
     assert prompts[0] == prompts[1]
 
 
-# ---------------------------------------------------------------- settled phrases (L2, D48)
+# ---------------------------------------------------------------- settled phrases
 
 
 def _glossary(*terms):

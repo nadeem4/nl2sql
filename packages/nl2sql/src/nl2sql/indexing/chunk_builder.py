@@ -49,7 +49,7 @@ class SchemaChunkBuilder:
 
     No inference, optimization, or database access is performed.
 
-    ``knowledge`` is the datasource's merged knowledge (wave_b.md, section 4):
+    ``knowledge`` is the datasource's merged knowledge:
     a description is the glossary's, else the snapshot's (the database's
     comment); a column also gets the glossary's synonyms and role; a glossary
     join is a relationship entry of its own; each term is a ``knowledge.term``

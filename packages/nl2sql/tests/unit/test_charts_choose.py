@@ -1,4 +1,4 @@
-"""Auto charts (wave_c.md, section 5): five rules choose a chart from a result's column kinds, a template writes
+"""Auto charts: five rules choose a chart from a result's column kinds, a template writes
 its takeaway, and ``ChartSpec.to_vega_lite`` exports it with no colour. Pure functions: no engine, no model."""
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ MONTHS = [["2024-01-01", 100], ["2024-02-01", 150], ["2024-03-01", 120]]
 CATEGORIES = [["books", 50], ["toys", 30], ["games", 20]]
 
 
-# ---------------------------------------------------------------- column kinds (D112)
+# ---------------------------------------------------------------- column kinds
 
 def test_column_kinds_follow_the_arrow_types():
     import datetime as dt
@@ -178,7 +178,7 @@ def test_an_unknown_forced_kind_is_an_error():
         _draw(["total"], {"total": "number"}, [[3]], kind="pie")
 
 
-# ---------------------------------------------------------------- plan refinements (D112)
+# ---------------------------------------------------------------- plan refinements
 
 def test_date_trunc_select_is_temporal():
     month = _func("DATE_TRUNC", _lit("month"), _col("created_at"))

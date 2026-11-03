@@ -1,4 +1,4 @@
-// The start screen (wave_d.md, section 4): what `GET /meta`'s `start` asks the page to show, and the one action that
+// The start screen: what `GET /meta`'s `start` asks the page to show, and the one action that
 // calls a route. The page computes nothing: `start` says which screen applies.
 //
 // - "choose": the served project has no datasource yet. Try the demo (`POST /jobs/demo`, admin) and Connect your

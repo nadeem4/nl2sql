@@ -1,4 +1,4 @@
-"""Join candidates: pairs of columns that look like a key and what refers to it (docs/architecture/wave_b.md, section 6).
+"""Join candidates: pairs of columns that look like a key and what refers to it.
 
 For each column ``A.c`` that is not part of a foreign key, the profiler looks for a single-column primary key
 ``B.k`` (or the only column named ``id``) it may point to:

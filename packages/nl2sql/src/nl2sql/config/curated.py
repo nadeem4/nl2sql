@@ -172,7 +172,6 @@ class CuratedDatasource(BaseModel):
 class CuratedSqlError(ValueError):
     """A verified query's SQL is not one read-only query."""
 
-
 @functools.lru_cache(maxsize=None)
 def _write_nodes() -> Tuple[type, ...]:
     from sqlglot import exp

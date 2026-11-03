@@ -1,6 +1,6 @@
 """The section models of ``nl2sql.config``, built in code.
 
-One test per rule the design gives a section (configuration_v2.md, section 2).
+One test per rule the config gives a section.
 """
 from __future__ import annotations
 

@@ -4,8 +4,7 @@
 catalog (``nl2sql.events.catalog``) lists each name with a model for its
 data; ``RunScope`` is one question on the bus, and ``publish`` is how code
 inside a run publishes. ``Event`` and ``Observer`` themselves live in the SDK
-(``nl2sql_sdk.events``), so an observer plugin depends on the SDK alone. The
-design is docs/architecture/wave_a.md, section 3.
+(``nl2sql_sdk.events``), so an observer plugin depends on the SDK alone.
 """
 from nl2sql.events.bus import EventBus, Subscription
 from nl2sql.events.catalog import (AUDIT_EVENTS, CATALOG, RUN_EVENTS, STREAM_EVENTS, EventInfo, RunStatus,

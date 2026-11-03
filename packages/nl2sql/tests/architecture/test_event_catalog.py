@@ -1,4 +1,4 @@
-"""Every event the engine publishes is in the catalog (docs/architecture/wave_a.md, section 15).
+"""Every event the engine publishes is in the catalog.
 
 An AST scan of every ``publish("<name>", ...)`` call site, ``bus.publish``,
 ``scope.publish`` and the module function ``nl2sql.events.publish`` alike.

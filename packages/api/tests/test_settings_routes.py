@@ -1,4 +1,4 @@
-"""The settings routes: the LLM, the providers, API keys and the event catalog (docs/architecture/wave_d.md, row A4a)."""
+"""The settings routes: the LLM, the providers, API keys and the event catalog."""
 from datetime import datetime, timezone
 
 import pytest

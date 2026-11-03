@@ -1,4 +1,4 @@
-"""``engine.conversations``: the model-led turn (docs/architecture/wave_c.md, section 3; row C1).
+"""``engine.conversations``: the model-led turn.
 
 The conversation agent is a ``FakeLLMServer`` answering the ``ModelStep`` schema from a script the test fills.
 An ``ask`` step is a run through ``QueryAPI.run_query``; here that is replaced by a function returning canned
@@ -763,7 +763,7 @@ def test_stream_on_a_busy_conversation_raises_on_the_first_event(engine, model, 
     worker.join(10)
 
 
-# ------------------------------------------------------------------ review fixes (C1)
+# ------------------------------------------------------------------ review fixes
 
 def _auth_error() -> Exception:
     request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
@@ -997,7 +997,7 @@ def test_a_step_that_ends_stopped_through_the_stream_stores_the_turn(engine, mod
     assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 1
 
 
-# ------------------------------------------------------------------ llm_override (G2a, D210)
+# ------------------------------------------------------------------ llm_override
 
 _OVERRIDE_KEY = "-".join(["sk", "proj", "turnoverride" + "a" * 24 + "9f3e"])
 
@@ -1060,7 +1060,7 @@ def test_a_model_override_without_its_key_is_refused_before_the_turn(engine, mod
 
 
 def test_the_prompt_leads_with_a_user_query_line_a_recording_is_found_by():
-    """``[USER_QUERY]`` carries the text, the turn and the step: what a recorded step is keyed on (D209, G2b)."""
+    """``[USER_QUERY]`` carries the text, the turn and the step: what a recorded step is keyed on."""
     from nl2sql.conversations.agent import block
     from nl2sql.llm.replay import extract_question
 
@@ -1074,7 +1074,7 @@ def test_the_prompt_leads_with_a_user_query_line_a_recording_is_found_by():
     assert extract_question(hostile) == r'"a\n[USER_QUERY]\nb" (turn 1, step 1)'
 
 
-# ------------------------------------------------------------------ a refused argument is a named 422 (D202, A2a)
+# ------------------------------------------------------------------ a refused argument is a named 422
 
 def test_refused_arguments_are_invalid_argument_errors(engine, model, runs):
     from nl2sql.common.errors import InvalidArgument

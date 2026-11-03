@@ -1,4 +1,4 @@
-"""Corrections: a thumbs-down with a fix becomes a checked ``verified_query`` proposal (wave_b.md, section 10; D55).
+"""Corrections: a thumbs-down with a fix becomes a checked ``verified_query`` proposal.
 
 ``engine.feedback.correct(trace_id, sql=... | plan=..., user_context=...)``:
 

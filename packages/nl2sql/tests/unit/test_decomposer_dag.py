@@ -452,7 +452,7 @@ def test_a_dag_that_cannot_be_built_ends_the_run_with_its_error():
     assert query_result.errors[0]["error_code"] == "PLANNER_FAILED"
 
 
-# C-W6e: "top 5 films by revenue in the top category" is two sub-queries joined on
+# "top 5 films by revenue in the top category" is two sub-queries joined on
 # the category. The engine does not chain post-combine ops (each reads the group,
 # and every op nothing reads is a result), so the final ranking is ONE op that
 # carries both order_by and limit.

@@ -2,7 +2,7 @@ import { hashFor } from "../router.js";
 import { needsKey } from "../pages/firstRun.js";
 import { withStep } from "./generate.js";
 
-// The guided dashboard builder (wave_d.md, section 18): which sources, which chips, which tiles, then the build job.
+// The guided dashboard builder: which sources, which chips, which tiles, then the build job.
 // Pure helpers so the steps, the bodies and the failure sentences can be tested without a browser.
 
 export const STEPS = ["sources", "inputs", "review", "build"];

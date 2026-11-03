@@ -1,7 +1,7 @@
-"""A conversation: stored turns, each a bounded loop of tool calls (docs/architecture/wave_c.md, section 3).
+"""A conversation: stored turns, each a bounded loop of tool calls.
 
 These are the shapes only; ``engine.conversations`` arrives with C1. A conversation is stored data
-(D100): every call names it. A step holds a ``QueryResult`` that is stored without rows (D106).
+: every call names it. A step holds a ``QueryResult`` that is stored without rows.
 """
 from __future__ import annotations
 
@@ -81,14 +81,14 @@ class Turn(StrictModel):
 class Conversation(StrictModel):
     id: str  # random, 22 url-safe characters
     tenant_id: Optional[str] = None
-    user_id: Optional[str] = None  # the owner (D105)
+    user_id: Optional[str] = None  # the owner
     title: str  # the first message, cut at 80 characters
     datasource_id: Optional[str] = None  # when set, every ask skips routing
     dashboard_id: Optional[str] = None  # the dashboard the dashboard tools edit
     created_at: datetime
     updated_at: datetime
     turns: List[Turn] = Field(default_factory=list)
-    pending: Optional[ClarificationRequest] = None  # Wave B's request the last turn ended with
+    pending: Optional[ClarificationRequest] = None  # request the last turn ended with
 
 
 class ConversationInfo(StrictModel):

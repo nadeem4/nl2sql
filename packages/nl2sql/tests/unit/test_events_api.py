@@ -1,12 +1,12 @@
-"""``engine.events``, the trace's event list and log correlation (wave_a.md, sections 3 and 4, row E1).
+"""``engine.events``, the trace's event list and log correlation.
 
 - ``engine.events.subscribe`` is the operator's view: every run's events and
   the engine's own, failing open; ``catalog()`` lists every event.
 - The trace document lists the run's events (all but ``answer.delta``).
 - Every log line written during a run, on the caller's thread or a graph
-  worker's, carries the run's ``trace_id`` (B14).
-- The catalog marks which events the caller's stream carries (D17) and which
-  the audit observer writes (E2): one definition each, extended by adding an
+  worker's, carries the run's ``trace_id``.
+- The catalog marks which events the caller's stream carries and which
+  the audit observer writes: one definition each, extended by adding an
   event to the catalog.
 """
 from __future__ import annotations
@@ -147,7 +147,7 @@ def test_trace_document_lists_the_run_events(monkeypatch):
     assert {event["trace_id"] for event in doc["events"]} == {result.trace_id}
 
 
-# ---------------------------------------------------------------- log correlation (B14)
+# ---------------------------------------------------------------- log correlation
 
 def test_every_log_line_in_a_run_has_its_trace_id(monkeypatch):
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _parallel_graph())

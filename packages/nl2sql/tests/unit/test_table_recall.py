@@ -1,4 +1,4 @@
-"""Table recall on a schema past the full-snapshot threshold (C-W4, docs/architecture/wave_c.md section 17).
+"""Table recall on a schema past the full-snapshot threshold.
 
 The 0.9.0 smoke test asked Pagila "top 5 films by revenue in the top category".
 "Revenue" is not near ``payment``, so vector search never sent it and the

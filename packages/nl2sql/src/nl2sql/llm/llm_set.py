@@ -2,8 +2,7 @@
 
 A run reads the engine's set once, when it starts, so a run never mixes two
 LLMs: ``engine.llm.replace`` builds a new set and swaps the reference, and
-runs already in flight finish on the old one. See
-docs/architecture/configuration_v2.md, "Replacing the LLM at runtime".
+runs already in flight finish on the old one. 
 """
 from __future__ import annotations
 

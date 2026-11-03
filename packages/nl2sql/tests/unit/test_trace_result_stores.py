@@ -1,7 +1,6 @@
 """The trace and result stores, retention and ``engine.storage``.
 
-docs/architecture/phase2.md, section 4 ("The interfaces", "Migrations and
-retention", "The facade") and the S4 row of section 12: the engine writes and
+The engine writes and
 reads traces through the ``TraceStore`` and results through the
 ``ResultStore``, so any store in those slots is used; ``files`` and ``local``
 take ``max_age_days``; ``engine.storage.purge()`` applies it.

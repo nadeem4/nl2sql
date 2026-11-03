@@ -1,4 +1,4 @@
-"""Why this answer: the explanation is rendered from the typed plan and state, never by a model (wave_b.md, section 8).
+"""Why this answer: the explanation is rendered from the typed plan and state, never by a model.
 
 Every test builds its state by hand (X1 comes before K2 and L1 fill
 ``knowledge_used`` and ``alternatives``), and the golden files hold the

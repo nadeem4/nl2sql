@@ -1,4 +1,4 @@
-"""``nl2sql knowledge``: the glossary as the engine uses it (docs/architecture/wave_b.md, section 3).
+"""``nl2sql knowledge``: the glossary as the engine uses it.
 
 * ``show``    -- the merged knowledge, each item with its origin; problems last, exit 1 when there are any.
 * ``export``  -- the knowledge the caller may see as one canonical ``glossary.yaml``, to stdout or ``--out``.
@@ -7,7 +7,7 @@
 Each calls the matching ``engine.knowledge`` method as the caller ``--as``
 (repeatable) and ``--user`` build. Without ``--as`` the role is
 ``policies.default_role``; with neither the command refuses, since a caller
-with no role reads nothing (Wave A D33, Wave B D60).
+with no role reads nothing.
 """
 from __future__ import annotations
 

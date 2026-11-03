@@ -1,4 +1,4 @@
-// Dashboards and workspaces (wave_d.md, "Dashboards and workspaces"). Every call is thin over a route of
+// Dashboards and workspaces. Every call is thin over a route of
 // routes/dashboards.py or routes/workspaces.py; none makes a model call. The pure parts (the refresh body, the layout)
 // are in src/dashboards/.
 import { request } from "./http.js";
@@ -70,7 +70,7 @@ export const deleteWorkspace = (id) => request("DELETE", `/workspaces/${enc(id)}
 // `body` is `{datasource_id, title?, workspace_id?, max_tiles?}` (generate.js `generateBody`).
 export const startDashboardJob = (body) => request("POST", "/jobs/dashboard", body);
 
-// ---- guided builder (wave_d.md, section 18)
+// ---- guided builder
 // The chips for one datasource: `{curated, saved, metrics, dimensions, time_columns, ranges}`. No model call.
 export const builderOptions = (datasourceId) =>
   request("GET", `/dashboard-builder/options?datasource_id=${enc(datasourceId)}`);

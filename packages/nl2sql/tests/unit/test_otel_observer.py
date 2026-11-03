@@ -1,4 +1,4 @@
-"""The ``otel`` observer: metrics and spans from the bus, on providers of its own (wave_a.md, section 4, E2).
+"""The ``otel`` observer: metrics and spans from the bus, on providers of its own.
 
 It needs the ``otel`` extra; CI installs it. The exporters here are the SDK's
 in-memory ones, so nothing leaves the process.

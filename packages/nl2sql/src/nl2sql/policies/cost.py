@@ -1,9 +1,9 @@
-"""The cost rule: the built-in ``policy.cost`` hook (docs/architecture/wave_b.md, section 9; D52 to D54).
+"""The cost rule: the built-in ``policy.cost`` hook.
 
 ``policies.cost`` limits the rows a query is estimated to *read*
 (``max_estimated_rows``), and says what to do over the limit (``over_limit``)
 and when no estimate can be had (``unknown``): ``allow``, ``confirm`` (a
-person approves, as Wave A's ``NeedsApproval``) or ``refuse``
+person approves, as ``NeedsApproval``) or ``refuse``
 (``COST_LIMIT_EXCEEDED``, never retried). A role's ``cost`` replaces the
 top-level fields it sets; a caller with several roles gets each field's most
 permissive value, ``null`` (no limit) winning.

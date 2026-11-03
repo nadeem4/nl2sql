@@ -1,4 +1,4 @@
-"""Request bodies of the conversation routes (docs/architecture/wave_d.md, A2a).
+"""Request bodies of the conversation routes.
 
 Responses are the facade's own models (``Conversation``, ``ConversationInfo``, ``Turn``, ``ChatToolInfo``), served as
 they are. A body is strict: a field it does not name is a 422.

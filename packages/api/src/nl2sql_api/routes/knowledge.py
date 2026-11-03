@@ -1,4 +1,4 @@
-"""The `knowledge` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", row A3): what the engine knows
+"""The `knowledge` namespace of `/api/v1`: what the engine knows
 about each datasource, and the proposals that change it. Thin over ``engine.knowledge`` and ``engine.proposals``.
 Profiling is the `profile` job (`POST /jobs/profile`, `routes/jobs.py`). Everything about proposals is admin work:
 a proposal can name a table the caller's scope hides, and accepting one writes a file."""

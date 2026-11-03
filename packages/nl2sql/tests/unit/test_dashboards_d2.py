@@ -1,4 +1,4 @@
-"""Refresh, stored results and schedules (docs/architecture/wave_c.md, section 6; row D2).
+"""Refresh, stored results and schedules.
 
 A chart's refresh is a run of its stored plan through ``QueryAPI.run_query(plan=..., answer=False)``; here that call
 is replaced by a function returning canned results, so a test can say what was asked, as whom, and what came back.
@@ -456,7 +456,7 @@ def test_open_serves_stored_results_after_the_access_check(engine, runs):
     assert generated["execute"] is False and generated["plan"].decomposition is not None, \
         "a generated plan is checked without running"
     assert verified["execute"] is False and verified["plan"].verified is not None, \
-        "a verified query is checked by the matcher without running it (D135)"
+        "a verified query is checked by the matcher without running it"
     assert all(c["answer"] is False and c["user_context"] == ANA for c in runs.calls)
 
 

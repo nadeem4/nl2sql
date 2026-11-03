@@ -1,4 +1,4 @@
-"""Knowledge in the prompts (docs/architecture/wave_b.md, section 4; K2).
+"""Knowledge in the prompts.
 
 The schema retriever reads the run's pinned knowledge: the chosen
 descriptions, the roles (the glossary's, else the ones the snapshot proves),
@@ -394,7 +394,7 @@ def test_alternative_denied_by_plan_after_is_not_offered():
 
     assert response.plan.reasoning == "revenue" and response.ambiguous_phrase == "sales"
     assert [(a.label, a.plan.reasoning) for a in response.alternatives] == [("Units sold", "units")]
-    # What the planner offered stays whole, so the plan is never cached (D47).
+    # What the planner offered stays whole, so the plan is never cached.
     assert [a.label for a in response.alternatives_offered] == ["Invoiced total", "Units sold"]
 
 
@@ -412,7 +412,7 @@ def test_alternative_modified_by_plan_after_is_offered_as_modified():
     assert [a.plan.limit for a in response.alternatives] == [10]
 
 
-# ---------------------------------------------------------------- review fixes (#340)
+# ---------------------------------------------------------------- review fixes
 
 
 def test_the_denied_name_pattern_is_built_once_per_sub_query_not_per_comment(monkeypatch):

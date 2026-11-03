@@ -1,4 +1,4 @@
-"""Seeding: draft eval cases from a datasource (wave_a.md, section 8, "Seeding: benchmark your own database"; D26).
+"""Seeding: draft eval cases from a datasource.
 
 The model is a ``FakeLLMServer`` answering the seeder's structured output
 (``SeedBatch``) from a queue the test fills; nothing calls a real model. The

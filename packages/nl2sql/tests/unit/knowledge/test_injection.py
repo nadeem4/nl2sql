@@ -1,4 +1,4 @@
-"""Knowledge is data: the validator and the caller's scope decide (docs/architecture/wave_b.md, D39).
+"""Knowledge is data: the validator and the caller's scope decide.
 
 Each test holds one part of the stance: knowledge reaches a prompt only as
 JSON values, cannot forge a prompt marker, is capped, never names a table the

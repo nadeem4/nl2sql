@@ -1,4 +1,4 @@
-"""An eval run's report: one board per LLM config, scored from its case records (wave_a.md, section 8).
+"""An eval run's report: one board per LLM config, scored from its case records.
 
 Each case run is a record (a dict, written as JSON): the case and role, its
 ``status`` (``pass`` when every scorer that applies passed, ``fail``,

@@ -27,7 +27,7 @@ logger = get_logger("schema_retriever")
 
 @dataclass
 class SchemaKnowledge:
-    """What the caller may see of a datasource's knowledge, as the schema block uses it (wave_b.md, section 4).
+    """What the caller may see of a datasource's knowledge, as the schema block uses it.
 
     ``shown`` is the knowledge filtered to the caller's scope; the maps are
     keyed by the snapshot's table key: the chosen table descriptions, each
@@ -47,11 +47,11 @@ def schema_knowledge(knowledge: Any, datasource_id: str, snapshot: SchemaSnapsho
                      dialect: Optional[str]) -> SchemaKnowledge:
     """The run's knowledge for one datasource, filtered to ``scope`` and resolved against ``snapshot``.
 
-    A description is the glossary's, else the database's comment (D38), and
+    A description is the glossary's, else the database's comment, and
     either is dropped when its text mentions a table the caller cannot read
-    (D39). A role is the glossary's, else the one the snapshot proves (D61).
+. A role is the glossary's, else the one the snapshot proves.
     A glossary join is a relationship only between two tables the caller may
-    read, with comparable types (D46).
+    read, with comparable types.
     """
     from nl2sql.knowledge.merge import Knowledge
     from nl2sql.knowledge.resolve import derived_roles, resolve_column, resolve_join, resolve_table
@@ -128,7 +128,7 @@ class SchemaRetrieverNode:
         # matches), then planning_k columns and relationships of those tables.
         self.table_k = ctx.settings.retrieval.table_k
         self.planning_k = ctx.settings.retrieval.planning_k
-        # Table recall past full_snapshot_max_tables (C-W4): the model is built on its first call only.
+        # Table recall past full_snapshot_max_tables: the model is built on its first call only.
         self.table_selector = ctx.settings.retrieval.table_selector
         self.selector_catalog_max = ctx.settings.retrieval.selector_catalog_max
         self.join_path_max_hops = ctx.settings.retrieval.join_path_max_hops
@@ -536,7 +536,7 @@ class SchemaRetrieverNode:
         """The relevant tables: every visible one when they fit, else the union of four steps.
 
         Vector search, the matched glossary ``terms``' tables, the table
-        selector's picks, and the tables that join them (wave_c.md, section 17).
+        selector's picks, and the tables that join them.
         """
         datasource_id = state.sub_query.datasource_id
         schema_version = state.sub_query.schema_version

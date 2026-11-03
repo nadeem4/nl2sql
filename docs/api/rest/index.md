@@ -13,7 +13,7 @@ Source: `packages/api/src/nl2sql_api/main.py`
   `NL2SQL.from_config()` (the file `NL2SQL_CONFIG` names, else `./nl2sql.yaml`)
   and calls `engine.check()` before it serves. A `required` datasource that
   fails, or no datasource ready at all, raises `EngineNotReady`: the API logs
-  the report and starts anyway (D208), so a restart loop never hides the reason.
+  the report and starts anyway, so a restart loop never hides the reason.
   `GET /ready` then answers `503 not_ready` and an admin reads each failing
   datasource and its stage under `problems`; an optional one that fails leaves
   the others serving. Any other failure of `check()` closes the engine and stops
@@ -143,7 +143,7 @@ The engine enforces RBAC; the API decides who is asking. `api.auth` picks one so
 | `static` | One role, `api.static_role`, for every request, with no user id. | `401` when `static_role` is unset |
 | `none` (default) | The local operator: `user_id: "local"` with the `policies.admin_roles`. | `403` unless the request is made straight to localhost |
 
-Under `none`, `nl2sql-api serve` refuses to bind a host that is not loopback (D205), and a request whose `Host` is not
+Under `none`, `nl2sql-api serve` refuses to bind a host that is not loopback, and a request whose `Host` is not
 `localhost`, `127.0.0.1` or `[::1]`, or that carries `X-Forwarded-For`, `Forwarded` or `X-Real-IP`, is a `403`, so a
 reverse proxy on the same host or a DNS-rebinding page is not taken for the operator.
 

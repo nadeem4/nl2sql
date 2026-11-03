@@ -1,4 +1,4 @@
-"""The conversation agent's prompt (docs/architecture/wave_c.md, section 3, "The model-led turn").
+"""The conversation agent's prompt.
 
 No braces here and no database dialect: the history and the tools reach the model as one JSON object in the
 human message, so this text is the only instruction it carries.

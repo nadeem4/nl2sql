@@ -170,7 +170,7 @@ def test_two_datasources_joined_on_customer_give_the_sqlite_answer(demo_project,
 
 @pytest.mark.e2e
 def test_a_key_declared_text_on_one_side_joins_after_coercion(demo_project, tmp_path):
-    # B30 (wave_a.md, D30): the support side declares its customer_id text,
+    # the support side declares its customer_id text,
     # Chinook's an integer. The validator accepts a number column declared as
     # text, the aggregator casts both sides to one type, and the answer is the
     # SQLite one.

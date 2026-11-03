@@ -1,4 +1,4 @@
-"""PostgreSQL partitions are folded into their parent when the schema is read (wave_c.md, section 18.3, C-W6).
+"""PostgreSQL partitions are folded into their parent when the schema is read.
 
 In the real Pagila, ``payment`` is partitioned into ``payment_p2022_01`` ...: the foreign keys are declared on
 the partitions, so the parent used to reach the planner with none.

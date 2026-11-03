@@ -1,4 +1,4 @@
-"""Wave D, D0a-1: the engine shapes the API and the web app build on (docs/architecture/wave_d.md, section 14)."""
+"""the engine shapes the API and the web app build on."""
 from __future__ import annotations
 
 import textwrap
@@ -23,7 +23,6 @@ embeddings: { provider: local }
 policies:   { allow_all: true }
 storage:    { path: .nl2sql }
 """
-
 
 def _load(tmp_path: Path, extra: str = "") -> Config:
     path = tmp_path / "nl2sql.yaml"

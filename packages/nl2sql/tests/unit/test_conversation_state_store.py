@@ -1,5 +1,5 @@
 """The state store at interface version 4: conversations, workspaces, dashboards, stored chart results and API
-keys (docs/architecture/wave_c.md, section 10), and migration 6."""
+keys, and migration 6."""
 from __future__ import annotations
 
 import sqlite3
@@ -134,7 +134,7 @@ def test_a_naive_or_z_stamp_compares_as_utc(store):
 
 
 def test_migration_6_adopts_a_0_8_state_file(tmp_path):
-    """A state.db that ran migrations 1 to 5 (release 0.8) gains only Wave C's tables, keeping its rows."""
+    """A state.db that ran migrations 1 to 5 (release 0.8) gains only tables, keeping its rows."""
     path = tmp_path / "state.db"
     with sqlite3.connect(path) as connection:
         connection.execute("CREATE TABLE nl2sql_meta (migration TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);")

@@ -1,4 +1,4 @@
-"""``nl2sql dashboards refresh`` (docs/architecture/wave_c.md, section 6, row D2).
+"""``nl2sql dashboards refresh``.
 
 The command is a thin face on ``engine.dashboards``: ``--dashboard`` refreshes one as the caller ``--as`` builds,
 ``--due`` calls ``run_scheduled`` so that cron can drive schedules. The charts run through a canned ``run_query``.

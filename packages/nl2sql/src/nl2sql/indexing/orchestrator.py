@@ -1,9 +1,9 @@
 """Builds one datasource's index entries and commits them by switching its build pointer.
 
-A build, in order (docs/architecture/phase2.md, section 4):
+A build, in order:
 
 1. The schema snapshot is stored in the state store, as an immutable row. It
-   holds only what the database said (B31): a model's draft never enters it,
+   holds only what the database said: a model's draft never enters it,
    and a person's words stay in the glossary. It gets a ``schema_version`` (an
    unchanged snapshot gets its old one), and nothing reads it yet.
 2. Every entry is embedded by the engine's embedder and written to the index
@@ -16,7 +16,7 @@ A build, in order (docs/architecture/phase2.md, section 4):
    are deleted, so a run that pinned the previous pointer keeps its entries.
 5. When the new version's structure differs from the version it replaced, the
    diff between them is stored beside the new version and ``schema.drifted``
-   is published (D31, docs/architecture/wave_a.md, section 10). A version
+   is published. A version
    whose statistics alone changed gets no diff.
 6. Its snapshots are deleted except the versions a pointer names (in any
    namespace), the one just replaced, and the newest
@@ -123,7 +123,7 @@ class IndexingOrchestrator:
         chunks = self._chunks(datasource_id, schema_snapshot, schema_version, curated)
 
         for issue in schema_snapshot.issues:
-            # The issue only: never the column's statistics or sample values (D15).
+            # The issue only: never the column's statistics or sample values.
             self._publish("index.column_failed", {"datasource_id": datasource_id, "table": issue.table,
                                                   "column": issue.column, "stage": issue.stage,
                                                   "message": self._issue_message(issue)})
@@ -166,7 +166,7 @@ class IndexingOrchestrator:
         ).build() + CuratedChunkBuilder(datasource_id, curated, schema_version).build()
 
     def _issue_message(self, issue: IndexIssue) -> str:
-        """What ``index.column_failed`` says of ``issue``, never a value from the data (D15).
+        """What ``index.column_failed`` says of ``issue``, never a value from the data.
 
         Reading a column's values or statistics can fail on a value (a cast
         error quotes it), so those two stages say only what failed and the

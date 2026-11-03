@@ -1,7 +1,7 @@
-"""Saving, listing, deleting and re-running a person's answers (docs/architecture/wave_d.md, section 18).
+"""Saving, listing, deleting and re-running a person's answers.
 
 A saved answer is a typed plan, not SQL and not rows. Re-running it is a normal ``run_query`` of that plan as the
-viewer (D240): the scope, the hooks, the validator and the approvals all apply, and nothing is shared across users.
+viewer: the scope, the hooks, the validator and the approvals all apply, and nothing is shared across users.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class Answers:
             raise NotSavable("That answer's source names no datasource, so it cannot be saved.") from e
         if found.trace_id != trace_id:
             raise NotSavable(f"Run '{trace_id}' is not the run of that step ({found.trace_id}).")
-        # The cap is read then written: hold the owner's lock so two saves at the limit cannot both pass (D242).
+        # The cap is read then written: hold the owner's lock so two saves at the limit cannot both pass.
         with self._ctx.state.lock(f"answers:{owner[0]}:{owner[1]}", ttl_s=_LOCK_TTL_S):
             mine = self._store.list(owner)
             answer = next((a for a in mine if a.trace_id == trace_id), None)  # saving twice keeps one answer
@@ -97,7 +97,7 @@ class Answers:
         except ValueError as error:  # the stored plan does not parse, or run_query refuses it at the call
             return QueryResult(status="error", errors=[_needs_fixing(str(error))])
         status, error = _classify(result)
-        if status == "needs_fixing":  # the schema has outgrown the plan: its owner asks again (D240)
+        if status == "needs_fixing":  # the schema has outgrown the plan: its owner asks again
             result = result.model_copy(update={"errors": [_needs_fixing((error or {}).get("message", "")),
                                                           *result.errors]})
         return result

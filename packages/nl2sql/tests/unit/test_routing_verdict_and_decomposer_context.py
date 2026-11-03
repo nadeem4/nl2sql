@@ -100,7 +100,7 @@ def _route(server, ds_ids, allowed=("*",), **state_kwargs):
     return resolved, prompt
 
 
-# --- B6: the verdict's subset is what goes forward ---------------------------
+# --- the verdict's subset is what goes forward ---------------------------
 
 
 def test_a_candidate_the_verdict_rejects_never_reaches_the_decomposer(serve):
@@ -146,7 +146,7 @@ def test_both_datasources_go_forward_when_the_verdict_accepts_both(serve):
     assert sorted(d.datasource_id for d in response.resolved_datasources) == ["chinook", "hr"]
 
 
-# --- B7: the decomposer sees descriptions and tables ---------------------------
+# --- the decomposer sees descriptions and tables ---------------------------
 
 
 def test_the_decomposer_prompt_carries_descriptions_and_sorted_table_names(serve):

@@ -1,4 +1,4 @@
-// A person's saved answers (wave_d.md, section 18). Every call is thin over a route of routes/answers.py; saving and
+// A person's saved answers. Every call is thin over a route of routes/answers.py; saving and
 // listing call no model, and a run is a normal run as the viewer. Another person's answer is a 404.
 import { request } from "./http.js";
 

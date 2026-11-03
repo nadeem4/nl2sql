@@ -420,7 +420,7 @@ def test_trace_replay_uses_the_cache_only_when_the_recorded_run_did():
     assert recorded_plan_cache_hit({}) is False
 
 
-# -- knowledge (wave_b.md, D57 and D47) ------------------------------------------
+# -- knowledge ------------------------------------------
 
 def _knowledge(definition):
     from nl2sql.knowledge.merge import LoadedSource, merge
@@ -472,7 +472,7 @@ def test_plan_whose_alternatives_were_all_dropped_for_the_caller_is_still_not_ca
 
 def test_an_ambiguity_flagged_on_an_earlier_attempt_keeps_the_plan_out_of_the_cache(store):
     # Attempt 1 offered another reading and its plan was rejected; attempt 2 is clear and executes. The
-    # question was still read two ways, so its plan is never cached (D47).
+    # question was still read two ways, so its plan is never cached.
     from nl2sql.pipeline.nodes.ast_planner.schemas import PlanAlternative
 
     other = PlanAlternative(label="Paying customers", plan=_plan("paying"))

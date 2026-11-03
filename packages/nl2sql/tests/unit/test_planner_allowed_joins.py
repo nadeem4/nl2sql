@@ -1,4 +1,4 @@
-"""The planner is told the allowed joins up front (wave_c.md, section 18.13, C-LT4).
+"""The planner is told the allowed joins up front.
 
 One [ALLOWED_JOINS] line per declared join between two tables it was sent, derived by the same helper the
 logical validator's join hint uses, so the prompt and the validator cannot disagree.

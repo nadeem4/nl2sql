@@ -1,4 +1,4 @@
-"""The ``replay`` provider (docs/architecture/wave_d.md, D209, row G2b).
+"""The ``replay`` provider.
 
 ``replay`` answers from recorded model output, with no key and no network, so
 the demo and a keyless Try-the-demo run the real pipeline. These tests build the

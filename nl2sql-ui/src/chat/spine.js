@@ -1,4 +1,4 @@
-// The live turn, as plain data: what a conversation stream's events (Wave A's names, plus `conversation.step` and
+// The live turn, as plain data: what a conversation stream's events (names, plus `conversation.step` and
 // `conversation.turn`) add up to. No React here, so `npm test` covers it with node's own test runner.
 //
 // `api/http.js` hands each frame over as `{event, data}`, where `data` is the whole Event as JSON: `name`, `at`,

@@ -1,4 +1,4 @@
-"""``llm_override=``: one call's own keys and models (docs/architecture/wave_d.md, D210, row G2a).
+"""``llm_override=``: one call's own keys and models.
 
 The run is a small graph with the pipeline's node names (as ``test_stream_query`` uses), so the override is
 observed from inside a real run, in the thread a real run uses. Keys are built at run time; nothing calls a model.

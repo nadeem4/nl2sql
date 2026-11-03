@@ -1,4 +1,4 @@
-"""``nl2sql review``: the review queue (docs/architecture/wave_b.md, section 5).
+"""``nl2sql review``: the review queue.
 
 * ``list``   -- the proposals the caller may see, newest first.
 * ``show``   -- one proposal, with the current glossary or curated value beside the proposed change.

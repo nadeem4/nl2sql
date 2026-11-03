@@ -1,4 +1,4 @@
-"""Curated answers end to end: the design's worked examples (a) to (d) on Chinook.
+"""Curated answers end to end: worked examples (a) to (d) on Chinook.
 
 Through the real CLI and the fake LLM, against the generated demo project. The
 module indexes one verified query into a private copy of the demo's index and

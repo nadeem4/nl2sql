@@ -10,7 +10,7 @@
 - Makes no model call.
 - Class: `ClarifierNode`
 - Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py`
-- Design: [Wave B, section 7](../wave_b.md#7-clarify-instead-of-guess) (D47).
+-.
 
 ---
 
@@ -72,7 +72,7 @@ for the datasource's knowledge digest.
 - Otherwise `ast_planner_response` with `alternatives` cut to the readings that
   passed and were not merged. `alternatives_offered` (every reading the
   planner gave, set by the planner node) is left as it is, so an answer with
-  readings is never cached (D47), even when none was left for this caller.
+  readings is never cached, even when none was left for this caller.
 - When it asks, also one `PipelineError`: `NEEDS_CLARIFICATION`, severity
   `INFO`, never retried. Its `details` carry what the result needs to build the
   `ClarificationRequest`: `phrase`, `datasource_id`, `schema_version`,
@@ -89,7 +89,7 @@ All of these hold:
 
 1. The planner named the phrase (`ambiguous_phrase`) and at least one
    alternative passed the checks and was not merged. A phrase the glossary
-   settles is not asked (D48): the flag and the alternatives are dropped and the
+   settles is not asked: the flag and the alternatives are dropped and the
    default plan goes on. A phrase is settled when a term's name equals it, or
    exactly one term lists it as a synonym (case-insensitive); "sales" listed by
    two terms stays open. The plan is still never cached, since the planner's

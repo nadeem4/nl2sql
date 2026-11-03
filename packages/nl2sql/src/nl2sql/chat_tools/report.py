@@ -1,8 +1,8 @@
-"""The ``report`` chat tool (docs/architecture/wave_c.md, section 4, "Reports").
+"""The ``report`` chat tool.
 
 Writes the conversation's answered turns up as Markdown through ``engine.conversations.report``: no model call.
-The stored output has no row data (D106); ask ``engine.conversations.report`` for the full report.
-Like every chat tool it imports only the top-level ``nl2sql`` and its own interface module (D109).
+The stored output has no row data; ask ``engine.conversations.report`` for the full report.
+Like every chat tool it imports only the top-level ``nl2sql`` and its own interface module.
 """
 from __future__ import annotations
 

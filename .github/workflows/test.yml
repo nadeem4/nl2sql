@@ -265,7 +265,7 @@ jobs:
           cache: npm
           cache-dependency-path: nl2sql-ui/package-lock.json
 
-      # The nl2sql-api wheel carries the built web app (D226), so it is built first.
+      # The nl2sql-api wheel carries the built web app, so it is built first.
       - name: Build the web app
         run: npm ci && npm run build
         working-directory: nl2sql-ui
@@ -313,7 +313,7 @@ jobs:
       - name: Import the API inside the image
         run: docker run --rm nl2sql-api:ci python -c "import nl2sql, nl2sql_api.main"
 
-      # `docker compose run --rm api nl2sql index` (D230).
+      # `docker compose run --rm api nl2sql index`.
       - name: The nl2sql command is installed
         run: docker run --rm nl2sql-api:ci nl2sql --help
 

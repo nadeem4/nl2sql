@@ -97,7 +97,7 @@ validation and executed is reused
   appended (`... | today=2026-10-12`): the planner is told today's date and
   writes relative dates as literals, so a plan from another day misses. So are
   the planner's model and the datasource's knowledge digest
-  (`... | knowledge=<sha256>`, Wave B D57): a changed definition plans again,
+  (`... | knowledge=<sha256>`): a changed definition plans again,
   and swapping the glossary back hits the old entries.
   Normalisation case-folds, collapses whitespace and strips trailing `.?!,;:`;
   the match is exact. No `schema_version`, no caching.
@@ -109,7 +109,7 @@ validation and executed is reused
 - **Written** by `wrap_subgraph` (`pipeline/graph_utils.py`) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
   and plan-only runs are not stored. Nor is a plan whose planner answer
-  carried alternatives or an `ambiguous_phrase` (D47), keyed on
+  carried alternatives or an `ambiguous_phrase`, keyed on
   `alternatives_offered`, so a reading `plan.after` or the caller's scope
   dropped still keeps the plan out of the cache. `alternatives_offered`
   carries over to a retry: a question an earlier attempt read two ways is
@@ -135,7 +135,7 @@ See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinis
    validator then checks like any other; a deny returns `plan=None` with
    `HOOK_DENIED` (or `HOOK_FAILED`), which is never retried. Return
    `ASTPlannerResponse` with the plan, `planner_plan` and reasoning. Each
-   alternative passes `plan.after` the same way; the clarifier (L1) decides
+   alternative passes `plan.after` the same way; the clarifier decides
    whether to ask.
 6. On exception, emit `PLANNING_FAILURE` error and return `plan=None`.
 

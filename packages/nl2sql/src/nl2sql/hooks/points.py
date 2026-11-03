@@ -1,4 +1,4 @@
-"""The six hook points and what a hook may answer at each (docs/architecture/wave_a.md, section 6).
+"""The six hook points and what a hook may answer at each.
 
 The first three come before the logical validator and may modify what the
 run carries; the last three come after it and may only stop it.

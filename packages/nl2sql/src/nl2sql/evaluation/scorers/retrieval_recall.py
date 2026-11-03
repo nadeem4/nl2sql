@@ -25,7 +25,7 @@ from nl2sql.policies import UserContext
 
 # Mode retrieval's runtime: the vector search runs on a schema of any size.
 # No model runs in this mode, so the table selector (a model call) is off: the run covers the vector search,
-# the glossary's tables and the join-path fill, and records the floor without the model (C-W4).
+# the glossary's tables and the join-path fill, and records the floor without the model.
 RETRIEVAL_CHANGES: Dict[str, Any] = {"settings.retrieval.full_snapshot_max_tables": 0,
                                      "settings.retrieval.table_selector": False}
 

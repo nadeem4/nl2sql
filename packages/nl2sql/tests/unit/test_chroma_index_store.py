@@ -1,4 +1,4 @@
-"""The ``chroma`` index store, on Chroma's public client API (docs/architecture/phase2.md, section 4).
+"""The ``chroma`` index store, on Chroma's public client API.
 
 The engine embeds and hands the store vectors; the store keeps entries in one
 collection per namespace, filters with ``Filter`` and records each

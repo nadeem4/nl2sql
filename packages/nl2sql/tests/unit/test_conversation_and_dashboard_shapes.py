@@ -1,4 +1,4 @@
-"""Wave C's shared shapes (docs/architecture/wave_c.md, row C0a): models, config, codes, events, registry kind.
+"""shared shapes: models, config, codes, events, registry kind.
 
 Nothing here runs a conversation, a chart or a dashboard: those arrive in later PRs. These tests hold the
 names and the strictness every later PR builds on.
@@ -101,7 +101,7 @@ def test_the_new_sections_load_from_a_file_on_disk(tmp_path):
 
 def test_conversation_is_an_agent(tmp_path):
     assert "conversation" in get_args(AgentName)
-    assert "conversation_rewriter" not in get_args(AgentName), "the first draft's rewrite agent is gone (D101)"
+    assert "conversation_rewriter" not in get_args(AgentName), "the first draft's rewrite agent is gone"
     config = make_config(tmp_path, llm={"provider": "openai", "model": "gpt-test",
                                         "agents": {"conversation": {"model": "gpt-mini"}}})
     assert config.llm.agents["conversation"].model == "gpt-mini"
@@ -137,17 +137,17 @@ OTHER_CODES = ["TOOL_FAILED", "TOOL_NOT_APPLICABLE", "UNKNOWN_CHAT_TOOL"]
 
 
 @pytest.mark.parametrize("code", NEVER_RETRIED)
-def test_wave_c_codes_that_end_a_step_are_never_retried(code):
+def test_conversation_codes_that_end_a_step_are_never_retried(code):
     error = PipelineError(node="n", message="m", severity=ErrorSeverity.ERROR, error_code=ErrorCode(code))
     assert not error.is_retryable
 
 
 @pytest.mark.parametrize("code", OTHER_CODES)
-def test_the_other_wave_c_codes_exist(code):
+def test_the_other_conversation_codes_exist(code):
     assert ErrorCode(code).value == code
 
 
-def test_wave_c_exceptions_have_the_designed_bases():
+def test_conversation_exceptions_have_the_expected_bases():
     from nl2sql.common import errors
 
     for name in ("ConversationNotFound", "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound"):
@@ -159,7 +159,7 @@ def test_wave_c_exceptions_have_the_designed_bases():
 
 # ---------------------------------------------------------------- events
 
-WAVE_C_EVENTS = {  # name: is a run event
+CONVERSATION_EVENTS = {  # name: is a run event
     "conversation.started": False, "conversation.step": True, "conversation.turn": True, "chat_tool.called": True,
     "dashboard.generated": False, "dashboard.refreshed": False, "dashboard.changed": False,
     "dashboard.schedule_set": False, "dashboard.schedule_stopped": False, "workspace.changed": False,
@@ -169,12 +169,12 @@ AUDITED = {"datasource.saved", "api_key.created", "api_key.revoked", "mcp.denied
            "dashboard.schedule_stopped"}
 
 
-def test_wave_c_events_are_catalogued():
+def test_conversation_events_are_catalogued():
     from nl2sql.events.catalog import AUDIT_EVENTS, CATALOG, STREAM_EVENTS
 
-    for name, run in WAVE_C_EVENTS.items():
+    for name, run in CONVERSATION_EVENTS.items():
         assert CATALOG[name].run is run, name
-        assert name not in STREAM_EVENTS, f"{name} is not on the run stream (conversations.stream adds its own, A4)"
+        assert name not in STREAM_EVENTS, f"{name} is not on the run stream (conversations.stream adds its own)"
     assert AUDITED <= AUDIT_EVENTS
     assert not ({"conversation.turn", "dashboard.changed", "workspace.changed"} & AUDIT_EVENTS)
     CATALOG["conversation.step"].model(conversation_id="c", turn=1, tool="ask", status="ok", trace_id="t",
@@ -254,7 +254,7 @@ def _tile_run():
 
 
 def _models():
-    """Every Wave C model, as (class, a valid instance)."""
+    """Every model, as (class, a valid instance)."""
     from nl2sql.api.query_api import QueryResult
     from nl2sql.chat_tools import ChatToolInfo, ToolOutput
     from nl2sql.charts.spec import ChartData, Encoding
@@ -298,7 +298,7 @@ def _models():
     ]
 
 
-def test_wave_c_models_are_strict():
+def test_conversation_models_are_strict():
     for model, instance in _models():
         assert model.model_config.get("extra") == "forbid", model.__name__
         data = instance.model_dump(mode="json")
@@ -326,7 +326,7 @@ def test_a_stored_step_holds_a_result_without_rows():
     result = QueryResult(sub_queries=[SubQueryResult(id="sq1", rows=RowSample(columns=["n"], rows=[[1]],
                                                                              total_rows=1))])
     step = ToolStep(call=ToolCall(name="ask"), status="ok", result=result)
-    assert step.result.sub_queries[0].rows is not None, "stripping rows is the conversation store's job (C1)"
+    assert step.result.sub_queries[0].rows is not None, "stripping rows is the conversation store's job"
 
 
 def test_the_chart_spec_has_four_kinds():

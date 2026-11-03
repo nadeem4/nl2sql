@@ -1,7 +1,7 @@
 """Prompts teach the task, not the evaluation: no prompt repeats a question from an evaluation suite.
 
 A worked example in a prompt that is also a suite question teaches the model the answer and
-inflates the keyed check (wave_c.md, 18.12). Examples come from a domain no suite uses.
+inflates the keyed check. Examples come from a domain no suite uses.
 
 Every ``prompts.py`` (and ``prompts/`` module) under ``nl2sql``, plus the table selector, is
 checked. The 5-word check catches a copied question, not a paraphrase of one; ``BANNED`` lists

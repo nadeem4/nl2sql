@@ -1,4 +1,4 @@
-"""``nl2sql keys``: the API keys MCP over HTTP verifies (docs/architecture/wave_c.md, section 9; D127).
+"""``nl2sql keys``: the API keys MCP over HTTP verifies.
 
 * ``create`` -- a key for a user and roles; the token is printed once.
 * ``list``   -- the keys, never a secret.

@@ -32,7 +32,7 @@ ROLES = set(CHINOOK_POLICIES)
 # alternatives and plan -- every key in its written order, so a row's column
 # order is pinned too -- computed from chinook_gold.yaml and
 # chinook_gold_plans.yaml with the 0.6 loader before they were deleted
-# (wave_a.md, section 8). The data never changes; only the keys around it did.
+#. The data never changes; only the keys around it did.
 GOLD_DIGEST = "72d28a8507eeb1af1e86204ef778a34f3f974b6d968aa14cf150739d58d071cb"
 
 

@@ -1,15 +1,4 @@
-# Curated Answers (design)
-
-!!! note "Status: partly built"
-    The config and its checks (PR 1), indexing and candidates (PR 2),
-    matching and running verified queries (PR 3), the playground badge, the
-    demo file and `nl2sql curated test` (PR 4), preferred tables (PR 5) and
-    feedback proposals (PR 6) are built; see
-    [Curated answers](../configuration/curated.md) and
-    [Datasources](../configuration/datasources.md#preferred-tables) for how to
-    use them. Each pull request in
-    [Implementation plan](#implementation-plan) updates this page and the
-    reference docs it touches.
+# Curated Answers
 
 ## Goal
 
@@ -19,15 +8,15 @@ so. If it has not, run today's pipeline unchanged.
 
 Curated answers come in three kinds:
 
-| Kind | What the data team writes | Where | This milestone |
+| Kind | What the data team writes | Where | Status |
 | --- | --- | --- | --- |
 | **Verified queries** | A SQL query with typed parameters, and the questions it answers | the `curated` section (`curated.yaml`) | Built |
 | **Preferred tables** | Views or tables the planner should reach for first | each datasource's `preferred_tables:` | Built |
-| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Designed only, [deferred](#business-metrics-deferred) |
+| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Not built, [deferred](#business-metrics-deferred) |
 
 A thumbs-up on a generated answer becomes a *proposal* for a verified query
 in the review queue, which a person reviews and accepts. Nothing writes
-`curated.yaml` but a person's accept (Wave B, D42: see
+`curated.yaml` but a person's accept (see
 [The review queue](../configuration/review.md)).
 
 ## Who does what
@@ -136,8 +125,7 @@ datasources:
 `DatasourceConfig` (`nl2sql/datasources/models.py`) gains
 `preferred_tables: List[str] = []`. The package never creates a view: the data
 team creates them in their own database, and `nl2sql index` picks them up as
-it picks up any table (every built-in adapter snapshots views; see
-[Views in snapshots](#open-questions)). A name is the bare table name or
+it picks up any table (every built-in adapter snapshots views). A name is the bare table name or
 `schema.table`, case ignored. One that is not in the indexed schema is a
 warning in `nl2sql doctor` and the index status, not an error.
 
@@ -220,8 +208,8 @@ would delete it. `IndexingOrchestrator.index_datasource()` therefore appends
 the curated chunks (built by a small `CuratedChunkBuilder`) to the schema
 chunks before it writes the build.
 
-Changing `curated.yaml` does **not** need a schema re-index (a change from the
-agreed design; see [Re-index cost](#open-questions)).
+Changing `curated.yaml` does **not** need a schema re-index (the index holds the schema
+only).
 `nl2sql index --refresh` writes a new build per datasource through the
 same write, switch and clean-up as any other, except that every entry is
 rendered again from the live build's stored snapshot and the entries that did
@@ -287,9 +275,9 @@ When it does not answer, the matcher returns nothing but its own trace record
 and the run continues at `datasource_resolver` as if it were not there. When
 the run is plan-only (`execute=False`) the matcher is skipped.
 
-A refinement made in PR 3: the node is added to the graph only when curated
+The node is added to the graph only when curated
 answers are on (a `curated` section with at least one verified query) and the run executes, or pins a supplied
-verified query (with `execute=False` the matcher checks it and runs nothing; wave_c.md, D2). Otherwise `datasource_resolver` stays the entry
+verified query (with `execute=False` the matcher checks it and runs nothing). Otherwise `datasource_resolver` stays the entry
 point, so with no curated file the graph, the trace and the answer are exactly
 what they were before, rather than gaining a node that does nothing. The
 first diamond above is therefore decided once when the graph is built
@@ -405,7 +393,7 @@ generated, `source = {type: "generated"}`.
 **(c) A missing or out-of-range value.** "Who are our top customers by
 revenue?" matches, but `year` has no default and the question gives none: the
 model leaves it empty and the run falls back (`param_missing`). Asking the
-user "which year?" belongs to the later Conversation milestone. "Top 500
+user "which year?" belongs to conversations. "Top 500
 customers in 2012" matches with `n=500`, beyond `max: 100`, and falls back
 (`param_invalid`); the generated pipeline then answers it under its own row
 limit.
@@ -506,7 +494,7 @@ Every answer says where it came from:
   similarities, the floor, the model's choice and reason, the params after
   checking, and the fallback reason code if it fell back.
 - The playground shows a badge on the answer, "Verified · top_customers_by_revenue",
-  with the params on hover. A generated answer shows no badge. Built in PR 4
+  with the params on hover. A generated answer shows no badge. Shown
   beside the question, in the shape of the *Recorded run* label rather than
   next to the plan-cache line, which only Debug shows: whether an answer was
   verified matters to every reader. The Plan station, which has no plan to
@@ -514,49 +502,11 @@ Every answer says where it came from:
 
 ## Feedback proposals
 
-!!! note "Replaced in 0.8"
-    `nl2sql curated proposals export` and its file writer are gone. A
-    thumbs-up now files a `verified_query` proposal in the review queue, and
-    an admin's accept writes `curated.yaml` (Wave B, Q1:
-    [The review queue](../configuration/review.md)). The section below is the
-    0.4 design, kept as history.
-
-A thumbs-up on a generated answer is already stored, one row per run, in the
-`feedback` table of the state store (`nl2sql/storage/sqlite.py`), with the question, role, status
-and SQL. That row is the proposal; nothing new is stored and nothing writes
-`curated.yaml`.
-
-`nl2sql curated proposals export --out curated.proposals.yaml` turns
-thumbs-up runs into draft verified queries in `curated.yaml`'s shape, under
-the datasource the run used: an id derived from the question (a slug, `_2`
-on a clash), a description placeholder, the question as the one phrasing,
-no params, and the run's SQL with its literal values, under a header telling
-the reviewer to replace literals with `{params}`/`:params`, drop the row-cap
-`LIMIT` the generator added, and move the entry into `curated.yaml`. Without
-`--out` it prints to stdout. It is modelled on `nl2sql feedback export --good`
-(`feedback/drafts.py`), and like it skips runs with no SQL or more than one
-statement, refuses to write over the config's own files (`nl2sql.yaml` and
-every file it includes), and lives in `nl2sql.feedback.proposals` (opt-in, imported
-lazily by the command). It also skips runs whose answer was already
-verified, runs that did not succeed, runs on more than one datasource and
-rows rated before the datasource was recorded, and proposes each question
-once per datasource, from its newest thumbs-up. Built in PR 6.
-
-The id comes from the question rather than the trace id (the first draft of
-this design said `proposal_<trace id prefix>`) because a reviewer keeps it:
-`how_many_customers_are_in_brazil` reads as what the query is, a trace prefix
-does not. The description is a placeholder rather than the question, so an
-unreviewed entry is obvious.
-
-Two refinements of the agreed design. First, there is no separate "approved"
-state: the person reviewing the exported drafts and committing them is the
-approval, as for gold drafts. Second, the feedback row does not record the
-datasource or the answer's source today, so the `feedback` table gains two
-nullable columns, `datasource_ids` and `source`, written by
-`feedback/record.py`'s `run_record()`.
-
-`curated.yaml` stays the single source of truth, in git. Neither the REST API
-nor the playground ever writes it.
+A thumbs-up on a generated answer files a `verified_query` proposal in the
+review queue. Nothing writes `curated.yaml` but an admin's accept (see
+[The review queue](../configuration/review.md)), so `curated.yaml` stays the
+single source of truth, in git. Neither the REST API nor the playground writes
+it any other way.
 
 ## Demo
 
@@ -591,7 +541,7 @@ a question whose recorded choice picked a query as covered too.
 | `settings.curated.match_top_k` | `5` | Candidates shown to the model (0.4's `CURATED_MATCH_TOP_K`). |
 
 The floor is a similarity in the configured embedding model's space, and
-models spread their scores differently. PR 2 calibrated it on the local ONNX
+models spread their scores differently. It was calibrated on the local ONNX
 model (`all-MiniLM-L6-v2`) with five Chinook verified queries (the example
 above, revenue by year, best-selling genre, tracks per artist, revenue by
 country) and the best candidate's similarity for 24 questions:
@@ -612,7 +562,7 @@ open: it needs the owner's key.
 
 ## Invariants this touches
 
-No invariant is weakened. PR 3 made these changes in
+No invariant is weakened. These changes are recorded in
 [`invariants.md`](invariants.md), each with its enforcement point:
 
 - New: **Verified SQL is human-authored, read-only and parameter-bound.** The
@@ -627,14 +577,11 @@ No invariant is weakened. PR 3 made these changes in
   exists, on every path" becomes "on every generated path"; a verified path
   has no AST, and its checks are the matcher's.
 
-`invariants.md` was not edited in the design PR, because its sections name
-enforcement points and none existed then; PR 3 added them.
-
 ## Deferred and out of scope
 
 ### Business metrics (deferred)
 
-The format is fixed in this milestone (`metrics:` in `curated.yaml`, parsed
+The format is fixed (`metrics:` in `curated.yaml`, parsed
 and validated), but nothing uses it yet. The sketch:
 
 - Each metric is indexed as the existing, so far unused, `schema.metric`
@@ -664,114 +611,4 @@ first, so the planner gets a retry rather than a dead end.
 - **Per-sub-query matching**, so one part of a multi-part question can be
   verified and the rest generated.
 - **Asking a follow-up question** for a missing value, instead of falling
-  back; that is the Conversation milestone.
-
-## Implementation plan
-
-Six pull requests for verified queries and preferred tables, each written
-test first and each updating its docs in the same PR (this page,
-`configuration/`, the node catalog, the CLI and REST references).
-
-**1. Config, loader and `nl2sql curated validate`.**
-`nl2sql/configs/curated.py`, `ConfigManager.load_curated()`, the
-`CURATED_CONFIG` and `CURATED_ENABLED` settings, the startup load in
-`Runtime`, the read-only and placeholder checks, `CuratedAPI.validate()`
-and `cli/commands/curated.py`. New page `docs/configuration/curated.md`; the
-settings table in `configuration/system.md`.
-Tests: `tests/unit/test_curated_config.py` (models, unique ids,
-placeholder and param agreement, defaults against types),
-`tests/unit/test_curated_sql_checks.py` (one statement, read-only, writes and
-DDL refused, CTEs, placeholders read in every built-in dialect),
-`tests/unit/test_cli_curated_validate.py` (report and exit codes, a table
-missing from the indexed schema), and a startup test that a broken file fails
-`Runtime`.
-
-**2. Indexing, staleness and candidates.**
-`VerifiedQueryChunk`, `CuratedChunkBuilder`, the orchestrator writing curated
-chunks in the datasource's build, `curated_hash:<id>` in the collection
-metadata, `IndexHealth.warnings`, the `doctor` line,
-`VectorStore.retrieve_verified_query_candidates()` and
-`CURATED_MATCH_TOP_K`; calibrating `CURATED_MATCH_FLOOR` (the setting lands
-here, its use in PR 3); `nl2sql index --curated-only`.
-Tests: `tests/unit/test_curated_chunks.py` (placeholder filling, ids,
-metadata), `tests/unit/test_vector_store_curated.py` (same build as schema, a
-schema re-index keeps them, active-build and datasource filters, de-dup by
-query, the curated-only refresh), `tests/unit/test_index_health_curated.py`
-(hash changed is a warning and `ok` stays true),
-`tests/unit/test_index_curated_refresh.py` (a curated-only refresh reads no
-schema, makes no model call and keeps the schema entries).
-
-**3. The matcher and execution.**
-The `curated_matcher` node and its prompt, `VerifiedQueryChoice`, param
-checks, the access check, `SUPPORTS_BOUND_PARAMETERS` in the SDK, parameters
-in the SQLAlchemy base adapter, `ExecutorRequest.parameters` and `max_rows`,
-the graph's new entry point and route, `CURATED_MATCH_FLOOR`, `source` on
-`QueryResult`, `plan_source="verified"`, `LLM_AGENTS` and `PIPELINE_STEPS`,
-the trace record, and the invariant edits above.
-Tests: `tests/unit/test_curated_params.py`, `tests/unit/test_curated_matcher.py`
-(each fallback reason), `tests/sqlalchemy_base/test_bound_parameters.py`
-(values bound, never interpolated: a value of `1; DROP TABLE x` is a value),
-`tests/unit/test_sql_executor_max_rows.py`, an entry in
-`tests/architecture/test_boundaries.py` if the SDK change needs one,
-`tests/unit/test_pipeline_steps.py` (already fails until the step is listed),
-and `tests/e2e/test_curated_fake_llm.py`, worked examples (a) to (d) end to
-end against Chinook with `FakeLLMServer` rules keyed on `VerifiedQueryChoice`,
-plus a run with no curated file whose graph and answer match today's.
-
-**4. Playground badge, demo file and `nl2sql curated test`.**
-The badge in `web/playground/src/`, `curated.demo.yaml` written by the demo,
-`CURATED_CONFIG` in the env template, `CuratedAPI.test()` and the command.
-Tests: a vitest case beside `results.test.js` for the badge,
-`tests/e2e/test_playground_curated_fake_llm.py`, `tests/unit/test_cli_curated_test.py`
-(a renamed column fails), and the demo setup test for the new file. The owner
-then re-records the demo answers. *Built.* `nl2sql curated test` binds each
-param's `default`, else its `example`, runs the query read-only through the
-adapter (the static checks first, only the first batch of rows fetched) and
-exits 1 on any failure; `CuratedAPI.test()` returns the report.
-
-**5. Preferred tables.**
-`DatasourceConfig.preferred_tables`, the ordering in the schema retriever for
-both the full-snapshot and the retrieval paths, planner instruction 14, views
-in the SQLAlchemy base adapter's snapshot, and the index health warning for a
-preferred table that is not indexed.
-Tests: `tests/unit/test_schema_retriever_preferred.py` (ordering, the
-*preferred* marker, a denied preferred table still hidden),
-`tests/unit/test_datasource_preferred_tables.py` (config, registry, warning)
-and `tests/adapters/unit/test_snapshot_views.py` (SQLite and DuckDB).
-
-**6. Feedback proposals.**
-The two feedback columns, `nl2sql.feedback.proposals`, and
-`nl2sql curated proposals export`.
-Tests: `tests/unit/test_curated_proposals.py` (shape, skips, refusal to write
-over `curated.yaml`), and a store migration test for the new columns. Built.
-
-**Gold data.** No existing gold entry changes. Tier 1 runs hand-written plans
-through the code nodes, and a verified answer has no plan, so tier 1 runs with
-curated answers off (it sets no `CURATED_CONFIG`, and PR 3 makes that explicit
-in `evaluation/tier1.py`) and needs no new entries. The verified path's own
-end-to-end check is the fake-LLM test in PR 3. Measuring how often real
-questions hit a verified query belongs to a later tier 2 run, with new entries
-added beside the existing ones, never in place of them.
-
-## Open questions
-
-- **The floor.** Is one global `CURATED_MATCH_FLOOR` enough, or does each
-  embedding model need its own default? Measured on the local model in PR 2
-  (0.6, see [Settings](#settings)); OpenAI's embeddings are not measured yet.
-- **Views in snapshots.** Resolved in PR 5: no built-in adapter did. All five
-  (SQLite, PostgreSQL, MySQL, SQL Server, DuckDB) snapshot through the
-  SQLAlchemy base, which read only `get_table_names()`. It now reads
-  `get_view_names()` too, and a driver that cannot list views logs a warning
-  and keeps its tables. PostgreSQL materialized views are still not read.
-- **Re-index cost.** Resolved in PR 2: a `curated.yaml` change must not cost
-  a schema re-read or a model call. `nl2sql index --refresh` (`--curated-only`
-  before 0.8) renders the entries again from the stored snapshot, keeps the
-  stored vectors of those that did not change, embeds the verified queries and
-  switches to the new build. A
-  flag rather than detecting "only `curated.yaml` changed" on a plain
-  `nl2sql index`, because knowing whether the schema changed means reading it.
-- **The synthesizer's context.** Resolved in PR 3: on a verified answer the
-  answer synthesizer is given the query's qualified id and description, in a
-  *Verified Query* section added to its prompt, so it can say "invoiced
-  revenue, before refunds" rather than guess what the numbers mean. A
-  generated answer's prompt is unchanged.
+  back; that is conversations.

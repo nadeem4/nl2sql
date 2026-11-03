@@ -5,7 +5,7 @@ config (``demo_config``).
 and one file per section, ``datasources/<id>.yaml``, ``knowledge.yaml`` and a ``glossary.yaml`` for the ``yaml``
 knowledge source. ``init_project`` builds the config and calls it; so will ``nl2sql launch``. ``NL2SQL.demo()``
 builds on ``demo_config``, and ``init_project(demo=True)`` writes ``demo_config`` out as files, so the two cannot
-drift apart. See docs/architecture/configuration_v2.md, section 10, and docs/architecture/wave_c.md, section 7.
+drift apart.
 
 A secret is never written into YAML (``nl2sql.config.writer``): ``init_project`` writes none, and the provider's
 standard variable is the fallback.
@@ -245,7 +245,7 @@ def write_project(
     at its default is left out. ``extra`` maps a path in ``folder`` to the text to write there, or the file to copy;
     ``headers`` maps a section (``settings``, ``curated``, ``evals``) to the comment its file starts with.
 
-    A secret field is written as a reference (D122): a literal becomes ``${env:NL2SQL_<PATH>}`` with its value in
+    A secret field is written as a reference: a literal becomes ``${env:NL2SQL_<PATH>}`` with its value in
     ``folder/.env`` when ``env_file`` is set, and is refused otherwise. A datasource connection key is a secret when
     its name says so or its adapter's connection model declares it so; ``registry`` (default ``Registry.default()``)
     is where the adapter is found.
@@ -374,7 +374,7 @@ def _relative(path: Path, folder: Path) -> str:
 TOC_HEADER = """\
 # nl2sql.yaml: the table of contents. Each section is in its own file, relative
 # to this one. A section can also be written inline here instead.
-# See architecture/configuration_v2 in the docs.
+# See configuration/system in the docs.
 """
 
 EXAMPLE_DATASOURCE = """\

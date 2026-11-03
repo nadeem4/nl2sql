@@ -1,10 +1,9 @@
 # Dashboards
 
-!!! note "Partly built (Wave C, 0.9)"
-    Workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`, `refresh`,
-    stored results and schedules (D2), and so do filters and `filter_values` (D2b), `generate` and
-    `suggest_questions`, the starter dashboard (D3), and building in chat (D4). The design is
-    [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
+!!! note "Partly built (release 0.9)"
+    Workspaces, the dashboard store, `pin`, `move` and the manual edits work, and so do `open`, `refresh`,
+    stored results and schedules, and so do filters and `filter_values`, `generate` and
+    `suggest_questions`, the starter dashboard, and building in chat. 
 
 A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
 private workspace. Opening one serves stored results after the access check; refreshing re-runs the
@@ -125,7 +124,7 @@ run = engine.dashboards.refresh(board.id, tile_id="t3", user_context=me)   # one
 | **Only what is old** | With `refresh_due=True` (the default) `open` then refreshes the charts older than the schedule's `every_minutes` (or never run), as the caller. A dashboard with no schedule has nothing due. An app that wants an instant open passes `False` and refreshes the ids in `view.due`. |
 | **`needs_fixing`** | A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is `needs_fixing` with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn: [`replace_plan`](#building-in-chat). |
 | **Cost guard** | A hook that wants a person's yes makes the chart `needs_approval`: it is not run, keeps its last result, and the request is in the run's `approvals_needed`. Pass an `Approval` for it to a **manual** `refresh(approvals=[...])`. `open` and a schedule never approve. |
-| **Caps** | A chart stopped at a Wave A cap (`stopped`) ends the refresh; the rest are `stopped` too and keep their last result. |
+| **Caps** | A chart stopped at a cap (`stopped`) ends the refresh; the rest are `stopped` too and keep their last result. |
 | **No double runs** | A refresh holds the state store's lock `dashboard-refresh:<id>`. A second `refresh` on the same dashboard raises `DashboardBusy`; `open` leaves the charts due; a schedule skips it. |
 
 Each refresh publishes `dashboard.refreshed` (the counts per status and the ids of the filters applied; the
@@ -226,7 +225,7 @@ engine.dashboards.suggest_questions("sales", user_context=me, n=5)         # the
 ```
 
 **What it reads.** Each column gets a role from the indexed snapshot alone (no query): what the schema proves (a
-key is an *identifier*, a date type a *date*), then Wave B's name and statistics rules (`money`, `quantity`,
+key is an *identifier*, a date type a *date*), then name and statistics rules (`money`, `quantity`,
 `enum`, a date held as text), and a role in `glossary.yaml` for that column wins over both. The dashboard reads
 them as a **measure** (`money`, `quantity`, on a number column), a **time** (`date`), a **dimension** (`enum`, or a
 text column with 2 to `charts.max_categories` (20) distinct values) or an **identifier**, which is never

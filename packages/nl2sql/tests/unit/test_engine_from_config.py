@@ -1,7 +1,6 @@
 """The engine built from a ``Config``: construction, ``check()``, ``close()`` and the ways to create one.
 
-docs/architecture/configuration_v2.md, section 4 ("Creating the engine",
-"Lifecycle") and the PR 7a row of section 11.
+Creating the engine from a config, and its lifecycle.
 """
 from __future__ import annotations
 

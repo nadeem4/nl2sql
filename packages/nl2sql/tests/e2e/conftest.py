@@ -40,7 +40,6 @@ project_config(..., storage=private_storage(demo_project, tmp_path / "store")),
 or copy_demo(demo_project, tmp_path / "demo") for a whole project.
 """
 
-
 def _pristine(root: Path) -> Path:
     """Where the session demo project's indexed ``.nl2sql`` is kept; nothing opens it."""
     return root.parent / f"{root.name}-store"

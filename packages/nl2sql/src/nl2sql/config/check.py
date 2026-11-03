@@ -1,7 +1,6 @@
 """``check_config``: the whole config checked without starting the engine, for ``nl2sql config check``.
 
-Steps 1, 2a and 2b of loading (docs/architecture/configuration_v2.md,
-section 6): ``load_config`` reads every file, applies the includes and
+Steps 1, 2a and 2b of loading: ``load_config`` reads every file, applies the includes and
 resolves ``${env:...}``; ``Runtime.components`` loads every name the config
 uses through the registry (interface version, installed drivers) and builds
 the components without connecting. With ``connect``, step 3 too: each

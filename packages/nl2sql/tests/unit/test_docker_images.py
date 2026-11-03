@@ -117,7 +117,7 @@ def test_api_image_installs_the_five_adapters_and_the_sql_server_driver():
 
 
 def test_api_image_installs_the_cli():
-    """D230: the image carries `nl2sql`, so `docker compose run --rm api nl2sql index` works; its build uses it too."""
+    """the image carries `nl2sql`, so `docker compose run --rm api nl2sql index` works; its build uses it too."""
     text = _image_text()
 
     assert "COPY ./nl2sql-cli /app/nl2sql-cli" in text

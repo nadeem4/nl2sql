@@ -1,5 +1,5 @@
 """Reads over a real engine: a datasource the caller's scope hides is not found, whichever route asks (no existence
-oracle), and a non-admin never gets a driver's text (docs/architecture/wave_d.md, row A3)."""
+oracle), and a non-admin never gets a driver's text."""
 import logging
 import sqlite3
 

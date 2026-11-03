@@ -1,4 +1,4 @@
-"""``/api/v1/conversations`` and ``/chat-tools``: the chat routes over a real engine (docs/architecture/wave_d.md, A2a).
+"""``/api/v1/conversations`` and ``/chat-tools``: the chat routes over a real engine.
 
 The engine is the real facade. Its conversation model is a ``FakeLLMServer`` answering the ``ModelStep`` schema from a
 script the test fills; an ``ask`` step is ``QueryAPI.run_query`` replaced by a function returning canned

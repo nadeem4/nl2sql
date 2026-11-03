@@ -1,4 +1,4 @@
-"""The page, its assets, the clips and the social card (docs/architecture/wave_d.md, "nl2sql-api serve", A4b)."""
+"""The page, its assets, the clips and the social card."""
 import re
 
 import pytest

@@ -1,8 +1,8 @@
-"""The ``dashboard_pin`` chat tool (docs/architecture/wave_c.md, sections 4 and 6).
+"""The ``dashboard_pin`` chat tool.
 
 Saves the dashboard being built, whole, through ``engine.dashboards.pin``. A chart is never pinned alone, and the
 model is told to call this only when the user asks. No model call. Like every chat tool it imports only the
-top-level ``nl2sql`` and its own interface module (D109).
+top-level ``nl2sql`` and its own interface module.
 """
 from __future__ import annotations
 

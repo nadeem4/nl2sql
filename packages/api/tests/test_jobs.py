@@ -1,4 +1,4 @@
-"""Background jobs: one worker, in memory, owned by the caller (docs/architecture/wave_d.md, D206 and "Jobs")."""
+"""Background jobs: one worker, in memory, owned by the caller."""
 import asyncio
 import json
 import threading

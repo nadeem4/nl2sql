@@ -4,7 +4,7 @@ import { cancelJob, followJob } from "../api/jobs.js";
 import { startDemo } from "../api/meta.js";
 import { HOSTED_STEPS, demoFlow } from "./startScreen.js";
 
-// The start screen (wave_d.md, section 4), shown on Home while `GET /meta` says `start`. Two choices.
+// The start screen, shown on Home while `GET /meta` says `start`. Two choices.
 //
 // - Empty project (`choose`): Try the demo adds the sample databases and indexes them (`POST /jobs/demo`, admin), then
 //   opens Chat; Connect your database goes to the Connect page. A caller who is not an admin is told, not offered.

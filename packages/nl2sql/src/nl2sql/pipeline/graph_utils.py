@@ -141,7 +141,7 @@ def wrap_subgraph(
 
     The clarifier may ask which reading was meant only when the run's
     ``clarify`` (in the scan payload) is on and the sub-query is the run's
-    only one (D47). A
+    only one. A
     sub-query that asked ends with status ``needs_clarification`` and its
     ``NEEDS_CLARIFICATION`` (INFO) as its error; no SQL is missing.
     """
@@ -220,7 +220,7 @@ def wrap_subgraph(
             e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
         )
         planner_plan = planner_response.planner_plan if planner_response else None
-        # Nor is a plan whose planner answer carried other readings (D47), read from what the planner
+        # Nor is a plan whose planner answer carried other readings, read from what the planner
         # offered, before plan.after or a caller's scope dropped any: a later caller allowed a dropped
         # reading must be asked, so a later run asks the planner again.
         ambiguous = bool(planner_response and (planner_response.alternatives_offered or planner_response.alternatives

@@ -207,7 +207,7 @@ class CuratedMatcherNode:
         """The error a supplied verified query ends the run with, in place of a fallback to a model run.
 
         A caller that supplied the query asked for that query: a refresh must not spend tokens on a
-        different one (wave_c.md, D132). A role that may not read it is ``SECURITY_VIOLATION``, a failed
+        different one. A role that may not read it is ``SECURITY_VIOLATION``, a failed
         run of it ``EXECUTION_FAILED``, and an unknown query or a bad value ``INVALID_STATE``.
         """
         codes = {"policy_denied": ErrorCode.SECURITY_VIOLATION, "execution_failed": ErrorCode.EXECUTION_FAILED}
@@ -295,7 +295,7 @@ class CuratedMatcherNode:
     def _checked(self, state: GraphState, ds_id: str, query: VerifiedQuery, params: Dict[str, Any],
                  tables: List[str]) -> Dict[str, Any]:
         """A verified query that passed every check, not run (``execute`` off): its one sub-query is done with its
-        SQL and no result, so the run ends ``plan_only`` (wave_c.md, D135: a dashboard's access check).
+        SQL and no result, so the run ends ``plan_only``.
 
         A verified query has no plan, so ``execute.before`` is its only hook point: it is asked here too, without
         the cost hook (nothing runs), and a ``Deny`` ends the run as a denial. A ``NeedsApproval`` passes: it
@@ -380,7 +380,7 @@ class CuratedMatcherNode:
         # The verified path has no plan: only the execute points apply to it.
         fields = self._hook_fields(state, sub_query, query, params, tables)
         verdict = self.hooks.call("execute.before", **fields)
-        # What the cost rule estimated (C2) goes on the result, whether or not the SQL then runs.
+        # What the cost rule estimated goes on the result, whether or not the SQL then runs.
         record = take_record(state.trace_id, sub_query.id)
         estimate = record.estimate if record is not None else None
         self._stop_if_denied(verdict, state, sub_query, query, params, estimate)

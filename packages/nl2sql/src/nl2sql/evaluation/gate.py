@@ -1,4 +1,4 @@
-"""The regression gate: an eval report against a baseline (wave_a.md, section 8, "The regression gate").
+"""The regression gate: an eval report against a baseline.
 
 :func:`gate` is what ``engine.evals.gate`` and ``nl2sql eval run --baseline``
 call. A baseline is another report, or a record from ``benchmarks/``

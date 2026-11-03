@@ -1,6 +1,6 @@
-"""Schema drift on a real PostgreSQL: a column added after the build shows in ``engine.index.check`` (D1).
+"""Schema drift on a real PostgreSQL: a column added after the build shows in ``engine.index.check``.
 
-docs/architecture/wave_a.md, section 10. The table lives in its own schema
+The table lives in its own schema
 of the sample database, made and dropped by the test with the admin login,
 and the datasource indexes only that schema, so the build is small. The
 embedder is a fake: nothing is downloaded and no model is called.

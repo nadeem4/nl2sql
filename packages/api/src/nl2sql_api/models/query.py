@@ -1,4 +1,4 @@
-"""Request bodies of the query, feedback and approval routes (docs/architecture/wave_d.md, D201-D204).
+"""Request bodies of the query, feedback and approval routes.
 
 Every body forbids unknown fields, so a misspelt or removed field is a 422 rather than silently ignored. Responses are
 the facade's own models (``QueryResult``, ``ResultPage``, ``Proposal``, ``ApprovalRecord``), never a copy of them.

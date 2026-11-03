@@ -7,9 +7,7 @@ the config path and the provider key variables are read directly (see
 [Environment variables](#environment-variables)); any other value from the
 environment is written in the YAML as `${env:VAR}`.
 
-The design and its reasoning are in
-[Configuration v2](../architecture/configuration_v2.md). This page is the
-reference.
+This page is the reference.
 
 ## `nl2sql.yaml`
 
@@ -143,9 +141,9 @@ reads a secret from the provider whose `id` is `vault` (see
 
 ### Observers, hooks and evals
 
-Three sections added in release 0.7 ([Wave A](../architecture/wave_a.md)).
+Three sections added in release 0.7.
 They are accepted and validated now; the engine runs the hooks and the
-observers, and reads evals from the Wave A change named below. The observers
+observers, and reads evals from the change named below. The observers
 are documented on their own page, [Observers](observers.md).
 
 ```yaml
@@ -193,7 +191,7 @@ Config(..., observers=[ObserverConfig(type="log"), MyObserver()],
 ### Knowledge
 
 The knowledge sources the glossary comes from, in precedence order (release
-0.8, [Wave B](../architecture/wave_b.md)). The engine loads them when it is
+0.8). The engine loads them when it is
 built and on `engine.knowledge.reload()`; see [Knowledge](knowledge.md) for
 the glossary, precedence and who sees what.
 
@@ -217,8 +215,8 @@ Config(..., knowledge=[KnowledgeSourceConfig(type="yaml", path="glossary.yaml"),
 
 ### Conversations, chat tools, dashboards and MCP
 
-Four sections for release 0.9 ([Wave C](../architecture/wave_c.md)). They are
-accepted and validated now; the Wave C change named with each reads it. Each
+Four sections for release 0.9. They are
+accepted and validated now; the change named with each reads it. Each
 is optional, and absent, the defaults shown apply. Chart limits are
 `settings.charts` ([Settings](settings.md#charts)).
 
@@ -256,9 +254,9 @@ auth: api_keys            # api_keys | none (none: loopback only)
 
 | Section | Rule |
 | --- | --- |
-| `conversations` | `Conversations`: strict keys; every count is at least 1, and `max_age_days: null` keeps conversations. Read by `engine.conversations` (C1). The `conversation` agent that leads a turn is one of the [LLM agents](llm.md#per-node-models). |
-| `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built (`chat_tools[i]` in the report), with the closest registered name; `ask` and a plugin whose `args_model` does not forbid extra keys are errors too. Absent means the default tools (`chart`, `diagram` and `report`) that the registry has, so an engine on `Registry.empty()` starts with none and needs no `chat_tools: []`; a name you list must be registered. `[]` means none; `ask` is the conversation's own tool and is always on. Read by `engine.conversations` and `engine.chat_tools` (C2); see [Chat tools](../conversations/tools.md). |
-| `dashboards` | `Dashboards`: strict keys; every value is at least 1. Read by `engine.dashboards` (D1 to D3). |
+| `conversations` | `Conversations`: strict keys; every count is at least 1, and `max_age_days: null` keeps conversations. Read by `engine.conversations`. The `conversation` agent that leads a turn is one of the [LLM agents](llm.md#per-node-models). |
+| `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built (`chat_tools[i]` in the report), with the closest registered name; `ask` and a plugin whose `args_model` does not forbid extra keys are errors too. Absent means the default tools (`chart`, `diagram` and `report`) that the registry has, so an engine on `Registry.empty()` starts with none and needs no `chat_tools: []`; a name you list must be registered. `[]` means none; `ask` is the conversation's own tool and is always on. Read by `engine.conversations` and `engine.chat_tools`; see [Chat tools](../conversations/tools.md). |
+| `dashboards` | `Dashboards`: strict keys; every value is at least 1. Read by `engine.dashboards`. |
 | `answers` | `Answers`: strict keys; `max_per_user` is at least 1. Read by `engine.answers` (DB1a): the save past the cap is refused with `AnswerLimitReached`, never by dropping an older answer. |
 | `mcp` | `Mcp`: strict keys. `http.port` is 1 to 65535 and `http.path` starts with `/`. `auth: none` is for loopback only: the server refuses to start on any other host, or when `allowed_hosts` lists a name that is not loopback. `allowed_hosts` and `allowed_origins` feed the MCP SDK's DNS-rebinding protection: a request whose `Host` or `Origin` is not listed is refused, so a deployment behind a proxy lists its public host name. Read by `nl2sql mcp --http`; see [MCP over HTTP](../getting_started/mcp.md#over-http). |
 
@@ -275,7 +273,7 @@ Config(..., conversations=Conversations(context_turns=5), chat_tools=["chart", "
 mode: your_data    # demo | your_data | hosted (default your_data)
 ```
 
-What the project is for: the bundled `demo`, your own data, or a `hosted` public demo ([Wave D](../architecture/wave_d.md), D229). It is a top-level key, not a section. The engine only validates it. `nl2sql.resolve_mode(flag, env, file)` picks the mode a process runs in: the launcher flag, else the value of `NL2SQL_MODE`, else this key. It is a pure function; the entry point reads the environment and passes the value in: `nl2sql-api serve` is the one place that reads `NL2SQL_MODE`, resolves it with the `--demo` and `--hosted` flags and the file, and builds the engine with the result in its `Config`. An unknown value is an error naming the three.
+What the project is for: the bundled `demo`, your own data, or a `hosted` public demo. It is a top-level key, not a section. The engine only validates it. `nl2sql.resolve_mode(flag, env, file)` picks the mode a process runs in: the launcher flag, else the value of `NL2SQL_MODE`, else this key. It is a pure function; the entry point reads the environment and passes the value in: `nl2sql-api serve` is the one place that reads `NL2SQL_MODE`, resolves it with the `--demo` and `--hosted` flags and the file, and builds the engine with the result in its `Config`. An unknown value is an error naming the three.
 
 ### Strict keys and errors
 

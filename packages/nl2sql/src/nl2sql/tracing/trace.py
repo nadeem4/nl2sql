@@ -76,7 +76,7 @@ def collect_secrets(ctx: Any) -> Set[str]:
 def redact_for(ctx: Any, text: str) -> str:
     """``text`` with every secret ``ctx`` knows of, and every secret-shaped substring, redacted.
 
-    For an engine event's driver or exception text (D15): a ``user:password@``
+    For an engine event's driver or exception text: a ``user:password@``
     in a DSN is redacted even when the password was never registered.
     """
     return Redactor(collect_secrets(ctx)).redact_text(text)

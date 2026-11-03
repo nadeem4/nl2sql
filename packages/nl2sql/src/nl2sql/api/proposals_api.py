@@ -1,10 +1,10 @@
-"""``engine.proposals``: the review queue (docs/architecture/wave_b.md, section 5).
+"""``engine.proposals``: the review queue.
 
-Reading the queue takes the caller (D60): a caller sees a proposal only when
+Reading the queue takes the caller: a caller sees a proposal only when
 their scope reaches its datasource and every table it names, and ``get`` of one
 they cannot see is "not found". Deciding needs ``by`` with an admin role
 (``policies.admin_roles``; under ``allow_all``, any caller); accept is the only
-code that writes a person's file (D42). ``nl2sql.review`` is imported inside
+code that writes a person's file. ``nl2sql.review`` is imported inside
 each method, so answering a question never loads it.
 """
 from __future__ import annotations

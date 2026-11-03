@@ -1,9 +1,9 @@
-"""Manual dashboard edits (docs/architecture/wave_c.md, section 6, D133).
+"""Manual dashboard edits.
 
 ``apply_edits`` is pure: it works on a copy of the dashboard and returns it with what changed, so an edit list
 is applied all or none (a refused edit leaves nothing behind) and the caller stores the result once. No edit
 calls a model, and none takes a question or a plan: ``add_tile`` and ``replace_plan`` change *what data* a chart
-shows, which only chat does (D4): they read the plan from an `ask` step of a conversation and check it with a
+shows, which only chat does: they read the plan from an `ask` step of a conversation and check it with a
 no-execute run before it is saved, so a plan the validator would reject never lands in a dashboard.
 """
 from __future__ import annotations
@@ -29,13 +29,13 @@ from nl2sql.hooks.approval import VerifiedRef
 class EditEnv:
     """What an edit needs to know beyond the dashboard."""
 
-    identity: ScheduleIdentity  # the caller, saved on a schedule it sets (D134)
+    identity: ScheduleIdentity  # the caller, saved on a schedule it sets
     now: datetime
     min_refresh_minutes: int
     workspace_ids: Set[str]  # the caller's workspaces
     chart_settings: ChartSettings
     last_run: Callable[[str], Optional[TileRun]]  # a tile's last stored result
-    # Chat only (D4): the question and plan of an ``ask`` step, and the no-execute check of a chart, which raises
+    # Chat only: the question and plan of an ``ask`` step, and the no-execute check of a chart, which raises
     # ``ValueError`` when its plan is refused. Absent, ``add_tile`` and ``replace_plan`` are refused.
     step: Optional[Callable[[StepRef], Tuple[str, ChartPlan]]] = None
     check: Optional[Callable[[Tile], None]] = None
@@ -188,7 +188,7 @@ def ask_step(conversation: Conversation, ref: StepRef) -> ToolStep:
 def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, ChartPlan]:
     """The question and the whole plan of an ``ask`` step the conversation holds: its decomposition with the plan of
     each sub-query, or the verified query that answered. Nothing but what the engine stored is read: no model text
-    becomes a plan (D4)."""
+    becomes a plan."""
     step = ask_step(conversation, ref)
     result = step.result
     if result.source.type == "verified":

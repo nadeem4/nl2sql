@@ -1,7 +1,7 @@
-"""Choosing a chart from a result's column kinds and, for a single-sub-query run, its plan (D111, D112).
+"""Choosing a chart from a result's column kinds and, for a single-sub-query run, its plan.
 
 Five rules, first match wins: a big number, a line, a line split into series, a bar, else a table. No model
-call: ``choose`` reads kinds and rows only. ``docs/architecture/wave_c.md``, section 5.
+call: ``choose`` reads kinds and rows only.
 """
 from __future__ import annotations
 

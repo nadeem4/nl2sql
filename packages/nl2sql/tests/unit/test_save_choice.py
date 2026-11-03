@@ -1,4 +1,4 @@
-"""Saving a clarification pick: ``engine.knowledge.save_choice`` (wave_b.md, section 7; D50, D60, L2).
+"""Saving a clarification pick: ``engine.knowledge.save_choice``.
 
 A pick becomes a ``term`` proposal; only an admin's accept writes the glossary, and a term of the same name is
 replaced. A real engine on a small SQLite database, as the review queue's tests build.

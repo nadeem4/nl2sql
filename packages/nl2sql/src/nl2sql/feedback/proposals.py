@@ -1,4 +1,4 @@
-"""A thumbs-up generated answer as a proposed verified query (docs/architecture/wave_b.md, section 5, D43).
+"""A thumbs-up generated answer as a proposed verified query.
 
 A thumbs-up on a *generated* answer is a candidate verified query: the
 question the person asked and the SQL that answered it well. ``verified_query``

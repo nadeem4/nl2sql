@@ -47,7 +47,7 @@ def _lifespan(config_path: Optional[str], adjust: Optional[Callable[[Config], Co
                                "NL2SQL_MODE=hosted).")
         engine = NL2SQL(config)
         # check() marks a datasource that cannot connect and leaves the others serving. The API starts either way:
-        # /ready says not ready (D208), where a refusal to start would only show as an orchestrator's restart loop.
+        # /ready says not ready, where a refusal to start would only show as an orchestrator's restart loop.
         try:
             engine.check()
         except EngineNotReady as exc:
@@ -56,12 +56,12 @@ def _lifespan(config_path: Optional[str], adjust: Optional[Callable[[Config], Co
             engine.close()  # any other failure stops the start, with no engine left open
             raise
         app.state.engine = engine
-        # One worker thread for the app's lifetime: the queue lives in this process (D206).
+        # One worker thread for the app's lifetime: the queue lives in this process.
         app.state.jobs = Jobs()
         # Retention: once now, then once a day while the API serves.
         await asyncio.to_thread(_purge, engine)
         purging = asyncio.create_task(purge_daily(engine))
-        # Dashboard schedules run only inside a long-running process; this is one (wave_c.md, D132).
+        # Dashboard schedules run only inside a long-running process; this is one.
         scheduling = asyncio.create_task(run_schedules(engine))
         yield
         for task in (purging, scheduling):

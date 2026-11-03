@@ -118,8 +118,8 @@ def test_refiner_keeps_stable_context_in_system_and_the_question_last(measure, t
 
 
 def test_decomposer_keeps_its_instructions_in_system_and_the_question_last(measure):
-    m1, _ = measure.render_decomposer(Q1)
-    m2, _ = measure.render_decomposer(Q2)
+    m1, _ = measure.render_decomposer
+    m2, _ = measure.render_decomposer
 
     assert [m.type for m in m1] == ["system", "human"]
     assert m1[0].content == m2[0].content

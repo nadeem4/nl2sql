@@ -1,6 +1,6 @@
-"""Schema drift, measured: ``engine.index.check``, ``versions`` and ``diff``, the impact, and ``schema.drifted`` (D1).
+"""Schema drift, measured: ``engine.index.check``, ``versions`` and ``diff``, the impact, and ``schema.drifted``.
 
-docs/architecture/wave_a.md, section 10. The owner wants drift captured and
+The owner wants drift captured and
 measured before anything acts on it: a check never re-indexes and never
 writes, a build stores the diff that introduced its version, and a caller
 sees drift only in the tables its scope may read. ``schema.drifted`` is an
@@ -357,7 +357,7 @@ def test_verified_query_impact_reads_columns_by_their_table():
 
 
 def test_drift_impact_lists_glossary_items():
-    """Wave B's K1: glossary items that named a dropped table or column, by one more finder and one more field."""
+    """glossary items that named a dropped table or column, by one more finder and one more field."""
     from datetime import datetime, timezone
     from types import SimpleNamespace
 

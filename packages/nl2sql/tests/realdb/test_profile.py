@@ -1,6 +1,6 @@
-"""The schema profiler on the test bed's PostgreSQL samples (P1).
+"""The schema profiler on the test bed's PostgreSQL samples.
 
-docs/architecture/wave_b.md, section 6. The profiler reads the live snapshot, so the index is written without
+The profiler reads the live snapshot, so the index is written without
 embedding (a snapshot and a pointer); the probes run on the real server through the adapter's
 ``probe_overlap``.
 """

@@ -1,7 +1,7 @@
 # Chat tools
 
-!!! note "Wave C, 0.9: the runner and the five tools are built"
-    The design is [Wave C, section 4](../architecture/wave_c.md#4-chat-tools).
+!!! note "Release 0.9: the runner and the five tools are built"
+    
 
 A chat tool turns something a conversation already has into something else, with no model call of its
 own. The five built-ins:
@@ -95,7 +95,7 @@ section says "Results expired." and keeps the text, the SQL and the trace. `turn
 unknown one is a `ValueError`); the default is every answered turn. A conversation with nothing answered is a
 `ValueError`. Every turn is considered, and a question counts when its `ask` step succeeded, even if a later
 tool step in that turn failed. The `report` tool is the same call, so it covers earlier turns, not the one it
-is called in. A stored tool output never holds row data (D106): the `report` tool stores the report without
+is called in. A stored tool output never holds row data: the `report` tool stores the report without
 its row tables and chart takeaways, and a stored `chart` output has its spec and columns but `data.rows` is
 empty. Ask `conversations.report` again for the full report, and `engine.results.chart` to draw a chart;
 both read the rows from the results while their retention keeps them.

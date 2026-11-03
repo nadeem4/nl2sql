@@ -68,7 +68,7 @@ def test_langchain_openai_maps_cached_and_reasoning_tokens_into_usage_metadata()
 
 
 def test_a_bare_plan_answers_the_planner_wrapped():
-    # The planner's structured output is PlannerAnswer (K2): a rule that answers with a plan alone is
+    # The planner's structured output is PlannerAnswer: a rule that answers with a plan alone is
     # wrapped as {"plan": ...}; one that already has "plan", and any other name, are sent as given.
     plan = {"tables": [], "select_items": []}
     server = FakeLLMServer([Rule("PlannerAnswer", plan, when="bare"), Rule("PlannerAnswer", json.dumps(plan)),

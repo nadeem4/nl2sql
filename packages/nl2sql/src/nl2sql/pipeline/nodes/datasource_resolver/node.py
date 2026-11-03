@@ -418,7 +418,7 @@ class DatasourceResolverNode:
 
 
 def _publish_refusals(policy_engine, user_context: UserContext, datasource_ids: list[str]) -> None:
-    """``policy.decision`` for each datasource the role check refused, when it refused them all (D16).
+    """``policy.decision`` for each datasource the role check refused, when it refused them all.
 
     Before a search that means every registered datasource; otherwise the
     explicit or only one. Routing that skips some while others go on is

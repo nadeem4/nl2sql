@@ -1,7 +1,6 @@
 """What ``nl2sql`` exports is a fixed list, so a change to the public surface is a deliberate one.
 
 Adding or removing a name here is a semver decision: a removal is breaking.
-See docs/architecture/configuration_v2.md, section 7.
 """
 import nl2sql
 
@@ -28,11 +27,11 @@ PUBLIC_SURFACE = {
     "configure_logging", "TraceContextFilter",
     # Evals: suites, reports and the scorer interface
     "EvalSuite", "EvalCase", "EvalReport", "RegenerateReport", "GateResult", "Scorer", "Score", "CaseRun",
-    # Wave B: knowledge, the review queue, the profiler, clarification and the explanation
+    # knowledge, the review queue, the profiler, clarification and the explanation
     "KnowledgeSourceConfig", "CostRule", "KnowledgeSourceInfo", "DatasourceKnowledgeView", "Proposal",
     "AcceptReport", "ReviewError", "ProfileReport", "ClarificationRequest", "ClarificationOption",
     "ClarificationChoice", "Explanation", "ExplainedStep", "TermUse",
-    # Wave C: conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys
+    # conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys
     "Conversation", "Turn", "ToolStep", "ToolCall", "ToolOutput", "ModelStep", "ConversationInfo",
     "ChartSpec", "ChartData", "Encoding", "ColumnKind", "diagram_for",
     "Workspace", "Dashboard", "DashboardInfo", "DashboardView", "DashboardRun", "Tile", "TileRun", "TileLayout",

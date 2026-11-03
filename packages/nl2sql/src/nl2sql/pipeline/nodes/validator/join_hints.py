@@ -1,4 +1,4 @@
-"""What a rejected join is told: the joins that are allowed between its two tables (docs/architecture/wave_c.md, section 18.3).
+"""What a rejected join is told: the joins that are allowed between its two tables.
 
 A model that is only told "Join does not match any allowed relationship" invents another shortcut on a
 shared key. The relationships of the retrieved schema are a graph; the hint names the declared joins

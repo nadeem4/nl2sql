@@ -49,7 +49,7 @@ class ProviderPreset(NamedTuple):
     preset_of: Optional[str] = None
 
 
-# The built-in providers (docs/architecture/phase2.md, section 5). ``openai``
+# The built-in providers. ``openai``
 # and ``anthropic`` are the two services with wires of their own: Anthropic
 # speaks its Messages API, where prompt caching and reliable tool-based
 # structured output work. ``openai_compatible`` is any other server with an
@@ -158,7 +158,6 @@ class RunLLMs:
 
 class MissingApiKey(ValueError):
     """A keyed provider with no key to resolve: a typed failure a turn can report instead of crashing."""
-
 
 class LLMRegistry:
     """One engine's LLM: the current ``LLMSet``, and the ``LLMClientCache`` its clients come from.

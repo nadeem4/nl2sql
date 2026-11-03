@@ -1,4 +1,4 @@
-"""The review fixes of C0b (wave_c.md, D119 and D132), end to end on the demo databases and the fake LLM.
+"""The review fixes of C0b, end to end on the demo databases and the fake LLM.
 
 ``answer=False`` still runs ``answer.after`` (a deny withholds the rows and the manifest); a supplied verified
 plan never falls back to a model run; a supplied multi-sub-query decomposition and a supplied verified plan run
@@ -182,7 +182,7 @@ def test_a_supplied_verified_plan_is_refused_at_the_call_when_it_cannot_run(make
 
 @pytest.mark.e2e
 def test_a_supplied_verified_plan_with_execute_false_is_checked_and_not_run(make, monkeypatch):
-    """The access check of a dashboard's verified chart (D135): the matcher checks scope and tables, runs nothing."""
+    """The access check of a dashboard's verified chart: the matcher checks scope and tables, runs nothing."""
     from nl2sql import UserContext
     from nl2sql.execution.executor import SqlExecutorService
 

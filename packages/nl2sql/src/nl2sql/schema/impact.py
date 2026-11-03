@@ -1,8 +1,8 @@
-"""What a schema diff breaks, from data the engine already has (docs/architecture/wave_a.md, section 10).
+"""What a schema diff breaks, from data the engine already has.
 
 ``drift_impact(ctx, diff, tables)`` runs every finder in ``FINDERS`` over the
 diff; each fills its own field of ``DriftImpact``. Something new that refers
-to tables (Wave B's glossary items, ``_glossary_items``) is one more field
+to tables (glossary items, ``_glossary_items``) is one more field
 and one more finder, and no caller changes. The diff given is the one the
 caller may see, so the impact names only tables the caller may read.
 
@@ -38,7 +38,7 @@ class DriftImpact(BaseModel):
     verified_queries: List[ImpactedQuery] = Field(default_factory=list)
     policy_rules: List[ImpactedRule] = Field(default_factory=list)
     preferred_tables: List[str] = Field(default_factory=list)  # the datasource's entries that were dropped
-    # Glossary items (``terms.revenue``, ``columns.orders.note``) that named a dropped table or column (Wave B, K1).
+    # Glossary items (``terms.revenue``, ``columns.orders.note``) that named a dropped table or column.
     glossary_items: List[str] = Field(default_factory=list)
 
     def is_empty(self) -> bool:
@@ -135,7 +135,7 @@ def _glossary_items(ctx: Any, diff: SchemaDiff, tables: List[TableRef], impact: 
     block = knowledge.datasources.get(diff.datasource_id) if knowledge is not None else None
     if block is None or not (diff.tables_dropped or diff.columns_dropped):
         return
-    # The caller's view of the glossary (D60): only items on tables it may read (``tables`` and the dropped
+    # The caller's view of the glossary: only items on tables it may read (``tables`` and the dropped
     # tables it sees) whose text mentions no other table of the stored snapshot. No snapshot: none (fails closed).
     from nl2sql.knowledge.scope import visible
 

@@ -33,7 +33,7 @@ def build_graph(
     is exactly the one without curated answers.
 
     ``pinned`` builds the graph of a run whose decomposition is pinned
-    (``state.pinned``: a supplied plan, an approval's, or Wave B's chosen
+    (``state.pinned``: a supplied plan, an approval's, or chosen
     one). It enters at ``pinned_entry``, which checks the datasources against
     the caller's scope and goes to the layer router; there is no curated
     matcher, resolver or decomposer in it. Any other run's graph has no
@@ -44,11 +44,10 @@ def build_graph(
         execute (bool): Whether to allow execution against real databases.
         pinned (bool): Build the pinned run's graph.
         answer (bool): False builds the graph without the answer synthesizer: the run ends at the
-            aggregator and writes no prose (a dashboard refresh; wave_c.md, D119). While a hook is attached
+            aggregator and writes no prose (a dashboard refresh). While a hook is attached
             at ``answer.after`` a model-free ``answer_gate`` runs it first, so a deny still withholds the data.
         verified (bool): The run pins a supplied verified query. With ``execute`` off the curated matcher is still
-            the entry: it checks the query under the caller's scope and runs nothing (a dashboard's access check;
-            wave_c.md, D135). Any other run with ``execute`` off has no matcher.
+            the entry: it checks the query under the caller's scope and runs nothing (a dashboard's access check). Any other run with ``execute`` off has no matcher.
 
     Returns:
         StateGraph: The compiled LangGraph runnable.

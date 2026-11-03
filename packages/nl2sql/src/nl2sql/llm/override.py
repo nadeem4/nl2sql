@@ -1,4 +1,4 @@
-"""``LLMOverride``: one call's own keys and models (docs/architecture/wave_d.md, D210)."""
+"""``LLMOverride``: one call's own keys and models."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

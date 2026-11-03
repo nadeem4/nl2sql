@@ -1,7 +1,6 @@
-"""``estimate`` (rows read) and ``probe_overlap`` (a distinct sample) on the in-process built-ins (C1).
+"""``estimate`` (rows read) and ``probe_overlap`` (a distinct sample) on the in-process built-ins.
 
-docs/architecture/wave_b.md, section 9, "The adapter method", and section 6,
-"Join candidates" (D45, D52). PostgreSQL, MySQL and SQL Server are proven in
+PostgreSQL, MySQL and SQL Server are proven in
 ``tests/realdb/test_estimate.py``; their plan readers are checked here on
 plans in the shape each server returns.
 """

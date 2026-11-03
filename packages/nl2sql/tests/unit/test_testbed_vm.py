@@ -1,6 +1,6 @@
 """``scripts/testbed.py``: the GCP test-bed VM, driven through a fake ``gcloud``.
 
-docs/architecture/phase2.md, section 3, "The GCP VM". A fake ``gcloud`` on
+A fake ``gcloud`` on
 ``PATH`` records every call (its arguments, its stdin and the test-bed
 and gcloud variables in its environment) and plays the parts that matter: it
 prints a password for ``secrets versions access``, a state for ``instances

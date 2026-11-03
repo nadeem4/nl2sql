@@ -1,4 +1,4 @@
-"""Wave C's stubs (docs/architecture/wave_c.md, row C0b): the namespaces, the chat-tool entry points. (The exports are held by test_public_surface.)
+"""stubs: the namespaces, the chat-tool entry points. (The exports are held by test_public_surface.)
 
 Each stub has its final signature and raises ``NotImplementedError`` naming the row that fills it, so the
 parallel PRs of the tracks touch different files. Nothing here runs a conversation, a chart or a dashboard.
@@ -85,7 +85,7 @@ def test_stubs_keep_the_signatures_the_design_gives(engine):
 # ---------------------------------------------------------------- chat-tool entry points
 
 CHAT_TOOL_ROWS = {}
-FILLED_CHAT_TOOLS = ["chart", "diagram", "report", "dashboard_edit", "dashboard_pin"]  # K1, K2, C2 and D4 filled them; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
+FILLED_CHAT_TOOLS = ["chart", "diagram", "report", "dashboard_edit", "dashboard_pin"]  # K1, C2 and D4 filled them; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
 
 
 def test_the_five_chat_tool_entry_points_load_their_stub_modules():

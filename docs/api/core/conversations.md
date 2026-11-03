@@ -20,19 +20,19 @@ anything runs, for: neither or both of `text` and `choice`, a `choice` with noth
 pending options, an empty message, a conversation at `max_turns` (`CONVERSATION_TOO_LONG`), `retry` with no
 earlier question.
 
-| Method | Row |
-|---|---|
-| `start(*, user_context, datasource_id=None, dashboard_id=None) -> Conversation` | C1 |
-| `ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None, llm_override=None) -> Turn` | C1, G2a |
-| `stream(conversation_id, text=None, *, user_context, choice=None, execute=True, llm_override=None) -> Iterator[Event]` | C1, G2a |
-| `retry(conversation_id, *, user_context, approvals=(), llm_override=None) -> Turn` | C1, G2a; `approvals` are `Approval` objects or granted request ids (D215) |
-| `ask_only(conversation_id, question, *, user_context, choice=None, cancellation_token=None) -> QueryResult` | C1 |
-| `get(conversation_id, *, user_context) -> Conversation` | C1 |
-| `list(*, user_context, limit=20) -> list[ConversationInfo]` | C1 |
-| `delete(conversation_id, *, user_context) -> None` (`ConversationBusy` while a turn runs) | C1 |
-| `tool(conversation_id, name, args=None, *, user_context) -> Turn` | C2 |
-| `report(conversation_id, *, user_context, turns=None, title=None, include_rows=True) -> str` | C2 |
-| `engine.chat_tools.list() -> list[ChatToolInfo]` | C2 |
+| Method |
+|---|
+| `start(*, user_context, datasource_id=None, dashboard_id=None) -> Conversation` |
+| `ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None, llm_override=None) -> Turn` |
+| `stream(conversation_id, text=None, *, user_context, choice=None, execute=True, llm_override=None) -> Iterator[Event]` |
+| `retry(conversation_id, *, user_context, approvals=(), llm_override=None) -> Turn` (`approvals` are `Approval` objects or granted request ids) |
+| `ask_only(conversation_id, question, *, user_context, choice=None, cancellation_token=None) -> QueryResult` |
+| `get(conversation_id, *, user_context) -> Conversation` |
+| `list(*, user_context, limit=20) -> list[ConversationInfo]` |
+| `delete(conversation_id, *, user_context) -> None` (`ConversationBusy` while a turn runs) |
+| `tool(conversation_id, name, args=None, *, user_context) -> Turn` |
+| `report(conversation_id, *, user_context, turns=None, title=None, include_rows=True) -> str` |
+| `engine.chat_tools.list() -> list[ChatToolInfo]` |
 
 - `start(dashboard_id=...)` needs a dashboard the caller owns (`DashboardNotFound` otherwise).
 - `ask` returns the stored `Turn`: `status` is that of the last step that did not end `ok`, else `answered`;

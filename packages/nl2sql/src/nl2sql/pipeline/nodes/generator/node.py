@@ -154,7 +154,6 @@ def _is_star(expr: Expr) -> bool:
 class MisplacedStar(ValueError):
     """A ``*`` where the database would refuse it, or read it differently from the plan."""
 
-
 STAR_RULE = (
     "A star is allowed only as a whole select item with no alias (* or t.*) or as COUNT(*) on its own. "
     "To count rows, use COUNT(*); to count the rows of one table in a join, count a non-null column "

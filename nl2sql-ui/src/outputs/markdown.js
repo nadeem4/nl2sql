@@ -1,4 +1,4 @@
-// The subset of Markdown Wave C's report tool writes, as plain blocks: headings, paragraphs, lists, pipe tables,
+// The subset of Markdown report tool writes, as plain blocks: headings, paragraphs, lists, pipe tables,
 // <details> with a <summary>, fenced code, and inline bold, italic, code and links. Raw HTML is never passed through:
 // Report.jsx draws these blocks as React elements, so nothing in a report can inject markup.
 

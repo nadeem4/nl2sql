@@ -1,4 +1,4 @@
-// Settings: the server's LLM, the providers it knows, and the API keys it issues (A4a). Admin calls answer 403 to
+// Settings: the server's LLM, the providers it knows, and the API keys it issues. Admin calls answer 403 to
 // anyone else; the page asks /meta first and does not offer them.
 import { request } from "./http.js";
 

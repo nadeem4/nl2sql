@@ -1,9 +1,9 @@
-"""Chat tools: what a conversation can do with an answer besides show it (docs/architecture/wave_c.md, section 4).
+"""Chat tools: what a conversation can do with an answer besides show it.
 
 A chat tool turns something the conversation already has into something else: a chart, a
-diagram, a report, a change to a dashboard. The model chooses tools in a bounded loop (D108),
+diagram, a report, a change to a dashboard. The model chooses tools in a bounded loop,
 or a client calls one by name. A tool makes no model call and reaches the engine through the
-public ``NL2SQL`` facade only (D109); ``ask`` is the conversation's own tool, not a registry
+public ``NL2SQL`` facade only; ``ask`` is the conversation's own tool, not a registry
 tool. Register one under the ``nl2sql.chat_tools`` entry point group, or with
 ``registry.add_chat_tool`` / ``@registry.chat_tool``; its interface is version 1.
 """
@@ -25,12 +25,11 @@ class ToolContext(BaseModel):
 
     conversation: Conversation  # a copy; the tool cannot change it
     user: UserContext
-    engine: Any  # the NL2SQL facade; a tool uses its public methods only (D109)
+    engine: Any  # the NL2SQL facade; a tool uses its public methods only
 
 
 class ToolNotApplicable(Exception):
     """Raised by a tool that cannot apply to that turn; the message says why."""
-
 
 @runtime_checkable
 class ChatTool(Protocol):

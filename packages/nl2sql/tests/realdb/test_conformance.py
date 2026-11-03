@@ -1,6 +1,6 @@
 """The conformance kit (``nl2sql_sdk.testing``) run on PostgreSQL, MySQL and SQL Server in the test bed.
 
-docs/architecture/phase2.md, section 7, "The conformance kit". The seed runs
+The seed runs
 with the server's admin login, in the sample database (MySQL's schemas are
 databases). ``limited_login`` is a second login, ``nl2sql_kit``, whose
 password holds ``@ : / # %`` and which may read the seed's first schema only.

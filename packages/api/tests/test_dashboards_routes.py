@@ -1,4 +1,4 @@
-"""The dashboards and workspaces routes (docs/architecture/wave_d.md, row A2b): thin over ``engine.dashboards`` and
+"""The dashboards and workspaces routes: thin over ``engine.dashboards`` and
 ``engine.workspaces``, each handler passing the caller. A stub engine records the calls; the errors and the ownership
 rules are the real engine's, over a real one at the bottom."""
 import threading

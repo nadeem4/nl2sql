@@ -121,7 +121,7 @@ class FeedbackAPI:
     def correct(self, trace_id: str, *, sql: Optional[str] = None, plan: Any = None, question: Optional[str] = None,
                 note: Optional[str] = None, user_context: "UserContext",
                 as_operator: bool = False) -> "Proposal":
-        """Correct run ``trace_id`` with a fix, checked, as a ``verified_query`` proposal (wave_b.md, section 10).
+        """Correct run ``trace_id`` with a fix, checked, as a ``verified_query`` proposal.
 
         Exactly one of ``sql`` (one read-only query) or ``plan`` (a
         ``PlanModel`` or its JSON) is the fix. The run is rated ``down`` with
@@ -202,7 +202,7 @@ class FeedbackAPI:
         return self._ctx.state.clear_feedback()
 
     def _propose(self, row: Dict[str, Any]) -> Tuple[Optional["Proposal"], str]:
-        """File a thumbs-up generated answer as a ``verified_query`` proposal (D43); other rows file nothing.
+        """File a thumbs-up generated answer as a ``verified_query`` proposal; other rows file nothing.
         Returns the proposal as stored, or None and why none was filed."""
         from nl2sql.config.curated import CuratedSqlError, inspect_verified_sql
         from nl2sql.feedback import skip_reason, verified_query

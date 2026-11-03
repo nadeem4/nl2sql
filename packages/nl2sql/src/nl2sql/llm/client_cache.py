@@ -1,6 +1,6 @@
 """One engine's LLM clients, shared by the agents and sets that use the same settings.
 
-docs/architecture/configuration_v2.md, "Replacing the LLM at runtime":
+Replacing the LLM at runtime:
 
 * the key is an agent's resolved client settings (every field of
   ``AgentConfig`` but its name), with the resolved API key and each header

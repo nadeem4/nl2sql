@@ -60,7 +60,7 @@ export function fieldErrors(details) {
 }
 
 // What a failed `POST /datasources` means for the page. NOT_WRITABLE is the one failure that leaves the datasource
-// registered (the config is read-only, as in the Docker image): it works until the server restarts (D212).
+// registered (the config is read-only, as in the Docker image): it works until the server restarts.
 export function describeAdd(error) {
   if (error.code === "NOT_WRITABLE") {
     return {

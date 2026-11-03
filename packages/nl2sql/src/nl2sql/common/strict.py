@@ -1,4 +1,4 @@
-"""The base of Wave C's stored and returned models: unknown keys are errors, not ignored."""
+"""The base of stored and returned models: unknown keys are errors, not ignored."""
 from pydantic import BaseModel, ConfigDict
 
 

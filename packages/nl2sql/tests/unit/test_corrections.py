@@ -1,6 +1,6 @@
-"""Corrections: a thumbs-down with a fix becomes a checked ``verified_query`` proposal (F1).
+"""Corrections: a thumbs-down with a fix becomes a checked ``verified_query`` proposal.
 
-docs/architecture/wave_b.md, section 10, and D55. The engine is Q1's: a real
+The engine is Q1's: a real
 engine on a small SQLite database, indexed with a fake embedder, so nothing is
 downloaded and no model is called. A run is a trace written to the engine's
 trace store, as a run with traces kept leaves one.

@@ -1,4 +1,4 @@
-"""An eval run: every approved case, once per role, in one of three modes (wave_a.md, section 8, "The facade").
+"""An eval run: every approved case, once per role, in one of three modes.
 
 * ``full``: the whole pipeline on the configured LLM, or on each of several
   named LLM configs, compared. Every call costs money, so a run needs a dollar
@@ -6,7 +6,7 @@
   price, and stops before a case that could pass the cap. Each config runs on
   its own derived runtime (``ctx.derive``) with the **plan cache off**, so a
   second pass asks the planner again. Curated answers follow ``curated``
-  (D12): a case a verified query answered runs again with them off, and that
+: a case a verified query answered runs again with them off, and that
   run is scored as its generated answer.
 * ``plans``: each case's hand-written plan through the validator, generator
   and executor, on the gold-plan fake LLM (:mod:`nl2sql.evaluation.gold_llm`).
@@ -26,7 +26,7 @@ question; every finished case publishes ``eval.case``, and the run
 ``eval.finished``, on the engine's bus.
 
 A case whose outcome for a role is ``clarify`` runs only with
-``clarify=True``. Wave B's clarification turns the engine's clarification on
+``clarify=True``. clarification turns the engine's clarification on
 for such a run; until then it is off, and those role runs are counted in
 ``skipped``.
 """
@@ -73,7 +73,6 @@ OnCase = Callable[[str, Dict[str, Any], float], None]
 
 class UnknownPriceError(ValueError):
     """A config names a model the price table has no row for."""
-
 
 # ---------------------------------------------------------------- prices
 
@@ -198,7 +197,7 @@ def _ask(run: Any, case: EvalCase, role: str
     # As QueryAPI.run_query does: entered here too, so every log line of the case carries its trace_id.
     with scope.entered():
         try:
-            # Clarification off: a case measures the default reading, with the same prompt (D58).
+            # Clarification off: a case measures the default reading, with the same prompt.
             state = run_with_graph(run, case.question, user_context=user, callbacks=[sent], scope=scope,
                                    clarify=False)
             store = getattr(run, "artifact_store", None)
@@ -516,7 +515,7 @@ def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: E
                 cost = question_cost(result.usage, cfg, prices) if result else 0.0
                 _count_unknown(report, result)
                 if result is not None and result.source.type == "verified":
-                    # D12: what the model alone would have answered, scored as the generated answer.
+                    # what the model alone would have answered, scored as the generated answer.
                     if generated_run is None:
                         generated_run = ctx.derive({**changes, "curated": None})
                         generated_run.llm_registry.replace_llms(agents)

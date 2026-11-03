@@ -1,4 +1,4 @@
-"""``load_config``: one test per rule in section 2 of configuration_v2.md.
+"""``load_config``: one test per rule.
 
 The file layout, ``file:`` includes, ``${provider:key}`` interpolation, strict
 keys with "did you mean", and the error report. The section models themselves
@@ -21,7 +21,6 @@ embeddings: { provider: local }
 policies:   { allow_all: true }
 storage:    { path: .nl2sql }
 """
-
 
 def write(folder: Path, name: str, text: str) -> Path:
     path = folder / name
@@ -108,14 +107,14 @@ def test_version_1_file_points_to_the_mapping(tmp_path):
     message = str(error)
     assert "is a 0.4 config file (`version: 1`)" in message
     assert "0.5 reads `nl2sql.yaml`" in message
-    assert "architecture/configuration_v2" in message
+    assert "configuration/system#from-04" in message
 
 
 def test_missing_version_points_to_the_mapping(tmp_path):
     error = load_error(write(tmp_path, "nl2sql.yaml", MINIMAL.replace("version: 2\n", "")))
     assert len(error.problems) == 1
     assert error.problems[0].path == "version"
-    assert "architecture/configuration_v2" in str(error)
+    assert "configuration/system#from-04" in str(error)
 
 
 def test_glossary_is_not_a_phase_1_section(tmp_path):

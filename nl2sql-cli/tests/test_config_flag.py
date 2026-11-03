@@ -1,4 +1,4 @@
-"""The CLI reads one config: the global ``--config`` (configuration v2, section 10).
+"""The CLI reads one config: the global ``--config``.
 
 ``nl2sql --config prod/nl2sql.yaml <command>``. Without it, ``NL2SQL_CONFIG``,
 then ``./nl2sql.yaml``. The ``.env`` next to that file is loaded without

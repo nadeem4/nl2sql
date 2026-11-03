@@ -38,7 +38,7 @@ and its example questions ([Knowledge in the index](#knowledge-in-the-index)).
 There is no symbolic index, behavioral index, or other catalog in the current
 implementation.
 
-The stored schema snapshot holds only what the database said (B31): a table or
+The stored schema snapshot holds only what the database said: a table or
 column comment the adapter read. A person's words stay in the glossary, and a
 description a model drafts is a proposal in the review queue that reaches
 nothing until a person accepts it. `nl2sql index` calls no model.
@@ -101,7 +101,7 @@ a message saying to run `nl2sql index`.
 ### Knowledge in the index
 
 Prompts read the in-memory knowledge, so an accepted change is effective in
-the next run. The index carries knowledge for ranking (D56): the chosen
+the next run. The index carries knowledge for ranking: the chosen
 descriptions and synonyms in the table and column entries, a `knowledge.term`
 entry per term, a relationship entry per glossary join that resolves (with its
 cardinality and `origin: glossary`), and the glossary's `examples` among the

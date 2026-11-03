@@ -1,4 +1,4 @@
-"""``engine.conversations`` end to end on the demo databases, with the fake model (wave_c.md, section 3; row C1).
+"""``engine.conversations`` end to end on the demo databases, with the fake model.
 
 The conversation agent and the pipeline's agents are all the fake server; an ``ask`` step is the real run
 through the planner, validator and executor. The unit tests (``tests/unit/test_conversations.py``) cover the
@@ -169,7 +169,7 @@ def test_the_model_charts_the_answer_it_just_got_and_the_report_has_its_rows(mak
 
 @pytest.mark.e2e
 def test_the_model_builds_a_dashboard_whose_chart_refreshes_with_no_model_call(make):
-    """D4: an answer's stored plan becomes a chart after a real no-execute check; saving and refreshing it call no model."""
+    """an answer's stored plan becomes a chart after a real no-execute check; saving and refreshing it call no model."""
     edit = {"call": {"name": "dashboard_edit", "args": {"title": "Customers", "edits": [
         {"kind": "add_tile", "title": "Customers", "from_step": {"turn": 1, "step": 1}}]}}}
     engine, server, prompts = make([_ask_step(COUNT), edit, {"reply": "I built it."}])

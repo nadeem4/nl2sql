@@ -1,4 +1,4 @@
-"""Join-path fill: the tables that connect the ones already chosen (docs/architecture/wave_c.md, section 17.3).
+"""Join-path fill: the tables that connect the ones already chosen.
 
 The chosen tables are the nodes to connect in a graph of the tables the caller
 may read, whose edges are foreign keys and glossary joins. It is an

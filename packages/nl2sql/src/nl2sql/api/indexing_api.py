@@ -255,7 +255,7 @@ class IndexAPI:
         The candidate pool with scores, the picks in order and what was
         dropped. ``types`` limits the entry types (``schema.table`` ...). It
         reads index metadata only and needs no LLM. There is no default
-        caller (D60): the entries of a table the caller's scope denies, a
+        caller: the entries of a table the caller's scope denies, a
         glossary term ``engine.knowledge.show`` would hide from them, and any
         entry whose text names a denied table never reach the pool. A
         datasource the caller cannot reach, or that is not indexed, shows

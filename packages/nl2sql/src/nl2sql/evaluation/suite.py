@@ -1,4 +1,4 @@
-"""Eval suites: the case format, its loader and its writer (wave_a.md, section 8, "The files").
+"""Eval suites: the case format, its loader and its writer.
 
 A suite is a YAML file of cases (``version: 1``, ``cases: [...]``). It is
 data, read when a run asks for it, never when the engine starts. Each case
@@ -16,7 +16,7 @@ The suites the package ships are in ``suites/``: ``chinook.yaml`` is the
 Chinook gold set, moved here unchanged from ``chinook_gold.yaml`` and
 ``chinook_gold_plans.yaml``; ``routing.yaml`` asks which of the demo's three
 databases a question belongs to (Phase R); ``clarify.yaml`` holds questions about "sales" that the demo glossary
-leaves open, each expecting ``clarify`` (Wave B).
+leaves open, each expecting ``clarify``.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ ROUTING_SUITE_PATH = SUITES_DIR / "routing.yaml"
 CLARIFY_SUITE_PATH = SUITES_DIR / "clarify.yaml"
 
 # What a role should get. ``clarify``: the engine should ask the caller to
-# narrow the question (Wave B); evals run such a case only with ``clarify=True``.
+# narrow the question; evals run such a case only with ``clarify=True``.
 Outcome = Literal["allowed", "refused", "unanswerable", "clarify"]
 Difficulty = Literal["easy", "medium", "hard"]
 CaseStatus = Literal["draft", "approved", "retired"]

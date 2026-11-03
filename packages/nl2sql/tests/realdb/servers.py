@@ -1,7 +1,5 @@
 """Where the test bed's servers are, read from the environment, for the ``realdb`` tests.
 
-docs/architecture/phase2.md, section 3, "The realdb marker and fixtures".
-
 | Variable | Meaning |
 |---|---|
 | ``REALDB=compose`` | The compose servers on 127.0.0.1, at the published ports, with the passwords in ``TESTBED_POSTGRES_PASSWORD``, ``TESTBED_MYSQL_PASSWORD`` and ``TESTBED_MSSQL_PASSWORD`` (``testbed/passwords.py`` makes them) |

@@ -1,4 +1,4 @@
-"""Routing at scale (wave_a.md, section 9, "The routing gate").
+"""Routing at scale.
 
 The test bed's PostgreSQL sample, pagila, beside its generated wide schema:
 1,200 tables of business nouns (orders, customers, invoices, payments) with

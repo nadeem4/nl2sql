@@ -1,4 +1,4 @@
-"""The four chart templates of the starter dashboard (docs/architecture/wave_c.md, section 6, D115).
+"""The four chart templates of the starter dashboard.
 
 Each template builds a ``SubQuery`` and a ``PlanModel`` in code, with its own question text from the columns' names
 humanised, and stores them as an ordinary ``ChartPlan``. The plan then takes the same path as a model's: ``plan.after``,

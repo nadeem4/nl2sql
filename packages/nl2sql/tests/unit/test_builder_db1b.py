@@ -1,4 +1,4 @@
-"""The guided dashboard builder, engine side (docs/architecture/wave_d.md, section 18; row DB1b).
+"""The guided dashboard builder, engine side.
 
 A real engine on a small SQLite database (indexed with a fake embedder), so the glossary, the column roles, the
 curated queries and the caller's scope are the real ones. ``run_query`` is replaced by canned results, as in the
@@ -329,7 +329,7 @@ def test_asked_without_a_key_is_the_missing_key_error_and_the_rest_still_works(t
 
 
 def test_asked_on_the_replay_provider_is_the_missing_key_error_too(tmp_path, server):
-    """D248: the keyless hosted demo has a provider that needs no key, but still no model for new questions."""
+    """the keyless hosted demo has a provider that needs no key, but still no model for new questions."""
     with _replay_engine(tmp_path, server) as demo:
         assert demo.index.build().ok
         with pytest.raises(MissingProviderKey):

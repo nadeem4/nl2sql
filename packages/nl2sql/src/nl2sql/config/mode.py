@@ -1,4 +1,4 @@
-"""``resolve_mode``: which mode a process runs in (docs/architecture/wave_d.md, D229)."""
+"""``resolve_mode``: which mode a process runs in."""
 from __future__ import annotations
 
 from typing import Optional, get_args

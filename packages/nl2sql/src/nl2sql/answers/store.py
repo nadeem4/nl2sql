@@ -1,4 +1,4 @@
-"""Saved answers in the state store: owner-only, the models behind the JSON documents (D238, D247).
+"""Saved answers in the state store: owner-only, the models behind the JSON documents.
 
 An answer is its owner's, a ``(tenant_id, user_id)`` pair as for a conversation; another caller's is "not found",
 never "forbidden", and an admin is another caller.

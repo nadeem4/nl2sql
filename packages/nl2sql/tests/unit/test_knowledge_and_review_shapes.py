@@ -1,4 +1,4 @@
-"""The shapes Wave B's tracks share, added before any of them (docs/architecture/wave_b.md, D59).
+"""The shapes tracks share, added before any of them.
 
 The SDK's glossary models, ``KnowledgeSource``, ``Proposal``, ``Estimate`` and
 ``Overlap``; the state store's proposal methods; the config sections and
@@ -62,7 +62,6 @@ datasources:
     examples:
       - Which genres sell best in Germany?
 """
-
 
 def test_the_design_glossary_loads():
     glossary = Glossary.model_validate(yaml.safe_load(GLOSSARY))
@@ -163,7 +162,7 @@ def store():
 
 
 def test_a_0_7_state_file_upgrades_to_the_latest_migration_keeping_its_rows(tmp_path):
-    """A state.db that ran migrations 1 to 4 (release 0.7) gains the proposals table (and, since 0.9, Wave C's)."""
+    """A state.db that ran migrations 1 to 4 (release 0.7) gains the proposals table (and, since 0.9, the conversation tables too)."""
     from nl2sql.storage.sqlite import MIGRATIONS
 
     path = tmp_path / "state.db"
@@ -407,7 +406,7 @@ ENDING = ["NEEDS_CLARIFICATION", "CLARIFICATION_INVALID", "CLARIFICATION_STALE",
 
 
 @pytest.mark.parametrize("code", ENDING)
-def test_wave_b_codes_exist_and_are_never_retried(code):
+def test_knowledge_and_review_codes_exist_and_are_never_retried(code):
     error = PipelineError(node="n", message="m", severity=ErrorSeverity.ERROR, error_code=ErrorCode(code))
     assert not error.is_retryable
 
@@ -433,7 +432,7 @@ def test_new_events_are_catalogued():
 
     for name, run in NEW_EVENTS.items():
         assert CATALOG[name].run is run, name
-        assert name not in STREAM_EVENTS, f"{name} is an operator event (D17)"
+        assert name not in STREAM_EVENTS, f"{name} is an operator event"
     assert {"proposal.decided", "cost.estimated"} <= AUDIT_EVENTS
     cost = CATALOG["cost.estimated"]
     assert cost.audited({"decision": "refuse"}) and cost.audited({"decision": "confirm"})

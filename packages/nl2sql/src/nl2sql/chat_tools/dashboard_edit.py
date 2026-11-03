@@ -1,10 +1,10 @@
-"""The ``dashboard_edit`` chat tool (docs/architecture/wave_c.md, sections 4 and 6).
+"""The ``dashboard_edit`` chat tool.
 
 Builds or changes a dashboard through ``engine.dashboards.edit``: the same typed edits a person makes by hand, plus
 ``add_tile`` and ``replace_plan``, which turn an ``ask`` step of the conversation into a chart. The plan comes from
 the engine's own stored step, never from model text, and is checked by a run that executes nothing before it is
 saved. The first use creates a draft tied to the conversation. No model call, no rows. Like every chat tool it
-imports only the top-level ``nl2sql`` and its own interface module (D109).
+imports only the top-level ``nl2sql`` and its own interface module.
 """
 from __future__ import annotations
 

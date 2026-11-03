@@ -7,7 +7,6 @@ from typing import Any, List, Optional
 class RunCancelled(Exception):
     """Raised inside the graph once its run's token is cancelled."""
 
-
 class CancellationToken:
     """Per-run cancellation flag, with why the run was cancelled.
 

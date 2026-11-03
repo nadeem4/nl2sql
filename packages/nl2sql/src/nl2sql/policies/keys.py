@@ -1,4 +1,4 @@
-"""The API key token: its format, its hash and the constant-time check (docs/architecture/wave_c.md, section 9; D127).
+"""The API key token: its format, its hash and the constant-time check.
 
 A token is ``nl2sql_<id>_<secret>``: ``id`` is 8 hex characters (shown in lists and logs), ``secret`` is 32 random
 bytes, URL-safe. Only ``sha256(secret)`` is stored. SHA-256 is enough because the secret is high-entropy: a

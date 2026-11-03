@@ -1,4 +1,4 @@
-"""Request bodies of the saved-answers routes (docs/architecture/wave_d.md, section 18, DB1c). Strict: an unknown
+"""Request bodies of the saved-answers routes. Strict: an unknown
 field is a 422. Responses are the engine's own models (``SaveReport``, ``SavedAnswer``, ``QueryResult``)."""
 from typing import List, Optional
 

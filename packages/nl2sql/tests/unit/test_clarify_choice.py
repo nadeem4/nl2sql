@@ -1,8 +1,8 @@
-"""Asking again: ``run_query(choice=...)`` (wave_b.md, section 7; D49, L2).
+"""Asking again: ``run_query(choice=...)``.
 
 The re-ask is stateless: the caller passes the request back with the option it picked. The engine checks the
 request's consistency hash, the question as passed, the asker, the live schema version and knowledge digest and
-the scope, then takes Wave A's pinned entry with the chosen option's plan (``plan_source="chosen"``).
+the scope, then takes pinned entry with the chosen option's plan (``plan_source="chosen"``).
 """
 from __future__ import annotations
 

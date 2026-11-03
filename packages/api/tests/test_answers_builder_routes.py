@@ -1,4 +1,4 @@
-"""The saved-answers and dashboard-builder routes (docs/architecture/wave_d.md, section 18, row DB1c): thin over
+"""The saved-answers and dashboard-builder routes: thin over
 ``engine.answers`` and ``engine.dashboards``, each handler passing the caller. A recorder stands in for the engine."""
 import threading
 import time

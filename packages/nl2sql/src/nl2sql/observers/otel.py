@@ -1,4 +1,4 @@
-"""The ``otel`` observer: OpenTelemetry metrics and spans from the event bus (D18).
+"""The ``otel`` observer: OpenTelemetry metrics and spans from the event bus.
 
 It needs the ``otel`` extra (``pip install "nl2sql-engine[otel]"``). This is
 the only module that imports ``opentelemetry``, and only when the observer is

@@ -1,4 +1,4 @@
-"""``/health``, ``/ready``, ``/meta`` and ``/about`` (docs/architecture/wave_d.md, "Health and readiness")."""
+"""``/health``, ``/ready``, ``/meta`` and ``/about``."""
 from importlib.metadata import version
 from types import SimpleNamespace
 

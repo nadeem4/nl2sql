@@ -2,8 +2,7 @@
 
 Two Mermaid views, written to read the same on a light or a dark page: no `%%{init}` line, no `style`,
 `classDef`, `linkStyle` or `click`, no colour. Emphasis is carried by shape and grouping, and the reader's page
-picks the theme. Neither view calls a model. The design is
-[Wave C, section 4](../architecture/wave_c.md#diagrams).
+picks the theme. Neither view calls a model. 
 
 ## The answer view
 

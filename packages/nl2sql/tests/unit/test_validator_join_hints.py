@@ -1,4 +1,4 @@
-"""A rejected join says which joins are allowed, and a join may name its sides either way round (wave_c.md, section 18.3, C-W6).
+"""A rejected join says which joins are allowed, and a join may name its sides either way round.
 
 The shapes are the Pagila ones the keyed run planned wrongly: shortcut joins on a shared key that is not a
 declared foreign key, and a declared join written with its operands the other way round.

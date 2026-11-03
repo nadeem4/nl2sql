@@ -1,7 +1,7 @@
 """The ``profiler`` agent's prompt: it describes the tables and columns the evidence asks for, and nothing else.
 
 Derived from the prompt of the enrichment ``nl2sql index --enrich`` ran (deleted by K3). The datasource's
-description, domains and sample questions are the operator's (docs/architecture/wave_b.md, section 6), so
+description, domains and sample questions are the operator's, so
 they are no longer asked for.
 """
 from langchain_core.prompts import ChatPromptTemplate

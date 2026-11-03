@@ -1,4 +1,4 @@
-"""``ChartSpec`` as a Vega-Lite v5 spec, with the rows inline (D110).
+"""``ChartSpec`` as a Vega-Lite v5 spec, with the rows inline.
 
 No colour, font or size is ever set: the renderer's theme decides. A ``color`` encoding names a field
 (a series, or the folded measures) and never a value or a scheme.

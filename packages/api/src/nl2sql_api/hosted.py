@@ -1,4 +1,4 @@
-"""The hosted demo's state and the middleware that enforces it (docs/architecture/wave_d.md, D221 and "The hosted demo").
+"""The hosted demo's state and the middleware that enforces it.
 
 ``nl2sql-api serve --demo --hosted`` is a public server where nobody is trusted and nothing is kept for long:
 

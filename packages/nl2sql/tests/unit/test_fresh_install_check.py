@@ -156,7 +156,7 @@ def test_venv_executable_follows_the_platform(check, tmp_path):
 
 
 def test_install_checks_the_nl2sql_command_the_cli_wheel_installs(check, tmp_path, monkeypatch):
-    """The CLI wheel is what installs `nl2sql` (D227): a release without a working command fails the check."""
+    """The CLI wheel is what installs `nl2sql`: a release without a working command fails the check."""
     calls = []
     monkeypatch.setattr(check, "_run", lambda cmd, **kw: calls.append([str(c) for c in cmd]))
 

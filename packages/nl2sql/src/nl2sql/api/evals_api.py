@@ -1,4 +1,4 @@
-"""``engine.evals``: evaluation as a product (wave_a.md, section 8, "The facade").
+"""``engine.evals``: evaluation as a product.
 
 ``load`` reads the suites ``evals.yaml`` names, ``run`` runs them in one of
 three modes and returns an ``EvalReport``, ``regenerate`` writes a suite's
@@ -89,7 +89,7 @@ class EvalsAPI:
             on_case: Called after each case with the config's name, the case
                 record and the dollars spent so far.
             clarify: Run the cases whose outcome is ``clarify``. Off by default;
-                Wave B's clarification is what such a case expects.
+                clarification is what such a case expects.
             cancellation_token: Cancel it to stop between cases: the case in
                 flight finishes, no other starts, and the report says
                 ``stopped: "cancelled"`` with what was scored.

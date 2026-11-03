@@ -54,7 +54,7 @@ class ErrorCode(str, Enum):
     PROVIDER_MODEL_UNAVAILABLE = "PROVIDER_MODEL_UNAVAILABLE"
     # The model's structured answer still did not parse after the agent's parse_retries.
     MODEL_OUTPUT_INVALID = "MODEL_OUTPUT_INVALID"
-    # Wave A (docs/architecture/wave_a.md). A hook denied the run or a part of it.
+    # A hook denied the run or a part of it.
     HOOK_DENIED = "HOOK_DENIED"
     # A hook raised, returned something that is not a decision, or a decision its point does not allow.
     HOOK_FAILED = "HOOK_FAILED"
@@ -72,7 +72,7 @@ class ErrorCode(str, Enum):
     JOIN_FAN_OUT = "JOIN_FAN_OUT"
     # A warning: a result column whose every value is null.
     ALL_NULL_COLUMN = "ALL_NULL_COLUMN"
-    # Wave B (docs/architecture/wave_b.md). The question can be read more than one way; the result
+    # The question can be read more than one way; the result
     # carries the options (INFO: nothing went wrong).
     NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"
     # A ClarificationChoice that is not one of this run's requests, or names no option of it.
@@ -81,7 +81,7 @@ class ErrorCode(str, Enum):
     CLARIFICATION_STALE = "CLARIFICATION_STALE"
     # The query is estimated to read more rows than the caller's cost rule allows, with over_limit: refuse.
     COST_LIMIT_EXCEEDED = "COST_LIMIT_EXCEEDED"
-    # Wave C (docs/architecture/wave_c.md, section 11). The conversation agent's step did not validate after
+    # The conversation agent's step did not validate after
     # its parse retries; the turn ends in error.
     MODEL_STEP_INVALID = "MODEL_STEP_INVALID"
     # A conversation already has settings conversations.max_turns turns.
@@ -94,7 +94,7 @@ class ErrorCode(str, Enum):
     UNKNOWN_CHAT_TOOL = "UNKNOWN_CHAT_TOOL"
     # A dashboard chart's stored plan no longer validates (the schema changed); fixing it is a chat turn.
     TILE_NEEDS_FIXING = "TILE_NEEDS_FIXING"
-    # Wave D (docs/architecture/wave_d.md). The replay provider has no recording for the question.
+    # The replay provider has no recording for the question.
     REPLAY_MISS = "REPLAY_MISS"
     # A request id passed as an approval that is unknown, denied or not yet granted.
     APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
@@ -123,18 +123,18 @@ FATAL_ERRORS = {
     ErrorCode.NEEDS_APPROVAL,
     ErrorCode.RUN_LIMIT_REACHED,
     ErrorCode.QUESTION_TOO_BROAD,
-    # Wave B: a question asked back, a choice that is wrong or stale, and a refused cost are never
-    # retried; planning the same question again rarely reads less (D54).
+    # a question asked back, a choice that is wrong or stale, and a refused cost are never
+    # retried; planning the same question again rarely reads less.
     ErrorCode.NEEDS_CLARIFICATION,
     ErrorCode.CLARIFICATION_INVALID,
     ErrorCode.CLARIFICATION_STALE,
     ErrorCode.COST_LIMIT_EXCEEDED,
-    # Wave C: a step the model cannot make, a conversation that is full, and a stored plan that does not
+    # a step the model cannot make, a conversation that is full, and a stored plan that does not
     # validate are not helped by planning again.
     ErrorCode.MODEL_STEP_INVALID,
     ErrorCode.CONVERSATION_TOO_LONG,
     ErrorCode.TILE_NEEDS_FIXING,
-    # Wave D: no recording, or an approval nobody granted, is not helped by planning again.
+    # no recording, or an approval nobody granted, is not helped by planning again.
     ErrorCode.REPLAY_MISS,
     ErrorCode.APPROVAL_NOT_GRANTED,
 }
@@ -225,7 +225,7 @@ class RunWarning(BaseModel):
 
 
 # ---------------------------------------------------------------- the facade's exceptions
-# docs/architecture/wave_d.md, "One base class (D202)". Each named exception derives from NL2SQLError and keeps the
+# One base class. Each named exception derives from NL2SQLError and keeps the
 # built-in it always had, so ``except LookupError`` still works. ``status`` is the HTTP status it means.
 
 
@@ -253,7 +253,7 @@ class NL2SQLError(Exception):
 
 
 class ConversationNotFound(NL2SQLError, LookupError):
-    """No such conversation, or it is not the caller's: the two are the same (D105)."""
+    """No such conversation, or it is not the caller's: the two are the same."""
 
     code, status = "NOT_FOUND", 404
 
@@ -313,7 +313,7 @@ class InvalidArgument(NL2SQLError, ValueError):
 
 
 class ReplayMiss(NL2SQLError):
-    """The ``replay`` provider has no recording for this question (D209).
+    """The ``replay`` provider has no recording for this question.
 
     Raised from inside a model call, so a node reports it as ``REPLAY_MISS``
     and not as a crash. It is not a ``ValueError``: nothing a caller passed was invalid.
@@ -376,7 +376,7 @@ class ScheduleTooFrequent(NL2SQLError, ValueError):
 
 
 class SecretValueInConfig(NL2SQLError, ValueError):
-    """A secret value would be written into YAML; secrets are written as references (D122)."""
+    """A secret value would be written into YAML; secrets are written as references."""
 
     code, status = "SECRET_VALUE_IN_CONFIG", 422
 
@@ -396,13 +396,13 @@ class ConnectionInvalid(NL2SQLError, ValueError):
 
 
 class AnswerNotFound(NL2SQLError, LookupError):
-    """No such saved answer, or it is not the caller's: the two are the same, an admin's included (D247)."""
+    """No such saved answer, or it is not the caller's: the two are the same, an admin's included."""
 
     code, status = "ANSWER_NOT_FOUND", 404
 
 
 class AnswerLimitReached(NL2SQLError):
-    """The caller already holds ``answers.max_per_user`` saved answers (D242); delete one to save another."""
+    """The caller already holds ``answers.max_per_user`` saved answers; delete one to save another."""
 
     code, status = "ANSWER_LIMIT_REACHED", 409
 

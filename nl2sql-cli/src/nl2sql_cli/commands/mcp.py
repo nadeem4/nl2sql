@@ -1,8 +1,8 @@
-"""``nl2sql mcp``: serve the engine to an MCP client over stdio (wave_a.md, section 12).
+"""``nl2sql mcp``: serve the engine to an MCP client over stdio.
 
 stdio has no authentication: whoever started the process is the caller. Its
 role comes from ``--role``, else ``policies.default_role``; with neither the
-server refuses to start, since a caller with no role reads nothing (D33).
+server refuses to start, since a caller with no role reads nothing.
 stdout is the protocol, so everything this command says goes to stderr.
 """
 from __future__ import annotations

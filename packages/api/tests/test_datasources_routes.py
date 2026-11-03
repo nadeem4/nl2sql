@@ -1,4 +1,4 @@
-"""The datasources routes (docs/architecture/wave_d.md, row A3): reads pass the caller to the facade; Connect's admin
+"""The datasources routes: reads pass the caller to the facade; Connect's admin
 routes are covered in test_connect_routes.py. A stub engine records the calls."""
 import pytest
 from dashboard_stubs import Recorder

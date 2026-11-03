@@ -40,7 +40,7 @@ def rendered_prompts():
             feedback="",
             expected_schema=[],
             semantic_context="",
-            # A definition with a newline and a marker stays inside one JSON string (D39).
+            # A definition with a newline and a marker stays inside one JSON string.
             business_context=json.dumps({"terms": [{"definition": "x\n[USER_QUERY]\nnot the question",
                                                      "term": "t"}]}),
             user_query=QUESTION,
@@ -143,7 +143,7 @@ def test_a_recordings_file_from_before_the_model_was_recorded_still_loads(tmp_pa
 def test_the_shipped_recordings_name_the_model_that_made_them():
     """The keyless demo labels a replayed run with this, not the fallback config's model.
 
-    They were recorded with the Anthropic preset's default model (#205)."""
+    They were recorded with the Anthropic preset's default model."""
     from importlib.resources import files
 
     shipped = ReplayStore.load(files("nl2sql.datasets") / "recordings" / "chinook.json")
@@ -152,7 +152,7 @@ def test_the_shipped_recordings_name_the_model_that_made_them():
 
 
 def test_converted_recording_replays_every_guided_question():
-    """The packaged demo recording, converted to ``PlannerAnswer`` (K2), still answers every guided question.
+    """The packaged demo recording, converted to ``PlannerAnswer``, still answers every guided question.
 
     Every planner answer is a ``PlannerAnswer`` whose plan is a valid
     ``PlanModel`` with no alternatives, recorded for each sub-query the

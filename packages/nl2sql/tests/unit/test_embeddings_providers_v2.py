@@ -1,7 +1,5 @@
 """Embeddings providers, interface version 2: ``openai_compatible``, ``base_url``,
 ``dimension``, ``describe()`` and the one-call dimension probe.
-
-See docs/architecture/phase2.md, section 5, "Embeddings".
 """
 import tomllib
 from pathlib import Path

@@ -1,4 +1,4 @@
-"""``nl2sql_api.sse.event_stream``: one place an SSE response is built (docs/architecture/wave_d.md, D207)."""
+"""``nl2sql_api.sse.event_stream``: one place an SSE response is built."""
 import asyncio
 import json
 import threading
@@ -80,7 +80,7 @@ def test_sse_a_failure_mid_stream_is_a_final_run_failed_frame():
     assert chunks[0] == _event("run.started").sse()
     assert len(chunks) == 2 and chunks[1].startswith("event: run.failed\n")
     data = json.loads(chunks[1].split("data: ", 1)[1])["data"]
-    assert data["error_code"] == "UNKNOWN_ERROR" and "secret" not in chunks[1], "never the exception text (D202)"
+    assert data["error_code"] == "UNKNOWN_ERROR" and "secret" not in chunks[1], "never the exception text"
 
 
 def test_sse_a_named_error_mid_stream_keeps_its_code_and_message():

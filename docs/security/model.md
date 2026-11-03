@@ -97,7 +97,7 @@ scope once, so every step decides the same way.
   claim that the role is allowed) is read by the policy check, so a crafted
   prompt cannot turn a refusal into an allow.
 
-**Knowledge is data.** The glossary (Wave B) reaches the planner and the
+**Knowledge is data.** The glossary reaches the planner and the
 refiner only as JSON values, in the schema block and in `[BUSINESS_CONTEXT]`,
 capped per item and per block, and filtered by the caller's scope: an item
 naming a denied table, or whose text (or a database comment) mentions one, is

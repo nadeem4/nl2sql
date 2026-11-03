@@ -3,8 +3,7 @@
 Schema snapshots and the diffs between them, the plan cache, answer feedback,
 the review queue's proposals, conversations, workspaces, dashboards with their
 stored chart results and API keys, the migrations that build them, and a lock
-(docs/architecture/phase2.md, section 4; the diffs, docs/architecture/wave_a.md,
-section 10; proposals, wave_b.md, section 5; the rest, wave_c.md, section 10).
+.
 
 * **Snapshots are immutable.** A row is keyed by ``(datasource_id,
   schema_version)`` and never updated: new content is a new version, and
@@ -46,7 +45,6 @@ logger = get_logger(__name__)
 
 class LockHeld(RuntimeError):
     """Another holder has the lease on this name, and it has not expired."""
-
 
 # -- migrations --------------------------------------------------------------------
 
@@ -111,7 +109,6 @@ def _adopt_0_5(connection: sqlite3.Connection) -> None:
         );
     """)
 
-
 def _feedback_datasources_and_source(connection: sqlite3.Connection) -> None:
     """Two nullable columns, so a row rated before them reads None."""
     present = {row[1] for row in connection.execute("PRAGMA table_info(feedback);")}
@@ -132,9 +129,8 @@ def _immutable_snapshots_and_locks(connection: sqlite3.Connection) -> None:
         );
     """)
 
-
 def _schema_diffs(connection: sqlite3.Connection) -> None:
-    """The structural diff that introduced each version, beside its snapshot (D31)."""
+    """The structural diff that introduced each version, beside its snapshot."""
     _script(connection, """
         CREATE TABLE IF NOT EXISTS schema_diffs (
             datasource_id TEXT NOT NULL,
@@ -145,9 +141,8 @@ def _schema_diffs(connection: sqlite3.Connection) -> None:
         );
     """)
 
-
 def _proposals(connection: sqlite3.Connection) -> None:
-    """The review queue (D41): one row per proposal, its fields as JSON, the filtered ones as columns too."""
+    """The review queue: one row per proposal, its fields as JSON, the filtered ones as columns too."""
     _script(connection, """
         CREATE TABLE IF NOT EXISTS proposals (
             id TEXT PRIMARY KEY,
@@ -161,9 +156,8 @@ def _proposals(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals (status, created_at);
     """)
 
-
 def _conversations_dashboards_and_keys(connection: sqlite3.Connection) -> None:
-    """Wave C: each owned document as JSON beside the columns it is filtered on (wave_c.md, section 10).
+    """each owned document as JSON beside the columns it is filtered on.
 
     ``tile_runs`` holds the last result of each chart, rows included, so it sits beside its dashboard and is
     deleted with it. ``api_keys`` holds a hash, never a secret.
@@ -210,9 +204,8 @@ def _conversations_dashboards_and_keys(connection: sqlite3.Connection) -> None:
         );
     """)
 
-
 def _approvals(connection: sqlite3.Connection) -> None:
-    """Wave D: stored approval requests and their grants, one JSON document per request id (D215)."""
+    """stored approval requests and their grants, one JSON document per request id."""
     _script(connection, """
         CREATE TABLE IF NOT EXISTS approvals (
             id TEXT PRIMARY KEY,
@@ -224,9 +217,8 @@ def _approvals(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals (status, created_at);
     """)
 
-
 def _saved_answers(connection: sqlite3.Connection) -> None:
-    """Wave D: a person's saved answers, one JSON document per id, owned by (tenant_id, user_id) (D238)."""
+    """a person's saved answers, one JSON document per id, owned by (tenant_id, user_id)."""
     _script(connection, """
         CREATE TABLE IF NOT EXISTS saved_answers (
             id TEXT PRIMARY KEY,
@@ -237,7 +229,6 @@ def _saved_answers(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_saved_answers_owner ON saved_answers (tenant_id, user_id, created_at);
     """)
-
 
 MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0001_adopt_0_5_tables", _adopt_0_5),

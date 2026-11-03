@@ -121,7 +121,7 @@ class ASTPlannerNode:
     def checked_alternatives(self, state: SubgraphExecutionState,
                              alternatives: List[PlanAlternative]) -> List[PlanAlternative]:
         """Each alternative reading as ``plan.after`` lets it through: a denied one is dropped, a changed one kept
-        as changed (wave_b.md, section 7). The clarifier validates what is left."""
+        as changed. The clarifier validates what is left."""
         kept = []
         for alternative in alternatives:
             verdict = self.check_plan(state, alternative.plan)
@@ -232,7 +232,7 @@ class ASTPlannerNode:
             update = self.after_plan(state, plan, "llm", notes)
             response = update["ast_planner_response"]
             # What an earlier attempt of this sub-query offered stays offered: a question read more than one
-            # way once is ambiguous, and its final plan is never cached (D47), however clear the retry was.
+            # way once is ambiguous, and its final plan is never cached, however clear the retry was.
             earlier = state.ast_planner_response
             offered = [*(earlier.alternatives_offered if earlier is not None else []), *answer.alternatives]
             if offered or answer.ambiguous_phrase:

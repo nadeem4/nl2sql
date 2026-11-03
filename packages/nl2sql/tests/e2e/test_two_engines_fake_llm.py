@@ -1,9 +1,7 @@
 """Two engines in one process never share anything.
 
-docs/architecture/configuration_v2.md, section 8. Written in PR 7a as a strict
-expected failure, while the pipeline read the process-global ``settings`` and
-the second engine's row limit leaked into the first. It passes since PR 11
-moved the pipeline onto each engine's runtime.
+The pipeline reads each engine's runtime, not a process-global ``settings``,
+so the second engine's row limit cannot leak into the first.
 """
 from __future__ import annotations
 

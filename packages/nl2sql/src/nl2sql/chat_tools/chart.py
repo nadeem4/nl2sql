@@ -1,8 +1,8 @@
-"""The ``chart`` chat tool (docs/architecture/wave_c.md, sections 4 and 5).
+"""The ``chart`` chat tool.
 
 Draws the rows of an ``ask`` step of the conversation as a line, a bar, a big number or a table, through
 ``engine.results.chart``: no model call. Like every chat tool it imports only the top-level ``nl2sql`` and
-its own interface module (D109).
+its own interface module.
 """
 from __future__ import annotations
 

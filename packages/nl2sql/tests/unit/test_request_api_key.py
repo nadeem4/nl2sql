@@ -169,7 +169,7 @@ def test_a_chosen_model_on_the_configured_provider_drops_the_operators_endpoint(
     moved, key = LLMRegistry._for_request(config, "astplanner", llms)
 
     assert (moved.provider, moved.model, key) == ("openai", "gpt-4.1", FIRST_KEY)
-    # The caller's choice runs at the provider's own endpoint, never the operator's (D210).
+    # The caller's choice runs at the provider's own endpoint, never the operator's.
     assert moved.base_url is None
     # And the temperature moves with the model.
     assert moved.temperature == 0.0

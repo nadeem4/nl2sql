@@ -6,7 +6,7 @@ only), stop it, or (at `execute.before`) ask for a person's approval. Hooks
 apply to every run: a generated answer and a verified query, from the
 Python API, the CLI and `nl2sql-api` alike. None ships built in.
 
-The design is [Wave A, section 6](../architecture/wave_a.md#6-hooks).
+
 
 ## The six points
 

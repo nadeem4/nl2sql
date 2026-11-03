@@ -1,6 +1,6 @@
-"""The ``[BUSINESS_CONTEXT]`` block the planner and the refiner send (docs/architecture/wave_b.md, section 4).
+"""The ``[BUSINESS_CONTEXT]`` block the planner and the refiner send.
 
-Knowledge reaches a prompt only as JSON values (D39): one object, keys
+Knowledge reaches a prompt only as JSON values: one object, keys
 sorted, no whitespace, ``ensure_ascii=False``, so a newline or a block marker
 in a definition stays inside one JSON string on one line. ``notes`` and
 synonyms are never in it. ``fit_business_context`` cuts the block to

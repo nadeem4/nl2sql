@@ -1,4 +1,4 @@
-"""The model-free Pagila retrieval baseline (wave_c.md, section 17.5, C-W5).
+"""The model-free Pagila retrieval baseline.
 
 The Pagila suite in mode retrieval, on the test bed's Pagila indexed with local embeddings: no model and no
 key, the table selector off, so the run is the floor (vector search, glossary tables, join-path fill). The

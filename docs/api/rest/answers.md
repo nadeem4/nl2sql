@@ -1,7 +1,7 @@
 # Saved answers
 
 A person's own record of "this answered my question": the typed plan behind a chat answer, run again on request. It is
-the REST face of [`engine.answers`](../core/answers.md); design in [Wave D, section 18](../../architecture/wave_d.md).
+the REST face of [`engine.answers`](../core/answers.md); 
 Code: `packages/api/src/nl2sql_api/routes/answers.py`.
 
 A saved answer belongs to its owner alone. Another caller's answer is a `404` `ANSWER_NOT_FOUND`, an admin's call

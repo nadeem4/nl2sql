@@ -1,4 +1,4 @@
-"""Glossary names against the live snapshot, the roles the snapshot proves, and the problems (wave_b.md, section 3).
+"""Glossary names against the live snapshot, the roles the snapshot proves, and the problems.
 
 A table is named as ``preferred_tables`` names it: the bare table name or
 ``schema.table``, case ignored. A column is ``table.column`` or
@@ -8,10 +8,10 @@ when it is loaded, since a glossary is written before (or without) an index:
 - a name that resolves to one table or column is used;
 - one that resolves to nothing, or a bare name matching tables in two
   schemas, is not used and is a *problem*, never an error in a run;
-- a join whose two sides' types cannot be compared (Wave A D30: a date
+- a join whose two sides' types cannot be compared (a date
   against a number or a boolean) is not used and is a problem.
 
-``derived_roles`` is what the snapshot proves (D61): ``identifier`` for a
+``derived_roles`` is what the snapshot proves: ``identifier`` for a
 primary or foreign key column, ``date`` for a temporal type. A role the
 glossary sets wins over it.
 """

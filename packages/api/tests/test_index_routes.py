@@ -1,4 +1,4 @@
-"""The index routes and the index and profile jobs (docs/architecture/wave_d.md, row A3). A stub engine records the
+"""The index routes and the index and profile jobs. A stub engine records the
 calls and answers with the engine's own models."""
 import threading
 import time

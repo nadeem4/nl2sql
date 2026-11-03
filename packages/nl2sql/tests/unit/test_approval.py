@@ -1,4 +1,4 @@
-"""Approval (docs/architecture/wave_a.md, section 7; D10, D24 amended).
+"""Approval.
 
 A hook at ``execute.before`` answers ``NeedsApproval``: the run ends
 ``needs_approval`` with an ``ApprovalRequest`` per pending sub-query. An
@@ -77,7 +77,7 @@ def test_the_request_id_hashes_everything_but_the_reason_and_the_roles():
     assert _request(question="Another question?").id != request.id
     assert _request(asker=UserContext(user_id="bob", tenant_id="acme")).id != request.id
     assert _request(sql=SQL + " WHERE 1 = 1").id != request.id
-    # Stable through JSON, so an app (or Wave D's store) can hold it and send it back.
+    # Stable through JSON, so an app (or store) can hold it and send it back.
     again = ApprovalRequest.model_validate_json(request.model_dump_json())
     assert again.expected_id() == request.id
 
@@ -315,7 +315,7 @@ def test_approved_verified_query_runs_its_pinned_values_with_no_matching_call(db
     assert next(iter(out["artifact_refs"].values())).row_count == 2
 
 
-# ---------------------------------------------------------------- the review's attacks (PR #319)
+# ---------------------------------------------------------------- the review's attacks
 
 
 def test_the_sql_shown_to_the_approver_is_the_sql_whose_hash_is_checked():

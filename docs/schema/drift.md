@@ -142,4 +142,4 @@ diff it stores. See [Events](../observability/events.md).
 - Impact: `packages/nl2sql/src/nl2sql/schema/impact.py`
 - The models: `packages/sdk/src/nl2sql_sdk/schema.py`
 - Storing a build's diff: `packages/nl2sql/src/nl2sql/indexing/orchestrator.py`
-- Design: [Wave A, section 10](../architecture/wave_a.md#10-schema-drift-measure-first)
+- 

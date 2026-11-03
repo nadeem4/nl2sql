@@ -1,6 +1,6 @@
-"""``engine.api_keys``: bearer keys for MCP over HTTP (docs/architecture/wave_c.md, section 9; D127).
+"""``engine.api_keys``: bearer keys for MCP over HTTP.
 
-Managing keys needs an admin ``by`` with no default (D130); ``verify`` takes the token alone and returns the key's
+Managing keys needs an admin ``by`` with no default; ``verify`` takes the token alone and returns the key's
 ``UserContext``. The token is ``nl2sql_<id>_<secret>`` (``nl2sql.policies.keys``); only the secret's hash is stored.
 """
 from __future__ import annotations

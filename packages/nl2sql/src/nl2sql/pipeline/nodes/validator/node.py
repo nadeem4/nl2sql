@@ -1011,7 +1011,7 @@ class LogicalValidatorNode:
                 )
             )
 
-        # A join key whose column cannot take its declared type (D30).
+        # A join key whose column cannot take its declared type.
         errors.extend(join_key_type_errors(plan, state.sub_query, state.relevant_tables, self._plan_dialect(state)))
 
         # Last, so every check above keeps its own error code: whatever the
@@ -1053,8 +1053,7 @@ class LogicalValidatorNode:
         ``plan`` is checked as a plan of ``state``'s sub-query, with its
         retrieved schema and its caller's scope, exactly as the node checks
         the state's own plan; the state is not changed. The clarifier runs
-        each of the planner's alternatives through it (docs/architecture/wave_b.md,
-        section 7), so an option is offered only when the node would pass it.
+        each of the planner's alternatives through it, so an option is offered only when the node would pass it.
         An ERROR or CRITICAL finding means the plan would not pass.
         ``audit=False`` (the clarifier's) publishes no ``policy.decision``
         and logs no denial warning: a reading that is only checked, and

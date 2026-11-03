@@ -1,5 +1,5 @@
 """The `query` namespace of `/api/v1`: ask, stream, read results and traces, rate and correct
-(docs/architecture/wave_d.md, "The routes", D201-D204, D207).
+.
 
 Every route calls the facade as the request's caller and nothing else: a run, result or trace another caller asked is
 a 404, and `feedback/correct` never acts as the trusted in-process operator.

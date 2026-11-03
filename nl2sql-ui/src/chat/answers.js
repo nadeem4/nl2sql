@@ -1,4 +1,4 @@
-// Pure helpers for "Did this answer it?" and My answers (wave_d.md, section 18). The server keeps the plan from its own
+// Pure helpers for "Did this answer it?" and My answers. The server keeps the plan from its own
 // copy of the step; the page sends only which run, which step of which conversation, and an optional note.
 import { NOTE_MAX } from "./feedback.js";
 
@@ -72,7 +72,7 @@ export function markHintSeen(storage) {
   }
 }
 
-// The hint is shown under every answer until the first click anywhere dismisses it for all of them (D249).
+// The hint is shown under every answer until the first click anywhere dismisses it for all of them.
 export function createHintStore(storage) {
   let visible = !hintSeen(storage);
   const listeners = new Set();

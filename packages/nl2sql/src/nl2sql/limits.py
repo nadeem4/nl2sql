@@ -1,9 +1,9 @@
 """Limits on model calls and dollars: ``Budget``, and ``RunStop``, why it stopped the work.
 
-docs/architecture/wave_a.md, section 5, "Per-question caps" (D20). A question
+A question
 runs under a ``Budget`` built from ``settings.pipeline.max_llm_calls`` (60)
 and ``max_cost_usd`` (none), which ``QueryAPI.open_scope`` attaches to the
-run's scope. Work that is not a question (Wave B's profiler drafting, V3's
+run's scope. Work that is not a question (profiler drafting, V3's
 seeding) opens a ``Budget`` of its own, with its own caps, and makes its model
 calls with ``budget.callbacks()``; the semantics are the same.
 

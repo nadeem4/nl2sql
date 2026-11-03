@@ -332,7 +332,7 @@ def test_an_unknown_mode_is_refused(monkeypatch):
         _run(monkeypatch, [_suite(_case("a"))], mode="tier3")
 
 
-# --- C-W7a: the terminal results, not the scans, are what a case is scored on ----
+# --- the terminal results, not the scans, are what a case is scored on ----
 
 
 class _Store:

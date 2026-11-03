@@ -1,4 +1,4 @@
-"""``nl2sql launch``: from a database to a working project in one sitting (docs/architecture/wave_c.md, section 7).
+"""``nl2sql launch``: from a database to a working project in one sitting.
 
 ``nl2sql launch [DIR] [--provider NAME] [--as ROLE] [--draft] [--yes] [--no-ports]``. Every step is a package call;
 this module only asks the questions and prints the answers:

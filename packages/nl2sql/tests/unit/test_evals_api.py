@@ -69,7 +69,7 @@ def test_run_takes_its_defaults_from_evals_yaml(tmp_path, monkeypatch):
         assert isinstance(report, EvalReport)
         assert seen["suites"] == ["shop"] and seen["mode"] == "full"
         assert (seen["scorers"], seen["curated"], seen["max_cost_usd"]) == (["result_match"], False, 2.5)
-        assert seen["clarify"] is False  # Wave B turns clarification on; evals run with it off by default
+        assert seen["clarify"] is False  # clarification is on elsewhere; evals run with it off by default
 
         engine.evals.run(mode="plans", scorers=["outcome"], curated=True, max_cost_usd=1.0, clarify=True,
                          cases=["c1"], roles=["admin"], passes=2)

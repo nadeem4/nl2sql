@@ -3,7 +3,7 @@
 A hook at ``execute.before`` may answer that a person must approve the SQL.
 The run then ends ``needs_approval`` with one request per pending sub-query;
 an approver re-runs the question with an ``Approval`` that carries it. The
-design is docs/architecture/wave_a.md, section 7 (D10, D24).
+
 
 The engine checks an approval, not the hook: ``approval_problem`` says why
 one does not cover the SQL a hook asked about (the runner calls it at
@@ -78,7 +78,7 @@ class ApprovalRequest(BaseModel):
         ``REQUEST_ID_FIELDS`` only, each dumped without the values it holds at
         their defaults. So a field added later to this model, or with a
         default to a nested one (a plan, a sub-query), does not change the id
-        of a request made before: a store keyed by id (Wave D) survives an
+        of a request made before: a store keyed by id survives an
         upgrade. Changing a default, or the meaning of a field in the list,
         does change ids; do that only on purpose.
         """

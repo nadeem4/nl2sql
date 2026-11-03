@@ -1,4 +1,4 @@
-"""The `dashboards` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", D224).
+"""The `dashboards` namespace of `/api/v1`.
 
 Thin over ``engine.dashboards``: every handler passes the caller and calls one named method. A dashboard is built as a
 draft in chat and pinned whole; these routes read, refresh, edit, pin, move and delete it, and call no model.

@@ -1,5 +1,5 @@
 """The `jobs` namespace of `/api/v1`: a background job's state, progress and cancellation. The routes that start a job
-(`POST /jobs/<kind>`) are added to this file by the rows that own each kind (docs/architecture/wave_d.md, "Jobs")."""
+(`POST /jobs/<kind>`) are added to this file by the rows that own each kind."""
 import logging
 from typing import Annotated, List, Optional
 

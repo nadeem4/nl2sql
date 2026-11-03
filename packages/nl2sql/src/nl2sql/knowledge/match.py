@@ -1,4 +1,4 @@
-"""Which knowledge a sub-query touches: matched terms and the rules of its tables (docs/architecture/wave_b.md, section 4).
+"""Which knowledge a sub-query touches: matched terms and the rules of its tables.
 
 A term matches lexically: its name or one of its synonyms appears, as whole
 words, in the sub-query's intent or the question, case and punctuation
@@ -6,7 +6,7 @@ ignored. A name scores 1.0, a synonym 0.9; the best ``top_k`` are kept, and
 every matching term is kept up to that, so two terms sharing a synonym are
 both sent (that is how the planner sees the ambiguity). A term whose
 ``knowledge.term`` index entry is at least ``floor`` similar to the intent
-matches too, scoring that similarity (K3).
+matches too, scoring that similarity.
 
 A rule is sent when its ``tables`` is empty or names one of the tables sent
 with the sub-query. Both take knowledge already filtered to the caller's

@@ -1,6 +1,6 @@
-"""The workspaces service behind ``engine.workspaces`` (docs/architecture/wave_c.md, section 6; D118, D131).
+"""The workspaces service behind ``engine.workspaces``.
 
-A workspace is a named, private group of its owner's dashboards. The caller is required on every method (D130).
+A workspace is a named, private group of its owner's dashboards. The caller is required on every method.
 """
 from __future__ import annotations
 

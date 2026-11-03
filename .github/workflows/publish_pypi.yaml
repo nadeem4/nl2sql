@@ -75,7 +75,7 @@ jobs:
           cache: npm
           cache-dependency-path: nl2sql-ui/package-lock.json
 
-      # The nl2sql-api wheel carries the built web app (D226), so it is built first.
+      # The nl2sql-api wheel carries the built web app, so it is built first.
       - name: Build the web app
         run: npm ci && npm run build
         working-directory: nl2sql-ui

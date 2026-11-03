@@ -1,4 +1,4 @@
-"""The conversation agent: one structured model call per step of a turn (docs/architecture/wave_c.md, section 3).
+"""The conversation agent: one structured model call per step of a turn.
 
 ``block`` renders what the model sees as one JSON object; ``decide`` asks for a ``ModelStep`` and checks it
 against the tools that exist, so a step the engine would refuse is sent back by the parse-and-retry of

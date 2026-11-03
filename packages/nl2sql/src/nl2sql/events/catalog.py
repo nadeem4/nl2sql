@@ -2,25 +2,24 @@
 
 ``EventBus.publish`` refuses a name that is not here and validates ``data``
 against its model; ``engine.events.catalog()`` returns the list, so an
-observer author and the docs read the same thing. The design is
-docs/architecture/wave_a.md, section 3, "The catalog".
+observer author and the docs read the same thing. 
 
-Events never carry result rows, sample values, keys or header values (D15).
+Events never carry result rows, sample values, keys or header values.
 The question and the answer text are carried and may contain values from the
 data. Each model forbids extra keys, so nothing rides along unlisted.
 
 Run events have the run's ``trace_id``; engine events have none, except
 where a run caused them. Each event names, in its description, who publishes
-it; most publishers arrive with the Wave A PR named there.
+it; each entry names its publisher.
 
 Each entry also says who else reads it, so each list has one definition and a
 later event joins it by its own entry, not by an edit elsewhere:
 
 - ``stream``: the caller's own stream (``stream_query``) carries it: the
-  caller-safe allow-list, D17 (``STREAM_EVENTS``). Operator data (a policy
+  caller-safe allow-list (``STREAM_EVENTS``). Operator data (a policy
   denial names a table, a hook decision its reasons, a model call its cost)
   stays off it and reaches an operator through ``engine.events.subscribe``.
-- ``audit``: the ``audit`` observer writes it (``AUDIT_EVENTS``, D19), and
+- ``audit``: the ``audit`` observer writes it (``AUDIT_EVENTS``), and
   ``audit_only``, when set, narrows it to the values named per data field
   (``hook.decision``: only ``deny``, ``needs_approval``, ``approved`` and
   ``error``).
@@ -35,7 +34,7 @@ from nl2sql.charts.spec import ColumnKind
 from nl2sql.config.models import HookPoint
 
 # How a run ended. ``needs_clarification``: the run asked which reading of the question was meant
-# (the clarifier, Wave B's L1), and nothing was executed.
+# (the clarifier), and nothing was executed.
 RunStatus = Literal["success", "plan_only", "error", "needs_approval", "stopped", "needs_clarification"]
 
 
@@ -154,7 +153,7 @@ class PlanCacheLookup(EventData):
 
 
 class PolicyDecision(EventData):
-    """A denial at an enforcement point (D16); never an allowed table."""
+    """A denial at an enforcement point; never an allowed table."""
 
     datasource_id: str
     schema_: Optional[str] = Field(default=None, alias="schema")
@@ -262,7 +261,7 @@ class EvalFinished(EventData):
     gate: Optional[Dict[str, Any]] = None
 
 
-# ---------------------------------------------------------------- Wave B (docs/architecture/wave_b.md, section 11)
+# ---------------------------------------------------------------- Knowledge, review and profiler events
 
 class KnowledgeSourceData(EventData):
     type: str
@@ -295,7 +294,7 @@ class CostEstimated(EventData):
     datasource_id: str
     sub_query_id: Optional[str] = None
     # Estimate.rows: the rows the query is expected to read. Not "rows": no event has a field of that
-    # name, so a result's rows can never ride along under it (D15).
+    # name, so a result's rows can never ride along under it.
     estimated_rows: Optional[int] = None
     cost: Optional[float] = None
     limit: Optional[int] = None
@@ -329,8 +328,8 @@ class ProposalDecided(EventData):
     wrote: Optional[str] = None
 
 
-# ---------------------------------------------------------------- Wave C (docs/architecture/wave_c.md)
-# None carries rows or a secret (D15): a step names its arguments, never their values, and a key is named
+# ---------------------------------------------------------------- Conversation, dashboard and key events
+# None carries rows or a secret: a step names its arguments, never their values, and a key is named
 # by its id, never its token.
 
 class ConversationStarted(EventData):
@@ -441,8 +440,8 @@ class EventSpec(BaseModel):
     model: Type[EventData]
     description: str
     run: bool
-    stream: bool = False  # on the caller's stream (D17)
-    audit: bool = False   # written by the audit observer (D19)
+    stream: bool = False  # on the caller's stream
+    audit: bool = False   # written by the audit observer
     # With ``audit``: write the event only when each named data field has one of these values.
     audit_only: Dict[str, FrozenSet[str]] = Field(default_factory=dict)
 
@@ -492,16 +491,16 @@ CATALOG: Dict[str, EventSpec] = {
                              run=True),
     "plan_cache.lookup": _spec(PlanCacheLookup, "The plan cache was asked for a plan. Published by "
                                                  "PlanCache.get.", run=True),
-    "policy.decision": _spec(PolicyDecision, "A denial at an enforcement point (D16): the logical validator, the "
+    "policy.decision": _spec(PolicyDecision, "A denial at an enforcement point: the logical validator, the "
                                              "curated matcher or the datasource resolver. Never on the caller's "
                                              "stream.", run=True, audit=True),
-    "hook.decision": _spec(HookDecision, "A hook answered at one of the six points (H1). The audit "
+    "hook.decision": _spec(HookDecision, "A hook answered at one of the six points. The audit "
                                          "observer writes deny, needs_approval, approved and error.",
                            run=True, audit=True,
                            audit_only={"decision": frozenset({"deny", "needs_approval", "approved", "error"})}),
-    "run.limit_reached": _spec(RunLimitReached, "The question reached its cost or call cap (E3).", run=True,
+    "run.limit_reached": _spec(RunLimitReached, "The question reached its cost or call cap.", run=True,
                                stream=True, audit=True),
-    "sanity.flagged": _spec(SanityFlagged, "An answer sanity check found something (S1).", run=True,
+    "sanity.flagged": _spec(SanityFlagged, "An answer sanity check found something.", run=True,
                             stream=True),
     # Engine events
     "datasource.failed": _spec(DatasourceFailed, "A datasource check failed. Published by "
@@ -515,7 +514,7 @@ CATALOG: Dict[str, EventSpec] = {
                                          "by IndexingOrchestrator._commit.", run=False, audit=True),
     "index.failed": _spec(IndexFailed, "An index build of one datasource failed; its previous build stays live. "
                                        "Published by rebuild_index.", run=False),
-    "schema.drifted": _spec(SchemaDrifted, "A datasource's structure differs from its build (D1).", run=False,
+    "schema.drifted": _spec(SchemaDrifted, "A datasource's structure differs from its build.", run=False,
                             audit=True),
     "retention.purged": _spec(RetentionPurged, "Old traces, results and audit files were deleted: the counts "
                                                "per slot. Published by engine.storage.purge().", run=False,
@@ -523,28 +522,28 @@ CATALOG: Dict[str, EventSpec] = {
     "llm.changed": _spec(LLMChanged, "The LLM configuration was replaced; never a key. Published by "
                                       "engine.llm.replace.", run=False,
                          audit=True),
-    "eval.case": _spec(EvalCase, "An eval case finished (V1).", run=False),
-    "eval.finished": _spec(EvalFinished, "An eval run finished (V1).", run=False),
-    # Wave B. None is on the caller's stream (D17): they carry glossary text, options and estimates, operator
+    "eval.case": _spec(EvalCase, "An eval case finished.", run=False),
+    "eval.finished": _spec(EvalFinished, "An eval run finished.", run=False),
+    # None is on the caller's stream: they carry glossary text, options and estimates, operator
     # matters. A caller learns of a clarification from the result run.finished carries.
     "knowledge.loaded": _spec(KnowledgeLoaded, "The knowledge sources were loaded, at build or by "
-                                               "engine.knowledge.reload() (K1).", run=False),
+                                               "engine.knowledge.reload().", run=False),
     "knowledge.used": _spec(KnowledgeUsedData, "A sub-query's prompts carried glossary terms and rules. "
                                                "Published by the planner on the sub-query's first prompt "
-                                               "(K2); a plan-cache hit sends none.", run=True),
+                                               "; a plan-cache hit sends none.", run=True),
     "clarification.requested": _spec(ClarificationRequested, "A run ended asking which reading was meant. "
-                                                             "Published by the clarifier (L1).", run=True),
+                                                             "Published by the clarifier.", run=True),
     "cost.estimated": _spec(CostEstimated, "The database estimated a sub-query's rows read, and the cost rule "
-                                           "decided. Published by policy.cost (C2). The audit observer writes "
+                                           "decided. Published by policy.cost. The audit observer writes "
                                            "confirm and refuse.", run=True, audit=True,
                             audit_only={"decision": frozenset({"confirm", "refuse"})}),
     "profile.finished": _spec(ProfileFinished, "A datasource's profile finished: its counts, never values. "
-                                               "Published by engine.knowledge.profile (P1).", run=False),
-    "proposal.created": _spec(ProposalCreated, "A proposal entered the review queue (Q1).", run=False),
+                                               "Published by engine.knowledge.profile.", run=False),
+    "proposal.created": _spec(ProposalCreated, "A proposal entered the review queue.", run=False),
     "proposal.decided": _spec(ProposalDecided, "A proposal was accepted or rejected, by whom and into which "
-                                               "file (Q1).", run=False, audit=True),
-    # Wave C. The run stream stays as it is: conversations.stream adds the two conversation events to its own
-    # allow-list (A4). The three of a turn have the turn's scope; the rest are engine events.
+                                               "file.", run=False, audit=True),
+    # The run stream stays as it is: conversations.stream adds the two conversation events to its own
+    # allow-list. The three of a turn have the turn's scope; the rest are engine events.
     "conversation.started": _spec(ConversationStarted, "A conversation was started. Published by "
                                                        "engine.conversations.start.", run=False),
     "conversation.step": _spec(ConversationStep, "A conversation turn finished one step (a tool call): the "
@@ -561,13 +560,13 @@ CATALOG: Dict[str, EventSpec] = {
     "dashboard.changed": _spec(DashboardChanged, "A dashboard was created, edited, pinned, moved or deleted: the kinds "
                                                  "of change, never values.", run=False),
     "dashboard.schedule_set": _spec(DashboardScheduleSet, "A refresh schedule was set; it saves a snapshot of "
-                                                          "the caller's roles (D134).", run=False, audit=True),
+                                                          "the caller's roles.", run=False, audit=True),
     "dashboard.schedule_stopped": _spec(DashboardScheduleStopped, "A schedule stopped with a visible error "
-                                                                  "(D134).", run=False, audit=True),
+                                                                  ".", run=False, audit=True),
     "workspace.changed": _spec(WorkspaceChanged, "A workspace was created, renamed or deleted.", run=False),
     "datasource.saved": _spec(DatasourceSaved, "One datasource's file was written "
-                                               "(engine.datasources.save, D123).", run=False, audit=True),
-    "api_key.created": _spec(ApiKeyCreated, "An API key was created; its id, never its token (D127).",
+                                               "(engine.datasources.save).", run=False, audit=True),
+    "api_key.created": _spec(ApiKeyCreated, "An API key was created; its id, never its token.",
                              run=False, audit=True),
     "api_key.revoked": _spec(ApiKeyRevoked, "An API key was revoked.", run=False, audit=True),
     "mcp.denied": _spec(McpDenied, "The MCP server refused a request's bearer token; never the token.",
@@ -575,9 +574,9 @@ CATALOG: Dict[str, EventSpec] = {
 }
 
 RUN_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.run)
-# The caller-safe allow-list (D17): what ``stream_query`` yields of its own run.
+# The caller-safe allow-list: what ``stream_query`` yields of its own run.
 STREAM_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.stream)
-# What the ``audit`` observer writes (D19); ``EventSpec.audited`` applies an entry's ``audit_only``.
+# What the ``audit`` observer writes; ``EventSpec.audited`` applies an entry's ``audit_only``.
 AUDIT_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.audit)
 
 

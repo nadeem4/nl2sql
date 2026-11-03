@@ -1,7 +1,7 @@
-"""The `answers` namespace of `/api/v1` (docs/architecture/wave_d.md, section 18, DB1c): a person's saved answers.
+"""The `answers` namespace of `/api/v1`: a person's saved answers.
 
 Thin over ``engine.answers``: every handler passes the caller and calls one named method. A saved answer is its
-owner's alone; another caller's is a 404, an admin included (D247). Saving and running call no model.
+owner's alone; another caller's is a 404, an admin included. Saving and running call no model.
 """
 from typing import Annotated, List, Optional
 

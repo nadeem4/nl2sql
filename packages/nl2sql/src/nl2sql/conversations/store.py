@@ -1,4 +1,4 @@
-"""Conversations in the state store: ownership, and the rule that a stored result has no rows (D105, D106)."""
+"""Conversations in the state store: ownership, and the rule that a stored result has no rows."""
 from __future__ import annotations
 
 from typing import Any, List, Optional, Tuple
@@ -23,13 +23,13 @@ def owner_of(user: Any, default_tenant: Optional[str]) -> Owner:
 
 
 def strip_rows(result: QueryResult) -> QueryResult:
-    """``result`` as a stored step keeps it: everything but the rows of its sub-queries (D106)."""
+    """``result`` as a stored step keeps it: everything but the rows of its sub-queries."""
     return result.model_copy(update={"sub_queries": [sq.model_copy(update={"rows": None})
                                                       for sq in result.sub_queries]})
 
 
 def strip_output_rows(step: ToolStep) -> ToolStep:
-    """``step`` as it is stored: a chart output keeps its spec and columns but not its rows (D106); a client draws
+    """``step`` as it is stored: a chart output keeps its spec and columns but not its rows; a client draws
     the chart again through ``engine.results.chart``."""
     output = step.output
     if output is None or not isinstance(output.body, dict) or not isinstance(output.body.get("data"), dict):

@@ -52,7 +52,7 @@ class ExpectedColumn(BaseModel):
     dtype: Optional[Dtype] = None
     # Set by the decomposer node on its own copy of each sub-query, never by
     # the model: kept out of the tool schema. The logical validator checks the
-    # type of a join-key column against `dtype` (wave_a.md, D30).
+    # type of a join-key column against `dtype`.
     join_key: SkipJsonSchema[bool] = False
 
 
@@ -199,7 +199,7 @@ class DecomposerResponse(BaseModel):
 
     @model_validator(mode="after")
     def validate_join_key_types(self):
-        """Each join key names a typed column of its side, and the two types can meet (D30).
+        """Each join key names a typed column of its side, and the two types can meet.
 
         The aggregator casts both sides of a key to one type before the join,
         so each side must declare one, in its sub-query's ``expected_schema``,

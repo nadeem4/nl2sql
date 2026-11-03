@@ -329,7 +329,7 @@ def test_an_eval_case_a_hook_ended_leaves_nothing_readable(monkeypatch, store):
 
 
 def test_an_eval_case_with_one_query_reads_back_the_scans_rows_as_its_terminal_result(monkeypatch, store):
-    """C-W7a: a standalone group's saved result is its scan (real aggregator, real store), so the case scores as before."""
+    """a standalone group's saved result is its scan (real aggregator, real store), so the case scores as before."""
     from nl2sql.api.query_api import RowSample
     from nl2sql.evaluation.run import _ask as ask_case
     from nl2sql.evaluation.suite import EvalCase

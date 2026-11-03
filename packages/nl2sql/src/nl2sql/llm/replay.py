@@ -170,7 +170,7 @@ def _text_of(messages: List[BaseMessage]) -> str:
 
 
 class ReplayChatModel(BaseChatModel):
-    """A chat model that answers from a :class:`ReplayStore`: no key, no network (D209).
+    """A chat model that answers from a :class:`ReplayStore`: no key, no network.
 
     An answer is found by the structured-output name (the schema's class name,
     ``plain`` for text) and the question the prompt carries. A call with no

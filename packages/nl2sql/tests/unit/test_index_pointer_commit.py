@@ -1,12 +1,11 @@
-"""The build pointer is the commit (bug B5), and one namespace per embedding model (bug B25).
+"""The build pointer is the commit, and one namespace per embedding model.
 
 Indexing stores the schema snapshot before it writes the index. Readers used
 to read the state store's *latest* snapshot, so a build that failed after the
 snapshot was stored left them describing a schema the live index was never
 built from. Now each datasource's ``BuildPointer`` records the
 ``schema_version`` its live build was made from, every reader resolves "live"
-through it, and switching the pointer is the commit. See
-docs/architecture/phase2.md, section 4.
+through it, and switching the pointer is the commit. 
 
 Each test builds a real engine on a small SQLite database with a fake
 embedder, so nothing is downloaded and no model is called.

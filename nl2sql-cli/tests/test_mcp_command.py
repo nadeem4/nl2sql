@@ -1,4 +1,4 @@
-"""``nl2sql mcp``: the engine over stdio, as the role the command line names (wave_a.md, D33)."""
+"""``nl2sql mcp``: the engine over stdio, as the role the command line names."""
 from __future__ import annotations
 
 import os
@@ -150,7 +150,7 @@ def test_a_client_talks_to_nl2sql_mcp_over_stdio(project, tmp_path):
     assert anyio.run(go) == {"datasources": []}
 
 
-# ------------------------------------------------------------------ --http (docs/architecture/wave_c.md, section 9)
+# ------------------------------------------------------------------ --http
 
 @pytest.fixture
 def served_http(monkeypatch):

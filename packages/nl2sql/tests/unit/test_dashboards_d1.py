@@ -1,4 +1,4 @@
-"""Workspaces, the dashboard store and manual edits (docs/architecture/wave_c.md, section 6; row D1).
+"""Workspaces, the dashboard store and manual edits.
 
 Nothing here runs a chart: D1 stores dashboards and edits them by hand. Dashboards are put straight into the
 state store (a draft comes from chat in D4, the starter from D3). The engine has a fake model server that

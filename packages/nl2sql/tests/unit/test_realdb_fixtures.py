@@ -1,6 +1,6 @@
 """The ``realdb`` fixtures skip loudly with the fix, or fail under ``REALDB_REQUIRED=1``.
 
-docs/architecture/phase2.md, section 3: a green run that skipped the real
+A green run that skipped the real
 databases proves nothing, so CI sets ``REALDB_REQUIRED=1``.
 """
 from __future__ import annotations

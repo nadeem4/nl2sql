@@ -170,7 +170,6 @@ CREATE TABLE feedback (
 );
 """
 
-
 def test_a_store_from_before_the_new_columns_gains_them_and_keeps_its_rows(tmp_path):
     import sqlite3
 

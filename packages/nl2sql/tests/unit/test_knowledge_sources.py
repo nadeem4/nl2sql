@@ -1,6 +1,5 @@
-"""Knowledge sources, merging, resolution, the scope filter, show, export and reload (K1).
+"""Knowledge sources, merging, resolution, the scope filter, show, export and reload.
 
-docs/architecture/wave_b.md, section 3, and decisions D36 to D39, D60 and D61.
 The engine tests build a real engine on a small SQLite database with a fake
 embedder, so nothing is downloaded and no model is called.
 """
@@ -564,7 +563,7 @@ def test_appliers_merge_each_kind_into_a_glossary():
     assert [(j.from_, j.cardinality) for j in shop.joins][0] == ("orders.customer_id", "one-to-one")
     assert len(shop.joins) == 2, "the same join is replaced, not added"
     assert [(t.term, t.definition) for t in shop.terms][0] == ("Revenue", "Replaced.")
-    assert len(shop.terms) == 3, "a term whose name exists is replaced (D50)"
+    assert len(shop.terms) == 3, "a term whose name exists is replaced"
     assert glossary.datasources["new_ds"].terms[0].term == "churn"
 
 
@@ -608,7 +607,7 @@ def test_registry_default_finds_the_yaml_source():
     assert "yaml" in Registry.default().names("knowledge_source")
 
 
-# ---------------------------------------------------------------- review fixes (PR #333)
+# ---------------------------------------------------------------- review fixes
 
 
 def test_a_reload_error_is_shown_only_to_a_caller_who_may_reload(engine, tmp_path):

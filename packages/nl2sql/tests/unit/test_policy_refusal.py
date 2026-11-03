@@ -4,7 +4,7 @@ A table the caller's scope denies never reaches the planner, and a plan that
 names one anyway is refused by the logical validator. These tests pin:
 
 1. hidden, not stripped: a denied table's name, columns, keys, relationships
-   and data never reach the planner's prompt (owner decision D7, Phase 2);
+   and data never reach the planner's prompt;
 2. a generic refusal for the user, the table, role and rule for the operator;
 3. an unknown role, or no role at all, refuses cleanly instead of crashing;
 4. the permission decision is made by the validator from the policy, never by

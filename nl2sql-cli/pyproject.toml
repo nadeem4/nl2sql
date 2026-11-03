@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.12"
-# It sits on the engine's facade and nothing else of this repository (wave_d.md, D227, D231): the SDK is for adapter
+# It sits on the engine's facade and nothing else of this repository: the SDK is for adapter
 # authors and the API is a separate process that `nl2sql demo` and `serve` start, so neither is a dependency.
 dependencies = [
     "nl2sql-engine~=0.9.1", # x-release-please-version
@@ -29,7 +29,7 @@ dependencies = [
     # typer no longer has an [all] extra; asking for it only warns.
     "typer>=0.9.0",
     "typing_extensions>=4.0",
-    # The terminal app, `nl2sql chat` (T1); a normal dependency, not an extra (D231).
+    # The terminal app, `nl2sql chat`; a normal dependency, not an extra.
     "textual>=0.80",
 ]
 

@@ -1,4 +1,4 @@
-"""The review queue: proposals, and accept, the only writer of a person's file (docs/architecture/wave_b.md, section 5).
+"""The review queue: proposals, and accept, the only writer of a person's file.
 
 * :mod:`models` -- ``AcceptReport``, ``ReviewError`` and its codes.
 * :mod:`queue` -- filing a proposal (identity, supersede), who sees one, who decides.

@@ -1,10 +1,10 @@
-"""``engine.dashboards``: dashboards pinned whole into workspaces (docs/architecture/wave_c.md, section 6).
+"""``engine.dashboards``: dashboards pinned whole into workspaces.
 
 The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; D2 ``open``,
 ``refresh`` and ``run_scheduled``; D2b ``filter_values`` and the filters of ``refresh``; D3 the starter dashboard,
 ``generate`` and ``suggest_questions``; D4 lets a conversation build and edit a draft (``create_draft``, and ``edit``
-with a conversation). Every method takes the caller keyword-only and required (D130), except ``run_scheduled``, which
-runs each dashboard as its stored owner (D134).
+with a conversation). Every method takes the caller keyword-only and required, except ``run_scheduled``, which
+runs each dashboard as its stored owner.
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 def resolve_refresh_approvals(ctx: Runtime, approvals: Sequence[Union[Approval, str]],
                               user: UserContext) -> List[Approval]:
-    """``approvals`` for a refresh, each request id replaced by its grant (D236). An id that cannot run is an
+    """``approvals`` for a refresh, each request id replaced by its grant. An id that cannot run is an
     ``ApprovalNotFound`` before anything refreshes: one bad id must not fail every chart with the same error."""
     if all(isinstance(a, Approval) for a in approvals):
         return list(approvals)
@@ -138,7 +138,7 @@ class DashboardsAPI:
 
     def set_schedule(self, dashboard_id: str, every_minutes: Optional[int], *,
                      user_context: UserContext) -> Dashboard:
-        """Sets or (with None) removes the refresh schedule, saving the caller's identity (D134). Nothing runs
+        """Sets or (with None) removes the refresh schedule, saving the caller's identity. Nothing runs
         until D2's scheduler does.
 
         Raises:
@@ -177,12 +177,11 @@ class DashboardsAPI:
 
         A chart whose plan no longer validates is ``needs_fixing`` (no rows, the refiner is never asked); one the
         caller cannot read is ``denied``; one a hook wants approved is ``needs_approval`` with its requests in
-        ``approvals_needed`` and keeps its last result; pass an ``Approval`` or a granted request id (``engine.approvals``,
-        D236) for each in ``approvals`` to run it.
+        ``approvals_needed`` and keeps its last result; pass an ``Approval`` or a granted request id (``engine.approvals``) for each in ``approvals`` to run it.
         A chart whose run fails (``error``) keeps its last good result too. A chart stopped at a cap ends the
         refresh.
 
-        ``filters`` maps filter ids to values (D117). Each is checked against the filter's kind before anything
+        ``filters`` maps filter ids to values. Each is checked against the filter's kind before anything
         runs, then added as a predicate (``between [a, b]`` is two comparisons, ``in`` is ORs, the values plan
         literals) to every stored query that reads the filter's table; a query that does not read it runs
         unfiltered, and a chart is ``filtered`` only when every active filter reached one of its queries. A
@@ -213,7 +212,7 @@ class DashboardsAPI:
         return self._service.filter_values(dashboard_id, filter_id, user_context=user_context, limit=limit)
 
     def run_scheduled(self, *, now: Optional[datetime] = None) -> List[DashboardRun]:
-        """Refreshes every dashboard whose schedule is due, each as its stored owner (D134). It has no caller;
+        """Refreshes every dashboard whose schedule is due, each as its stored owner. It has no caller;
         only a long-running process and ``nl2sql dashboards refresh --due`` call it.
 
         Each dashboard is refreshed under its lock (one being refreshed is skipped). Before it runs, the saved
@@ -235,9 +234,9 @@ class DashboardsAPI:
                  workspace_id: Optional[str] = None,
                  max_tiles: Optional[int] = None, on_tile: Optional[Callable[[TileProgress], None]] = None,
                  cancellation_token: Optional[CancellationToken] = None) -> Tuple[Dashboard, DashboardRun]:
-        """The no-model starter (D115): charts chosen from the column roles, run as the caller, laid out and saved.
+        """The no-model starter: charts chosen from the column roles, run as the caller, laid out and saved.
 
-        Needs an index, not a profile. Each column's role comes from Wave B's rules over the indexed snapshot, and a
+        Needs an index, not a profile. Each column's role comes from rules over the indexed snapshot, and a
         role in the glossary wins. Four templates (key totals, trends, top N, distributions) build typed plans in
         code; each runs through ``run_query`` as the caller, so only the tables and columns the caller can read are
         charted and every hook and the validator apply. The charts whose first run is ``ok`` are kept (up to
@@ -279,7 +278,7 @@ class DashboardsAPI:
         ``curated`` are the verified queries the caller's scope reaches (those that need a value are left out),
         ``saved`` the caller's own saved answers, ``metrics`` the glossary terms that name readable columns,
         ``dimensions`` and ``time_columns`` the columns the starter dashboard would break down and trend by
-        (D115), and ``ranges`` five fixed time ranges. Everything listed exists and is readable by the caller.
+``ranges`` five fixed time ranges. Everything listed exists and is readable by the caller.
 
         Raises:
             NotIndexed: the datasource has no index, or the caller cannot reach it.
@@ -295,13 +294,13 @@ class DashboardsAPI:
         ``sources`` is any of ``"curated"``, ``"saved"`` and ``"asked"``. Curated and saved ids become proposals
         directly and call no model; an id the caller was not offered is left out. With ``"asked"``, one model call
         turns the chips (``metrics``: glossary terms; ``dimensions``: column names from the options; ``time_range``:
-        a range id) and ``text`` into at most 3 questions (D246). The proposal never exceeds
+        a range id) and ``text`` into at most 3 questions. The proposal never exceeds
         ``dashboards.max_tiles``.
 
         Raises:
             NotIndexed: the datasource has no index, or the caller cannot reach it.
             InvalidArgument: an unknown source or time range.
-            MissingProviderKey: ``"asked"`` without a key for the model (D248); pass ``llm_override`` with one.
+            MissingProviderKey: ``"asked"`` without a key for the model; pass ``llm_override`` with one.
         """
         return self._service.builder.propose(
             self._source(datasource_id, user_context), user_context, sources=sources, curated_ids=curated_ids,

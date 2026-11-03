@@ -56,7 +56,7 @@ callers' results apart, call the engine in process with a `user_id` from your ow
 
 **Operator tools.** `nl2sql run`, `nl2sql trace`, `nl2sql eval`, the replay provider and the feedback tools read
 the result they were just given, traces and recordings, never `engine.results`, so they are unchanged. In-process
-code is trusted with the `UserContext` it passes (Wave A's D24): an operator who needs a past run's rows reads them
+code is trusted with the `UserContext` it passes: an operator who needs a past run's rows reads them
 as its asker, a `UserContext` with that caller's `user_id` and `tenant_id`.
 
 ```python

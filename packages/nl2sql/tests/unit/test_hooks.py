@@ -1,4 +1,4 @@
-"""The hook runner: order, decisions, failing closed, and how a hook is built (docs/architecture/wave_a.md, section 6).
+"""The hook runner: order, decisions, failing closed, and how a hook is built.
 
 Hooks run in the order the runtime hands them over. The first deny ends the
 point; modifications chain. An exception, a value that is not a decision, or
@@ -340,7 +340,7 @@ def test_the_runtime_builds_the_runner_in_config_order(tmp_path):
 
 
 def test_a_built_in_hook_can_run_first_with_its_own_approvers():
-    # Wave B's policy.cost: the runtime hands the runner its list, built-ins first.
+    # policy.cost: the runtime hands the runner its list, built-ins first.
     seen = []
     builtin = _bind("policy.cost", lambda ctx: seen.append("cost") or Allow(), points=["execute.before"],
                     approver_roles=("admin",))

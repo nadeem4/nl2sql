@@ -191,7 +191,7 @@ def run_with_graph(
     has one, is the run's.
 
     ``pinned`` is a decomposition and plans the run takes as given (a
-    supplied plan; Wave B's chosen one): the run enters at the pinned entry.
+    supplied plan; chosen one): the run enters at the pinned entry.
     ``approvals`` are passed to the ``execute.before`` hooks; without
     ``pinned``, the first one that is this run's (unedited, its SQL its hash,
     the same question after ``run.before`` and asker) and whose approver
@@ -202,11 +202,11 @@ def run_with_graph(
 
     ``clarify`` off runs the default reading where the planner saw two
     (``settings.clarify.enabled`` must be on too for the run to ask); the
-    prompts are the same either way (docs/architecture/wave_b.md, D58).
+    prompts are the same either way.
 
     ``answer`` off builds the graph without the answer synthesizer: the run
     ends at the aggregator, ``final_answer`` is None and no model call is made
-    for prose (docs/architecture/wave_c.md, D119).
+    for prose.
     """
     approvals = list(approvals or [])
     # QueryAPI checks this first, before the run's scope opens; a direct caller is held to it here.
@@ -248,7 +248,7 @@ def run_with_graph(
     timeout_sec = settings.pipeline.timeout_s
     timing = NodeTimingCallback()
     # The scope's collector, when it has one, so a model call made in the run
-    # before the graph (Wave C's rewrite) counts in the run's usage.
+    # before the graph (rewrite) counts in the run's usage.
     usage = (scope.usage if scope is not None and scope.usage is not None
              else TokenUsageCallback(prices=usage_prices(ctx)))
     recorder = TraceRecorder()
@@ -335,7 +335,7 @@ def run_with_graph(
         }, "cancelled")
 
     attached = [cb for cb in scope.callbacks() if cb is not usage] if scope is not None else []
-    # The run's budget stops it through this run's token (wave_a.md, section 5).
+    # The run's budget stops it through this run's token.
     for piece in attached:
         if isinstance(piece, Budget):
             piece.bind(token)

@@ -1,10 +1,10 @@
-"""A clarification: the options a run offers instead of guessing, and the caller's pick (D47, D49).
+"""A clarification: the options a run offers instead of guessing, and the caller's pick.
 
 Nothing is stored: the caller holds the request and passes it back in a
 ``ClarificationChoice``. ``id`` is an unkeyed hash of the request's content,
 a consistency check against mistakes and mixed-up requests, not tamper
 evidence: the validator, run again on the chosen plan with the caller's
-scope, is the guard (as for Wave A's ``ApprovalRequest``, D24).
+scope, is the guard (as for ``ApprovalRequest``).
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
-"""The review queue: filing a proposal, who may see one, and who may decide (docs/architecture/wave_b.md, section 5).
+"""The review queue: filing a proposal, who may see one, and who may decide.
 
-``propose`` is how every track files a finding (D41):
+``propose`` is how every track files a finding:
 
 - **Identity.** A proposal's id hashes its kind, datasource, target and
   change. The same change filed again updates the open row's evidence; a
@@ -10,7 +10,7 @@
   open item per target. Decided rows are never superseded.
 
 A caller sees a proposal only when their scope reaches its datasource and
-every table in its ``tables`` (D60); deciding needs ``by`` with an admin role.
+every table in its ``tables``; deciding needs ``by`` with an admin role.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def caller(user_context: Any, name: str = "user_context") -> "UserContext":
-    """The caller, required: there is no default view and no default decider (D60)."""
+    """The caller, required: there is no default view and no default decider."""
     from nl2sql.policies import UserContext
 
     if not isinstance(user_context, UserContext):
@@ -64,7 +64,7 @@ def split_table(name: str) -> Tuple[str, Optional[str], str]:
 
 
 def visible(ctx: Any, user: "UserContext", proposal: Proposal) -> bool:
-    """Whether ``user``'s scope reaches the proposal's datasource and every table it names (D60)."""
+    """Whether ``user``'s scope reaches the proposal's datasource and every table it names."""
     if proposal.datasource_id not in ctx.ds_registry.list_ids():
         return False
     scopes = {}
@@ -156,7 +156,7 @@ def propose(ctx: Any, proposal: Proposal) -> Proposal:
 
     ``tables`` is completed with every table the target and change name
     (``named_tables``), so a caller who cannot read one of them never sees it
-    (D60). Publishes ``proposal.created`` when the row is new, or was
+. Publishes ``proposal.created`` when the row is new, or was
     superseded and is proposed again.
     """
     given = {t.lower() for t in proposal.tables}

@@ -1,4 +1,4 @@
-"""The Pagila table-recall suite names the tables its gold SQL reads, and only real Pagila tables and columns (C-W4)."""
+"""The Pagila table-recall suite names the tables its gold SQL reads, and only real Pagila tables and columns."""
 from __future__ import annotations
 
 import pytest
@@ -50,7 +50,7 @@ def test_the_demo_does_not_copy_a_suite_for_a_database_it_does_not_have(tmp_path
 
 @pytest.mark.parametrize("case_id", ["pagila_002", "pagila_003", "pagila_011"])
 def test_a_person_in_one_full_name_column_is_an_accepted_answer(case_id):
-    """A run wrote the name as one column (C-W6f); the same people, order and totals as the gold's two columns."""
+    """A run wrote the name as one column; the same people, order and totals as the gold's two columns."""
     case = next(c for c in SUITE.cases if c.id == case_id)
 
     assert len(case.alt_sql) == len(case.alt_rows) == 1

@@ -1,4 +1,4 @@
-"""Seeding: draft eval cases from a datasource, for a person to review (wave_a.md, section 8; D26).
+"""Seeding: draft eval cases from a datasource, for a person to review.
 
 ``engine.evals.seed("sales", count=20, out="evals/sales.yaml", user_context=...)``:
 

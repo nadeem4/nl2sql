@@ -1,6 +1,6 @@
-"""``engine.workspaces``: the folders dashboards live in (docs/architecture/wave_c.md, section 6).
+"""``engine.workspaces``: the folders dashboards live in.
 
-The logic is ``nl2sql.dashboards.workspaces``. Private to the owner (D118): the caller is required (D130).
+The logic is ``nl2sql.dashboards.workspaces``. Private to the owner: the caller is required.
 """
 from __future__ import annotations
 

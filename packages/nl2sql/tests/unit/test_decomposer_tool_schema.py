@@ -64,7 +64,7 @@ def test_the_prompt_asks_for_a_tool_call_not_a_json_document():
     assert "do not wrap" in prompt.lower()
 
 
-# C-W6e: split only when one query cannot express the question. The plan is one
+# split only when one query cannot express the question. The plan is one
 # flat SELECT (joins, filters, group by, having, order by, limit): no subquery,
 # CTE or window function. pagila_001 ("top 5 films by revenue in the top
 # category") was split into a top-category query and a per-film query that came

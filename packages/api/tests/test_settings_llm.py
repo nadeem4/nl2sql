@@ -1,6 +1,6 @@
 """PUT /api/v1/settings/llm replaces the engine's whole ``llm`` section through ``engine.llm.replace``.
 
-docs/architecture/configuration_v2.md, "Replacing the LLM at runtime": admin
+Replacing the LLM at runtime: admin
 only, the body is the ``llm`` section as JSON, a bad section is a 422 with the
 config error's text, and the answer is the change with no keys.
 """

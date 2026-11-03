@@ -1,9 +1,9 @@
-"""``engine.approvals``: the requests a ``needs_approval`` run stored, and their grants (D215).
+"""``engine.approvals``: the requests a ``needs_approval`` run stored, and their grants.
 
 Over HTTP the approver and the asker are two callers at different times, so the engine keeps each
 ``ApprovalRequest`` (pending) from the run that raised it, an approver grants or denies it by id, and the asker's
 re-run names the id. A granted id becomes the ``Approval`` the engine already checks (``hooks.approval``), so
-Wave A's checks are unchanged. The documents live in the state store (``put_approval`` and friends); a request and
+checks are unchanged. The documents live in the state store (``put_approval`` and friends); a request and
 its grant expire ``settings.approvals.max_age_hours`` after their last change, and ``engine.storage.purge()``
 deletes them.
 """
@@ -37,7 +37,7 @@ class ApprovalRecord(BaseModel):
 
 
 class Approvals:
-    """``engine.approvals``. The caller is required on every method (D204)."""
+    """``engine.approvals``. The caller is required on every method."""
 
     def __init__(self, ctx: Any):
         self._ctx = ctx

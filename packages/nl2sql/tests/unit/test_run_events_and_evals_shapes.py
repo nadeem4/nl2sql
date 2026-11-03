@@ -1,4 +1,4 @@
-"""The shapes Wave A's tracks share, added before any of them (docs/architecture/wave_a.md, D35).
+"""The shapes tracks share, added before any of them.
 
 The config sections and settings, the registry kinds, the error codes, the
 result fields, the engine's bus and the stub ``engine.events`` and
@@ -191,7 +191,7 @@ WARNINGS = ["JOIN_KEY_UNCONVERTED", "ALL_NULL_COLUMN"]
 
 
 @pytest.mark.parametrize("code", NOT_RETRYABLE + RETRYABLE + WARNINGS)
-def test_wave_a_error_codes_exist(code):
+def test_run_event_and_eval_error_codes_exist(code):
     assert ErrorCode(code).value == code
 
 

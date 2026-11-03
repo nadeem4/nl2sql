@@ -1,4 +1,4 @@
-"""The review file: the queue's export and import format (docs/architecture/wave_b.md, section 5, D41).
+"""The review file: the queue's export and import format.
 
 ``nl2sql review export`` writes the open proposals a caller may see; a reviewer
 sets each item's ``decision`` (``accept``, ``reject``, or empty to leave it

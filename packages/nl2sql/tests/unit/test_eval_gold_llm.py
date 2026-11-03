@@ -38,7 +38,7 @@ def test_the_decomposition_matches_the_plan(c):
 
 
 def test_every_structured_output_is_answered_from_one_table_keyed_by_its_schema():
-    # The planner answer (Wave B) wraps the plan under "plan".
+    # The planner answer wraps the plan under "plan".
     assert set(RESPONSES) == {"AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer", "AggregatedResponse",
                               "plain"}
     llm = GoldPlanLLM(PLANS)

@@ -1,4 +1,4 @@
-"""The answer sanity checks after a sub-query runs (Wave A, section 11, D32 and D34).
+"""The answer sanity checks after a sub-query runs.
 
 A join on a key that is not unique on the other side repeats the rows of the
 one side, so ``COUNT``, ``SUM`` or ``AVG`` over one of its columns counts each
@@ -393,7 +393,7 @@ def test_verified_query_is_not_checked():
     assert "ExecutorNode" not in source and "sanity" not in source
 
 
-# --- typed warnings (D34) ------------------------------------------------------------------
+# --- typed warnings ------------------------------------------------------------------
 
 def test_warnings_are_typed():
     state = {

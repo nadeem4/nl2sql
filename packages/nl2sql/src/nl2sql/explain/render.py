@@ -1,4 +1,4 @@
-"""Render a run's explanation from its typed plans and state, with no model call (docs/architecture/wave_b.md, D51).
+"""Render a run's explanation from its typed plans and state, with no model call.
 
 ``explain_plan`` renders one plan (an executed sub-query's, or a
 clarification option's); ``explain_state`` renders a finished run's state,
@@ -20,7 +20,7 @@ from nl2sql.knowledge.models import KnowledgeUsed
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, JoinSpec, PlanModel
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 
-# What the sanity checks report about a result the run kept (Wave A); RESULT_TRUNCATED is the row cap's.
+# What the sanity checks report about a result the run kept; RESULT_TRUNCATED is the row cap's.
 _SANITY_CODES = ("VALUE_NOT_FOUND", "JOIN_FAN_OUT", "ALL_NULL_COLUMN", "JOIN_KEY_UNCONVERTED")
 _SOURCES = {"llm": "generated"}
 _JOIN_TYPES = {

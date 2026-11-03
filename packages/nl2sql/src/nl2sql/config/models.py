@@ -2,8 +2,7 @@
 
 Every model is strict (``extra="forbid"``) and frozen. Field names are the YAML
 keys. ``load_config`` builds a ``Config`` from the files; building one in code
-gives exactly the same object. See docs/architecture/configuration_v2.md,
-section 2.
+gives exactly the same object.
 """
 from __future__ import annotations
 
@@ -33,7 +32,6 @@ class KeepsReferences:
     A secret is resolved when the component that uses it is built, so the
     config, logs and errors only ever hold the reference.
     """
-
 
 KEEPS_REFERENCES = KeepsReferences()
 
@@ -95,19 +93,18 @@ AgentName = Literal[
     "curated_matcher",
     "datasource_resolver",
     "decomposer",
-    "table_selector",  # picking tables from a catalog on a schema past full_snapshot_max_tables (C-W4)
+    "table_selector",  # picking tables from a catalog on a schema past full_snapshot_max_tables
     "ast_planner",
     "refiner",
     "answer_synthesizer",
-    "profiler",  # drafting table and column descriptions, only with profile(draft=True) (Wave B, D44)
-    "eval_seeder",  # seeding a draft eval suite (V3)
-    "conversation",  # the model-led turn of engine.conversations (Wave C, D101)
+    "profiler",  # drafting table and column descriptions, only with profile(draft=True)
+    "eval_seeder",  # seeding a draft eval suite
+    "conversation",  # the model-led turn of engine.conversations
 ]
 
 
 Mode = Literal["demo", "your_data", "hosted"]
-"""What a project is for: the bundled demo, the owner's own data, or a hosted public demo (D229)."""
-
+"""What a project is for: the bundled demo, the owner's own data, or a hosted public demo."""
 
 class _Model(BaseModel):
     """Strict, frozen, and a secret never prints.
@@ -265,11 +262,10 @@ class CostRule(_Model):
     """The cost guard (``policies.cost``): a limit on the rows a query is estimated to read.
 
     ``over_limit``, and ``unknown`` (no estimate: not declared, failed, or no
-    rows), each ``allow``, ``confirm`` (a person approves, through Wave A's
+    rows), each ``allow``, ``confirm`` (a person approves, through the
     approval) or ``refuse``. ``max_estimated_rows: null`` is no limit. On a
     role, the fields it sets replace the top-level ones for that role. Enforced
-    by the built-in ``policy.cost`` hook from C2 (docs/architecture/wave_b.md,
-    section 9).
+    by the built-in ``policy.cost`` hook from C2.
     """
 
     max_estimated_rows: Optional[PositiveInt] = None
@@ -372,10 +368,8 @@ class _PluginBlock(BaseModel):
 class PolicyCheckConfig(_PluginBlock):
     """A policy check, by name: ``PolicyCheckConfig(type="corp_iam", url=...)``. The check's ``config_model`` checks the other keys."""
 
-
 class StoreConfig(_PluginBlock):
     """One store, by name: ``StoreConfig(type="files")``. The store's ``config_model`` checks the other keys."""
-
 
 STORE_SLOTS = ("index", "state", "traces", "results")
 
@@ -485,7 +479,7 @@ class RetrievalSettings(_Model):
     table_k: PositiveInt = 8
     planning_k: PositiveInt = 12
     decomposer_tables: PositiveInt = 30
-    # Table recall past full_snapshot_max_tables (C-W4, docs/architecture/wave_c.md section 17): a model
+    # Table recall past full_snapshot_max_tables: a model
     # picks tables from a catalog of every visible table (the nearest selector_catalog_max past that many),
     # and the tables that join the picks are added from the foreign keys, up to join_path_max_hops joins apart.
     table_selector: bool = True
@@ -496,7 +490,7 @@ class RetrievalSettings(_Model):
 class RoutingSettings(_Model):
     """Cross-database routing (read from R1 and R2)."""
 
-    candidates: PositiveInt = 3  # datasources shown to the answerability check (D28)
+    candidates: PositiveInt = 3  # datasources shown to the answerability check
     max_datasources: PositiveInt = 3  # datasources one question may use
     max_sub_queries: PositiveInt = 6  # sub-queries one question may have
     floor_ratio: float = Field(0.5, ge=0.0, le=1.0)  # drop a candidate less similar than this share of the best
@@ -533,7 +527,7 @@ class KnowledgeSettings(_Model):
     item_max_chars: PositiveInt = 500  # one glossary text; longer is a load error
     block_max_chars: PositiveInt = 4000  # the whole [BUSINESS_CONTEXT] block; cut by score, and traced
     top_k: PositiveInt = 8  # matched terms kept per sub-query
-    match_floor: float = Field(0.6, ge=0.0, le=1.0)  # a term entry's similarity to match (K3)
+    match_floor: float = Field(0.6, ge=0.0, le=1.0)  # a term entry's similarity to match
 
 
 class ClarifySettings(_Model):
@@ -560,13 +554,13 @@ class ReviewSettings(_Model):
 
 
 class ApprovalSettings(_Model):
-    """Stored approval grants (read from Wave D's G3a; docs/architecture/wave_d.md, "Approvals over REST")."""
+    """Stored approval grants."""
 
     max_age_hours: PositiveInt = 24  # a request and its grant are purged this long after their last change
 
 
 class ChartSettings(_Model):
-    """How a result becomes a chart (read from K1; docs/architecture/wave_c.md, section 5)."""
+    """How a result becomes a chart."""
 
     max_points: PositiveInt = 1000  # rows charted; a longer line becomes a table
     max_categories: PositiveInt = 20  # bars
@@ -604,7 +598,6 @@ class ObserverConfig(_PluginBlock):
     The engine builds its observers from the ``observers`` section from E2.
     """
 
-
 HookPoint = Literal["run.before", "datasources.after", "plan.after", "execute.before", "execute.after",
                     "answer.after"]
 
@@ -629,9 +622,8 @@ class KnowledgeSourceConfig(_PluginBlock):
     """One knowledge source, by name: ``KnowledgeSourceConfig(type="yaml", path="glossary.yaml")``.
 
     The source's ``config_model`` checks the other keys. The engine builds and
-    loads its knowledge sources from K1 (docs/architecture/wave_b.md, section 3).
+    loads its knowledge sources from K1.
     """
-
 
 _EXAMPLE = {"an observer": "log", "a hook": "corp_sql_review", "a knowledge source": "yaml"}
 
@@ -679,12 +671,12 @@ class EvalsConfig(_Model):
 
     suites: List[Path] = Field(default_factory=list)
     scorers: List[str] = Field(default_factory=lambda: list(DEFAULT_SCORERS))
-    curated: bool = True  # D12: curated answers on in mode full
+    curated: bool = True  # curated answers on in mode full
     max_cost_usd: Optional[PositiveFloat] = None  # across a run in mode full; required for it
     gate: EvalGate = Field(default_factory=EvalGate)
 
 
-# ---------------------------------------------------------------- Wave C sections (docs/architecture/wave_c.md)
+# ---------------------------------------------------------------- Sections for conversations, dashboards and chat tools
 
 class Conversations(_Model):
     """The ``conversations`` section: how a model-led turn is bounded and kept (read from C1)."""
@@ -704,7 +696,7 @@ class Dashboards(_Model):
 
 
 class Answers(_Model):
-    """The ``answers`` section: saved answers (DB1a, D242)."""
+    """The ``answers`` section: saved answers (DB1a)."""
 
     max_per_user: PositiveInt = 100  # saved answers one person may keep; the next save is refused by name
 
@@ -759,7 +751,7 @@ class Api(_Model):
     auth: Literal["api_keys", "proxy", "static", "none"] = "none"
     proxy: ApiProxy = Field(default_factory=ApiProxy)
     static_role: Optional[str] = None  # auth: static only
-    request_llm: bool = False  # callers may send their own key and models (D210)
+    request_llm: bool = False  # callers may send their own key and models
     cors_origins: List[str] = Field(default_factory=list)
 
 
@@ -790,7 +782,7 @@ class Config(_Model):
     dashboards: Dashboards = Field(default_factory=Dashboards)
     answers: Answers = Field(default_factory=Answers)
     mcp: Mcp = Field(default_factory=Mcp)
-    # What this project is for (D229): demo, your_data or hosted. NL2SQL_MODE and the launcher flags override it
+    # What this project is for: demo, your_data or hosted. NL2SQL_MODE and the launcher flags override it
     # at the entry point (resolve_mode); the engine reads no environment.
     mode: Mode = "your_data"
 

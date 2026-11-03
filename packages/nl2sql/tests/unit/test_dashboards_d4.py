@@ -1,4 +1,4 @@
-"""Chat builds and edits dashboards (docs/architecture/wave_c.md, section 6; row D4).
+"""Chat builds and edits dashboards.
 
 The conversation agent is the ``FakeLLMServer`` of ``test_conversations.py``. Both runs a dashboard needs are
 replaced by one function returning canned ``QueryResult``s: an ``ask`` step (it has a scope) and the no-execute

@@ -1,4 +1,4 @@
-// Wave C's Mermaid has no colour of its own, so the page's theme decides: neutral on the light page, dark on the
+// Mermaid has no colour of its own, so the page's theme decides: neutral on the light page, dark on the
 // dark one. The library is loaded by Mermaid.jsx on the first diagram.
 export const mermaidTheme = (dark) => (dark ? "dark" : "neutral");
 

@@ -1,7 +1,6 @@
 """``check_config``: the engine side of ``nl2sql config check``.
 
-Steps 1, 2a and 2b of loading (docs/architecture/configuration_v2.md,
-section 6) against the registry passed in, without building any store.
+Steps 1, 2a and 2b of loading against the registry passed in, without building any store.
 """
 from __future__ import annotations
 

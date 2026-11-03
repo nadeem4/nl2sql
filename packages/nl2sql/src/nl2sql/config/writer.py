@@ -1,7 +1,6 @@
 """What writing a config needs: secrets written as references, the ``.env`` file, and a file replaced whole.
 
 ``write_project`` (``config/project.py``) and ``engine.datasources.save`` are the only callers. The rules are
-docs/architecture/wave_c.md, section 7, "Writing the config" (D122, D123).
 
 A secret is never written into YAML. A reference (``${env:VAR}``, ``${vault:path}``) is kept as it is; a literal
 becomes ``${env:NL2SQL_<PATH>}`` with the value in the ``.env`` beside ``nl2sql.yaml``, where the writer may write
@@ -114,7 +113,7 @@ def config_reserved_names(config: Any) -> Dict[str, Tuple[str, str]]:
 
 
 def adapter_secret_fields(registry: Any, type_name: Optional[str]) -> Set[str]:
-    """The connection fields the adapter's connection model declares secret (``format: password``, D122).
+    """The connection fields the adapter's connection model declares secret (``format: password``).
 
     Empty for a datasource with no ``type``, a type the registry does not know, or an adapter that fails to import:
     the key-name hints still apply to those.
@@ -146,7 +145,6 @@ def dump_model(model: BaseModel, what: str, **kwargs: Any) -> Any:
 
 class _Dumper(yaml.SafeDumper):
     """Writes multi-line strings (the SQL) as ``|`` blocks, so a file reads as written."""
-
 
 _Dumper.add_representer(
     str,

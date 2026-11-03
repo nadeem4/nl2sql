@@ -1,4 +1,4 @@
-"""Where the starter dashboard's charts go on the 4-column grid (docs/architecture/wave_c.md, section 6).
+"""Where the starter dashboard's charts go on the 4-column grid.
 
 Big numbers come first, one column wide on one row; then lines (the first four wide, the rest two); then bars (two
 wide); tables last, four wide. A big number is one row high, any other chart two. A chart that does not fit the

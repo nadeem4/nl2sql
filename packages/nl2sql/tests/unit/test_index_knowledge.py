@@ -1,13 +1,13 @@
-"""Knowledge in the index, ``refresh``, and the snapshot that holds only the database's words (wave_b.md, section 4; K3).
+"""Knowledge in the index, ``refresh``, and the snapshot that holds only the database's words.
 
-The index carries knowledge for ranking (D56): the chosen descriptions in table
+The index carries knowledge for ranking: the chosen descriptions in table
 and column entries, ``knowledge.term`` entries, glossary joins as relationship
 entries, and the glossary's ``examples`` as example entries. The build pointer
 records the datasource's ``knowledge_hash``; a changed glossary makes health
 ``stale``. ``refresh`` renders every entry's text again from the live build's
 stored snapshot, the curated section and the knowledge, reads no schema, calls
 no model, and embeds only the entries whose text changed. Nothing a model wrote
-reaches a snapshot (B31).
+reaches a snapshot.
 """
 from __future__ import annotations
 
@@ -379,7 +379,7 @@ def test_the_orchestrator_refresh_is_not_called_refresh_curated():
     assert not hasattr(IndexingOrchestrator, "refresh_curated")
 
 
-# ------------------------------------------------------------------ B31, and the removed options
+# ------------------------------------------------------------------ the snapshot holds only what the database said, and the removed options
 
 
 def test_snapshot_holds_only_database_text(tmp_path):

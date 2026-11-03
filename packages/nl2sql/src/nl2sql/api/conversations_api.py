@@ -1,7 +1,7 @@
-"""``engine.conversations``: a model-led conversation over the database (docs/architecture/wave_c.md, section 3).
+"""``engine.conversations``: a model-led conversation over the database.
 
 The logic is ``nl2sql.conversations.api``. Every
-method takes the caller keyword-only and required (D105, D130), so an app that forgot it fails closed.
+method takes the caller keyword-only and required, so an app that forgot it fails closed.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class ConversationsAPI:
             cancellation_token: Optional["CancellationToken"] = None,
             llm_override: Optional["LLMOverride"] = None) -> Turn:
         """One turn: the model's loop, stored. ``choice`` is an option id of the pending clarification, given
-        instead of ``text``; it re-asks with no model call. ``llm_override`` (D210) puts the whole turn, the
+        instead of ``text``; it re-asks with no model call. ``llm_override`` puts the whole turn, the
         model's own steps and every run it asks for, on the caller's keys and models; it is never stored."""
         return self._service.ask(conversation_id, text, user_context=user_context, choice=choice, execute=execute,
                                   cancellation_token=cancellation_token, llm_override=llm_override)
@@ -57,7 +57,7 @@ class ConversationsAPI:
         """Re-runs the last ``ask`` step's question as a new turn of kind ``retry``, with no model call of the
         conversation's own (the run's steps use ``llm_override`` when given).
 
-        ``approvals`` are ``Approval`` objects or request ids (``engine.approvals``, D215); ``run_query`` resolves them."""
+        ``approvals`` are ``Approval`` objects or request ids (``engine.approvals``); ``run_query`` resolves them."""
         return self._service.retry(conversation_id, user_context=user_context, approvals=approvals,
                                    llm_override=llm_override)
 

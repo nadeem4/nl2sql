@@ -200,7 +200,6 @@ def test_webanalytics_has_anonymous_traffic_and_single_view_sessions():
         WHERE NOT EXISTS (SELECT 1 FROM sessions s WHERE s.session_id = c.session_id)
     """)[0][0] == 0
 
-
 def test_the_pricing_page_question_has_an_answer():
     """Visited /pricing but never purchased: a real, non-empty, non-total set."""
     viewed, bought = _rows(WEBANALYTICS_DB_PATH, """

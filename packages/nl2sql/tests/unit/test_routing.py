@@ -1,4 +1,4 @@
-"""Phase R routing (wave_a.md, section 9, row R1).
+"""Phase R routing.
 
 One index entry per example phrasing; five signals (the description, the
 example questions, the verified queries, the tables and the columns) each
@@ -69,7 +69,7 @@ def test_each_sample_question_is_its_own_entry():
 
 
 def test_the_example_builder_takes_its_questions_from_the_caller():
-    """Wave B adds the glossary's ``examples`` to the list; the builder needs no change for it."""
+    """The glossary adds its's ``examples`` to the list; the builder needs no change for it."""
     chunks = build_example_chunks("chinook", ["From sample_questions?", "From a glossary?", "  ",
                                               "From sample_questions?"], "v1")
 
@@ -95,7 +95,7 @@ def test_rrf_fuses_signal_ranks():
 
 
 def test_having_entries_of_a_type_is_not_a_vote():
-    """Review of PR 316: only chinook had verified queries, and that alone won it nearly every question."""
+    """Only chinook had verified queries, and that alone won it nearly every question."""
     fused = fuse({"description": ["b", "a", "c"], "examples": ["b", "c", "a"], "curated": ["a"],
                   "tables": ["b", "c", "a"], "columns": ["b", "a", "c"]}, rrf_k=60, datasource_ids=["a", "b", "c"])
 
@@ -430,7 +430,7 @@ def test_retrieval_k_values_come_from_settings(judge):
 
 
 def test_resolver_routes_only_over_the_tables_and_verified_queries_the_scope_allows(judge):
-    """A denied table, and a verified query that reads one, never vote (review of PR 316)."""
+    """A denied table, and a verified query that reads one, never vote."""
     from nl2sql.config.curated import CuratedDatasource
     from nl2sql.config.models import Curated
 
@@ -462,7 +462,7 @@ def test_resolver_routes_only_over_the_tables_and_verified_queries_the_scope_all
 
 
 def test_routing_keeps_three_candidates_by_default():
-    """D28: the top 3 by fused score go to the answerability check."""
+    """the top 3 by fused score go to the answerability check."""
     from nl2sql.config.models import Settings
 
     assert Settings().routing.candidates == 3

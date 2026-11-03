@@ -1,4 +1,4 @@
-"""Background jobs: in process, one worker thread, in memory (docs/architecture/wave_d.md, D206 and "Jobs").
+"""Background jobs: in process, one worker thread, in memory.
 
 A job is one facade call (index, profile, eval, dashboard) run by ``Jobs``' single worker, in submission order. A route
 submits a runner, a function of a :class:`JobContext`, which reports progress and watches its cancellation token. The

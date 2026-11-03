@@ -1,7 +1,6 @@
 """Policies, step 1: allow and deny globs over ``datasource.schema.table``, and one ``Scope``.
 
-The pattern rules are in docs/architecture/phase2.md, "Policies, step 1", and
-docs/configuration/policies.md. Every place that decides table access asks a
+The pattern rules are in docs/configuration/policies.md. Every place that decides table access asks a
 ``Scope``, so these tests pin the decision itself; the nodes are pinned in
 ``test_policies_in_the_pipeline.py``.
 """

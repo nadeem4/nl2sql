@@ -1,4 +1,4 @@
-"""The `evals` namespace of `/api/v1` (docs/architecture/wave_d.md, "The routes", row A4a): the suites and the scorers.
+"""The `evals` namespace of `/api/v1`: the suites and the scorers.
 Running them is `POST /jobs/eval`. All admin only: a report holds every role's cases, plans and SQL."""
 from typing import Annotated, List
 

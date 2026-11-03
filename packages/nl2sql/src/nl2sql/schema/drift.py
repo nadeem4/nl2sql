@@ -1,6 +1,6 @@
-"""Schema drift, measured: the live database against its build, and the stored versions (D1, D31).
+"""Schema drift, measured: the live database against its build, and the stored versions.
 
-docs/architecture/wave_a.md, section 10. Nothing here re-indexes, schedules
+Nothing here re-indexes, schedules
 or writes the index: the owner wants drift measured before anything acts on
 it. Everything a caller gets back has been through its ``Scope``, so a denied
 table's name never reaches it; ``schema.drifted`` is the operator's event, on

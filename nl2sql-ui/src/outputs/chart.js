@@ -1,5 +1,5 @@
 // A ChartSpec as geometry: scales, ticks, one line per series, bars in the spec's order, formatted numbers. The
-// engine chose the kind and the encodings (D110, D214); this module only places them. No React and no colour here:
+// engine chose the kind and the encodings; this module only places them. No React and no colour here:
 // Chart.jsx draws what `chartModel` returns, and the series colours are CSS tokens (styles/outputs.css).
 
 // Four series colours, then one neutral for every series after them (the palette's "other", styles/outputs.css).

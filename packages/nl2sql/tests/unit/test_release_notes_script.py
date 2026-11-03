@@ -30,7 +30,6 @@ A release for testing: it fixes one thing.
 - Something.
 """
 
-
 def _load_script():
     spec = importlib.util.spec_from_file_location("release_notes", SCRIPT)
     module = importlib.util.module_from_spec(spec)

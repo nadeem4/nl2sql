@@ -11,7 +11,7 @@ If you are building a SQL adapter, extend `SQLAlchemyAdapter` from `nl2sql_sdk.s
 ## 2. Register it
 
 The engine finds an adapter by its `type` name in the
-[registry](../architecture/configuration_v2.md#5-the-registry). There are two
+registry. There are two
 ways to put a name there.
 
 **From a package**, declare an entry point in the `nl2sql.adapters` group of

@@ -1,4 +1,4 @@
-"""The evals routes and the eval and demo jobs (docs/architecture/wave_d.md, row A4a). A stub engine records the calls and
+"""The evals routes and the eval and demo jobs. A stub engine records the calls and
 answers with the engine's own models. Every route here is admin only."""
 import pathlib
 import time

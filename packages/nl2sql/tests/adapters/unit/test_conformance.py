@@ -1,6 +1,6 @@
 """The conformance kit (``nl2sql_sdk.testing``) run on the two in-process built-ins, SQLite and DuckDB.
 
-docs/architecture/phase2.md, section 7, "The conformance kit". PostgreSQL,
+PostgreSQL,
 MySQL and SQL Server run it in ``tests/realdb/test_conformance.py``.
 """
 from __future__ import annotations

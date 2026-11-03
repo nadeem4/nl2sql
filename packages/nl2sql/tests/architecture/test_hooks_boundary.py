@@ -1,4 +1,4 @@
-"""Hooks modify only before the validator, and only deny after it (docs/architecture/wave_a.md, section 6).
+"""Hooks modify only before the validator, and only deny after it.
 
 The invariant *Hooks Modify Before the Validator, Deny After*
 (docs/architecture/invariants.md) is held three ways:
@@ -12,7 +12,7 @@ The invariant *Hooks Modify Before the Validator, Deny After*
    resolver and the planner, and every point is called somewhere.
 3. In the SQL agent graph, built with fakes, every path from the planner to
    the generator passes the logical validator. A node may sit between the
-   validator and the generator (Wave B's clarifier); none may bypass the
+   validator and the generator (clarifier); none may bypass the
    validator.
 """
 from __future__ import annotations

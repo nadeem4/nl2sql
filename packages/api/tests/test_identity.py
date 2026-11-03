@@ -1,4 +1,4 @@
-"""Who is asking: ``api.auth`` picks one source and every request resolves one ``UserContext`` (D203, D205)."""
+"""Who is asking: ``api.auth`` picks one source and every request resolves one ``UserContext``."""
 from types import SimpleNamespace
 
 import pytest
@@ -135,7 +135,7 @@ def test_static_without_a_role_is_refused(make_client):
     assert "static_role" in _error(response)["fix"]
 
 
-# ---------------------------------------------------------------- none (D205)
+# ---------------------------------------------------------------- none
 
 def test_none_refuses_to_start_off_loopback():
     for host in ("0.0.0.0", "10.0.0.5", "example.com", ""):

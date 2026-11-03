@@ -258,8 +258,7 @@ without it needs no change.
 
 ### Optional hooks: `estimate` and `probe_overlap`
 
-Two optional protocols in `nl2sql_sdk.protocols`, added for release 0.8
-([Wave B](../architecture/wave_b.md), D45 and D52), found with `isinstance`
+Two optional protocols in `nl2sql_sdk.protocols`, added for release 0.8, found with `isinstance`
 as the two hooks above are. The adapter interface stays at version 2.
 
 | Protocol | Method | Contract |
@@ -392,7 +391,7 @@ The models they exchange: `Entry` (`id`, `text`, `vector`, `metadata`), `Hit`
 (`eq`, `ne` and `in`, all of which must hold), `BuildPointer` (which build
 of a datasource is live, the `schema_version` it was built from, and the
 `curated_hash` and `knowledge_hash` it was built with) and `Proposal` (one
-row of the [review queue](../architecture/wave_b.md#5-the-review-queue): its
+row of the [review queue](../configuration/review.md): its
 `id` is a hash of its kind, datasource, target and change, which
 `Proposal.build(...)` computes). The engine embeds; a store keeps the
 vectors it is handed.
@@ -503,7 +502,6 @@ with release 0.8.
 ## Optional: `DiscoverableAdapter`
 
 An adapter can declare what it is found by, so `engine.datasources.scan()`
-(release 0.9, [Wave C](../architecture/wave_c.md#finding-a-database-scan))
 can offer it without the engine naming any database. It lives in
 `nl2sql_sdk.discovery`, which imports only pydantic and the standard
 library, with `Found` (`kind`: `url`, `file` or `port`, and its `value`). The

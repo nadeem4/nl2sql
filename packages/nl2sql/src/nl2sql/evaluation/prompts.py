@@ -1,7 +1,6 @@
 """The ``eval_seeder`` prompt: questions a person would ask of one datasource, each with a typed plan.
 
-docs/architecture/wave_a.md, section 8, "Seeding: benchmark your own
-database" (D26). The model writes a question and a ``PlanModel`` for it, in
+The model writes a question and a ``PlanModel`` for it, in
 the planner's own plan format, and never SQL: the engine's validator and
 generator render each plan, so a seeded case's SQL is the engine's own.
 

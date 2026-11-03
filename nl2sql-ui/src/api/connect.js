@@ -1,4 +1,4 @@
-// Connect: the datasource routes (A3). Admin-only calls answer 403 to everyone else, and always on the hosted demo.
+// Connect: the datasource routes. Admin-only calls answer 403 to everyone else, and always on the hosted demo.
 import { request } from "./http.js";
 
 const id = (value) => encodeURIComponent(value);

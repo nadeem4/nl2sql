@@ -1,12 +1,12 @@
-"""The built-in ``yaml`` knowledge source, and the engine's glossary writer (docs/architecture/wave_b.md, section 3).
+"""The built-in ``yaml`` knowledge source, and the engine's glossary writer.
 
 ``YamlKnowledgeSource`` reads one ``glossary.yaml`` (``path``, relative to the
 folder of ``nl2sql.yaml``) with ``yaml.safe_load`` and validates it with the
 SDK's ``Glossary``. It is installed under the ``nl2sql.knowledge_sources``
 entry point group as ``yaml``.
 
-``write_glossary`` is engine-internal, not part of the SDK contract (D36):
-only the review queue's accept calls it (D42). It writes the canonical form
+``write_glossary`` is engine-internal, not part of the SDK contract:
+only the review queue's accept calls it. It writes the canonical form
 (``canonical_yaml``), refuses when the file changed since it was read, writes
 through a symlink, and replaces the file atomically.
 """
@@ -33,7 +33,6 @@ HEADER = """\
 # proposal: comments are not kept, so write remarks in a `notes:` field.
 # See docs/configuration/knowledge.md.
 """
-
 
 class YamlSourceConfig(BaseModel):
     """The ``yaml`` source's keys: ``path``, the glossary file, relative to the folder of ``nl2sql.yaml``."""
@@ -109,7 +108,6 @@ def file_sha256(path: Path) -> Optional[str]:
 class _Dumper(yaml.SafeDumper):
     """Long or multi-line text as a literal block, so a file reads as written."""
 
-
 _Dumper.add_representer(
     str,
     lambda dumper, value: dumper.represent_scalar(
@@ -148,7 +146,7 @@ def write_glossary(path: Path, glossary: Glossary, expected_sha256: Optional[str
     """Rewrite ``path`` with ``glossary`` in canonical form; return the new file's SHA-256.
 
     Engine-internal: only the review queue's accept calls it, under its lock
-    (D42). The real path is resolved first, so a symlinked file is written
+. The real path is resolved first, so a symlinked file is written
     through and the link kept; the text goes to a temporary file beside it,
     flushed to disk and given the file's mode, which is renamed over it. The
     hash check and the rename are check-then-act against an editor outside

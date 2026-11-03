@@ -107,7 +107,7 @@ test("a replay miss on the hosted demo asks for a key, with the way to Settings"
   assert.equal(missPrompt(null, HOSTED), null);
 });
 
-// What a replayed run reports: the recording's model on every call, and no token usage (G2b).
+// What a replayed run reports: the recording's model on every call, and no token usage.
 const WITH = { provider: "anthropic", model: "claude-test" };
 const call = (extra) => ({ node: "astplanner", model: "claude-test", usage_reported: false, ...extra });
 

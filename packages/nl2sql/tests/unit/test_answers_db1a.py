@@ -1,4 +1,4 @@
-"""Saved answers in the engine (docs/architecture/wave_d.md, section 18; row DB1a, decisions D238 to D249).
+"""Saved answers in the engine.
 
 The engine is Q1's: a real engine on a small SQLite database, indexed with a fake embedder, so nothing is
 downloaded and no model is called. A run is a trace written to the engine's trace store, and a conversation is

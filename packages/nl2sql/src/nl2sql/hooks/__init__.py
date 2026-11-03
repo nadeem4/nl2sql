@@ -3,8 +3,7 @@
 At each point a hook answers ``Allow``, ``Modify`` (before the validator
 only), ``Deny`` or ``NeedsApproval`` (at ``execute.before`` only). Hooks run
 in order; the first deny ends the point and modifications chain. A hook that
-raises denies, unless it is configured ``on_error: open``. The design is
-docs/architecture/wave_a.md, sections 6 and 7; the user guide is
+raises denies, unless it is configured ``on_error: open``. The user guide is
 docs/configuration/hooks.md.
 
 The interface lives here, in the engine and not the SDK, because the context
@@ -32,8 +31,8 @@ class HookContext(BaseModel):
     ``tables`` are ``datasource.schema.table``, read by the SQL. ``result`` is
     a summary (columns, row count, truncated), never rows; ``results`` are
     the run's results' summaries at ``answer.after``. ``conversation_id`` is
-    set when the run is a conversation's turn (Wave C). ``approvals`` are
-    what the run was re-run with (section 7).
+    set when the run is a conversation's turn. ``approvals`` are
+    what the run was re-run with.
     """
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
@@ -59,7 +58,6 @@ class HookContext(BaseModel):
 
 class Allow(BaseModel):
     """Let the run go on unchanged."""
-
 
 class Modify(BaseModel):
     """Go on with these fields changed. Only before the validator, and only the point's own field."""

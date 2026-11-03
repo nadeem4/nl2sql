@@ -1,4 +1,4 @@
-"""A request's own keys and models, as the engine's ``LLMOverride`` (docs/architecture/wave_d.md, D210).
+"""A request's own keys and models, as the engine's ``LLMOverride``.
 
 ``X-NL2SQL-Api-Key-<provider>`` carries one provider's key; ``X-NL2SQL-Models`` carries ``{"<agent>": "<provider>:
 <model>"}`` and no secret. Only where ``api.request_llm`` is on. A model is honoured only on a provider the same request

@@ -109,7 +109,7 @@ def mark_join_keys(
     ``right_dtype`` is replaced: they are not in its tool schema, and only
     this function sets them. The logical validator reads the flag (a join-key
     column whose type cannot be coerced is retried) and the aggregator the
-    dtypes (both sides are cast to one type before the join). D30.
+    dtypes (both sides are cast to one type before the join).
     """
     by_id = {sq.id: sq for sq in sub_queries}
     keys: Dict[str, set] = {sq.id: set() for sq in sub_queries}
@@ -347,7 +347,7 @@ class DecomposerNode:
             )
 
             if len(llm_response.sub_queries) > self.max_sub_queries:
-                # Not asked again (D29): a model that ignored the limit once
+                # Not asked again: a model that ignored the limit once
                 # usually does again, and the question is what has to change.
                 return self._too_broad()
 

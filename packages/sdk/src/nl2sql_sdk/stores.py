@@ -26,10 +26,7 @@ example ``index: {type: qdrant, url: ...}``. Every store class has:
   ``${provider:key}`` in it. ``folder`` is ``storage.path``. It should not
   write anything: ``nl2sql config check`` builds the stores too.
 
-This module imports only pydantic and the standard library. See
-docs/architecture/phase2.md, section 4, for proposals,
-docs/architecture/wave_b.md, section 5, and for conversations, dashboards and
-API keys, docs/architecture/wave_c.md, section 10.
+This module imports only pydantic and the standard library.
 """
 from __future__ import annotations
 
@@ -62,7 +59,6 @@ Slot = Literal["index", "state", "traces", "results"]
 
 Scalar = Union[str, int, float, bool]
 """A metadata value an index entry carries and a ``Filter`` compares."""
-
 
 class Entry(BaseModel):
     """One index entry. The engine embeds ``text``; the store keeps the vector it is handed."""
@@ -380,7 +376,7 @@ class StateStore(Store, Protocol):
 
     def list_api_keys(self) -> List[dict]: ...
 
-    # -- approvals (Wave D, D215). A document has ``id`` (the approval request's id), ``status`` (``pending``,
+    # -- approvals. A document has ``id`` (the approval request's id), ``status`` (``pending``,
     # ``granted`` or ``denied``), ``created_at`` and ``updated_at`` (ISO 8601; a stamp with no zone is UTC).
 
     def put_approval(self, doc: dict) -> None:
@@ -404,7 +400,7 @@ class StateStore(Store, Protocol):
         """Delete the approvals last updated before ``older_than``; return how many."""
         ...
 
-    # -- saved answers (Wave D, D238). A document has ``id``, ``tenant_id``, ``user_id`` and ``created_at``
+    # -- saved answers. A document has ``id``, ``tenant_id``, ``user_id`` and ``created_at``
     # (ISO 8601; a stamp with no zone is UTC).
 
     def put_saved_answer(self, doc: dict) -> None:

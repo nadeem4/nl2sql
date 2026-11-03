@@ -1,6 +1,6 @@
 """The ``sqlite`` state store: immutable snapshots, the plan cache, feedback, migrations and the lock.
 
-See docs/architecture/phase2.md, section 4. Every test uses a real store, on
+Every test uses a real store, on
 a file in ``tmp_path`` or on ``:memory:``.
 """
 from __future__ import annotations
@@ -98,7 +98,7 @@ def test_keep_snapshots_deletes_the_rest_and_their_plans(store):
     assert store.get_plan("q", "ds1", v2) == "{}"
 
 
-# -- schema diffs (store interface version 2, D31) ---------------------------------
+# -- schema diffs (store interface version 2) ---------------------------------
 
 
 def _diff(to_version: str, from_version: str = "v0") -> SchemaDiff:
@@ -221,7 +221,6 @@ CREATE TABLE feedback (
     plan_cache_hits INTEGER NOT NULL DEFAULT 0, sub_queries INTEGER NOT NULL DEFAULT 0,
     models TEXT NOT NULL, engine_version TEXT NOT NULL);
 """
-
 
 def test_a_05_state_file_is_adopted(tmp_path):
     path = tmp_path / "state.db"

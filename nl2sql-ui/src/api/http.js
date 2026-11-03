@@ -1,10 +1,10 @@
-// The one place the page talks to nl2sql-api (wave_d.md, section 5): `request` for JSON, `stream` for Server-Sent
+// The one place the page talks to nl2sql-api: `request` for JSON, `stream` for Server-Sent
 // Events. Each area's client file (chat.js, dashboards.js, ...) is a thin set of calls to these two.
 //
 // Every call carries the tab's identity and keys, so no page has to remember to:
 //   * `Authorization: Bearer <key>`, when the tab holds an API key (the server's `api_keys` mode; under `proxy` and
 //     `none` there is no key and nothing is sent);
-//   * `X-NL2SQL-Api-Key-<provider>` and `X-NL2SQL-Models`, from the keys and step models the tab holds (D210).
+//   * `X-NL2SQL-Api-Key-<provider>` and `X-NL2SQL-Models`, from the keys and step models the tab holds.
 // A failure is always an `ApiError`, whether the server sent its error envelope, sent something else, or sent nothing.
 import { askHeaders, readKeys } from "../lib/hostedKey.js";
 import { readModels } from "../lib/hostedModels.js";

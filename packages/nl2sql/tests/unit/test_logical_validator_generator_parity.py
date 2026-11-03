@@ -316,7 +316,7 @@ def test_a_registry_without_an_adapter_does_not_break_validation():
 
 
 def test_a_join_key_that_cannot_be_coerced_is_stopped_at_the_validator():
-    # D30: the generator builds this plan, and the aggregator could not join a
+    # the generator builds this plan, and the aggregator could not join a
     # date to a number. The validator is the last gate with a retry edge, so
     # the join-key type check lives there, with a retryable code.
     # Arrange
@@ -344,7 +344,7 @@ def test_a_join_key_that_cannot_be_coerced_is_stopped_at_the_validator():
     assert error.severity == ErrorSeverity.ERROR and error.is_retryable
 
 
-# --- a glossary join (docs/architecture/wave_b.md, D46) ----------------------------------------------
+# --- a glossary join ----------------------------------------------
 
 
 def _glossary_join_state(with_glossary: bool) -> SubgraphExecutionState:

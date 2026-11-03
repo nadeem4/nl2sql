@@ -1,4 +1,4 @@
-// The dashboard grid, as Wave C's `TileLayout` has it: four columns, a tile at column x, row y, w wide and h tall.
+// The dashboard grid, as `TileLayout` has it: four columns, a tile at column x, row y, w wide and h tall.
 // The page arranges by order and size, never by dragging: a list of {id, w, h} is packed left to right into rows, so
 // every arrangement it sends is on the grid and no two tiles share a cell.
 export const GRID_COLUMNS = 4;

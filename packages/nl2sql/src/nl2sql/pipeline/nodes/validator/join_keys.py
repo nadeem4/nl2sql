@@ -1,4 +1,4 @@
-"""The join-key type check (docs/architecture/wave_a.md, D30).
+"""The join-key type check.
 
 The aggregator casts both sides of a join key to one type, so almost any pair
 joins. What cannot be coerced is a date against a number or a boolean: such a

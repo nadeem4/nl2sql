@@ -1,4 +1,4 @@
-"""Proposed column roles: heuristics a person should confirm (docs/architecture/wave_b.md, section 6, D61).
+"""Proposed column roles: heuristics a person should confirm.
 
 What the snapshot proves is *derived* (a primary or foreign key is an ``identifier``, a temporal type a
 ``date``) and never proposed. The rules below are the proposed ones, one row each, from the snapshot alone:

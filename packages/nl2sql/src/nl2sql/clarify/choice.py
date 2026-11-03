@@ -1,8 +1,8 @@
-"""Asking again: the checks on a ``ClarificationChoice`` and the pin it becomes (wave_b.md, section 7; D49).
+"""Asking again: the checks on a ``ClarificationChoice`` and the pin it becomes.
 
 The re-ask is stateless. ``choice_problem`` is the consistency check (the id is an unkeyed hash: a guard against
 mistakes and mixed-up requests, not tamper evidence; the validator, run on the chosen plan with the caller's
-scope, is the guard against an edited plan). ``pinned_from_choice`` is the run it pins: Wave A's pinned entry
+scope, is the guard against an edited plan). ``pinned_from_choice`` is the run it pins: pinned entry
 with one sub-query, standalone, and the chosen option's plan as ``plan_source="chosen"``.
 """
 from __future__ import annotations
@@ -105,7 +105,7 @@ def _select_columns(plan: PlanModel) -> List[str]:
 
 
 def choice_proposal(ctx: Any, choice: ClarificationChoice, user: UserContext, term: Optional[str] = None) -> Proposal:
-    """The ``term`` proposal that saving ``choice`` files (D50): the phrase (or ``term``) named, the option's
+    """The ``term`` proposal that saving ``choice`` files: the phrase (or ``term``) named, the option's
     label as its definition, the columns the chosen plan's select items read, and the tables it reads.
 
     A ``term`` other than the phrase also lists the phrase as a synonym, so the phrase is settled once accepted.

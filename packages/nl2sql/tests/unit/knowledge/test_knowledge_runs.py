@@ -1,4 +1,4 @@
-"""Knowledge in a whole run, on a real engine with a fake model (docs/architecture/wave_b.md, sections 4 and 8).
+"""Knowledge in a whole run, on a real engine with a fake model.
 
 A glossary join lets a plan the database declares no key for validate and
 run; the result's ``knowledge_used`` and ``explanation`` hold only what the

@@ -1,6 +1,6 @@
 """The structural diff between two schema contracts of one datasource, and what a caller may see of it.
 
-docs/architecture/wave_a.md, section 10. It compares exactly what
+It compares exactly what
 ``schema/fingerprint.py`` covers, keyed the same way (tables by their key in
 the contract, columns by name), so for two contracts of one datasource the
 diff is empty exactly when the fingerprints are equal. A rename is a drop and

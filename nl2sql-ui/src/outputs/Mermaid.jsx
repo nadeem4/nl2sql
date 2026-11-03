@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { mermaidConfig } from "./mermaid.js";
 
 // A Mermaid diagram, drawn by the library on first use: `import("mermaid")` is its own chunk, so a page with no
-// diagram never downloads it. Wave C's Mermaid has no colour, so the page's theme decides (mermaid.js).
+// diagram never downloads it. Mermaid has no colour, so the page's theme decides (mermaid.js).
 
 const QUERY = "(prefers-color-scheme: dark)";
 

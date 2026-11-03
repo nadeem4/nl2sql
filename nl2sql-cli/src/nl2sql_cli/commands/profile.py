@@ -1,4 +1,4 @@
-"""``nl2sql profile``: the schema profiler (docs/architecture/wave_b.md, section 6).
+"""``nl2sql profile``: the schema profiler.
 
 ``nl2sql profile [--datasource ID ...] --as ROLE`` calls ``engine.knowledge.profile`` as the caller ``--as``
 (repeatable) and ``--user`` build, prints each datasource's report, then the open proposals it left in the

@@ -1,8 +1,7 @@
 """The ``NL2SQL`` facade: the one thing an application talks to.
 
 Questions are top level (``run_query``, ``stream_query``); everything else is
-a namespace (``engine.datasources``, ``engine.index``, ...). See
-docs/architecture/configuration_v2.md, section 7.
+a namespace (``engine.datasources``, ``engine.index``, ...).
 """
 
 from __future__ import annotations
@@ -52,8 +51,7 @@ class NL2SQL:
 
     ``NL2SQL(config)``, ``NL2SQL.from_config(path)`` and ``NL2SQL.demo()``
     build it. Building it never connects to a datasource or calls a model;
-    ``check()`` does, and ``close()`` releases what it opened. See
-    docs/architecture/configuration_v2.md, section 4.
+    ``check()`` does, and ``close()`` releases what it opened.
     """
 
     def __init__(self, config: "Config", *, registry: Optional["Registry"] = None):
@@ -411,13 +409,13 @@ class NL2SQL:
         model call at all).
 
         ``llm_override`` (a :class:`~nl2sql.LLMOverride`) gives this one call the
-        caller's own keys and models in place of the configured ones (D210): its
+        caller's own keys and models in place of the configured ones: its
         ``keys`` map a provider to the caller's key, its ``models`` map an agent
         name to ``(provider, model)``. A model runs only on a key the override
         carries for its provider, else ``MissingProviderKey`` is raised before
         anything runs, so a caller's choice never lands on the operator's
         account. The keys live for the call: they are in no environment variable
-        and no cache, and the trace masks them. With a replay provider (G2b) an
+        and no cache, and the trace masks them. With a replay provider an
         override key replaces the recording for this call.
         """
         self._ensure_open()
