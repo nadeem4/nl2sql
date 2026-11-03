@@ -98,3 +98,58 @@ def test_replacing_the_llm_drops_the_kept_ready_check(make_client):
 
     assert client.put(ROUTE, json=NEW_LLM).status_code == 200
     assert app.state.ready_cache is None
+
+
+RICH = {"provider": "openai", "model": "gpt-test", "api_key": "sk-test", "base_url": "http://gw.local/v1",
+        "prices": {"gpt-test": {"input": 1.0, "output": 2.0}},
+        "agents": {"ast_planner": {"model": "gpt-planner", "temperature": None}}}
+
+
+def _rich_client(make_client, **sections):
+    client, engine = make_client(**sections)
+    engine.llm.replace(RICH)
+    return client, engine
+
+
+def test_patch_settings_llm_changes_models_and_keeps_the_rest(make_client):
+    client, engine = _rich_client(make_client, api=PROXY)
+
+    response = client.patch(ROUTE, json={"default": {"provider": "openai", "model": "gpt-new"},
+                                         "ast_planner": {"provider": "openai", "model": "gpt-plan2"},
+                                         "refiner": None}, headers=_as("admin"))
+
+    assert response.status_code == 200, response.text
+    llm = engine.config.llm
+    assert (llm.model, llm.base_url, set(llm.prices)) == ("gpt-new", "http://gw.local/v1", {"gpt-test"})
+    assert (llm.agents["ast_planner"].model, llm.agents["ast_planner"].temperature) == ("gpt-plan2", None)
+    body = response.json()
+    assert body["by"]["via"] == "api" and body["changes"]["default"]["new"] == "openai/gpt-new"
+    assert "sk-test" not in response.text
+
+
+def test_patch_settings_llm_requires_admin(make_client):
+    client, engine = _rich_client(make_client, api=PROXY)
+    body = {"default": {"provider": "openai", "model": "gpt-new"}}
+
+    assert client.patch(ROUTE, json=body).status_code == 401
+    assert client.patch(ROUTE, json=body, headers=_as("analyst")).status_code == 403
+    assert engine.config.llm.model == "gpt-test"
+
+
+def test_patch_settings_llm_a_bad_provider_is_a_422_with_a_fixed_message(make_client):
+    client, engine = _rich_client(make_client, api=PROXY)
+
+    response = client.patch(ROUTE, json={"default": {"provider": "nope", "model": "x"}}, headers=_as("admin"))
+
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_CONFIG"
+    assert error["message"] == "That provider and model cannot be used on this server."
+    assert engine.config.llm.model == "gpt-test"
+
+
+def test_patch_settings_llm_an_unknown_agent_or_removed_default_is_a_422(make_client):
+    client, _ = _rich_client(make_client, api=PROXY)
+
+    for body in ({"planner": {"provider": "openai", "model": "x"}}, {"default": None}):
+        assert client.patch(ROUTE, json=body, headers=_as("admin")).status_code == 422

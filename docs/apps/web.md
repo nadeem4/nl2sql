@@ -155,7 +155,7 @@ Removing a datasource asks first. Once a datasource is added, secrets typed into
 
 ## Evals
 
-**Evals** (`#/evals`) runs the suites named in `evals.suites` on the server and shows the report. It is for administrators: a report holds every role's cases, plans and SQL, so `GET /meta` (`caller.admin`) decides whether the page is listed, and a caller who opens it anyway is told it is off.
+**Evals** (`#/evals`) runs the suites named in `evals.suites` on the server and shows the report. It is for administrators: a report holds every role's cases, plans and SQL, so `GET /meta` (`caller.admin`) decides whether the page is listed: until `/meta` names the caller, or when it names none, the page is not listed. A caller who opens it anyway is told it is off.
 
 1. Pick a **mode**. *Plans only* and *Retrieval only* call no model. *Full* asks every case end to end, spends money, and needs a **cost cap** in dollars (the run stops when its model calls reach it).
 2. Tick the suites to run (all by default; each shows how many of its cases are approved).
@@ -168,7 +168,7 @@ The report shows, for each configuration: accuracy with its interval, the genera
 **Settings** (`#/settings`) holds up to four cards, depending on the server and on who you are.
 
 - **API key** and **Model for each step** appear when the server lets a request bring its own model (`api.request_llm`, which `GET /meta` reports). The key and the choices stay in this browser tab (`sessionStorage`) and travel as headers with each question; nothing is written on the server. A step put on a provider needs a key for it in the same tab, or the question is refused. The providers, their models and the steps come from `GET /llm/providers` and `GET /llm`.
-- **The server's model** (administrators) edits the default model and the model of each step, and saves with `PUT /settings/llm`. That replaces the server's whole `llm` section in memory only: `llm.yaml` is read again on a restart. Each provider's key is read from its environment variable, as before. The page no longer warns about models that ignore temperature 0, because `GET /llm/providers` does not say which they are.
+- **The server's model** (administrators) edits the default model and the model of each step, and saves with `PATCH /settings/llm`, which sends only the models you changed. Everything else in the server's `llm` section (`base_url`, `headers`, `prices`, temperatures, a key held in a custom variable) stays as it was; where a step's provider changes, its key and `base_url` are cleared and the new provider's standard key variable is used. A provider whose key the server does not have is labelled "(no key)". The change is in memory and in this server process only, so with more than one worker a save reaches just the one that answered; `llm.yaml` is read again on a restart. The page no longer warns about models that ignore temperature 0, because `GET /llm/providers` does not say which they are.
 - **API keys for this server** (administrators) lists the keys the server issues, and creates one from a user id, roles, an optional tenant and an optional label (`POST /api-keys`). The new key's token is shown once and never again. **Revoke** ends a key (`DELETE /api-keys/{id}`).
 
 A caller who is not an administrator, on a server that does not take a key with a question, sees that there is nothing to set.

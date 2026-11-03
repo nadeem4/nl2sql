@@ -29,11 +29,12 @@ function split(value) {
 }
 
 // The groups for one selector: the default first, then one group per provider that lists models.
-export function modelGroups(providers, defaultModel) {
+// With `markMissingKeys`, a provider whose key this server lacks is labelled "(no key)": choosing it would be refused.
+export function modelGroups(providers, defaultModel, { markMissingKeys = false } = {}) {
   return [
     { label: null, options: [{ value: "", label: `Default (${defaultModel})` }] },
     ...(providers || []).filter((p) => p.models && p.models.length).map((p) => ({
-      label: p.label,
+      label: markMissingKeys && p.key_variable && !p.key_present ? `${p.label} (no key)` : p.label,
       options: p.models.map((m) => ({ value: joined(p.name, m), label: m })),
     })),
   ];
@@ -56,35 +57,19 @@ export function serverRows(llms) {
   }));
 }
 
-// Each key points at its provider's environment variable, never at a value.
-function keyFor(providers, name) {
-  const found = (providers || []).find((p) => p.name === name);
-  return found && found.key_variable ? { api_key: "${env:" + found.key_variable + "}" } : {};
-}
-
-// The `llm` section PUT /settings/llm replaces, built from GET /llm and the edits (agent -> "provider:model", or ""
-// to inherit). Agents that inherit are left out. A changed default drops its temperature, which the new model may
-// not accept.
-export function llmSection(llms, providers, edits) {
-  const base = llms.default;
-  const chosen = "default" in edits && edits.default ? edits.default : joined(base.provider, base.model);
-  const [provider, model] = split(chosen);
-  const section = { provider, model };
-  if (base.temperature !== null && base.temperature !== undefined && provider === base.provider && model === base.model) {
-    section.temperature = base.temperature;
+// The changes PATCH /settings/llm takes, from the edits (agent -> "provider:model", or "" to inherit the default): only
+// what changed. An agent that already inherits stays so; the default has no "inherit".
+export function modelChanges(llms, edits) {
+  const changes = {};
+  for (const [agent, value] of Object.entries(edits)) {
+    if (value) {
+      const [provider, model] = split(value);
+      changes[agent] = { provider, model };
+    } else if (agent !== "default" && llms[agent] && !llms[agent].inherited) {
+      changes[agent] = null;
+    }
   }
-  Object.assign(section, keyFor(providers, provider));
-  const agents = {};
-  for (const agent of Object.keys(llms)) {
-    if (agent === "default") continue;
-    const row = llms[agent];
-    const value = agent in edits ? edits[agent] : (row.inherited ? "" : joined(row.provider, row.model));
-    if (!value) continue;
-    const [p, m] = split(value);
-    agents[agent] = { provider: p, model: m, ...keyFor(providers, p) };
-  }
-  section.agents = agents;
-  return section;
+  return changes;
 }
 
 // "analyst, admin viewer" -> ["analyst", "admin", "viewer"].

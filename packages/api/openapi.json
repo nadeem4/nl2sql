@@ -3978,6 +3978,26 @@
         "title": "MetricSpec",
         "type": "object"
       },
+      "ModelChoice": {
+        "additionalProperties": false,
+        "description": "One agent's model: the provider and the model name.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "ModelChoice",
+        "type": "object"
+      },
       "MoveBody": {
         "additionalProperties": false,
         "properties": {
@@ -13028,6 +13048,89 @@
       }
     },
     "/api/v1/settings/llm": {
+      "patch": {
+        "description": "Change only the provider and model of the named agents (`engine.llm.set_models`); every other `llm`\nsetting (`base_url`, `headers`, `prices`, temperatures) stays. The body maps an agent's name, as `GET /llm`\nlists it, to `{provider, model}`, or to null to drop that agent's own model so it runs on `default`. Where an\nagent's provider changes, its key and `base_url` are cleared and the provider's standard key variable is\nused. A choice the server cannot use is a 422 and changes nothing. Like `PUT`, the change is in memory\nand per process, logged and audited. Returns the same change as `PUT`. Admin only.",
+        "operationId": "set_llm_models_api_v1_settings_llm_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "planner": {
+                  "value": {
+                    "ast_planner": {
+                      "model": "gpt-5.5",
+                      "provider": "openai"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ModelChoice"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Changes",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Llm Models Api V1 Settings Llm Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No identity: see `api.auth`."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The caller holds no role in `policies.admin_roles`."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A provider or model cannot be used, an agent is unknown, or `default` was removed."
+          }
+        },
+        "summary": "Change the agents' models",
+        "tags": [
+          "settings"
+        ]
+      },
       "put": {
         "description": "Replace the engine's whole `llm` section with the body: the section as JSON, the same shape as\n`llm.yaml`. It is checked exactly as the file is, and every agent's key must resolve; a bad section\nis a 422 whose `error.message` is the config error, and changes nothing. Runs in flight finish on the old\nLLM. The change is logged and audited, and not written to any file: a restart reads `llm.yaml`\nagain. Returns who changed it (`by`) and each agent whose provider or model changed, old and new.\nAdmin only.",
         "operationId": "replace_llm_api_v1_settings_llm_put",

@@ -2,12 +2,13 @@
 // anyone else; the page asks /meta first and does not offer them.
 import { request } from "./http.js";
 
-export const getLlm = () => request("GET", "/llm");
+export const getLlm = () => request("GET", "/llm").then((body) => body.llms);
 export const getProviders = () => request("GET", "/llm/providers");
 export const getIndex = () => request("GET", "/index");
 
-// Replaces the whole `llm` section in memory (nothing is written to a file).
-export const replaceLlm = (section) => request("PUT", "/settings/llm", section);
+// Changes the provider and model of the named agents (null: drop that agent's own model) and nothing else of the
+// `llm` section, in memory (nothing is written to a file, and other server processes are not told).
+export const setModels = (changes) => request("PATCH", "/settings/llm", changes);
 
 export const listApiKeys = () => request("GET", "/api-keys");
 export function createApiKey({ userId, roles, tenantId, label }) {

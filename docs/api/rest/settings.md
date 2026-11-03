@@ -61,6 +61,27 @@ HTTP 422
 {"detail": "LLM has 1 problem:\n\n  LLM → llm.agents.ast_planer\n    Unknown key. Did you mean 'ast_planner'?"}
 ```
 
+### `PATCH /api/v1/settings/llm`
+
+Changes the provider and model of the named agents and nothing else, through `engine.llm.set_models` (see
+[LLM API → llm.set_models](../core/llm.md#llmset_models)). Admin only. In memory and per process, like `PUT`: with
+more than one worker, a save reaches only the one that answered, and a restart reads `llm.yaml` again.
+
+Request body: an agent's name, as `GET /llm` lists it (`default` included), mapped to `{"provider", "model"}`, or to
+`null` to drop that agent's own model so it runs on `default`.
+
+```json
+{"default": {"provider": "openai", "model": "gpt-5.4"}, "ast_planner": {"provider": "openai", "model": "gpt-5.5"}, "refiner": null}
+```
+
+`base_url`, `headers`, `prices`, temperatures and every other setting stay. Where an agent's provider changes, its
+`api_key` and `base_url` are cleared, so it uses the new provider's standard key variable. Response (`200`): the same
+change as `PUT`, never a key.
+
+Errors: `401` and `403` as for `PUT`. A provider or model the server cannot use, a key that does not resolve, an
+unknown agent, or `default: null` -> `HTTP 422` with the fixed message "That provider and model cannot be used on
+this server."; nothing changes.
+
 ### `GET /api/v1/llm`
 
 Any caller. Response: `{"llms": {...}}`, `engine.llm.list()`: each agent by its name in the `llm` section (`default`

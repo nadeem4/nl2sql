@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { llmSection, modelGroups, parseRoles, providerName, serverRows, stepRows } from "./settings.js";
+import { modelChanges, modelGroups, parseRoles, providerName, serverRows, stepRows } from "./settings.js";
 
 // The shapes GET /llm/providers and GET /llm answer (engine.llm.providers(), engine.llm.list()).
 const PROVIDERS = [
@@ -48,31 +48,22 @@ test("serverRows lists default first and says what each agent inherits", () => {
   assert.equal(rows.find((r) => r.agent === "ast_planner").value, "anthropic:claude-opus-5");
 });
 
-test("llmSection keeps what is set, points each key at its provider's variable and leaves inherited agents out", () => {
-  assert.deepEqual(llmSection(LLMS, PROVIDERS, {}), {
-    provider: "openai", model: "gpt-5.4", temperature: 0, api_key: "${env:OPENAI_API_KEY}",
-    agents: { ast_planner: { provider: "anthropic", model: "claude-opus-5", api_key: "${env:ANTHROPIC_API_KEY}" } },
+test("modelGroups can mark a provider whose key the server does not have", () => {
+  const groups = modelGroups(PROVIDERS, "gpt-5.4", { markMissingKeys: true });
+  assert.deepEqual(groups.map((g) => g.label), [null, "OpenAI", "Anthropic (no key)"]);
+  assert.deepEqual(modelGroups(PROVIDERS, "gpt-5.4").map((g) => g.label), [null, "OpenAI", "Anthropic"]);
+});
+
+test("modelChanges sends only the edits, as provider and model", () => {
+  assert.deepEqual(modelChanges(LLMS, {}), {});
+  assert.deepEqual(modelChanges(LLMS, { default: "openai:gpt-4.1", decomposer: "anthropic:claude-opus-5" }), {
+    default: { provider: "openai", model: "gpt-4.1" },
+    decomposer: { provider: "anthropic", model: "claude-opus-5" },
   });
 });
 
-test("llmSection applies a changed model and drops the temperature it no longer vouches for", () => {
-  const section = llmSection(LLMS, PROVIDERS, { default: "openai:gpt-4.1", decomposer: "anthropic:claude-opus-5" });
-  assert.equal(section.model, "gpt-4.1");
-  assert.equal("temperature" in section, false);
-  assert.deepEqual(section.agents.decomposer, {
-    provider: "anthropic", model: "claude-opus-5", api_key: "${env:ANTHROPIC_API_KEY}",
-  });
-});
-
-test("choosing the default for an agent that had its own model makes it inherit", () => {
-  const section = llmSection(LLMS, PROVIDERS, { ast_planner: "" });
-  assert.deepEqual(section.agents, {});
-});
-
-test("a provider with no key variable gets no api_key", () => {
-  const section = llmSection({ default: { provider: "ollama", model: "llama3", temperature: 0, inherited: false } },
-    PROVIDERS, {});
-  assert.equal("api_key" in section, false);
+test("choosing the default for an agent that had its own model drops it; one that inherited is left alone", () => {
+  assert.deepEqual(modelChanges(LLMS, { ast_planner: "", decomposer: "" }), { ast_planner: null });
 });
 
 test("parseRoles splits on commas and spaces and drops empties", () => {

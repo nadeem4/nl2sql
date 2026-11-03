@@ -7,7 +7,7 @@ import Home from "./pages/Home.jsx";
 import { sampleQuestion } from "./pages/home.js";
 import { listApprovals } from "./api/chat.js";
 import { getMeta } from "./api/meta.js";
-import { callerOf, mayAdminister } from "./lib/caller.js";
+import { callerOf, isAdmin } from "./lib/caller.js";
 import { toDecide } from "./chat/approval.js";
 import { needsKey } from "./pages/firstRun.js";
 import { modeStatus } from "./pages/status.js";
@@ -201,7 +201,7 @@ export default function App() {
   // Evals is an admin page: not listed for a caller who is not one.
   const nav = navItems(page, {
     retrieval: retrieval && !retrieval.available,
-  }, { approvals: toDecide(waiting).length }).filter((item) => item.id !== "evals" || mayAdminister(caller));
+  }, { approvals: toDecide(waiting).length }).filter((item) => item.id !== "evals" || isAdmin(caller));
 
   return (
     <div className="app">
