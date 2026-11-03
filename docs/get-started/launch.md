@@ -42,7 +42,7 @@ uvx --from nl2sql-engine nl2sql launch my-project
 | Profile | Joins the database does not declare and column roles, filed as proposals ([Schema Profiler](../schema/profiler.md)). |
 | Starter questions | Five questions from the [starter dashboard](../dashboards/index.md)'s templates, printed and filed as `example` proposals. |
 | Review | Each waiting proposal: accept, reject, skip or edit. |
-| Next | The `nl2sql run` command for the first starter question, and `nl2sql demo --dir DIR` to open the playground on your project. `demo` warns about an old engine only for a folder whose demo stamp is older, so a launched folder (it has no stamp) opens without a warning. |
+| Next | The `nl2sql run` command for the first starter question, and `nl2sql demo --dir DIR` to open the web app on your project. `demo` warns about an old engine only for a folder whose demo stamp is older, so a launched folder (it has no stamp) opens without a warning. |
 
 ## Secrets
 

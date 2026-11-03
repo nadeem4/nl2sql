@@ -1,10 +1,5 @@
 # Dashboards
 
-!!! note "Partly built (release 0.9)"
-    Workspaces, the dashboard store, `pin`, `move` and the manual edits work, and so do `open`, `refresh`,
-    stored results and schedules, and so do filters and `filter_values`, `generate` and
-    `suggest_questions`, the starter dashboard, and building in chat. 
-
 A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
 private workspace. Opening one serves stored results after the access check; refreshing re-runs the
 stored plans as the caller with no model call. The methods are in

@@ -15,7 +15,7 @@ command has `--help`.
 | `nl2sql run "QUESTION"` | Ask a question and print the plan, checks, SQL, rows and answer | `--role` (default `admin`), `--no-exec` (plan and validate only), `--ds-id`, `--verbose`/`-v`, `--show-perf` |
 | `nl2sql index` | Index datasource schemas into the index of the configured embedding model, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--refresh` (write the entries again from the stored snapshot, the glossary and the `curated` section after a change; no schema read, no model call, and only changed entries are embedded), `--check` (re-index nothing: compare each live database with the schema its index was built from; exits 0 unchanged, 1 drifted, 2 a check failed or nothing was checked; with `--role` (default `admin`) and `--json`) |
 | `nl2sql mcp` | Serve the engine to an MCP client: `ask`, `list_datasources`, `describe_table`. Over stdio by default, as the role given (refuses to start with no role and no `policies.default_role`); with `--http`, over HTTP behind bearer API keys, each running as its key's roles. Needs `pip install "nl2sql-engine[mcp]"` | `--role` (repeatable), `--user` (default `mcp`), `--http`, `--host`, `--port` |
-| `nl2sql index prune` | Drop the index of every other embedding model (and 0.5's collection); the current one is kept | |
+| `nl2sql index prune` | Drop the index of every other embedding model; the current one is kept | |
 | `nl2sql config check` | Check the whole config without starting the engine: every file, include and `${env:...}`, and every component it names (installed, right interface version, drivers present). Problems are printed by file; each secret is reported present or missing, never printed. Exits 0, or 1 on any problem. Writes nothing under `storage.path` | `--connect` (also connect to every datasource; one that fails is a problem) |
 | `nl2sql doctor` | Check Python, installed drivers and provider keys, then build the configured engine and print `engine.check()`: each datasource, each agent's key, the index | |
 | `nl2sql list-adapters` | List the installed datasource adapters | |
@@ -32,17 +32,17 @@ command has `--help`.
 | `nl2sql review reject ID...` | Reject proposals as an admin role; a rejected change is never proposed again | `--reason TEXT`, `--as ROLE`, `--user` |
 | `nl2sql review export` | The open proposals the role may see as a review file, to decide in a pull request | `--out FILE`, `--kind K`, `--datasource ID`, `--as ROLE`, `--user` |
 | `nl2sql review apply FILE` | Read a review file as an admin role: accept each `accept` (with its edited change), reject each `reject` | `--as ROLE`, `--user` |
-| `nl2sql profile` | Profile the indexed schema and file what it finds for review, and with `--draft` have the model draft missing descriptions; arrives in 0.8 | `--datasource ID`, `--draft`, `--max-cost USD`, `--as ROLE`, `--user` |
-| `nl2sql launch` | Find a database (a file, `DATABASE_URL` or a local port), test it, write the project with secrets in `.env`, index, profile, file five starter questions and review what it found, in one sitting; also `uvx --from nl2sql-engine nl2sql launch`; arrives in 0.9 | `DIR`, `--provider`, `--as ROLE`, `--draft`, `--yes` (accept nothing; write `review.yaml`), `--no-ports` |
+| `nl2sql profile` | Profile the indexed schema and file what it finds for review, and with `--draft` have the model draft missing descriptions | `--datasource ID`, `--draft`, `--max-cost USD`, `--as ROLE`, `--user` |
+| `nl2sql launch` | Find a database (a file, `DATABASE_URL` or a local port), test it, write the project with secrets in `.env`, index, profile, file five starter questions and review what it found, in one sitting; also `uvx --from nl2sql-engine nl2sql launch` | `DIR`, `--provider`, `--as ROLE`, `--draft`, `--yes` (accept nothing; write `review.yaml`), `--no-ports` |
 | `nl2sql keys create` | Create an API key for MCP over HTTP; the token is printed once; managing keys needs an admin role (under `allow_all` leave out `--as` and `--role`) | `--user`, `--role` (repeatable), `--tenant`, `--label`, `--as ROLE` |
 | `nl2sql keys list` | The API keys, never a secret (under `allow_all` leave out `--as`) | `--as ROLE` |
 | `nl2sql keys revoke ID` | Revoke an API key; it stops verifying at once (under `allow_all` leave out `--as`) | `--as ROLE` |
-| `nl2sql dashboards refresh` | Re-run the stored plans of a dashboard, or of every dashboard that is due, with no model call; arrives in 0.9 | `--dashboard ID`, `--due`, `--as ROLE` |
+| `nl2sql dashboards refresh` | Re-run the stored plans of a dashboard, or of every dashboard that is due, with no model call | `--dashboard ID`, `--due`, `--as ROLE` |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |
 | `nl2sql cache clear` | Empty the plan cache in `<storage.path>/state.db`; schema snapshots are kept | |
 | `nl2sql storage purge` | Delete traces and results older than their store's `max_age_days` (14 and 7 days by default), and decided proposals older than `settings.review.max_age_days` (365); `nl2sql-api` does this at startup and once a day | |
-| `nl2sql feedback list` | Playground ratings, newest first | `--limit` (default 50) |
+| `nl2sql feedback list` | Web app ratings, newest first | `--limit` (default 50) |
 | `nl2sql feedback stats` | Ratings plus guardrail rates: refusals, refiner retries, validator rejections, errors, plan-cache hits | `--json`, `--traces DIR` |
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft eval cases to a separate suite file for review | `--out` (default `feedback_gold_drafts.yaml`) |
 | `nl2sql feedback clear` | Delete every rating | `--yes` |

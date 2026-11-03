@@ -50,8 +50,7 @@ suite:
   deterministic, and the case carries the `ties` tag. When the tie is only
   about order, `order_matters` is `false`.
 
-**The data never changes.** The suite was moved from 0.6's
-`chinook_gold.yaml` and `chinook_gold_plans.yaml` with only its keys renamed.
+**The data never changes.**
 `test_chinook_suite_holds_the_gold_data_unchanged` pins a SHA-256 of every
 case's question, SQL, rows, alternatives, outcomes, tables, columns and plan.
 A new accepted answer is a reviewed [alternative](#alternative-answers),
@@ -182,9 +181,8 @@ of more than 12 columns is not searched for a reordering (the in-order match sti
 match it was (`detail.match`: `strict`, `reordered`, `extra columns` or
 `extra columns, reordered`). Period labels never pass this way; they stay
 lenient-only. The row count, every row value and, when `order_matters`, the row
-order are as strict as before. (Column order used to count
-dropped that rule, because a question asks for no column order and Spider-style
-execution checks ignore it.)
+order stay strict. Column order does not count, because a question asks for
+no column order and Spider-style execution checks ignore it.
 
 Lenient is a superset of strict by construction: everything strict accepts is
 accepted. It is not partial credit -- a case passes a score or it does
@@ -285,7 +283,7 @@ The rest is the real pipeline on the indexed demo, so a failing case is a bug
 in a code node or in the plan, never in a model. The run turns curated
 answers off, because a verified answer has no plan. It also scores refusals
 against the generic message: the demo's config names the refused table so the
-playground can show it, and the run turns that off.
+web app can show it, and the run turns that off.
 
 Each plan reads exactly the case's `tables` (the RBAC outcome is derived from
 them) and selects the rows' columns in order. PlanModel has no subqueries or
@@ -470,8 +468,7 @@ a case that has become flaky reads as a regression.
 The regression gate (`engine.evals.gate`, `nl2sql eval run --baseline`)
 compares only comparable runs (the same mode, suite digest, schema and, in
 mode full, roles and curated answers), and a case passes on
-**execution accuracy** (`result_match` and `outcome`), the measure 0.6's tier
-2 published: a faithfulness miss alone is not a regression. With curated
+**execution accuracy** (`result_match` and `outcome`): a faithfulness miss alone is not a regression. With curated
 answers on it checks that accuracy as users see it and on the generated path.
 It fails a run when, for any config both runs name:
 
@@ -500,7 +497,7 @@ benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 
 | Part | What it is |
 | --- | --- |
-| `mode` | `full`, `plans` or `retrieval`; 0.6 wrote mode full runs under `tier2`, read as `full` |
+| `mode` | `full`, `plans` or `retrieval` |
 | `database` | The datasource id (`chinook`) |
 | `shortsha` | The first seven characters of the engine commit |
 | `config` | The config name (`retrieval` for a retrieval run) |
@@ -516,16 +513,14 @@ Every record holds:
 | `engine_version` | The installed `nl2sql-engine` version (the same for every run until a release) |
 | `git_commit`, `git_dirty` | The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed `nl2sql` package to its `.git`, so a run from the demo folder of an editable install still names the repo commit. `"unknown"` for a wheel install or without git, never null |
 | `note` | What changed, e.g. `"slim prompts"` (null without one) |
-| `dataset` | The suite's name and digest (a SHA-256 of its LF bytes, so a Windows checkout hashes the same). A record 0.6 wrote names `chinook_gold.yaml` |
+| `dataset` | The suite's name and digest (a SHA-256 of its LF bytes, so a Windows checkout hashes the same). |
 | `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` and the `tables` and `columns` counts. The fingerprint hashes the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it. Built from the datasources the suite's cases name, not every datasource the project registered: the demo registers three and this suite asks about Chinook, so a run there is still `chinook` with Chinook's fingerprint |
 | `config` | The config name, and `provider:model` per node |
 | `metrics` | The headline numbers: execution accuracy (strict and lenient) with their intervals, then `accuracy_all_scorers` and `accuracy_generated`, `pass_k`, answerability, dollars, tokens, latency, determinism and faithfulness; or, for retrieval, the recall summary |
 | `scoreboard` | The config's whole board, every case record included |
 
 **The headline accuracy is execution accuracy** (`accuracy.execution`), the
-measure 0.6's tier 2 published, so the series reads the same before and
-after 0.7. The 0.6 records are on the 0.6 gold file, so the first 0.7 run
-starts a new series beside them.
+series the published records track.
 
 Records are never edited after writing: a run writes a new file. Two runs are
 comparable when they share the mode, the suite digest and the schema
@@ -613,16 +608,9 @@ Read recall with the amount sent: sending all 11 tables would score 100%, so
 a change that raises recall by sending more is not an improvement by itself.
 A missed column is one the planner cannot select, filter or join on.
 
-The committed baseline (2026-09-22, engine 0.1.2, 39 questions):
-
-| Table recall | Column recall | Every table | Every column | Sent on average |
-| --- | --- | --- | --- | --- |
-| 98.5% | 72.6% | 37 of 39 | 15 of 39 | 8.3 tables, 24.2 columns |
-
-The first 0.7 record (2026-10-15, CI's baseline) scores each answerable case
+The committed baseline (2026-10-15, CI's baseline) scores each answerable case
 once per role allowed to read it, 96 case runs over 43 cases: 97.9% table
 recall, 76.5% column recall, 7.98 tables and 22.2 columns sent on average.
-It is a new series: the suite is not the 0.6 gold file.
 
 Most misses are columns of a table that was sent. Once one column entry of
 a table is picked, or a relationship entry adds its key columns, only those

@@ -81,8 +81,7 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 
-The router `web` is empty
-for now: a later row fills it. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
+The built web app is served at `/` and is not an API route. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
 fails when a route changes without it (rewrite it with `python packages/api/tests/test_openapi_snapshot.py`).
 
 ## Error Handling
@@ -140,7 +139,7 @@ The engine enforces RBAC; the API decides who is asking. `api.auth` picks one so
 | --- | --- | --- |
 | `api_keys` | `Authorization: Bearer <key>`, verified by `engine.api_keys.verify`: the key's user, tenant and roles. | `401` with `WWW-Authenticate: Bearer` |
 | `proxy` | The `api.proxy.user_header`, `tenant_header` (else `settings.tenant_id`) and `roles_header` (comma-separated), honoured only from a peer in `api.proxy.trusted_from`. | `401` (also for a peer outside `trusted_from`, whose headers are ignored) |
-| `static` | One role, `api.static_role`, for every request, with no user id. | `401` when `static_role` is unset |
+| `static` | One role, `api.static_role`, for every request, as the one user `static`. | `401` when `static_role` is unset |
 | `none` (default) | The local operator: `user_id: "local"` with the `policies.admin_roles`. | `403` unless the request is made straight to localhost |
 
 Under `none`, `nl2sql-api serve` refuses to bind a host that is not loopback, and a request whose `Host` is not

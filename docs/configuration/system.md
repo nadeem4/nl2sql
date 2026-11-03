@@ -77,7 +77,7 @@ storage:    { path: .nl2sql }
 
 | Section | Required | Page | Notes |
 | --- | --- | --- | --- |
-| `version` | yes | | `2`. Anything else, or none, is an error that points to [the 0.4 mapping](#from-04). |
+| `version` | yes | | `2`. Anything else, or none, is an error. |
 | `datasources` | yes | [Datasources](datasources.md) | A list; `[]` is enough. |
 | `llm` | yes | [LLMs](llm.md) | The model every agent uses, and per-agent overrides. |
 | `embeddings` | yes | [Embeddings](embeddings.md) | `{provider: local}` is a complete section. |
@@ -141,10 +141,8 @@ reads a secret from the provider whose `id` is `vault` (see
 
 ### Observers, hooks and evals
 
-Three sections added in release 0.7.
-They are accepted and validated now; the engine runs the hooks and the
-observers, and reads evals from the change named below. The observers
-are documented on their own page, [Observers](observers.md).
+Three sections. The engine runs the hooks and the observers and reads
+evals. The observers are documented on their own page, [Observers](observers.md).
 
 ```yaml
 # observers.yaml: where the engine's events go
@@ -215,9 +213,7 @@ Config(..., knowledge=[KnowledgeSourceConfig(type="yaml", path="glossary.yaml"),
 
 ### Conversations, chat tools, dashboards and MCP
 
-Four sections for release 0.9. They are
-accepted and validated now; the change named with each reads it. Each
-is optional, and absent, the defaults shown apply. Chart limits are
+Four sections. Each is optional, and absent, the defaults shown apply. Chart limits are
 `settings.charts` ([Settings](settings.md#charts)).
 
 ```yaml
@@ -293,8 +289,7 @@ nl2sql.yaml has 2 problems:
     'antropic' is not an installed LLM provider. Did you mean 'anthropic'?
 ```
 
-A secret is shown as its reference, never as its value. A 0.4 file
-(`version: 1`) gets one message pointing to [the mapping](#from-04).
+A secret is shown as its reference, never as its value.
 
 ## Environment variables
 
@@ -440,94 +435,6 @@ connection: { host: db.internal, database: sales, user: nl2sql, password: "${env
 
 A Python caller decides for itself. Without `check()`, a broken datasource
 fails the first query that targets it, with its reason.
-
-## From 0.4
-
-0.5 reads only `nl2sql.yaml`. There is no migration command: map each 0.4 file,
-variable and flag with these tables. `nl2sql init` writes a fresh layout to
-start from.
-
-### Files
-
-| 0.4 | 0.5 |
-| --- | --- |
-| `configs/datasources.yaml` (`DATASOURCE_CONFIG`) | `datasources:`, one file per datasource in `datasources/`. `connection.type` moves up to `type`; `options:` and the top-level limits become `limits: {row_limit, timeout_ms, max_bytes}`. |
-| `configs/llm.yaml` (`LLM_CONFIG`) | `llm:`, flat: `default:`'s keys are the top level; `agents:` are keyed by node name (`ast_planner`, not `astplanner`); `name:` and `version:` are gone. |
-| `configs/policies.json` (`POLICIES_CONFIG`) | `policies:`, in YAML; the `role:` field that repeated the key is gone. |
-| `configs/secrets.yaml` (`SECRETS_CONFIG`) | `secrets:`, without `version`. `hashi` is now `hashicorp`. |
-| `configs/curated.yaml` (`CURATED_CONFIG`) | `curated:`, without `version`. Present means on. |
-| `configs/sample_questions.yaml` (`SAMPLE_QUESTIONS`, `ROUTING_EXAMPLES`) | `sample_questions:` on each datasource. |
-| `.env`, `.env.<name>` (`ENV`, `APP_ENV`, `ENV_FILE_PATH`) | The `.env` next to `nl2sql.yaml`, loaded by the entry points only. |
-| `.env.demo` and `configs/*.demo.*` | `nl2sql init --demo` (and `nl2sql demo`, which runs it): `nl2sql.yaml`, its files, and `.env`. |
-
-### Settings variables
-
-| 0.4 variable | 0.5 |
-| --- | --- |
-| `OPENAI_API_KEY` | `llm.api_key` / `embeddings.api_key`, or the fallback variable above |
-| `VECTOR_STORE` | `storage.path` (the index is `<path>/index/`) |
-| `VECTOR_STORE_COLLECTION` | removed (an internal constant) |
-| `EMBEDDING_PROVIDER` | `embeddings.provider` |
-| `EMBEDDING_MODEL` | `embeddings.model` |
-| `TENANT_ID` | `settings.tenant_id` |
-| `CURATED_ENABLED` | removed: the `curated` section is present or absent |
-| `CURATED_MATCH_TOP_K` | `settings.curated.match_top_k` |
-| `CURATED_MATCH_FLOOR` | `settings.curated.match_floor` |
-| `GLOBAL_TIMEOUT_SEC` | `settings.pipeline.timeout_s` |
-| `RESULT_ARTIFACT_BASE_URI` | `storage.path` (`<path>/results/`) |
-| `RESULT_ARTIFACT_PATH_TEMPLATE` | removed: a fixed layout under `<path>/results/` |
-| `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_S3_*`, `RESULT_ARTIFACT_ADLS_*` | removed: results are local; the S3 and ADLS backends are deleted |
-| `SCHEMA_STORE_BACKEND` | removed: SQLite at `<path>/state.db` |
-| `SCHEMA_STORE_PATH` | `storage.path` (`<path>/state.db`, which also holds the plan cache and feedback) |
-| `SCHEMA_STORE_MAX_VERSIONS` | `settings.schema.max_versions` |
-| `SCHEMA_VERSION_MISMATCH_POLICY` | removed: a run reads the schema version its index build was made from |
-| `PLAN_CACHE_ENABLED` | `settings.pipeline.plan_cache` |
-| `FEEDBACK_ENABLED` | `settings.feedback.enabled` |
-| `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | `settings.retrieval.full_snapshot_max_tables` |
-| `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `settings.pipeline.strict_columns` |
-| `RBAC_REFUSAL_NAMES_TABLES` | `policies.refusal_names_tables` |
-| `SQL_AGENT_MAX_RETRIES` | `settings.pipeline.retries.max` |
-| `SQL_AGENT_RETRY_BASE_DELAY_SEC` | `settings.pipeline.retries.base_delay_s` |
-| `SQL_AGENT_RETRY_MAX_DELAY_SEC` | `settings.pipeline.retries.max_delay_s` |
-| `SQL_AGENT_RETRY_JITTER_SEC` | `settings.pipeline.retries.jitter_s` |
-| `LLM_PRICES` | `llm.prices` |
-| `TRACE_MODE` | `settings.traces.mode` |
-| `TRACE_DIR` | `storage.path` (`<path>/traces/`) |
-| `RESULT_ROW_LIMIT` | `settings.results.row_limit` |
-| `RESULT_FETCH_BATCH_SIZE` | `settings.results.fetch_batch_size` |
-| `ANSWER_PREVIEW_ROWS` | `settings.results.preview_rows` |
-| `TRACE_SAMPLE_ROWS` | `settings.traces.sample_rows` |
-| `TRACE_MAX_FIELD_CHARS` | `settings.traces.max_field_chars` |
-| `NL2SQL_TODAY` | `settings.pipeline.today` |
-| `OBSERVABILITY_EXPORTER` | an `otel` observer in the `observers` section (0.7) |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | the `otel` observer's `endpoint` (0.7) |
-
-### Other variables
-
-| 0.4 variable | 0.5 |
-| --- | --- |
-| `NL2SQL_API_ROLE_HEADER` | `api.proxy.roles_header` with `api.auth: proxy` (0.10) |
-| `NL2SQL_API_ROLE` | `api.static_role` with `api.auth: static` (0.10) |
-| `NL2SQL_API_TRUST_BODY_ROLE` | removed in 0.10: a request body never carries the caller |
-| `NL2SQL_API_CORS_ORIGINS` (comma-separated) | `api.cors_origins` (a list) |
-| `NL2SQL_API_ADMIN_ROLES` | `policies.admin_roles` |
-| `NL2SQL_DEMO_HOSTED` | `nl2sql-api serve --demo --hosted` |
-| `NL2SQL_DEMO_QUESTIONS_PER_MINUTE`, `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `nl2sql-api serve --questions-per-minute N --questions-per-session N` |
-| `VAULT_ADDR`, `VAULT_TOKEN` | `secrets.providers[].url` / `.token` (write `${env:VAULT_TOKEN}` to keep reading the variable) |
-| `AZURE_KEYVAULT_URL` | `secrets.providers[].vault_url` |
-| `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unchanged: the fallback key variables |
-
-### CLI
-
-| 0.4 | 0.5 |
-| --- | --- |
-| `nl2sql setup` | `nl2sql init [DIR] [--provider NAME] [--force]`; the guided flow comes in a later release |
-| `nl2sql setup --demo` | `nl2sql init --demo [DIR]` (or just `nl2sql demo`) |
-| `--env NAME`, `--env-file PATH` | removed: the `.env` next to `nl2sql.yaml` is loaded |
-| `--config PATH` (the datasource file), `--llm-config`, `--secrets-config`, `--policies-config`, `--vector-store` | the one global `nl2sql --config PATH/nl2sql.yaml` |
-| `curated validate/test --curated --config --secrets` | `nl2sql --config ... curated validate/test` |
-| `policy validate --config --policies --secrets` | `nl2sql --config ... policy validate` |
-| `nl2sql --env demo <command>` (from the demo folder) | `nl2sql --config nl2sql-demo/nl2sql.yaml <command>`, or run it from inside `nl2sql-demo/` |
 
 ## Source references
 

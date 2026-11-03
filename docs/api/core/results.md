@@ -1,6 +1,5 @@
 # Results API
 
-## Purpose
 `engine.results`: the results a run saved, read back by its `trace_id`, and the chart their data is drawn as.
 Readable only by the caller who asked the run.
 
@@ -40,7 +39,7 @@ caller's `tenant_id` (else the engine's `settings.tenant_id`) and `user_id`, and
   other roles. A trace id appears in events, traces and the audit log, so it is never the access check.
 - No caller is a `TypeError` (`user_context` missing, `None`, or not a `UserContext`). There is no default caller,
   as for conversations and dashboards: failing open would let anyone read a run whose trace id they saw.
-- A manifest that records no asker (one written before 0.9) is `ResultNotFound` for every caller. There is no
+- A manifest that records no asker is `ResultNotFound` for every caller. There is no
   legacy path; run the question again.
 
 **Anonymous callers.** A run asked with no `user_id` (a `UserContext` with only roles, or `run_query` with no
@@ -49,10 +48,9 @@ has no `user_id` and has the same roles, and by no named user. So a `viewer` hol
 reads nothing, while anonymous callers with the same roles share each other's results, because nothing else tells
 them apart.
 
-The REST API has no per-user identity yet: its static or header role (and the playground's role picker) build a
-`UserContext` with roles only. So every REST run is anonymous, and readable by any REST caller of the same tenant
-with the same roles. API keys carry a `user_id`, but only to the MCP server; REST does not take them. To keep
-callers' results apart, call the engine in process with a `user_id` from your own auth.
+Every REST request carries a `user_id` (see [REST identity](../rest/index.md#identity)): the API key's user, the
+trusted proxy's user header, `static` for every caller under `auth: static`, `local` under `auth: none`, and a
+per-visitor id on the hosted demo. So under `auth: static` all callers are one user and share their results.
 
 **Operator tools.** `nl2sql run`, `nl2sql trace`, `nl2sql eval`, the replay provider and the feedback tools read
 the result they were just given, traces and recordings, never `engine.results`, so they are unchanged. In-process

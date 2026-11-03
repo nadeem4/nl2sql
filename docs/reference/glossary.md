@@ -1,5 +1,7 @@
 # Glossary
 
+The terms this documentation uses for the engine's data, pipeline and access model, for readers meeting them for the first time.
+
 ## Core concepts
 
 - **ArtifactRef**: Metadata reference to persisted query results (URI, backend, schema_version).

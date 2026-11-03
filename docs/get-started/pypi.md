@@ -17,7 +17,7 @@ pip install "nl2sql-engine[postgres]"
 pip install "nl2sql-engine[mysql,mssql]"   # [mssql] also needs Microsoft's ODBC Driver for SQL Server
 pip install "nl2sql-engine[duckdb]"
 
-# The browser playground behind `nl2sql demo` (adds fastapi + uvicorn).
+# The browser web app behind `nl2sql demo` (adds fastapi + uvicorn).
 # `[all]` does NOT include it -- `all` covers database drivers only.
 pip install "nl2sql-cli[web]"
 ```
@@ -292,7 +292,7 @@ pip install "nl2sql-engine[hashicorp]"
 ```
 
 See [Configuration](../configuration/system.md) for the whole config, the
-environment variables it reads, and where each 0.4 file and variable went.
+environment variables it reads.
 
 ## Use the engine from Python
 

@@ -45,7 +45,7 @@ curated:
   match_floor: 0.6
 feedback:
   enabled: true
-knowledge:                    # read from release 0.8
+knowledge:
   item_max_chars: 500
   block_max_chars: 4000
   top_k: 8
@@ -61,7 +61,7 @@ profiler:
   max_cost_usd: 0.50
 review:
   max_age_days: 365
-charts:                       # read from release 0.9
+charts:
   max_points: 1000
   max_categories: 20
   max_series: 5
@@ -72,7 +72,7 @@ approvals:                    # stored approval grants
 Unknown keys are errors, as everywhere in the config. The demo
 (`nl2sql init --demo`) writes a `settings.yaml` with `pipeline.timeout_s: 300`
 (a live run makes six model calls; one OpenAI run took 136 s) and
-`traces.mode: always` (the playground's Debug drill-down reads every run's
+`traces.mode: always` (the web app's Debug drill-down reads every run's
 trace).
 
 In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
@@ -82,8 +82,7 @@ In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
 
 Where the engine's events, logs and metrics go is not a setting: it is the
 [`observers` section](observers.md) of
-`nl2sql.yaml`. The 0.6 `observability` group (`exporter`, `otlp_endpoint`)
-is gone; an `otel` observer takes its place. The `schema` group is the attribute `schema_`
+`nl2sql.yaml`. An `otel` observer exports metrics and traces. The `schema` group is the attribute `schema_`
 (`cfg.settings.schema_.max_versions`), because `schema` would shadow a
 pydantic method; the YAML key is `schema`.
 
@@ -105,7 +104,7 @@ The tenant id for requests that name none. Result files are kept per tenant.
 | `retries.jitter_s` | `0.5` | Most jitter added to a delay. |
 | `max_llm_calls` | `60` | The most model calls one question may make, parse retries included; `null` turns the cap off. 60 covers the largest legitimate run: the resolver, the decomposer, six sub-queries each with a planner call and three refiner and planner retries, the answer, and parse retries. See [Per-question caps](#per-question-caps). |
 | `max_cost_usd` | none | The most one question may spend, in dollars; `null` (the default) is no cap. With a cap set, every model the `llm` section names must have a [price](llm.md#prices), or the engine does not build. See [Per-question caps](#per-question-caps). |
-| `sanity_checks` | `true` | The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). `false` turns them all off. Read from release 0.7's sanity checks. |
+| `sanity_checks` | `true` | The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). `false` turns them all off. |
 
 ### Per-question caps
 
@@ -140,9 +139,8 @@ check for work that is not a question: make the model calls with
 | `selector_catalog_max` | `200` | Past this many readable tables, the selector's catalog is the nearest this many by vector search, not all of them (about 15,000 tokens at 200, with column names). |
 | `join_path_max_hops` | `4` | The tables that join the chosen ones are added from the foreign keys and glossary joins when at most this many joins apart; a longer path is not added. |
 
-`table_k`, `planning_k` and `decomposer_tables` replace the constants the
-schema retriever and the resolver had before 0.7 (`TABLE_K`, `PLANNING_K`,
-`MAX_DECOMPOSER_TABLES`).
+`table_k`, `planning_k` and `decomposer_tables` set how many tables the schema
+retriever and the resolver keep.
 
 How the tables are chosen past the threshold is in the
 [schema retriever's reference](../how-it-works/nodes/schema_retriever_node.md).
@@ -197,12 +195,11 @@ Whether curated answers are on is not a setting: the
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `enabled` | `true` | Let the playground record a thumbs up or down, with an optional note, for a run. Stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
+| `enabled` | `true` | Reserved: the key is accepted and validated, and nothing reads it. Ratings of a run (**Yes** or **Not quite** in the web app) are stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
 
 ## `knowledge`, `clarify`, `profiler` and `review`
 
-Four groups for release 0.8. They are
-accepted and validated now; the change named with each reads it.
+Four groups of knobs.
 
 | Key | Default | Description |
 | --- | --- | --- |
@@ -221,8 +218,7 @@ accepted and validated now; the change named with each reads it.
 
 ## `charts`
 
-Release 0.9. `engine.results.chart` reads it
-([Charts](../charts/index.md)).
+`engine.results.chart` reads it ([Charts](../charts/index.md)).
 
 | Key | Default | Description |
 | --- | --- | --- |

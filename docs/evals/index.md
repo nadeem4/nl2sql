@@ -1,14 +1,16 @@
 # Evals
 
-## At a glance
+`engine.evals` measures how well the engine answers your questions, and this
+page is for anyone writing a suite or reading a report. You write **cases** (a
+question, what each role should get, and the SQL a person reviewed) in
+**suite** files. A run asks every case once per role and scores it with
+registered **scorers** (`result_match`, `outcome`, `retrieval_recall`,
+`faithfulness`, `routing`), in three modes, and the result is an `EvalReport`.
+A case may carry reviewed `alt_sql` alternatives, so a second correct way to
+answer it scores as correct; gold data is never edited to make a run pass.
 
-- **`engine.evals`:** suites of cases in `evals.yaml`, scored by registered
-  scorers (`result_match`, `outcome`, `retrieval_recall`, `faithfulness`,
-  `routing`), in three modes.
-- **The Chinook suite:** 47 cases (43 answerable, 4 deliberately not) with
-  expected results per role, including refusals. A case may carry reviewed
-  `alt_sql` alternatives, so a second correct way to answer it scores as
-  correct; gold data is never edited to make a run pass.
+## Modes
+
 - **Mode plans** (no key, runs in CI): the hand-written plans through the
   validator, generator and executor with a fake LLM, so a failure is a bug in
   code, not the model.
@@ -24,18 +26,13 @@
   path, so `accuracy_generated` measures the model alone.
 - **Mode retrieval** (no key): the share of each case's needed tables and
   columns that schema retrieval sends the planner, and where routing sends it.
-- **Feedback:** playground ratings and guardrail rates via `nl2sql feedback stats`;
+- **Feedback:** web app ratings and guardrail rates via `nl2sql feedback stats`;
   `feedback export --good` drafts new eval cases for review.
 
 Recorded runs are published with `nl2sql eval publish` to the
 README and [Benchmarks](../benchmarks.md). Details:
 [the Chinook suite](chinook-suite.md),
 [Feedback and Signals](../observability/feedback.md).
-
-`engine.evals` measures how well the engine answers your questions. You
-write **cases** (a question, what each role should get, and the SQL a person
-reviewed) in **suite** files. A run asks every case once per role and scores it
-with registered **scorers**, and the result is an `EvalReport`.
 
 The package ships one answer suite for the demo, Chinook's 47 gold cases, and
 `nl2sql init --demo` copies it next to the demo's `nl2sql.yaml`. (It also
@@ -203,10 +200,9 @@ board.
 **Two accuracies, on purpose.** `accuracy.overall` counts a case as passed
 only when every scorer that applies passes. In mode full with the default
 scorers, that includes `faithfulness`, `retrieval_recall` at 1.0 and
-`routing`. So it is stricter than the accuracy 0.6's tier 2 published.
-`accuracy.execution` is that older measure alone: `result_match` and
-`outcome` passed, no other scorer counted. Compare it, not `overall`, with
-the runs published before 0.7 (`docs/benchmarks.md`).
+`routing`. `accuracy.execution` is the narrower measure: `result_match` and `outcome`
+passed, no other scorer counted. It is the series the published runs track
+([Benchmarks](../benchmarks.md)), so compare it, not `overall`, with them.
 
 A board holds:
 
@@ -255,9 +251,9 @@ suites' digests match and the mode is the same. Anything else is a series
 break: `ok` is false and nothing is compared.
 
 **The gate reads execution accuracy.** A case passes when `result_match` and
-`outcome` pass; no other scorer counts. That is `accuracy.execution`, the
-measure 0.6's tier 2 published, so a run compares with the history published
-before 0.7 and a faithfulness verdict alone is never a regression. A
+`outcome` pass; no other scorer counts. That is `accuracy.execution`, so a run
+compares with the published history and a faithfulness verdict alone is never
+a regression. A
 `kind: routing` case has no rows to check and is left out of it. With
 curated answers on, it is checked twice: as users see it, and on the
 generated path. Mode retrieval has no execution, so its cases are read by

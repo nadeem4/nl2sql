@@ -114,7 +114,7 @@ Back and Forward, and that routing touches nothing but the hash.
 ## Home
 
 `#/` (`src/pages/Home.jsx`, its words in `src/pages/home.js` so `npm test` can hold each
-claim against what the playground does). Top to bottom:
+claim against what the web app does). Top to bottom:
 
 - **The hero**: the one eyebrow on the page (**Questions in, rows out**), the
   promise as the h1, one sentence a line on a wide window, a lede, then three

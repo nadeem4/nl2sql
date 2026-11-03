@@ -39,7 +39,7 @@ out of routing, and each agent's key is checked without a model call. A
 datasource with `required: true` that cannot connect makes `check()` raise
 `EngineNotReady`, and the entry point refuses to start: `nl2sql-api` before it
 accepts a request, the CLI before it runs a command, `nl2sql demo` before it
-serves the playground.
+serves the web app.
 
 ## Runtime modes
 
@@ -49,7 +49,7 @@ serves the playground.
   service cannot run without, an observability exporter enabled.
 - **Self-hosted**: the `nl2sql-api` image with the web app, run by
   [Docker Compose](compose.md): one service, one data volume, API keys on.
-- **Hosted demo**: the playground on the shipped sample databases, holding no
+- **Hosted demo**: the web app on the shipped sample databases, holding no
   API key of its own; each visitor brings theirs. See
   [Hosted demo](hosted-demo.md).
 

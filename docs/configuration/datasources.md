@@ -46,7 +46,7 @@ The section can also be a file holding the list
 | `index` | everything | What of the database is indexed; see [Index](#index). |
 | `preferred_tables` | `[]` | Tables or views the planner should reach for first. See [Preferred tables](#preferred-tables). |
 | `sample_questions` | `[]` | Questions the datasource answers. Each is indexed as an entry of its own (`schema.datasource_example`), one of the signals routing votes with. |
-| `domains` | `[]` | A routing hint written by people. Routing does not read it yet. |
+| `domains` | `[]` | A routing hint written by people. Routing does not read it. |
 | `required` | `false` | `engine.check()` fails (`EngineNotReady`) when this datasource cannot connect, and the CLI and the demo refuse to start. `nl2sql-api` starts anyway and `/ready` answers 503 `not_ready`. See [Startup](system.md#startup-check-and-required). |
 
 In Python, `Datasource(id=..., adapter=MyAdapter(...))` passes a built adapter
@@ -123,8 +123,7 @@ limits:
   warning; see [row cap before a combine](../how-it-works/nodes/engine_aggregator_node.md#row-cap-before-a-combine).
 - `max_bytes`: passed to the adapter.
 
-There is one place for each limit: the 0.4 `options:` bag and the top-level
-spellings are gone.
+Each limit has one place: `limits:`.
 
 ## Index
 

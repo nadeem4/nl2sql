@@ -369,26 +369,16 @@ cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in `QueryResult.usage.calls` and
 in a run trace's `llm.by_node` (see [Debugging](../observability/debugging.md)).
 
-In the demo, the playground's **Settings** page writes exactly these entries
-into the demo folder's `llm.yaml`. Choosing a provider and a model for a step adds
-an `agents:` entry with `provider`, `model` and the temperature that model
-takes: `0.0`, or `null` for `gpt-5.5`, `gpt-5-mini`, `claude-opus-5` and
-`claude-sonnet-5`. A step on the default's provider takes the default's
-`base_url` and `api_key`; a step on another provider names no key (its
-standard variable is read) and no `base_url`. A key saved on the page goes to
-the demo's `.env`. Choosing "Default" removes the entry. The running engine
-reloads its `llm` section from `nl2sql.yaml`, so the change applies to the
-next question. The page offers the providers and models in
-`VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
-now, and a provider only once its key is saved. See
-[the Settings page](../get-started/demo.md#the-settings-page).
+The web app's **Settings** page changes models in two ways. An administrator saves the server's default model and each
+step's model with `PATCH /settings/llm`; the change is in memory, in the process that answered, and `llm.yaml` is read
+again on a restart. Anyone, where the server allows it (`api.request_llm`), can keep a key and a model per step in
+their own browser tab, sent with each question (see the hosted demo below). The page offers the providers and models
+from `GET /llm/providers`. See [the Settings page](../apps/web.md#settings).
 
-The playground's **Pipeline** page reads the same configuration back: it lists
-every step of a run and, for each of the seven a model decides, the provider and
-model it is set to use, then what it actually spent once a question has been
-asked. It is served by `GET /api/pipeline` from `engine.about()`, whose steps
-(`nl2sql.pipeline.steps`) take their seven model steps from `LLM_AGENTS` rather
-than repeating the table above. See [the Pipeline page](../get-started/demo.md#the-pipeline-page).
+The web app's **Pipeline** page lists every step of a run and, for each of the seven a model decides, the provider and
+model it is set to use. It reads `GET /about`, from `engine.about()`, whose steps (`nl2sql.pipeline.steps`) take their
+seven model steps from `LLM_AGENTS` rather than repeating the table above. See
+[the Pipeline page](../apps/web.md#home-pipeline-and-retrieval).
 
 On the **hosted demo** (`nl2sql-api serve --demo --hosted`) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
@@ -402,18 +392,9 @@ caches none of them, and refuses with `400` -- naming the step and the
 provider -- when a step is on a provider the request brought no key for. See
 [Hosted demo](../deployment/hosted-demo.md).
 
-When `nl2sql demo` picks replay or live mode at start-up it points the top
-level of `llm.yaml` at the chosen provider. In replay and record mode every
-`agents:` entry follows, with the local replay server or recording proxy as
-`base_url` and the placeholder `api_key` (`replay`, `proxy`) it accepts,
-because one fake or proxy serves every call; no key goes into the
-environment. In live mode a step keeps the provider it was given; only an
-entry with no provider, or one left on the replay endpoint, follows the top
-level, and no `api_key` is written. Moving an entry between OpenAI and
-Anthropic replaces a model the new provider does not serve (a `gpt-` model on
-Anthropic, a `claude-` one on OpenAI) with that provider's default and its
-temperature. Every provider key saved in the demo's `.env` is loaded at
-start-up, so each step finds its own.
+`prepare_demo` writes the demo's `llm.yaml` for the first provider whose key variable is set, else Ollama when a local
+daemon has a model pulled, else `replay`. Every provider key in the demo's `.env` is loaded at start-up, so each step
+finds its own.
 
 ## Any other OpenAI-style server (`openai_compatible`)
 
@@ -613,7 +594,7 @@ field (`api_key`, a `headers` value) and is an error anywhere else, so data that
 from your files never reads the environment. `nl2sql-api` serves it as the
 admin-only [`PUT /api/v1/settings/llm`](../api/rest/settings.md): the body is the
 section as JSON, and a bad one is HTTP 422 with the `ConfigError` text. The
-playground's model switch calls `replace` too. `engine.llm.list()` shows the
+web app's model switch calls `replace` too. `engine.llm.list()` shows the
 model each agent runs on.
 
 ## Embeddings are a separate path

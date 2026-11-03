@@ -69,22 +69,10 @@ package ships are in `nl2sql/evaluation/suites/`, and `nl2sql init --demo`
 copies them into the demo's `evals/` folder. `engine.evals.load(path)` and
 `engine.evals.run([path])` also take a suite file directly.
 
-The Chinook suite (`suites/chinook.yaml`) is 0.6's gold set
-(`chinook_gold.yaml` and `chinook_gold_plans.yaml`) with its keys renamed and
-nothing else changed:
-
-| Was | Now |
-| --- | --- |
-| `datasource` | `datasources` |
-| `expected` | `outcome` |
-| `needed_tables`, `needed_columns` | `tables`, `columns` |
-| `gold_sql`, `gold_result`, `alt_gold_sql`, `alt_gold_result` | `sql`, `rows`, `alt_sql`, `alt_rows` |
-| plans in `chinook_gold_plans.yaml` | `plan` on each case |
-
+The Chinook suite (`suites/chinook.yaml`) is the gold set: `sql`, `rows`, `alt_sql`, `alt_rows` and a `plan` on each case.
 `test_chinook_suite_holds_the_gold_data_unchanged` pins a SHA-256 of every
-case's question, SQL, rows, alternatives, outcomes, tables, columns and plan,
-taken from the old files with the old loader. [The Chinook
-suite](chinook-suite.md) describes it.
+case's question, SQL, rows, alternatives, outcomes, tables, columns and plan.
+[The Chinook suite](chinook-suite.md) describes it.
 
 ## The routing suite
 
@@ -118,8 +106,8 @@ nl2sql eval run --mode full --suite evals/routing.yaml --max-cost 5             
 
 In mode retrieval a case passes when routing ranks one of its datasources
 first and shortlists all of them (`settings.routing.candidates`, cut at
-`max_datasources`). A few cases fail today; the baseline records where
-routing misses, and the gate allows no other case to start failing. The test
+`max_datasources`). The baseline records the cases where routing misses,
+and the gate allows no other case to start failing. The test
 bed's 1,200-table wide schema has routing cases of its own in the `realdb`
 job (`tests/realdb/test_routing_wide.py`), since they need the test bed's
 databases.

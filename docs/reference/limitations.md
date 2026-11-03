@@ -1,5 +1,7 @@
 # Status and limitations
 
+The known gaps in the released packages, for anyone deciding whether NL2SQL fits their use.
+
 The packages are pre-1.0. `nl2sql-sdk`, `nl2sql-engine`,
 `nl2sql-api` and `nl2sql-cli` share one version and are released together
 ([Releasing](../contribute/releasing.md)). Unreleased changes are on `main`;
@@ -27,9 +29,11 @@ Known limitations:
   `user_context` raises instead of refusing.
 - OpenTelemetry metrics and traces are off unless an `otel` observer is
   configured ([Observability](../observability/stack.md)).
-
-Roadmap: using the engine on your own database (bring-your-own-database setup
-beyond the bundled demo databases) is planned. `nl2sql init` and the adapters
-exist, and `nl2sql launch` ([Launch](../get-started/launch.md)) walks you
-from a database to a working project; it does not yet cover every datasource
-type or every setting.
+- `nl2sql launch` ([Launch](../get-started/launch.md)) walks you from a
+  database to a working project, but it does not cover every datasource type
+  or every setting.
+- The `metrics:` list in `curated.yaml` is parsed and validated, but no
+  question is answered from it yet; only verified queries are used
+  ([Curated answers](../how-it-works/curated_answers.md)).
+- A verified query answers a whole question: one part of a multi-part question
+  cannot be answered from a verified query while the rest is generated.

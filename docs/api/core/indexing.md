@@ -1,6 +1,5 @@
 # Indexing API
 
-## Purpose
 `engine.index`: build the vector index that retrieval and grounding read,
 report its health, clear it, prune other embedding models' indexes,
 inspect one search of it, and measure schema drift.
@@ -125,9 +124,8 @@ refresh an index, build it instead, which never leaves it empty.
 Signature:
 `prune() -> list[str]`
 
-Drops the index namespace of every other embedding model, including 0.5's
-`nl2sql_store` collection, which this version never reads, and returns their
-names. The current model's namespace is kept. `nl2sql index prune` calls it.
+Drops the index namespace of every other embedding model, including a
+leftover `nl2sql_store` collection, and returns their names. The current model's namespace is kept. `nl2sql index prune` calls it.
 
 ### index.inspect
 
@@ -145,9 +143,8 @@ glossary term `knowledge.show` would hide from the caller, an entry whose text
 names a denied table, and every entry of a datasource the caller cannot reach
 or that is not indexed are left out; verified-query entries are never shown.
 The hiding happens after the search, from a pool four times larger than
-usual, so a caller for whom most matches are hidden can get a short pool. The
-playground and REST API take the role from the request without verifying it;
-see [the security model](../../security/model.md).
+usual, so a caller for whom most matches are hidden can get a short pool. See [the security model](../../security/model.md) for how the REST API
+identifies a caller.
 
 ### index.check
 
@@ -196,11 +193,11 @@ pipeline's own retrieval uses: `k` (8 picks), `lambda_mult` (1 is relevance
 only, 0 is difference only), `fetch_multiplier` (the candidate pool is `k`
 times it) and `types`, every entry type the index holds
 (`schema.datasource`, `schema.datasource_example`, `schema.table`,
-`schema.column`, `schema.relationship`, `schema.metric`, `knowledge.term`). The playground's Retrieval inspector starts from it.
+`schema.column`, `schema.relationship`, `schema.metric`, `knowledge.term`). The web app's Retrieval inspector starts from it.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.
-- Store the schema snapshot and its version (nothing reads it yet).
+- Store the schema snapshot and its version.
 - Build the chunks (the schema's, the knowledge's and the verified queries'),
   embed them, write them as a new build, and switch the datasource's build
   pointer to it, recording the `knowledge_hash` and `curated_hash`.

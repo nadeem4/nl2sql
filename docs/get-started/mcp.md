@@ -247,7 +247,7 @@ a script using a model provider's remote MCP tool. For example, in a client's JS
 ```
 
 Keep the token in the client's secret store, not in a file you share. A chat app whose connector screen
-offers only OAuth does not work with keys; OAuth is the next step after 0.9. The hosted demo is not
+offers only OAuth does not work with keys: MCP over HTTP supports API keys only. The hosted demo is not
 exposed over MCP.
 
 Logs go to stderr. A request that fails to check a key (the state store is down) is a `500` and a log

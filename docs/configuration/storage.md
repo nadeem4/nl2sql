@@ -14,12 +14,12 @@ and adds `.nl2sql/` to `.gitignore`.
 
 Everything the engine writes lives under it:
 
-| Under `path` | What | Was (0.4) |
-| --- | --- | --- |
-| `index/` | The vector index (Chroma), one collection per embedding model: `nl2sql__<model slug>__<dimension>`. | `VECTOR_STORE`, `VECTOR_STORE_COLLECTION` |
-| `state.db` | SQLite: schema snapshots, the plan cache and playground feedback. | `SCHEMA_STORE_PATH` |
-| `traces/` | Run traces (`settings.traces.mode`), kept 14 days by default. | `TRACE_DIR` |
-| `results/` | Result files, `<tenant_id>/<request_id>/<sub_query_id>.parquet`. Kept 7 days by default. See [Artifact Store](../storage/artifact-store.md). | `RESULT_ARTIFACT_BASE_URI` |
+| Under `path` | What |
+| --- | --- |
+| `index/` | The vector index (Chroma), one collection per embedding model: `nl2sql__<model slug>__<dimension>`. |
+| `state.db` | SQLite: schema snapshots, the plan cache and web app feedback. |
+| `traces/` | Run traces (`settings.traces.mode`), kept 14 days by default. |
+| `results/` | Result files, `<tenant_id>/<request_id>/<sub_query_id>.parquet`. Kept 7 days by default. See [Artifact Store](../storage/artifact-store.md). |
 
 ## The four stores
 
@@ -127,10 +127,9 @@ is its folder or file, or `None` for a store that does not have one.
 ## The state
 
 The state store keeps the schema snapshots (immutable, one row per version),
-the plan cache, the playground's feedback, and the lock that lets one index
+the plan cache, the web app's feedback, and the lock that lets one index
 build run at a time. The engine applies the store's pending migrations when it
-starts; the built-in `sqlite` store adopts a 0.5 `state.db` as it is, and
-applies them in one `BEGIN IMMEDIATE` transaction, so engines or CLI runs
+starts; the built-in `sqlite` store applies them in one `BEGIN IMMEDIATE` transaction, so engines or CLI runs
 opening a new `state.db` at the same moment apply each one exactly once. A
 store with nothing pending takes no lock, so a read-only `state.db` opens. See
 [The state store](../schema/store.md#the-state-store).
@@ -149,8 +148,7 @@ run reads the pointers once when it starts. See
   reports the index `missing`, and `nl2sql index` builds it. Switching back
   finds the old namespace still built.
 - **`nl2sql index prune`** (`engine.index.prune()`) drops every namespace but
-  the current model's, including 0.5's `nl2sql_store` collection, which 0.6
-  never reads. Run it once after upgrading, and after settling on a new model.
+  the current model's, including a leftover `nl2sql_store` collection. Run it after settling on a new model.
 - The `chroma` store opens `index/` on the first build; reading a missing
   folder or namespace creates nothing.
 

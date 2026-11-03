@@ -1,6 +1,6 @@
 # Releasing
 
-The monorepo publishes four distributions to PyPI under **unified versioning**:
+This page is for maintainers cutting a release. The monorepo publishes four distributions to PyPI under **unified versioning**:
 they all carry the same version and are released together. Internal
 dependencies use compatible-release constraints (`~=0.1`), so a release only
 resolves for users if every package declares the same version.
@@ -71,10 +71,8 @@ put the footer on a commit of a visible type.
     `BREAKING CHANGE:` footer therefore moves `0.1.0` to `0.2.0` rather than to
     `1.0.0` — semver's rule for an unstable public API.
 
-    Without this setting the *first* breaking commit silently declares the
-    project stable. That is exactly what happened before it was added: the
-    `refactor!:` that collapsed the distributions made release-please propose
-    `1.0.0`.
+    Without this setting the first breaking commit would silently declare the
+    project stable.
 
     Going to `1.0.0` is then a deliberate act: set the version explicitly with a
     `Release-As: 1.0.0` commit (below). The flag stays `true` afterwards and
@@ -224,23 +222,17 @@ the release decision.
    with the Dockerfile named explicitly (`file: Dockerfile`),
    because the Dockerfile installs the SDK, engine, API and CLI from their local sources
    and its `COPY ./packages/...` paths resolve against the build context. A
-   context of `packages/api` makes them resolve to
-   `packages/api/packages/sdk`, which does not exist — that is what
-   failed on `v0.1.0`. A root `.dockerignore` keeps that context small.
+   context of `packages/api` would make them resolve to
+   `packages/api/packages/sdk`, which does not exist. A root `.dockerignore`
+   keeps that context small.
    `needs: pypi` is retained so the image is only published for a release that
    reached PyPI, not because the image build needs PyPI. The image's
    `FROM python:X.Y` has to satisfy every package's `requires-python`
-   (`>=3.12`): on `v0.2.0` it was still `python:3.11-slim`, pip refused to
-   install the SDK into it, and this job failed after PyPI and
-   the docs had published. `tests/unit/test_docker_images.py` now checks every
+   (`>=3.12`), or pip refuses to install the SDK and this job fails after PyPI
+   and the docs have published. `tests/unit/test_docker_images.py` checks every
    Dockerfile's base against every `pyproject.toml`, and the `api-image` job
    in `test.yml` builds this image on every pull request.
 
-    !!! note "There is no `nl2sql-api:0.2.0` image"
-        The job builds from the tagged commit, and `v0.2.0`'s Dockerfile cannot
-        build, so re-running it would fail the same way. The first image built
-        with the fix is published by the next release, `0.2.1`, which moves
-        `ghcr.io/nadeem4/nl2sql-api:latest` onto it.
 4. **`docs`** — `needs: pypi`, likewise after all four uploads.
    `mike deploy --push --update-aliases $TAG latest` adds a versioned copy of
    the docs to `gh-pages` and moves the `latest` alias onto it.
@@ -264,8 +256,8 @@ the release decision.
    with the tag, which pins the Space's image to
    `nl2sql-cli[web]==X.Y.Z`, pushes it and waits for the build. That
    `pypi-smoke` installed the version is not proof that the Hub's builder
-   will: on `v0.2.0` the Space build ran minutes later and its pip still saw
-   only `0.1.x`. So the workflow first waits, up to 20 times 30 seconds, until
+   will: the Space build runs minutes later and its pip can still see only the
+   previous version. So the workflow first waits, up to 20 times 30 seconds, until
    `https://pypi.org/simple/nl2sql-engine/` lists `X.Y.Z`, and the Space's
    Dockerfile retries its install up to 10 times, 30 seconds apart, with
    pip's cache off.
@@ -276,7 +268,7 @@ the release decision.
    report `RUNNING` on its new build while the router still sends visitors
    to the old one, so this checks where visitors are: it polls
    `https://nadeem4nk-nl2sql-demo.hf.space/api/health` until it reports
-   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/meta`; then
+   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/v1/meta`; then
    the same on the Space's custom domain, `SPACE_CUSTOM_DOMAIN` in the
    workflow (`https://nl2sql.codewithnk.com`; empty skips it).
 
@@ -307,12 +299,12 @@ is no API token anywhere in the workflow and no secret to rotate.
     certificate's Build Config URI. PyPI verifies the attestation against the
     one publisher that authenticated the request, so the two can never both
     match and the upload fails with `400 Invalid attestations supplied during
-    upload`. This is what broke `v0.1.1`. Trusted publishing is unaffected; the
+    upload`. Trusted publishing is unaffected; the
     cost is that released artifacts carry no PEP 740 provenance. See
     [PyPI's note on reusable workflows](https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github).
 
-The four `pypi` legs run with `fail-fast: false`, so one package failing no
-longer cancels the others and skips `ghcr` and `docs`.
+The four `pypi` legs run with `fail-fast: false`, so one package failing does
+not cancel the others; `ghcr` and `docs` wait for every leg.
 
 ### Why the publish is chained to release-please, not to the tag
 
@@ -320,9 +312,9 @@ longer cancels the others and skips `ghcr` and `docs`.
 `GITHUB_TOKEN`.** This is a deliberate recursion guard, and it has no opt-out
 short of pushing the tag with a personal access token instead. release-please
 tags with `GITHUB_TOKEN`, so a `v*` tag it pushes never fires
-`publish_pypi.yaml`'s `push: tags` trigger. This is exactly what happened to
-`v0.1.0`: the tag and the GitHub Release exist, both authored by
-`github-actions[bot]`, and *Publish Release* has no run for them.
+`publish_pypi.yaml`'s `push: tags` trigger. The tag and the GitHub Release
+release-please creates are authored by `github-actions[bot]`, and *Publish
+Release* has no run for them.
 
 Introducing a PAT would defeat the point of trusted publishing, so the publish
 is chained to release-please's own outputs instead. `release_please.yml` gives
@@ -354,24 +346,22 @@ nothing and still covers a tag a human pushes by hand.
 ### Publishing a release manually
 
 `publish_pypi.yaml` also accepts `workflow_dispatch` with a required `tag`
-input. Use it when a release was tagged but never published — `v0.1.0`, or any
-tag pushed before the chaining above existed:
+input. Use it when a release was tagged but never published:
 
 ```console
-$ gh workflow run publish_pypi.yaml -f tag=v0.1.0
+$ gh workflow run publish_pypi.yaml -f tag=vX.Y.Z
 ```
 
 or **Actions → Publish Release → Run workflow** and type the tag.
 
 The same dispatch is how you recover a release that **tagged but never
 uploaded** — the `vX.Y.Z` tag and the GitHub Release exist, but PyPI still shows
-the previous version and no image reached GHCR. That is what happened to
-`v0.1.1`: the `pypi` matrix failed and took `ghcr` and `docs` down with it.
-Nothing needs to be re-tagged; fix the cause on `main`, then dispatch the same
+the previous version and no image reached GHCR, because the `pypi` matrix
+failed and took `ghcr` and `docs` down with it. Nothing needs to be re-tagged; fix the cause on `main`, then dispatch the same
 tag:
 
 ```console
-$ gh workflow run publish_pypi.yaml -f tag=v0.1.1
+$ gh workflow run publish_pypi.yaml -f tag=vX.Y.Z
 ```
 
 The dispatch checks out the tag, so it publishes the tagged commit, not `main`.
@@ -384,7 +374,7 @@ To redeploy only the hosted demo at a release that is already on PyPI, without
 touching PyPI, GHCR or the docs, dispatch the Space workflow with the tag:
 
 ```console
-$ gh workflow run publish_space.yml -f tag=v0.2.0
+$ gh workflow run publish_space.yml -f tag=vX.Y.Z
 ```
 
 When the Space root for that tag is already on the Space there is nothing to
@@ -399,42 +389,15 @@ release; the input is what makes every checkout, the GHCR image tag and
 `mike deploy` land on the tagged commit. Dispatching is safe to repeat only up
 to the PyPI upload — PyPI rejects a re-upload of a version that already exists.
 
-## Pinning a version, and the first release
+## Pinning a version
 
-Two settings exist only because release-please was adopted **mid-project**,
-long after the first commit. Both concern the very first release and neither is
-permanent.
+### `bootstrap-sha`
 
-### `bootstrap-sha` — where the changelog starts
-
-With no tag in the repository, release-please has no marker for "the last
-release" and walks the whole history, so the first changelog it generated
-listed every `feat:` ever committed — 228 entries reaching back to before this
-phase of work.
-
-The top-level `bootstrap-sha` in `release-please-config.json` is the fix. The
-manifest-releaser documentation describes it as a key that *"will cause
-release-please to stop there for collecting changelog commits (so choose one
-commit earlier than the first commit you want to include)"*. Ours is:
-
-```json
-"bootstrap-sha": "39d488ae9f9943ea5d9879bf2dd503c34370b24a"
-```
-
-That is the **parent** of `28687fe`, the merge of the first pull request in
-this phase of work, so the changelog begins at that pull request and covers
-this phase rather than the entire project.
-
-It is top-level on purpose: the schema does not accept it inside a `packages`
-entry, and the documentation notes it is *"only applicable at top-level
-config"*.
-
-!!! note "It expires on its own"
-    Per the documentation, *"once a release-please generated PR has been
-    merged, this config value will be ignored for all subsequent runs and can
-    be removed."* Once a real `vX.Y.Z` tag exists, that tag is the baseline and
-    `bootstrap-sha` does nothing. Deleting it then is tidy-up, not a behaviour
-    change.
+The top-level `bootstrap-sha` in `release-please-config.json` tells
+release-please where a changelog starts when the repository has no release tag
+to mark it. Once a release-please pull request has merged, release-please
+ignores it and the latest `vX.Y.Z` tag is the baseline. It is top-level on
+purpose: the schema does not accept it inside a `packages` entry.
 
 ### `Release-As:` — choosing an exact version
 
@@ -442,15 +405,15 @@ To publish a specific version rather than the one conventional commits imply,
 put a `Release-As:` footer in the **body** of a commit that lands on `main`:
 
 ```txt
-ci: pin the first release to 0.1.0 and scope its changelog
+ci: release 1.0.0
 
-Release-As: 0.1.0
+Release-As: 1.0.0
 ```
 
 Release-please reads `Release-As: x.x.x` (case insensitive) from the commit
-body and opens its next release pull request for exactly that version. This is
-how the first release was pinned to `0.1.0` instead of the `1.0.0` that the
-`refactor!:` commit would otherwise have produced.
+body and opens its next release pull request for exactly that version. A `!` or
+`BREAKING CHANGE:` commit would otherwise move the version by a major step; the
+footer overrides that.
 
 The footer applies to **one** commit and expires with it — nothing has to be
 cleaned up afterwards.
@@ -468,7 +431,8 @@ cleaned up afterwards.
 
     A `release-as` left in the config does not pin one release — it pins
     **every** release, forever, to that version. The repository would stay at
-    `0.1.0` while commits accumulated, and nobody would get an error saying so.
+    one version while commits accumulated, and nobody would get an error
+    saying so.
 
     This repository therefore has **no `release-as` key at all**, and should not
     gain one. Use the commit footer, which cannot be forgotten because it does
@@ -536,22 +500,16 @@ of files release-please updates is unchanged.
     Setting `group-pull-request-title-pattern` to add `${version}` does not fix
     the mismatch above, and it breaks that body fallback for any release PR
     already merged under the old title (`Bad pull request title: 'chore: release
-    main'`), stranding that version permanently. Reading these warnings as the
-    cause cost a release cycle.
+    main'`), stranding that version permanently. Treat these warnings as noise.
 
 ### Manifest seeding
 
 `.release-please-manifest.json` records the **last released** version, not the
-next one, so it must be seeded *below* the first version to be shipped:
-
-```json
-{ ".": "0.0.0" }
-```
-
-Seeding it at the target instead — `{".": "0.1.0"}` while a `Release-As: 0.1.0`
-footer pins the same value — makes the first release a no-op: release-please
-treats the version it would propose as already released, so the pull request it
-opens rewrites `CHANGELOG.md` and bumps nothing. This also cost a cycle.
+next one, and release-please updates it in the release pull request. A project
+that has never released is seeded *below* its first version (`{ ".": "0.0.0" }`):
+seeded at the target, release-please treats the version it would propose as
+already released, so the pull request rewrites `CHANGELOG.md` and bumps
+nothing.
 
 ## Documentation versions
 
@@ -562,10 +520,9 @@ opens rewrites `CHANGELOG.md` and bumps nothing. This also cost a cycle.
 | `dev` | `publish_docs.yml` | every push to `main` |
 | `X.Y.Z` + the `latest` alias | `publish_pypi.yaml` | on a release, or a manual dispatch |
 
-`publish_docs.yml` previously ran `mkdocs gh-deploy --force`, which replaces the
-entire `gh-pages` root and would have wiped every released version on the next
-push to `main`. It now deploys to the `dev` version instead, so the two
-workflows write different directories. Both declare `concurrency: group:
+`publish_docs.yml` deploys to the `dev` version, never with
+`mkdocs gh-deploy --force`, which would replace the entire `gh-pages` root and
+wipe every released version. The two workflows write different directories. Both declare `concurrency: group:
 gh-pages` so they never push to that branch at the same time. Only the release
 workflow moves `latest` and sets the site default.
 
@@ -630,22 +587,20 @@ OIDC and adding a token secret would only widen the blast radius.
 Renaming `publish_pypi.yaml`, or renaming an environment in it, breaks
 publishing until the publisher entries are updated to match.
 
-#### Checklist before the first 0.5 release: `nl2sql-sdk`
+#### Checklist before a new project's first release
 
-Until 0.4 the SDK published as `nl2sql-adapter-sdk`. From 0.5 it publishes as
-`nl2sql-sdk`, a project PyPI has never seen, so it needs its own pending
-publisher. Do both before merging the 0.5 release PR:
+The CLI publishes as `nl2sql-cli`. A project name PyPI has not seen needs its
+own pending publisher. Do both before merging the first release PR that
+publishes the project (shown here for `nl2sql-cli`):
 
-- [ ] On PyPI, add a pending trusted publisher for project `nl2sql-sdk`:
+- [ ] On PyPI, add a pending trusted publisher for the project:
       owner `nadeem4`, repository `nl2sql`, workflow `publish_pypi.yaml`,
-      environment `pypi-nl2sql-sdk`.
-- [ ] On GitHub, create the environment `pypi-nl2sql-sdk` under
+      environment `pypi-nl2sql-cli`.
+- [ ] On GitHub, create the environment `pypi-nl2sql-cli` under
       **Settings → Environments**.
 
-Without them the SDK leg of the release fails. The `pypi` matrix is
-`fail-fast: false`, so the engine and API legs would still publish, and
-`nl2sql-engine` would land on PyPI depending on an `nl2sql-sdk` that is not
-there. `nl2sql-adapter-sdk` is not published again.
+Without them that project's leg of the release fails. The `pypi` matrix is
+`fail-fast: false`, so the other legs would still publish.
 
 ### GHCR package visibility
 

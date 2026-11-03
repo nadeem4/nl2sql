@@ -1,41 +1,36 @@
 # Feedback and Signals
 
 Nothing in the engine can tell on its own whether a live answer was right. Two
-small signals help: a person's rating of an answer in the playground, and the
+small signals help: a person's rating of an answer in the web app, and the
 guardrail rates the engine already records for every run. `nl2sql feedback`
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
 set, and thumbs-up generated answers as proposed verified queries.
 
-The playground and `nl2sql feedback` are both built on `engine.feedback`
+The web app and `nl2sql feedback` are both built on `engine.feedback`
 (`record`, `list`, `stats`, `export`, `clear`, `correct`), which any Python caller can use
 too: see [the public facade](../api/core/public-facade.md#feedback).
 
-## Rating an answer in the playground
+## Rating an answer in the web app
 
-After a run, below **Cost & time**, the playground asks **Was this answer
-right?** with two buttons, **👍 Right** and **👎 Wrong**. A click saves the
-rating at once. A note is optional: pick **Wrong number**, **Wrong table**,
-**Wrong filter** or **Missing rows**, or type a few words (up to 280
-characters), then **Save note**. Rating the same run again replaces the earlier
-rating.
+Below an answered turn the web app asks **Did this answer it?** with two
+buttons, **Yes** and **Not quite**. **Yes** keeps the answer in **My answers**
+and rates the run up. **Not quite** rates the run down and opens a note and a
+corrected SQL, which **Send for review** files as a proposal. Rating the same
+run again replaces the earlier rating. See [Web app](../apps/web.md#chat).
 
-The page sends only the run's trace id, the rating and the note. The server
-stores what *it* answered for that run, from its own copy of the last 200 runs,
-so a page cannot put a question or SQL into the table that the engine never
-produced. A run the playground did not answer is refused with `404`.
+The server stores what *it* answered for that run, read from the run's own
+trace, so a caller cannot put a question or SQL into the table that the engine
+never produced.
 
 | Route | Gate |
 | --- | --- |
-| `GET /api/feedback` | Whether feedback is on (and why not), the counts and the last 50 ratings. The ratings are returned only where the gate below passes. |
-| `POST /api/feedback` | `{"trace_id", "rating": "up" \| "down", "note"}`. Local only, the same gate as Settings, Rebuild and the Retrieval inspector: on a non-loopback `--host` it answers `403` unless `nl2sql demo --allow-settings`, and it refuses another site's page (a foreign `Origin`), a non-loopback hostname and anything but JSON. |
+| `POST /feedback` | `{"trace_id", "rating": "up" \| "down", "note"}`. Records a rating for a run the caller asked; another caller's run is a `404`. |
+| `POST /feedback/correct` | Turns the caller's fix (`sql` or `plan`) into a proposal for a verified query, checked as the caller; a refused fix is `422 CORRECTION_REFUSED`. |
+| `GET /feedback` | Every rating, newest first. Admin only. |
 
 A rating needs a kept trace (`engine.feedback.record` reads the run's own
 trace), so on the default `settings.traces.mode: on_failure` only failed runs
 can be rated; set `always` to rate successful ones.
-
-Feedback is available in the playground that `nl2sql demo` starts, and on by
-default. `settings.feedback.enabled: false` turns it off: the control then says so and
-`POST /api/feedback` answers `403`.
 
 ## What is stored
 
@@ -223,7 +218,7 @@ rated; the default keeps only failed runs' traces.
 
 ## Turning it off and clearing it
 
-- `settings.feedback.enabled: false` stops the playground recording ratings.
+- `settings.feedback.enabled` is reserved: it is accepted and nothing reads it.
 - `nl2sql feedback clear` deletes every rating (`--yes` skips the prompt).
   Schema snapshots and the plan cache are kept, and `nl2sql cache clear`
   never touches the ratings.

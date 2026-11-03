@@ -1,10 +1,6 @@
 # Conversations
 
-!!! note "Release 0.9"
-    `start`, `ask`, `stream`, `retry`, `ask_only`, `tool`, `report`, `get`, `list` and `delete` work, with the
-    [chat tools](tools.md) `chart`, `diagram` and `report`. 
-
-A conversation is a chat over the database. The model decides, step by step, whether to answer or to ask the
+A conversation (`engine.conversations`: `start`, `ask`, `stream`, `retry`, `ask_only`, `tool`, `report`, `get`, `list` and `delete`, with the [chat tools](tools.md)) is a chat over the database. The model decides, step by step, whether to answer or to ask the
 database a question through the same typed plan and validator as `run_query`. It never writes SQL and never
 sees result rows.
 

@@ -1,151 +1,47 @@
 # nl2sql-engine
 
-Ask a database questions in English. The model writes a typed query plan, never
-SQL text; the plan is checked against the real schema and the caller's role
-before any SQL is generated.
+The engine behind NL2SQL, for developers who embed it in Python or run it through the CLI and REST packages. The model returns a typed query plan, never SQL text; the plan is checked against the real schema and the caller's role before any SQL is generated.
 
-This distribution is the engine: the LangGraph pipeline, the `nl2sql` CLI with
-its browser playground, and the database adapters (PostgreSQL, MySQL, SQL
-Server, SQLite, DuckDB). The REST server is the separate `nl2sql-api` package.
-Full README and docs: <https://github.com/nadeem4/nl2sql>.
-
-## Try it in your browser
-
-**<https://nl2sql.codewithnk.com>** — the playground on three sample
-databases, nothing to install.
-
-[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nl2sql.codewithnk.com)
-
-The server holds no API key: you paste your own into the page, one per
-provider, and it stays in that browser tab, is used in memory for the question
-that needs it, and is never stored, logged or traced. Settings also puts each
-of the seven model-using steps on a provider and model of its own.
-
-![The nl2sql playground on its Ask page: the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
-
-## How it works
-
-- The question is checked for answerability and routed to one of the registered
-  databases, then split into sub-queries, and each gets the part of the schema
-  it needs.
-- The model returns a typed plan (a Pydantic `PlanModel`), never SQL. It may
-  only name a function from an allow-list, and date work is written portably
-  and rendered by each adapter in its own dialect.
-- The logical validator checks every table and column against the schema,
-  joins against the declared foreign keys, and every table against the caller's
-  role (RBAC); it also builds the query tree the generator would build, so an
-  unjoinable plan is caught while the planner can still be asked to fix it. A
-  refused plan never becomes SQL.
-- Only a plan that passes is rendered to SQL, deterministically, with `sqlglot`,
-  then executed and summarised.
-
-The whole pipeline is 15 steps, six of them decided by a model; the
-playground's Pipeline page lists them. The first, matching a verified query
-from `curated.yaml`, runs only when curated answers are configured; the
-second only when a run is given its plan.
-
-## Quickstart
+This distribution holds the pipeline, the `nl2sql` Python facade and the database adapters (PostgreSQL, MySQL, SQL Server, SQLite, DuckDB). The `nl2sql` command is the separate `nl2sql-cli` package and the REST server and web app are `nl2sql-api`.
 
 Requires Python 3.12 or newer.
+
+## Try it
+
+Hosted demo on three sample databases, nothing to install: <https://nl2sql.codewithnk.com>. To run it yourself:
 
 ```bash
 pip install "nl2sql-cli[web]"
 nl2sql demo
 ```
 
-`nl2sql demo` starts `nl2sql-api serve --demo` (the `nl2sql-cli[web]` extra installs the
-web app, `nl2sql-api`) and opens your browser. The server writes a demo project
-into `./nl2sql-demo`, copies in three SQLite databases --
-[Chinook](https://github.com/nadeem4/nl2sql/blob/main/THIRD_PARTY_NOTICES.md),
-`support` and `webanalytics` -- indexes their schemas locally (no key; the
-first run downloads a ~79 MB ONNX embedding model) and serves the web app on
-<http://127.0.0.1:8765/>. The command's flags are `--dir`, `--host`, `--port`
-and `--no-browser`.
-
-**Answering a question needs a model:** `OPENAI_API_KEY`,
-`OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment (Claude needs
-`pip install "nl2sql-cli[web]" "nl2sql-engine[anthropic]"`), a key saved in the project's
-`.env`, a key pasted into the web app's Settings page, or a reachable Ollama.
-Without one the demo replays the recorded answers to its guided questions and
-says so.
-
-`nl2sql-api serve --demo --hosted` runs the public variant yourself: the server
-holds no API key, each visitor pastes their own into the page for that question
-only (without one, the guided questions replay recorded runs), the sample
-databases are opened read-only, and questions are rate limited per visitor and
-capped per session. See
-[Hosted demo](https://github.com/nadeem4/nl2sql/blob/main/docs/deployment/hosted-demo.md)
-in the full docs.
-
-## CLI
-
-Every command reads one config: `--config PATH`, else `NL2SQL_CONFIG`, else
-`./nl2sql.yaml`, and loads the `.env` next to it. From the demo folder
-(`cd nl2sql-demo`):
-
-```bash
-nl2sql run "How many customers do we have, by country?"
-nl2sql run --role viewer "Who are the top 5 customers by total spend?"   # refused
-nl2sql run --no-exec "Which artist has the most albums?"                 # plan only
-nl2sql index                       # re-index the schema
-nl2sql config check --connect      # the whole config, by file; exit 1 on a problem
-nl2sql doctor                      # drivers, provider keys, and the engine's check
-nl2sql feedback stats              # ratings and guardrail rates
-```
-
-Your own database: `nl2sql launch my-project` finds it, asks for what is missing, writes the project (secrets
-to `.env`), indexes, profiles and files five starter questions for review; or `nl2sql init` writes `nl2sql.yaml`
-and one file per section (edit `datasources/example.yaml`), then `nl2sql index`.
-
-Every command: [CLI reference](https://nadeem4.github.io/nl2sql/reference/cli/).
-
-## Python
+## Use it from Python
 
 ```python
 from nl2sql import NL2SQL, UserContext
 
-engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
-engine.index.build()                 # once: builds the index under .nl2sql-demo/
-# Your own config instead:  engine = NL2SQL.from_config("nl2sql.yaml")
+engine = NL2SQL.demo()      # the bundled databases; reads a provider key from the environment
+engine.index.build()        # once: builds the search index
 result = engine.run_query(
     "How many customers are there?",
     user_context=UserContext(roles=["admin"]),
 )
-for sq in result.sub_queries:
-    print(sq.sql, [c.name for c in sq.validation if c.passed])
 print(result.final_answer["summary"] if result.final_answer else result.errors)
 ```
 
-Pass a `user_context` with a role: with none, `run_query` currently raises a
-validation error, and an unknown role is refused.
-
-## Install extras
-
-```bash
-pip install "nl2sql-engine[postgres]"        # or [mysql], [mssql], [duckdb]
-pip install "nl2sql-engine[all]"             # every database driver; not [anthropic]
-```
-
-SQLite needs no extra.
+Your own config instead: `NL2SQL.from_config("nl2sql.yaml")`. Database drivers are extras (`pip install "nl2sql-engine[postgres]"`, `[mysql]`, `[mssql]`, `[duckdb]`, `[all]`); SQLite needs none.
 
 ## Security
 
-- The LLM provider receives the question, the schema the planner needs, sample
-  column values of tables the role may read, and the result rows (for the
-  written answer).
-- RBAC is a per-role table allowlist; a plan touching a forbidden table is
-  refused. No column masking or row-level security.
-- Read-only is not checked by the executor: only SELECTs are generated, and a
-  SQLite datasource can be opened read-only with `options.read_only: true` (the
-  three sample databases are), but no other dialect is. Give the engine a
-  read-only database user.
-- No authentication: the caller supplies the role.
-- No cross-database questions and no conversation yet: each sub-query is
-  planned against one datasource, and each question is answered on its own.
+The model returns a typed plan and never SQL; the plan is checked against the schema and the caller's role before any SQL is generated. The provider sees the question, the schema it needs and the result rows. Read the [security model](https://nadeem4.github.io/nl2sql/security/model/) before pointing it at real data.
 
-## Status
+## Documentation
 
-0.1.x. `nl2sql-sdk`, `nl2sql-engine` and `nl2sql-api` share one version
-and are released together. Known limitations, benchmark results and the
-roadmap: <https://nadeem4.github.io/nl2sql/reference/limitations/>.
-MIT licensed.
+Full documentation: <https://nadeem4.github.io/nl2sql/>
+
+- [Get started](https://nadeem4.github.io/nl2sql/get-started/)
+- [How it works](https://nadeem4.github.io/nl2sql/how-it-works/overview/)
+- [Security model](https://nadeem4.github.io/nl2sql/security/model/)
+- [Known limitations](https://nadeem4.github.io/nl2sql/reference/limitations/)
+
+`nl2sql-sdk`, `nl2sql-engine`, `nl2sql-api` and `nl2sql-cli` are released together. MIT licensed.

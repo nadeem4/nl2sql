@@ -15,7 +15,6 @@ gate that protects it.
 | the API keys | saved to the project's `.env`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
 | a model per step | written to the project's `llm.yaml` | chosen in the browser tab, sent per request, saved nowhere |
 | Settings | writes `.env` and `llm.yaml` | writes nothing; the page keeps the keys and the choices |
-| Rebuild | on for an admin | refused |
 | Answer ratings | on | off |
 | Retrieval inspector | on | on, read only, at the hosted rate |
 | Pipeline page | on | on, read only: it names the steps and their models, never a key |
@@ -53,7 +52,7 @@ mode uses) and, for a question that carries no key:
   live."; the page shows that with an **Add a key in Settings** button.
 
 With a key, every question -- guided or not -- runs live on that key, exactly as
-before. `/api/meta` lists the questions that replay as `recorded`, and the page
+before. `/api/v1/meta` lists the questions that replay as `recorded`, and the page
 marks those chips with a dot.
 
 **The model a replayed run names is the one that recorded it.** The recordings
@@ -63,8 +62,8 @@ loads and names none). The hosted server's own config falls back to an OpenAI
 default, so without this a keyless visitor would be told a model produced the
 answer that did not. Instead, a keyless replay asks the replay server for the
 recorded model, which echoes it, so every call in the run's usage ledger -- and
-the Debug pane and the trace with it -- names `claude-opus-5`. `/api/meta` and
-`/api/pipeline` report the same `recorded_with`, and the Pipeline page shows
+the Debug pane and the trace with it -- names `claude-opus-5`. `GET /meta` and
+`GET /about` report the same `recorded_with`, and the Pipeline page shows
 that model on each model step, tagged **recorded**, until the visitor adds a
 key; then it shows the models their run will use, as before. Local replay mode
 (`nl2sql demo` with no key) does the same.
@@ -122,7 +121,7 @@ deliberate act, never part of CI. Either:
   (`.github/workflows/record_demo.yml`). It runs the same script with the
   repository secret **`ANTHROPIC_API_KEY`** and opens a pull request with the new
   recordings. It only ever runs by hand. The same workflow with `record: clips`
-  re-records the playground home page's clips, which needs no key: Ask's clip is
+  re-records the web app home page's clips, which needs no key: Ask's clip is
   made from these recordings, so record the answers first.
 
 The recordings ship inside the `nl2sql-engine` wheel, and the public Space runs
@@ -157,14 +156,14 @@ The visitor pastes a key on the **Settings** page, one per provider. From there:
    provider's own name. Closing the tab clears it. Nothing else in the page
    reads it.
 2. **It travels as a request header of its own**, `X-NL2SQL-Api-Key-<provider>`
-   (`X-NL2SQL-Api-Key-anthropic`), on `POST /api/ask` (or its streamed twin,
-   `POST /api/ask/stream`, which applies the same rules) and nowhere else. A
+   (`X-NL2SQL-Api-Key-anthropic`), on the question routes (`POST /query`, `POST /query/stream` and a conversation's `POST /conversations/{id}/turns`
+   and `.../turns/stream`, which apply the same rules) and nowhere else. A
    header rather than the body, because a body is what request logs and
    validation errors quote back; one header per provider, so a key never shares
    a header with anything else and nothing that parses or quotes a header can
    expose two at once. With exactly one key the older `X-NL2SQL-Api-Key` is
    sent as well, and on its own it still means what it always did. The
-   playground is served over plain HTTP locally and over the host's TLS when it
+   web app is served over plain HTTP locally and over the host's TLS when it
    is published, so deploy it behind HTTPS.
 3. **The server uses it for that one request.** It is bound to the request with
    [`nl2sql.llm.request_key`][key-module] and the LLM registry builds each
@@ -217,7 +216,7 @@ What it does **not** do:
 - It is not stored, so it cannot be reused for anyone else's question, and there
   is nothing to leak if the container is compromised later.
 - It does not reach a trace. Run traces are written as usual (that is what the
-  playground's **Debug** drill-down reads), and the trace redactor is told about
+  web app's **Debug** drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
   reaches a prompt or an error. The demo project's `settings.yaml` sets
   `traces: { mode: always }`, so every question leaves a file on the
@@ -317,21 +316,17 @@ environment and is not part of any response or log.
 ## What is off, and what is on
 
 **Off:** Settings *persistence* (choosing a model is on; it is only the saving
-that is off), Rebuild, and answer ratings. A server-side key is refused: it is the
+that is off), and answer ratings. A server-side key is refused: it is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.
 
-Rebuild being off is said on the page rather than left as a gap: the index
-panel reports that the index was built before the demo started and which
-databases it covers, and where the button would be it prints the server's own
-reason -- rebuilding writes to disk and the sample data never changes.
+The index was built before the demo started and nothing rebuilds it: the
+sample data never changes.
 
 **On:** the guided questions without a key, from recorded runs; asking them or
 any other question live with a key; a key per
-provider and a model per step (both kept by the browser), the schema view of
-any of the three databases (the rail's **Showing** switcher), which database
-answered a run, the per-node **Debug** drill-down with its traces, and the
-retrieval inspector read-only.
+provider and a model per step (both kept by the browser), which database answered a run, the per-node
+**Trace and cost** drill-down, and the Retrieval page read-only.
 
 ## Read-only sample data
 
@@ -343,7 +338,7 @@ read-only everywhere.
 
 ## The container
 
-`deploy/huggingface/Dockerfile` builds the playground as a hosted demo. It is a
+`deploy/huggingface/Dockerfile` builds the web app as a hosted demo. It is a
 Space root rather than a repository build: it needs no build context, so the
 whole deploy is that one folder, copied to the Space's root.
 
@@ -448,7 +443,7 @@ flowchart LR
    (10 attempts, 30 seconds apart): the index the Hub's builder sees can lag
    a fresh upload, which is what failed `v0.2.0`'s first Space build.
 3. **`space-smoke`** polls `https://nadeem4nk-nl2sql-demo.hf.space/api/health`
-   until it reports `X.Y.Z`, then checks the page and `/api/meta`. A Space goes
+   until it reports `X.Y.Z`, then checks the page and `/api/v1/meta`. A Space goes
    on serving its previous image while the new one builds, so a build that
    finished is not yet proof that visitors see it. It then runs the same check
    against the custom domain, `SPACE_CUSTOM_DOMAIN` at the top of
@@ -458,11 +453,9 @@ flowchart LR
 
 The whole release flow is in [Releasing](../contribute/releasing.md).
 
-**A push to `main` does not deploy the Space.** It used to: every merge that
-touched the engine, the playground or this folder rebuilt the public demo from
-that commit, so the demo ran code no release contained, and a broken merge
-reached visitors before anyone had decided to ship it. Now a merge reaches the
-Space with the next release. Nothing is lost by waiting: the `fresh-install`
+**A push to `main` does not deploy the Space.** A merge reaches the Space with
+the next release, so the public demo never runs code no release contains and a
+broken merge cannot reach visitors before anyone has decided to ship it. Nothing is lost by waiting: the `fresh-install`
 job on every pull request builds the wheels, installs them as a user would and
 boots this exact command, so a change that would break the Space fails its PR.
 To see a change running on a Space before it is released, deploy it to a
@@ -545,7 +538,7 @@ survives a deploy.
 **Rolling back.** Run it by hand with the earlier tag,
 `gh workflow run publish_space.yml -f tag=v0.1.9`. It checks that tag out,
 pins the image to that version on PyPI and rebuilds, so the engine and the
-playground both go back. PyPI keeps every version, so any earlier release can
+web app both go back. PyPI keeps every version, so any earlier release can
 be redeployed this way.
 
 The workflow adds a commit on top of whatever the Space's `main` already is, so
@@ -583,7 +576,7 @@ Two different links go around, and each unfurls from a different place:
 
 Both show the same 1200x630 card:
 
-![The link preview card: the nl2sql playground wordmark, the line "Ask a database in plain English, the model plans, the code writes the SQL", and a fragment of a plan turning into SQL](../assets/social-card.png)
+![The link preview card: the nl2sql web app wordmark, the line "Ask a database in plain English, the model plans, the code writes the SQL", and a fragment of a plan turning into SQL](../assets/social-card.png)
 
 **The app's tags** are added to the built page's `<head>` by
 [`preview.py`][preview] as each request goes out, not baked into the bundle. A
@@ -627,13 +620,13 @@ as `image/png`.
 
 ### The mark
 
-The wordmark's icon on the card is the playground's favicon, the plan spine: a
+The wordmark's icon on the card is the web app's favicon, the plan spine: a
 root bar and stem with two indented steps, the typed plan the model writes, in
-outline. Its one copy is `docs/assets/favicon.svg`; the playground inlines it,
+outline. Its one copy is `docs/assets/favicon.svg`; the web app inlines it,
 this site uses it as its favicon, and the card redraws it in the light colours.
-See [the playground README][playground-readme] for where each copy lives.
+See [the web app README][web-readme] for where each copy lives.
 
-[playground-readme]: https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the-mark
+[web-readme]: https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the-mark
 
 ## Running it locally instead
 

@@ -1,6 +1,5 @@
 # Public Facade API
 
-## Purpose
 Provide one entry point: `NL2SQL` is built from one `Config`, owns everything
 it builds (its `Runtime`), and is the only thing an application talks to.
 Questions are top-level methods; everything else is a namespace.
@@ -69,7 +68,7 @@ the calls that change it.
 
 Each engine owns its config: nothing is process-global and nothing writes
 the environment, so two engines in one process share nothing. The CLI,
-`nl2sql-api` and the playground build their engine from `nl2sql.yaml` and call
+`nl2sql-api` and the web app build their engine from `nl2sql.yaml` and call
 `check()` at startup.
 
 ## Lifecycle
@@ -155,15 +154,11 @@ engine.proposals     # list, get, current, accept, reject, export, apply (the re
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.
 
-The CLI, the playground and `nl2sql-api` are callers like any other: they use
+The CLI, the MCP server and `nl2sql-api` are callers like any other: they use
 only these methods and namespaces, never the runtime behind them.
-`test_the_cli_the_playground_and_the_api_use_only_the_public_api` in
-`tests/architecture/test_boundaries.py` holds them to that, and
-`test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql`
-holds the playground, `nl2sql demo` and `nl2sql-api` to importing from the
-top-level `nl2sql` only (the old playground keeps a short, named
-list of exceptions in that test, each with the reason and the change that
-removes it; `nl2sql demo` is now a launcher that imports nothing from the engine but `nl2sql_cli`).
+`test_the_cli_the_mcp_server_and_the_api_use_only_the_public_api` and
+`test_the_cli_and_the_api_import_only_the_public_nl2sql` in
+`tests/architecture/test_boundaries.py` hold them to that.
 
 ### About
 
@@ -174,7 +169,7 @@ them. Each step has its `node` (the name usage and timings are recorded
 under), `label`, what it `does`, its `kind` (`model` when a model decides it,
 `code` otherwise) and its `parent` (`sql_agent` for the steps nested in the SQL
 agent). A model step also has its `agent` and the `provider` and `model` it is
-configured to run on; never a key. The playground's Pipeline page reads it.
+configured to run on; never a key. The web app's Pipeline page reads it.
 
 ```python
 about = engine.about()
@@ -186,7 +181,7 @@ about = engine.about()
 
 Ratings of answered runs, and the guardrail rates over recorded runs. They live
 in the state store (`<storage.path>/state.db` by default); the rates also read the
-traces in `<storage.path>/traces`. `nl2sql feedback` and the playground's
+traces in `<storage.path>/traces`. `nl2sql feedback` and the web app's
 thumbs up and down are built on it. See
 [Feedback and signals](../../observability/feedback.md) for what is stored.
 
@@ -280,7 +275,7 @@ classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
 (`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
 (`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the evals' shapes
 (`EvalSuite`, `EvalCase`, `EvalReport`, `RegenerateReport`) and scorer
-interface (`Scorer`, `Score`, `CaseRun`), and release 0.8's shapes
+interface (`Scorer`, `Score`, `CaseRun`), and the knowledge, review, profiling and clarification shapes
 (`KnowledgeSourceConfig`, `CostRule`, `KnowledgeSourceInfo`,
 `DatasourceKnowledgeView`, `Proposal`, `AcceptReport`, `ReviewError`,
 `ProfileReport`, `ClarificationRequest`, `ClarificationOption`,

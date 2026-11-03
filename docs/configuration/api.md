@@ -53,10 +53,9 @@ request_llm: false              # callers may send their own key and models
 | `request_llm` | `false` | Whether callers may send their own provider key and models per request. |
 | `cors_origins` | `[]` | Browser origins allowed to call the API. Empty, no cross-origin request is allowed. |
 
-The 0.9 fields `role_header`, `role` and `trust_body_role` are gone, and the
-engine rejects them as unknown keys. Use `auth: proxy` (the roles header is
-`proxy.roles_header`), `auth: static` with `static_role`, and nothing for the
-body role: a request body never carries the caller.
+The roles header is `proxy.roles_header` under `auth: proxy`, and `auth: static`
+takes `static_role`. There is no body role: a request body never carries the
+caller.
 
 ## Admin routes
 
@@ -90,6 +89,3 @@ to start over a config with `mode: hosted`, which needs `nl2sql-api serve`.
 
 `serve` runs one worker, and with `auth: none` it refuses to bind any host but
 loopback, naming `api.auth` in the message.
-
-The `NL2SQL_API_*` variables of 0.4 are not read; see
-[From 0.4](system.md#from-04).

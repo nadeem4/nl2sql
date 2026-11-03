@@ -1,6 +1,5 @@
 # Query API
 
-## Purpose
 Answer a question with the NL2SQL pipeline: `engine.run_query`,
 `engine.stream_query`, and `engine.results` to read back what a run saved.
 
@@ -37,7 +36,7 @@ Parameters:
 | `datasource_id` | `Optional[str]` | no | Datasource override; otherwise resolved. |
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
 | `user_context` | `Optional[UserContext]` | no | RBAC context. Omitted (or `None`), the run starts with an empty `UserContext`, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
-| `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The playground cancels it when the browser drops the request. |
+| `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The web app cancels it when the browser drops the request. |
 | `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`): a whole run (`decomposition` and `plans`), or a verified query (`verified` and `verified_datasource_id`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the datasource of every sub-query of the plan, or the call raises `ValueError` before anything runs. |
 | `approvals` | `Optional[Sequence[Union[Approval, str]]]` | no | Approvals for an earlier run's `approvals_needed`: `Approval` objects, or request ids granted through `engine.approvals`. See [Approval](#approval). |
 | `clarify` | `bool` | no | Default `True`: a question the planner reads two or three ways ends `needs_clarification` with the options instead of running the most likely one. `False` runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See [Clarification](#clarification). |
@@ -230,9 +229,7 @@ on warnings alone) adds a `MISSING_SQL` error, so the run reports `"error"`.
 (`clarification`), otherwise `"error"` when any blocking error is present, otherwise
 `"plan_only"` when no sub-query produced rows or an artifact (an
 `execute=False` run), otherwise `"success"`. A state with no sub-queries and no
-errors leaves it `None`. Hooks, approval and the caps
-that produce `"needs_approval"` and `"stopped"` arrive with release 0.7.
-
+errors leaves it `None`. 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set lives in artifact storage, addressed through `artifact_refs`; each
 combined result is listed in `result_manifest` and read back by the run's
@@ -341,11 +338,8 @@ synthesizer says them; see the
 [executor's sanity checks](../../how-it-works/nodes/executor_node.md#answer-sanity-checks).
 `settings.pipeline.sanity_checks: false` turns those checks off.
 
-0.7 changed this shape: a warning was a dict with `error_code` and `severity`,
-and is now a `RunWarning` with `code`, and `detail.recovered` where `severity`
-said `ERROR`. A run's state is never kept across an upgrade (a run that ended
-`needs_approval` is asked again, not resumed), so no older warning is
-ever read back.
+A warning is a `RunWarning` with a `code`; `detail.recovered` marks an earlier
+attempt's error that a retry replaced.
 
 ### Explanation
 
@@ -446,8 +440,7 @@ for event in engine.stream_query("Which genre sells the most tracks?",
 An `Event` (`nl2sql.Event`, from `nl2sql_sdk.events`) has a `name`, `at` (UTC),
 the run's `trace_id`, its `tenant_id` and a JSON-ready `data` dict;
 `event.sse()` is the event as one Server-Sent Event (`event: <name>`, and the
-whole event as JSON on the `data` line), which is how `nl2sql-api` and the
-playground send it.
+whole event as JSON on the `data` line), which is how `nl2sql-api` sends it.
 
 | name | data | when |
 | --- | --- | --- |
@@ -544,7 +537,7 @@ with open("genres.csv", "wb") as out:
 
 `nl2sql-api` serves these as
 [`GET /api/v1/results/{trace_id}/{result_id}`](../rest/results.md#get-apiv1resultstrace_idresult_id)
-and `.../{result_id}.csv`; the playground serves the same two under `/api/query/...`.
+and `.../{result_id}.csv`.
 
 ### SubQueryResult
 
@@ -608,7 +601,7 @@ where LangGraph provides it, so the keys are node names such as `ast_planner`,
 `usage` is collected by `TokenUsageCallback`
 (`packages/nl2sql/src/nl2sql/services/callbacks/token_handler.py`), which
 `run_with_graph` attaches to every run, so the Python API, the REST API, the CLI
-and the demo playground all report it. It is also filled in, with whatever had
+and the demo web app all report it. It is also filled in, with whatever had
 been recorded, on a timed-out or cancelled run.
 
 `QuestionUsage`:

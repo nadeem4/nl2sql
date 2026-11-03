@@ -273,3 +273,6 @@ nav:
     - "0.1.1": releases/0.1.1.md
     - "0.1.0": releases/0.1.0.md
   - Benchmarks: benchmarks.md
+
+validation:
+  anchors: warn

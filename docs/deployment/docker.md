@@ -5,7 +5,7 @@ NL2SQL can be deployed as a standalone HTTP service using the `nl2sql-api` packa
 For a ready-made stack (one service, one volume, API keys on), see
 [Docker Compose](compose.md).
 
-For the playground served as a public demo of the sample databases, where each
+For the web app served as a public demo of the sample databases, where each
 visitor brings their own API key, see [Hosted demo](hosted-demo.md).
 
 ## Container requirements
