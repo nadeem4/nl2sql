@@ -5,8 +5,10 @@ import Pipeline from "./pages/Pipeline.jsx";
 import RetrievalInspector from "./pages/Retrieval.jsx";
 import Home from "./pages/Home.jsx";
 import { sampleQuestion } from "./pages/home.js";
+import { onReplay } from "./pages/pipeline.js";
+import { retrievalOptions } from "./pages/retrieval.js";
 import { listApprovals } from "./api/chat.js";
-import { getMeta } from "./api/meta.js";
+import { getAbout, getInspectDefaults, getMeta } from "./api/meta.js";
 import { callerOf, isAdmin } from "./lib/caller.js";
 import { toDecide } from "./chat/approval.js";
 import { needsKey } from "./pages/firstRun.js";
@@ -48,19 +50,6 @@ function writeDebug(on) {
   } catch {
     /* not persisted; the toggle still works for this visit */
   }
-}
-
-async function getJson(url, options) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    // A refusal carries the server's own sentence -- no key, a bad key, a
-    // limit reached -- and that is what the page should show, not a status.
-    const reply = await response.json().catch(() => ({}));
-    throw new Error(
-      typeof reply.detail === "string" ? reply.detail : `${url} returned ${response.status}`,
-    );
-  }
-  return response.json();
 }
 
 const reducedMotion = () =>
@@ -130,11 +119,10 @@ export default function App() {
   const { page, param } = useRoute();
   const { navRef, indRef } = useNavIndicator(page);
   const [meta, setMeta] = useState(null);
-  const [role, setRole] = useState("admin");
   const [error, setError] = useState(null);
-  const [retrieval, setRetrieval] = useState(null);
+  const [inspectDefaults, setInspectDefaults] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
-  const [pipeline, setPipeline] = useState(null);
+  const [about, setAbout] = useState(null);
   const [pipelineError, setPipelineError] = useState(null);
   // A question another page wants Chat to ask (the sample on Home), and how many approvals wait for a decision.
   const [starter, setStarter] = useState(null);
@@ -150,16 +138,16 @@ export default function App() {
   const pageRef = useRef(null);
   const firstPage = useRef(true);
 
+  // What the server is, who is asking, the pipeline and the retrieval defaults: all v1 routes. `loadMeta` runs again
+  // once the demo has been added, since `start` and the datasources have changed.
+  const loadMeta = () => getMeta()
+    .then((m) => { setMeta(m); setCaller(callerOf(m)); setRequestLlm(Boolean(m.request_llm)); return m; })
+    .catch((e) => { setError(e.message); return null; });
   useEffect(() => {
-    getJson("/api/meta")
-      .then((m) => {
-        setMeta(m);
-        if (m.roles.length) setRole(m.roles.includes("admin") ? "admin" : m.roles[0]);
-      })
-      .catch((e) => setError(e.message));
-    getMeta().then((m) => { setCaller(callerOf(m)); setRequestLlm(Boolean(m.request_llm)); }).catch(() => {});
-    getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
-    getJson("/api/pipeline").then(setPipeline).catch((e) => setPipelineError(e.message));
+    loadMeta();
+    getInspectDefaults().then(setInspectDefaults).catch((e) => setRetrievalError(e.message));
+    getAbout().then(setAbout).catch((e) => setPipelineError(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The Approvals tab shows how many requests wait; it is read again on each page change, which is when a decision
@@ -181,8 +169,8 @@ export default function App() {
   }, [page]);
 
   // Try a sample question on Home: open Chat and have it ask one, a recorded one when the server has some.
-  const trySample = () => {
-    const q = sampleQuestion(meta);
+  const openSample = (m) => {
+    const q = sampleQuestion(m);
     window.location.hash = hashFor("chat");
     if (q) setStarter(q);
   };
@@ -191,17 +179,16 @@ export default function App() {
   const saveStepModel = (agent, choice) =>
     setStepModels((models) => writeModel(window.sessionStorage, models, agent, choice));
 
-  const replay = meta && meta.mode === "replay";
-  const hosted = Boolean(meta && meta.hosted);
+  const hosted = Boolean(meta && meta.mode === "hosted");
   // Keys are set under Settings by an administrator, or by any visitor on a server that takes one with the question.
   const canSet = Boolean(requestLlm || (caller && caller.admin));
   const noKey = needsKey(meta, apiKeys);
-  const status = modeStatus(meta, apiKeys, { canSet });
+  // Every model step runs on recordings (the replay provider), or the hosted demo has no key yet.
+  const replaying = noKey || onReplay(about && about.steps);
+  const status = modeStatus(meta, apiKeys, { canSet, replaying });
   const current = pageFor(page);
   // Evals is an admin page: not listed for a caller who is not one.
-  const nav = navItems(page, {
-    retrieval: retrieval && !retrieval.available,
-  }, { approvals: toDecide(waiting).length }).filter((item) => item.id !== "evals" || isAdmin(caller));
+  const nav = navItems(page, {}, { approvals: toDecide(waiting).length }).filter((item) => item.id !== "evals" || isAdmin(caller));
 
   return (
     <div className="app">
@@ -246,7 +233,8 @@ export default function App() {
       <main className="page" id="page" ref={pageRef} tabIndex={-1}
         aria-labelledby={page === "home" ? "home-title" : "page-title"}>
         {error && <p className="fault" role="alert">{error}</p>}
-        {page === "home" && <Home meta={meta} onTry={trySample} />}
+        {page === "home" && <Home meta={meta} caller={caller} replaying={replaying} onTry={() => openSample(meta)}
+          onDemoAdded={() => loadMeta().then(openSample)} />}
         {/* On Chat the conversation says where you are; the heading stays for screen readers. Home has its own. */}
         {page !== "home" && <div className={page === "chat" ? "page-head visually-hidden" : "page-head"}>
           <h1 id="page-title">{current.title}</h1>
@@ -258,7 +246,7 @@ export default function App() {
 
         {page === "chat" && (
           <Suspense fallback={null}>
-            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} />
+            <Chat param={param} starter={starter} onStarter={() => setStarter(null)} meta={meta} />
           </Suspense>
         )}
 
@@ -270,8 +258,8 @@ export default function App() {
 
         {page === "pipeline" && (
           <div className="sheet" id="pipeline-panel">
-            <Pipeline pipeline={pipeline} error={pipelineError} result={null} asked={null}
-              replaying={replay || noKey} />
+            <Pipeline pipeline={about} error={pipelineError} result={null} asked={null}
+              replaying={replaying} recordedWith={meta && meta.recorded_with} />
           </div>
         )}
 
@@ -285,7 +273,8 @@ export default function App() {
 
         {page === "retrieval" && (
           <div className="sheet" id="retrieval-panel">
-            <RetrievalInspector options={retrieval} error={retrievalError} question="" role={role} />
+            <RetrievalInspector error={retrievalError} question=""
+              options={inspectDefaults && meta ? retrievalOptions(inspectDefaults, meta) : null} />
           </div>
         )}
 

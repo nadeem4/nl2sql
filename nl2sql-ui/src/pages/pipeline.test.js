@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countModelSteps, modelUsed, pipelineRows, recordingShown, stepChip } from "./pipeline.js";
+import { countModelSteps, onReplay, modelUsed, pipelineRows, recordingShown, stepChip } from "./pipeline.js";
 
 const STEPS = [
   { node: "datasource_resolver", label: "Answerability check", does: "a.", kind: "model",
@@ -125,4 +125,12 @@ test("stepChip after a live run names the model its calls reported", () => {
 
   assert.deepEqual(stepChip(row, result.usage, null),
     { model: "gpt-5.5", provider: "openai", recorded: false });
+});
+
+test("onReplay: a server whose model steps all run on the replay provider answers from recordings", () => {
+  const step = (provider, kind = "model") => ({ node: "n", kind, provider });
+  assert.equal(onReplay([step("replay"), step("replay"), step(null, "code")]), true);
+  assert.equal(onReplay([step("replay"), step("openai")]), false);
+  assert.equal(onReplay([step(null, "code")]), false);
+  assert.equal(onReplay(null), false);
 });

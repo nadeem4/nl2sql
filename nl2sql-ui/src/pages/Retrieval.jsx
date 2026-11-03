@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { minMaxShares } from "../lib/artifacts.js";
-import { asText, mmrLine, passedOver, picksInOrder, score, searchTitle, shortType } from "./retrieval.js";
+import { inspectIndex } from "../api/meta.js";
+import { asText, inspectBody, mmrLine, passedOver, picksInOrder, score, searchTitle, shortType } from "./retrieval.js";
 
 // What a vector search saw and how MMR chose: the pool nearest first, the
 // picks marked in the accent (as the Database marks the tables a plan reads),
@@ -136,13 +137,14 @@ const TYPE_LABELS = { "schema.datasource": "Datasources", "schema.table": "Table
 // engine fixes (k, lambda, which entry types, which datasource) exposed. The
 // embedder is local, so every search is free; after the first one, changing a
 // knob searches again.
-export default function RetrievalInspector({ options, error, question, role }) {
+// `options` is `retrievalOptions(defaults, meta)` (retrieval.js); the search runs as the caller.
+export default function RetrievalInspector({ options, error, question }) {
   const defaults = (options && options.defaults) || { k: 8, lambda_mult: 0.7, fetch_multiplier: 4 };
   const [query, setQuery] = useState(question || "");
   const [k, setK] = useState(defaults.k);
   const [lambda, setLambda] = useState(defaults.lambda_mult);
   const [types, setTypes] = useState(["schema.table", "schema.column"]);
-  const [datasource, setDatasource] = useState(options ? options.datasource_id || "" : "");
+  const [datasource, setDatasource] = useState("");
   const [result, setResult] = useState(null);
   const [fault, setFault] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -155,15 +157,7 @@ export default function RetrievalInspector({ options, error, question, role }) {
     setBusy(true);
     setFault(null);
     try {
-      const response = await fetch("/api/retrieval", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text, k: Number(k), lambda_mult: Number(lambda), types, datasource_id: datasource || null, role }),
-      });
-      const reply = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(typeof reply.detail === "string" ? reply.detail : `The server answered ${response.status}.`);
-      }
+      const reply = await inspectIndex(inspectBody({ query: text, k, lambda, types, datasource }));
       setResult(reply);
       setCopied(false);
       searched.current = true;
@@ -181,15 +175,15 @@ export default function RetrievalInspector({ options, error, question, role }) {
     const timer = setTimeout(search, 250);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [k, lambda, types, datasource, role]);
+  }, [k, lambda, types, datasource]);
 
   if (error) return <p className="fault">The inspector could not be read: {error}</p>;
   if (!options) return <p className="quiet">Checking the index.</p>;
-  if (!options.available) {
+  if (!options.datasources.length) {
     return (
       <div className="settings-off" id="retrieval-unavailable">
-        <h3>The Retrieval inspector is off here</h3>
-        <p>{options.reason}</p>
+        <h3>There is nothing here you can search yet</h3>
+        <p>No datasource you can reach has been added. An administrator can try the demo on Home or connect a database.</p>
       </div>
     );
   }

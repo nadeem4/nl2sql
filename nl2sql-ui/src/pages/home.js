@@ -3,10 +3,13 @@
 // is the model's, the checks and the SQL are code, a guided question replays
 // without a key only when the server has a recording for it.
 
+import { recordedQuestions } from "./firstRun.js";
+import { guidedGroups } from "./questions.js";
+
 export const REPO = "https://github.com/nadeem4/nl2sql";
 export const DOCS = "https://nadeem4.github.io/nl2sql/";
 
-// Clips are served by the playground itself (`/clips/<name>` in app.py), not
+// Clips are served by the playground itself (`/clips/<name>`, routes/web.py), not
 // inlined into the page, so the bundle stays the size it was.
 export const CLIP_ROOT = "/clips/";
 
@@ -94,34 +97,28 @@ export function clipFor(id) {
   };
 }
 
-function guided(meta) {
-  if (!meta) return [];
-  const groups = meta.question_groups || [];
-  const fromGroups = groups.flatMap((group) => group.questions || []);
-  return fromGroups.length ? fromGroups : meta.questions || [];
-}
-
 // The question "Try a sample question" asks: the first guided question with a
 // recorded answer, so it works with no key, else the first guided question.
 export function sampleQuestion(meta) {
-  const all = guided(meta);
+  const all = guidedGroups(meta).flatMap((group) => group.questions);
   if (!all.length) return null;
-  const recorded = new Set((meta && meta.recorded) || []);
+  const recorded = new Set(recordedQuestions(meta));
   return all.find((q) => recorded.has(q)) || all[0];
 }
 
-function replays(meta) {
+// `replaying`: every model step runs on recordings (pipeline.js `onReplay`).
+function replays(meta, replaying) {
   if (!meta) return false;
-  if (meta.hosted) return ((meta.recorded || []).length) > 0;
-  return meta.mode === "replay" && (meta.recorded_questions || 0) > 0;
+  if (meta.mode === "hosted") return recordedQuestions(meta).length > 0;
+  return Boolean(replaying) && recordedQuestions(meta).length > 0;
 }
 
 // The strip under the hero. The third fact is the one that depends on the
 // server: it only says a key is optional where something answers without one.
-export function facts(meta) {
+export function facts(meta, { replaying = false } = {}) {
   const base = ["No sign-in", "Sample databases included"];
-  if (!meta || replays(meta)) return [...base, "A key is only needed for your own questions"];
-  if (meta.hosted) return [...base, "Bring your own API key; it stays in this tab"];
-  if (meta.mode === "replay") return [...base, "Add an API key to ask a question"];
+  if (!meta || replays(meta, replaying)) return [...base, "A key is only needed for your own questions"];
+  if (meta.mode === "hosted") return [...base, "Bring your own API key; it stays in this tab"];
+  if (replaying) return [...base, "Add an API key to ask a question"];
   return [...base, "Runs on your machine, with your key"];
 }

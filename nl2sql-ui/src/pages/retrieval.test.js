@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asText, mmrLine, passedOver, picksInOrder, score, searchTitle, shortType, typeCounts } from "./retrieval.js";
+import { asText, inspectBody, retrievalOptions, mmrLine, passedOver, picksInOrder, score, searchTitle, shortType, typeCounts } from "./retrieval.js";
 
 const entry = (rank, label, similarity, pick_order = null, extra = {}) => ({
   rank, id: `schema.table:${label}:v1`, label, type: "schema.table", similarity,
@@ -82,4 +82,24 @@ test("the routing record says how the datasources were fused and cut", () => {
   assert.equal(mmrLine(routing),
     "Fused 3 datasources with reciprocal rank fusion (k 60) and kept 2: at most 3, " +
     "none less similar than 0.5 of the most similar.");
+});
+
+// --- the inspector's options and request (GET and POST /index/inspect) ---------
+
+test("the options are the server's defaults plus the datasources the caller may reach", () => {
+  const defaults = { k: 8, lambda_mult: 0.7, fetch_multiplier: 4, types: ["schema.table", "schema.column"] };
+  const meta = { datasources: [{ id: "chinook" }, { id: "support" }] };
+  assert.deepEqual(retrievalOptions(defaults, meta), {
+    defaults: { k: 8, lambda_mult: 0.7, fetch_multiplier: 4 },
+    types: ["schema.table", "schema.column"],
+    datasources: ["chinook", "support"],
+  });
+  assert.deepEqual(retrievalOptions(defaults, null).datasources, []);
+});
+
+test("the request names only what the page set, and asks as the caller (no role)", () => {
+  assert.deepEqual(inspectBody({ query: " genre ", k: "5", lambda: 0.5, types: ["schema.table"], datasource: "chinook" }),
+    { query: "genre", k: 5, lambda_mult: 0.5, types: ["schema.table"], datasource_id: "chinook" });
+  assert.deepEqual(inspectBody({ query: "x", k: 8, lambda: 0.7, types: [], datasource: "" }),
+    { query: "x", k: 8, lambda_mult: 0.7, types: [], datasource_id: null });
 });

@@ -9,12 +9,14 @@
 // `tone` is "ok" when a question can be answered live and "warn" when it
 // cannot (no key yet, or replay answering only from recordings).
 
-import { NO_KEY_REASON, hostedNote } from "./firstRun.js";
+import { NO_KEY_REASON, hostedNote, recordedQuestions } from "./firstRun.js";
+import { guidedGroups } from "./questions.js";
 import { providerName } from "../lib/settings.js";
 
 // The replay sentence: it claims recorded answers only when the server loaded some.
 export function replayNote(recorded, total, canSet) {
-  const fix = canSet ? "add an API key under Settings or restart with --api-key" : "restart with --api-key";
+  const fix = canSet ? "add an API key under Settings or put one in the project's .env and restart"
+    : "put a key in the project's .env and restart";
   if (!recorded) {
     return `No API key found, and replay mode has no recorded answers, so no question can be answered. To ask questions, ${fix}.`;
   }
@@ -28,12 +30,13 @@ function heldProviders(apiKeys) {
   return Object.keys(apiKeys).filter((provider) => (apiKeys[provider] || "").trim());
 }
 
-export function modeStatus(meta, apiKeys, { canSet = false } = {}) {
+// `replaying`: every model step runs on recordings (pipeline.js `onReplay`, from GET /about).
+export function modeStatus(meta, apiKeys, { canSet = false, replaying = false } = {}) {
   if (!meta) return null;
-  if (meta.hosted) {
+  if (meta.mode === "hosted") {
     const held = heldProviders(apiKeys);
     if (!held.length) {
-      const recorded = (meta.recorded || []).length;
+      const recorded = recordedQuestions(meta).length;
       if (recorded) {
         return {
           tone: "warn",
@@ -50,9 +53,9 @@ export function modeStatus(meta, apiKeys, { canSet = false } = {}) {
       detail: `${hostedNote(meta, apiKeys)} Settings.`,
     };
   }
-  if (meta.mode === "replay") {
-    const recorded = meta.recorded_questions || 0;
-    const total = (meta.questions || []).length;
+  if (replaying) {
+    const recorded = recordedQuestions(meta).length;
+    const total = guidedGroups(meta).reduce((n, group) => n + group.questions.length, 0);
     return {
       tone: "warn",
       label: recorded ? `Replay mode · ${recorded} of ${total} recorded` : "Replay mode · No recordings",

@@ -153,3 +153,17 @@ a.home-more-link { text-decoration: underline; text-underline-offset: 4px; text-
   .home-ctas { flex-direction: column; align-items: stretch; }
 }
 @media (pointer: coarse) { .home-cta, .home-open { min-height: 44px; } }
+
+/* The start screen (StartScreen.jsx): two plain cards above the story, in the page's own rules and wells. */
+.start { display: grid; gap: var(--sp-4); }
+.start-title { margin: 0; font-size: var(--fs-4); font-weight: var(--fw-bold); }
+.start-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); }
+.start-card {
+  display: grid; gap: var(--sp-3); align-content: start; justify-items: start; min-width: 0;
+  padding: var(--sp-5); border: 1px solid var(--rule); border-radius: var(--r-well); background: var(--raised);
+}
+.start-card h3 { margin: 0; font-size: var(--fs-3); font-weight: var(--fw-bold); }
+.start-card p { margin: 0; font-size: var(--fs-2); color: var(--ink-2); }
+.start-steps { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-3); font-size: var(--fs-2); min-width: 0; max-width: 100%; }
+.start-steps pre { margin-top: var(--sp-2); }
+@media (max-width: 900px) { .start-cards { grid-template-columns: minmax(0, 1fr); } }

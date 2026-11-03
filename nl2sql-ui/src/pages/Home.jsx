@@ -1,5 +1,7 @@
 import React from "react";
 import Clip from "./Clip.jsx";
+import StartScreen from "./StartScreen.jsx";
+import { startView } from "./startScreen.js";
 import { FEATURES, HERO, MORE, REPO, STEPS, clipFor, facts } from "./home.js";
 
 // The front page: what the product does in one sentence, the five steps a
@@ -19,8 +21,11 @@ function jumpTo(id) {
   target.focus({ preventScroll: true });
 }
 
-export default function Home({ meta, onTry }) {
-  const said = facts(meta);
+// `replaying`: every model step runs on recordings. `caller` is who /meta says is asking; `onDemoAdded` runs once the
+// demo job has finished.
+export default function Home({ meta, caller = null, replaying = false, onTry, onDemoAdded = () => {} }) {
+  const said = facts(meta, { replaying });
+  const start = startView(meta, caller);
   return (
     <div className="home" id="home">
       <section className="home-hero" aria-labelledby="home-title">
@@ -43,6 +48,8 @@ export default function Home({ meta, onTry }) {
           {said.map((fact) => <li key={fact}>{fact}</li>)}
         </ul>
       </section>
+
+      {start && <StartScreen view={start} onTry={onTry} onDemoAdded={onDemoAdded} />}
 
       <section className="home-path" id="how" tabIndex={-1} aria-labelledby="home-path-title">
         <h2 id="home-path-title" className="visually-hidden">How a question travels</h2>

@@ -365,7 +365,10 @@ visited. A route nobody serves lands on Home.
 **Home** says what the engine does and shows it: the five steps a question
 travels (Question, Plan, Check, SQL, Rows, marked by whether a model or code
 decides each), then a short clip of Ask, Pipeline and Retrieval with a link
-into each. **Try a sample question** opens Ask and asks a guided question; on
+into each. On a project with no datasource yet, Home also shows a start screen
+with two choices, **Try the demo** (adds the sample databases and builds their index) and
+**Connect your database**; on the hosted demo the second one shows how to run nl2sql
+yourself. **Try a sample question** opens Ask and asks a guided question; on
 the hosted demo it picks one with a recorded answer, so it works before you
 add a key. The nav marks the page you are on,
 and marks Settings or Retrieval when the server has it off; the page itself

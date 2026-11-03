@@ -20,7 +20,9 @@ API starts even when a required datasource cannot connect; this route says so.
 ### `GET /api/v1/meta`
 
 Without a caller: `{"mode": "demo" | "your_data" | "hosted", "auth": "api_keys" | "proxy" | "static" | "none",
-"request_llm": false}`, what a page needs before it has an identity. With a caller, also `datasources`, each one the
+"request_llm": false, "start": "choose" | "hosted" | null}`, what a page needs before it has an identity. `start` tells the
+web app which start screen to show: `choose` when the project has no datasource yet and the caller is an administrator (try the demo or connect a database; anyone else gets `null`, so the route does not tell them the project is empty),
+`hosted` on the hosted demo, and `null` once a datasource exists. With a caller, also `datasources`, each one the
 caller may reach as `{id, description, sample_questions, recorded}` (`recorded` is the sample questions the `replay`
 provider can answer with no key), and `recorded_with`, the provider and model those recordings came from, or `null`.
 It also names the caller as `caller: {"user_id": "...", "admin": true | false}`. `admin` is whether the caller holds a role

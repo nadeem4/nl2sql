@@ -45,27 +45,33 @@ test("the more band: run it locally, the docs and the source", () => {
   assert.equal(MORE[2].href, "https://github.com/nadeem4/nl2sql");
 });
 
+const ds = (id, sample_questions, recorded = []) => ({ id, description: "", sample_questions, recorded });
+
 test("the sample question is one a visitor with no key can replay", () => {
-  const meta = {
-    questions: ["a", "b", "c"],
-    question_groups: [{ datasource: "chinook", questions: ["a", "b", "c"] }],
-    recorded: ["b", "c"],
-  };
+  const meta = { datasources: [ds("chinook", ["a", "b", "c"], ["b", "c"])] };
   assert.equal(sampleQuestion(meta), "b");
   // Nothing recorded: the first guided question, which asks for a key.
-  assert.equal(sampleQuestion({ ...meta, recorded: [] }), "a");
-  assert.equal(sampleQuestion({ questions: [] }), null);
+  assert.equal(sampleQuestion({ datasources: [ds("chinook", ["a", "b", "c"])] }), "a");
+  assert.equal(sampleQuestion({ datasources: [ds("chinook", [])] }), null);
+  assert.equal(sampleQuestion({}), null);
   assert.equal(sampleQuestion(null), null);
 });
 
+test("the sample question is found on the meta read after the demo is added, not on the empty one", () => {
+  assert.equal(sampleQuestion({ datasources: [] }), null);
+  assert.equal(sampleQuestion({ datasources: [ds("chinook", ["a"], ["a"])] }), "a");
+});
+
 test("the facts only promise what this server does", () => {
-  const recorded = facts({ hosted: true, recorded: ["a"] });
+  const recorded = facts({ mode: "hosted", datasources: [ds("c", ["a"], ["a"])] });
   assert.deepEqual(recorded, ["No sign-in", "Sample databases included", "A key is only needed for your own questions"]);
   // Hosted with nothing recorded, every question needs a key: say that instead.
-  assert.equal(facts({ hosted: true, recorded: [] })[2], "Bring your own API key; it stays in this tab");
-  // Local replay with recordings answers the guided questions with no key too.
-  assert.equal(facts({ mode: "replay", recorded_questions: 3 })[2], "A key is only needed for your own questions");
-  assert.equal(facts({ mode: "live" })[2], "Runs on your machine, with your key");
+  assert.equal(facts({ mode: "hosted", datasources: [ds("c", ["a"])] })[2], "Bring your own API key; it stays in this tab");
+  // A server whose models replay recordings answers the guided questions with no key too.
+  const replaying = { mode: "demo", datasources: [ds("c", ["a"], ["a"])] };
+  assert.equal(facts(replaying, { replaying: true })[2], "A key is only needed for your own questions");
+  assert.equal(facts({ mode: "demo", datasources: [] }, { replaying: true })[2], "Add an API key to ask a question");
+  assert.equal(facts({ mode: "your_data" })[2], "Runs on your machine, with your key");
   assert.deepEqual(facts(null).slice(0, 2), ["No sign-in", "Sample databases included"]);
 });
 

@@ -1,5 +1,5 @@
 // Pure helpers for the Pipeline page. The steps themselves come from the
-// server (GET /api/pipeline), which reads them from `nl2sql.pipeline.steps`;
+// server (GET /about), which reads them from `nl2sql.pipeline.steps`;
 // nothing here names a node, a model or a provider.
 //
 // The page joins that list to the last run's telemetry by node name, which is
@@ -38,7 +38,7 @@ export function modelUsed(usage, node) {
 }
 
 // The recording whose model the page labels its model steps with, or null.
-// `recordedWith` is the server's ({provider, model}, from GET /api/pipeline);
+// `recordedWith` is the server's ({provider, model}, `recorded_with` in GET /meta);
 // `replaying` is whether this tab answers from recordings (local replay mode,
 // or the hosted demo with no key). Before a run that decides; after one, the
 // run does: a recorded run is labelled, a live one never is.
@@ -62,4 +62,11 @@ export function stepChip(row, usage, recording) {
 
 export function countModelSteps(steps) {
   return (steps || []).filter((step) => step.kind === "model").length;
+}
+
+// Whether every model step runs on the `replay` provider, so this server answers from recordings. `GET /about` names
+// each model step's provider; a server with no model step is not replaying.
+export function onReplay(steps) {
+  const models = (steps || []).filter((step) => step.kind === "model");
+  return models.length > 0 && models.every((step) => step.provider === "replay");
 }

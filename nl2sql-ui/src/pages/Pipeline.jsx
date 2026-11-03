@@ -3,6 +3,7 @@ import { countModelSteps, pipelineRows, recordingShown, stepChip } from "./pipel
 import { pipelinePhases, stepStates, waterfall } from "./pipelinePhases.js";
 import { providerName } from "../lib/settings.js";
 import { secs } from "../lib/runState.js";
+import { DOCS } from "./home.js";
 
 // What runs a question. The page exists because the engine's one claim -- the
 // model plans, deterministic code writes and checks the SQL -- is invisible
@@ -16,7 +17,7 @@ import { secs } from "../lib/runState.js";
 // After a run each row carries its share of the run's time as a bar, so the
 // page doubles as the run's waterfall.
 //
-// The list itself is the server's (GET /api/pipeline), which reads it from the
+// The list itself is the server's (GET /about), which reads it from the
 // graph's own node names, so this page cannot describe a pipeline that is not
 // the one running.
 
@@ -82,7 +83,7 @@ function Step({ row, state, bar, usage, ran, recording }) {
   );
 }
 
-// The page in its final shape while GET /api/pipeline is on its way: the
+// The page in its final shape while GET /about is on its way: the
 // legend, three phases and their rows, as bars.
 export function PipelineSkeleton() {
   const rows = [3, 4, 2];
@@ -115,7 +116,8 @@ export function PipelineSkeleton() {
 // `replaying`: this tab answers from recordings (local replay mode, or the
 // hosted demo with no key), so before a run each model step names the model
 // the recordings were made with, marked recorded, not the config's fallback.
-export default function Pipeline({ pipeline, error, result, asked, replaying }) {
+// `pipeline` is `GET /about`; `recordedWith` is `recorded_with` from `GET /meta`.
+export default function Pipeline({ pipeline, error, result, asked, replaying, recordedWith }) {
   if (error) {
     return <p className="fault">The pipeline could not be loaded: {error}</p>;
   }
@@ -123,7 +125,7 @@ export default function Pipeline({ pipeline, error, result, asked, replaying }) 
   const steps = pipeline.steps || [];
   const ran = Boolean(result && asked);
   const usage = ran ? result.usage : null;
-  const recording = recordingShown(pipeline.recorded_with, { replaying, result: ran ? result : null });
+  const recording = recordingShown(recordedWith, { replaying, result: ran ? result : null });
   const rows = pipelineRows(steps, ran ? result : null);
   const phases = pipelinePhases(rows);
   const states = stepStates(rows, ran);
@@ -141,11 +143,9 @@ export default function Pipeline({ pipeline, error, result, asked, replaying }) 
         {models} of these {rows.length} steps put the question to a model. The rest is ordinary
         code: it finds the schema, writes the SQL from the plan, checks it against the real tables
         and this role's policy, runs it and combines the results.{" "}
-        {pipeline.docs && (
-          <a href={pipeline.docs} target="_blank" rel="noreferrer">
-            The architecture docs have the long version.
-          </a>
-        )}
+        <a href={`${DOCS}architecture/pipeline/`} target="_blank" rel="noreferrer">
+          The architecture docs have the long version.
+        </a>
       </p>
 
       <p className="pipeline-state">
