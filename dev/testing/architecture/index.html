@@ -2928,7 +2928,7 @@ release. Its <code>realdb-gate</code> job always runs and is the required check.
 </li>
 <li>
 <p><strong><code>fresh-install</code></strong> takes those wheels and installs them the way a user
-  does, <code>pip install "nl2sql-engine[demo]"</code>, into an empty virtualenv outside
+  does, <code>pip install "nl2sql-cli[web]"</code>, into an empty virtualenv outside
   the checkout. It then boots <code>nl2sql-api serve --demo --hosted</code> (the command the Hugging
   Face Space runs) with no API key, and passes only when the web app page,
   <code>/api/v1/meta</code>, each datasource's schema, <code>/api/v1/index</code>, the recorded guided questions

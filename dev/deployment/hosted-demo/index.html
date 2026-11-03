@@ -3383,12 +3383,13 @@ read-only everywhere.</p>
 <p><code>deploy/huggingface/Dockerfile</code> builds the playground as a hosted demo. It is a
 Space root rather than a repository build: it needs no build context, so the
 whole deploy is that one folder, copied to the Space's root.</p>
-<p>It installs whatever the one build argument <code>NL2SQL_SPEC</code> names. On the Space
-that is always <strong>a released version from PyPI</strong>,
-<code>nl2sql-engine[demo]==X.Y.Z</code>, written into the copy of the <code>Dockerfile</code> the
+<p>It installs whatever the build arguments <code>NL2SQL_SPEC</code> (the command line app and,
+through its <code>web</code> extra, the web app), <code>NL2SQL_ENGINE_SPEC</code> and <code>NL2SQL_API_SPEC</code>
+name. On the Space that is always <strong>a released version from PyPI</strong>,
+<code>nl2sql-cli[web]==X.Y.Z</code> beside <code>nl2sql-engine==X.Y.Z</code> and <code>nl2sql-api==X.Y.Z</code>, written into the copy of the <code>Dockerfile</code> the
 release pushes. The checked-in default is a GitHub archive of the tip of
 <code>main</code>, which is only what a local <code>docker build</code> gets; pass
-<code>--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"</code> to build a release
+<code>--build-arg NL2SQL_SPEC="nl2sql-cli[web]==X.Y.Z" --build-arg NL2SQL_ENGINE_SPEC="nl2sql-engine==X.Y.Z" --build-arg NL2SQL_API_SPEC="nl2sql-api==X.Y.Z"</code> to build a release
 locally. Then it runs <code>nl2sql init --demo /home/demo/demo</code> and <code>nl2sql index</code>
 <strong>at build time</strong>, with <code>NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml</code> set in the
 image so every command and the server read that config. That bakes three
@@ -3456,7 +3457,7 @@ with nothing to do by hand. Merging the release pull request tags <code>vX.Y.Z</
     PS --&gt; SP[space: publish_space.yml&lt;br/&gt;pins and pushes the Space]
     SP --&gt; SS[space-smoke: the live URL&lt;br/&gt;reports X.Y.Z]</code></pre>
 <ol>
-<li><strong><code>pypi-smoke</code></strong> installs <code>nl2sql-engine[demo]==X.Y.Z</code> from PyPI into an
+<li><strong><code>pypi-smoke</code></strong> installs <code>nl2sql-cli[web]==X.Y.Z</code> from PyPI into an
    empty virtualenv on a fresh runner, boots this same <code>nl2sql-api serve --demo --hosted</code>
    with no key, asks every recorded guided question and its scripted follow-up, and checks it serves. The Space is never built on a version
    that does not install from PyPI.</li>
@@ -3499,7 +3500,7 @@ rewritten:</p>
 <tbody>
 <tr>
 <td><code>Dockerfile</code></td>
-<td>its <code>ARG NL2SQL_SPEC=</code> line: <code>nl2sql-engine[demo]==X.Y.Z</code> for a release, or a GitHub archive of the commit for a tagless run by hand</td>
+<td>its <code>ARG NL2SQL_SPEC=</code> line (and <code>NL2SQL_ENGINE_SPEC</code>, <code>NL2SQL_API_SPEC</code>): <code>nl2sql-cli[web]==X.Y.Z</code> for a release, or a GitHub archive of the commit for a tagless run by hand</td>
 </tr>
 <tr>
 <td><code>SOURCE_SHA</code></td>
@@ -3651,7 +3652,7 @@ See <a href="https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-cli[web]"</span>
 <a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>

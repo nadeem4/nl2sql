@@ -3411,7 +3411,7 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
    <code>mike deploy --push --update-aliases $TAG latest</code> adds a versioned copy of
    the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
 <li><strong><code>pypi-smoke</code></strong> — <code>needs: pypi</code>. On a fresh runner, installs the release
-   from PyPI itself, <code>pip install "nl2sql-engine[demo]==X.Y.Z"</code>, into an empty
+   from PyPI itself, <code>pip install "nl2sql-cli[web]==X.Y.Z"</code>, into an empty
    virtualenv, boots <code>nl2sql-api serve --demo --hosted</code> with no API key and
    checks the page, <code>/api/v1/health</code> (which must report <code>X.Y.Z</code> for the engine and
    the API), <code>/api/v1/meta</code>, each datasource's schema and <code>/api/v1/index</code>, then asks
@@ -3428,7 +3428,7 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
    version that does not install from PyPI. Calls
    <a href="../../deployment/hosted-demo/#deployed-by-the-release"><code>publish_space.yml</code></a>
    with the tag, which pins the Space's image to
-   <code>nl2sql-engine[demo]==X.Y.Z</code>, pushes it and waits for the build. That
+   <code>nl2sql-cli[web]==X.Y.Z</code>, pushes it and waits for the build. That
    <code>pypi-smoke</code> installed the version is not proof that the Hub's builder
    will: on <code>v0.2.0</code> the Space build ran minutes later and its pip still saw
    only <code>0.1.x</code>. So the workflow first waits, up to 20 times 30 seconds, until
