@@ -12,7 +12,7 @@ The field-by-field reference is [Configuration System](../configuration/system.m
 - Only `nl2sql.yaml` includes, and only it has `version`. An included file holds the section's body and cannot include another file.
 - `datasources` may name a folder instead: one datasource per `*.yaml`, with the file name as its `id`. No other section may include a folder.
 - A file may be included once.
-- The section files are plain YAML, so a person edits them in git. The loader remembers each file's hash so the engine can refuse to overwrite a hand edit it did not see.
+- The section files are plain YAML, so a person edits them in git. The loader records the SHA-256 of `nl2sql.yaml`, each section file and each datasource file. When the engine writes one of them (saving a datasource, adding the demo), it refuses with `FILE_CHANGED` if the file on disk no longer matches, so it never overwrites a hand edit it did not see.
 
 ## References
 
@@ -45,6 +45,8 @@ The environment is read only where an allow-list says (`READS_THE_ENVIRONMENT` i
 | `nl2sql/secrets/providers/env.py` | the `env` secret provider |
 | `nl2sql/common/logger.py` | `NL2SQL_LOG_LEVEL`, `NL2SQL_LOG_FORMAT` |
 | `nl2sql/tracing/trace.py` | the trace redactor masks every value the environment holds |
+| `nl2sql_cli/commands/eval.py` | `CI`, so a `full` eval never runs in CI |
+| `nl2sql_cli/commands/launch.py` | `DATABASE_URL`, the one URL `nl2sql launch` offers as a candidate |
 | `nl2sql_api/serve.py` | `NL2SQL_MODE`, the mode of this process |
 
 Anything else is configuration and belongs in `nl2sql.yaml`, as `${env:VAR}` when it should come from the environment. Nothing writes `os.environ`; the config writer (`nl2sql/config/writer.py`) writes a file and leaves the process alone.

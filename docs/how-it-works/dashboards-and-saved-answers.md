@@ -45,7 +45,7 @@ A datasource's stored connection sets the most anyone can see through it, and a 
 
 The builder makes a dashboard from chosen sources without chat, in two steps (`dashboards/builder.py`):
 
-1. `propose_tiles` is read-only and runs nothing. It offers three sources: curated verified queries, the person's saved answers, and "tell us what matters", where chips (metrics, breakdowns, periods) become at most three new questions for the model.
+1. `propose_tiles` is read-only: it runs no query and saves nothing, and only for the third source makes one model call. It offers three sources: curated verified queries, the person's saved answers, and "tell us what matters", where chips (metrics, breakdowns, periods) become at most three new questions for the model.
 2. `build` adds the ticked tiles. Curated and saved tiles need no model; new questions run as `ask` steps of one builder conversation. Over REST this is a job.
 
 Only the third source calls a model, so the first two work with no key.

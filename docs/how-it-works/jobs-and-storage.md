@@ -30,7 +30,7 @@ The hosted demo allows each visitor one job and two open streams.
 
 Two more things sit beside them: the `audit` observer's day files in `<path>/audit/`, and in the hosted demo the session signing key `hosted_session.key`.
 
-Store implementations are plugins in the `nl2sql.stores` entry point group, and the interfaces they implement are in `nl2sql_sdk.stores`. Only `packages/nl2sql/src/nl2sql/storage/` imports `chromadb` and `sqlite3`.
+Store implementations are plugins in the `nl2sql.stores` entry point group, and the interfaces they implement are in `nl2sql_sdk.stores`. Outside the adapters, only `packages/nl2sql/src/nl2sql/storage/` imports `sqlite3`, and only it imports `chromadb` (the local embedding model borrows chromadb's embedding function, not its index).
 
 ## Why one folder
 

@@ -1,6 +1,6 @@
 # Node Catalog
 
-This section indexes all control-graph nodes and SQL agent subgraph nodes. Each node has a dedicated reference page with inputs, outputs, contracts, and limitations.
+Every pipeline node, with a link to its reference page, for contributors. This section indexes all control-graph nodes and SQL agent subgraph nodes. Each node has a dedicated reference page with inputs, outputs, contracts, and limitations.
 
 For pipeline-level wiring, see `../pipeline.md`. For subgraph wiring and lifecycle, see `../subgraphs/sql_agent.md`.
 

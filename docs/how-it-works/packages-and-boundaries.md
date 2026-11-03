@@ -38,7 +38,7 @@ The engine reaches adapters only through the `nl2sql.adapters` entry point group
 - **The engine and the API never import the CLI, and the engine has no `cli` package.** Knowledge an SDK or REST caller also needs belongs in the engine.
 - **The CLI imports only the top-level `nl2sql`.** It never imports `nl2sql_sdk` or `nl2sql_api`. Its one dependency on another package of this project is `nl2sql-engine`, plus `nl2sql-api` as the `web` extra; `nl2sql demo` and `nl2sql serve` start the API as a child process (`python -m nl2sql_api serve`).
 - **The REST API, the CLI and the MCP server import only the top-level `nl2sql` facade.** None reaches the runtime behind it (`engine._runtime`). What one of them needs is a facade method every caller can use.
-- **Only the storage package imports `chromadb` and `sqlite3`; only the CLI's `chat` package imports `textual`; only the MCP package imports `mcp`.** Each heavy dependency has one door.
+- **Outside the adapters, only the storage package imports `sqlite3`, and only the storage package imports `chromadb` (the local embedding model borrows chromadb's embedding function, not its index); only the CLI's `chat` package imports `textual`; only the MCP package imports `mcp`.** Each heavy dependency has one door.
 
 ## Rules about loading and the environment
 

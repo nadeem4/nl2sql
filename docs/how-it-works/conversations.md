@@ -21,7 +21,7 @@ Each `ask` step is a run of its own with its own `trace_id` and its own timeout 
 
 ## Clarifications and approvals
 
-A run that ends `needs_clarification` ends the turn and records a pending question on the conversation. The next turn answers it with an option id (no model call) or with text the model maps to an option. A run that ends `needs_approval` ends the turn; an approver grants the request elsewhere, and the asker's `retry` re-runs the last `ask` step with no model call. See [Access and security](access-and-security.md) for how approvals are stored.
+A run that ends `needs_clarification` ends the turn and records a pending question on the conversation. The next turn answers it with an option id, which skips the conversation model, or with text the model maps to an option. A run that ends `needs_approval` ends the turn; an approver grants the request elsewhere, and the asker's `retry` re-runs the last `ask` step's question without calling the conversation model. See [Access and security](access-and-security.md) for how approvals are stored.
 
 ## What is stored
 

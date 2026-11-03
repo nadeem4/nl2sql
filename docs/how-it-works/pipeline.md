@@ -1,6 +1,6 @@
 # Pipeline Architecture
 
-This document consolidates the LangGraph pipeline architecture as implemented in code. It describes the control graph, logical DAG, routing, and execution/aggregation flow. Node and subgraph details live in their respective sections.
+The LangGraph control graph, its routing and how results are combined, for contributors changing the pipeline. It describes the control graph, logical DAG, routing, and execution/aggregation flow. Node and subgraph details live in their respective sections.
 
 ## End-to-end flow
 

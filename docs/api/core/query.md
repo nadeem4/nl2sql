@@ -164,7 +164,7 @@ path, the values are the same), and `by` holds one of the hook's configured
 request lists. Then the next hook still runs. Anything else asks again: the
 run ends `needs_approval` with a new request. An `Approval` object is not
 stored, signed or expired by the engine (request ids are stored and expire: see above): it is trusted as far as the
-`user_context` a caller passes. See [Hooks](../../configuration/hooks.md#approval).
+`user_context` a caller passes. See [Hooks](../../configuration/hooks.md).
 
 Returns:
 `QueryResult`, built from the pipeline graph state by `result_from_state`.

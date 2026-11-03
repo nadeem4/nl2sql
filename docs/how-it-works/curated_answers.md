@@ -577,7 +577,7 @@ No invariant is weakened. These changes are recorded in
   exists, on every path" becomes "on every generated path"; a verified path
   has no AST, and its checks are the matcher's.
 
-## Deferred and out of scope
+## Not built yet
 
 ### Business metrics (deferred)
 

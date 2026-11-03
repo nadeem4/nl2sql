@@ -1,6 +1,6 @@
 # Architecture Overview
 
-NL2SQL is a **multi-stage orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by `Runtime`, which instantiates registries, stores, and policy enforcement.
+The parts of NL2SQL and how a question moves through them, for anyone new to the code. NL2SQL is a **multi-stage orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by `Runtime`, which instantiates registries, stores, and policy enforcement.
 
 ## In brief
 

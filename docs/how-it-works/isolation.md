@@ -1,7 +1,6 @@
 # Execution Isolation and Concurrency
 
-This page describes how a pipeline run is bounded, cancelled, and protected in
-the current implementation. It is deliberately explicit about what the engine
+How a run is bounded in time, cost and concurrency, and how it is cancelled, for operators and contributors. This page is deliberately explicit about what the engine
 does **not** do, because the boundaries matter when you reason about failure.
 
 ## There is no process sandbox

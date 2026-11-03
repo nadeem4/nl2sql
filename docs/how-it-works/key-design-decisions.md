@@ -18,9 +18,9 @@ We chose to keep every dialect name and dialect-specific rule inside adapters, o
 
 We chose one `NL2SQL` facade that the API, the CLI and the MCP server all use, over each app reaching into the runtime. A capability that exists only in one app cannot be used or tested by the others, so anything an app needs becomes a facade method. A test enforces it.
 
-## The model never sees rows
+## The answer model sees a preview, not the result
 
-We chose to give the answer model a bounded preview, the column names and the row count, over the full result. The answer writes about the data and never copies it, so the prompt does not grow with the result. Conversations and dashboards store plans and summaries, not rows.
+We chose to give the answer model a bounded preview (the first rows, the column names and the row count) over the full result, so the prompt does not grow with the result. The conversation model sees no rows at all, only each answer's summary and columns. Conversations and dashboards store plans and summaries, not rows.
 
 ## Strict, fail-closed access
 
@@ -48,7 +48,7 @@ We chose a single `storage.path` with a slot per kind of data and stores named b
 
 ## Jobs in process
 
-We chose an in-memory queue with one worker thread over an external job system. The target is a single-container deployment, jobs are short administrative work, and what a job produces is stored by the engine, so losing the list on restart loses nothing that matters.
+We chose an in-memory queue with one worker thread over an external job system. The target is a single-container deployment, a restart loses the job list and stops a running job, but what finished jobs produced is in the engine's stores.
 
 ## Ask when the reading is ambiguous
 

@@ -8,6 +8,7 @@ root. The short form of the rules is
 
 - [Testing Architecture](testing.md): the test markers and what each one needs.
 - [Real-Database Test Bed](test-bed.md): the Docker Compose test bed and its cloud twin.
+- [Documentation style guide](docs-style.md): how the pages are written.
 - [Releasing](releasing.md): how a release is cut, published and verified.
 - [Extending NL2SQL](../extend/index.md): adapters, chunk types, the planner, execution backends.
 

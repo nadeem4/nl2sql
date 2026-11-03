@@ -1,4 +1,4 @@
-"""A run's results are readable only by the caller who asked (docs/security/model.md, "Results").
+"""A run's results are readable only by the caller who asked.
 
 The manifest a run writes records its asker, ``(tenant_id, user_id)``: the caller's tenant, else the engine's,
 and the caller's user id, None for an anonymous caller. An anonymous caller (every REST caller today) also has

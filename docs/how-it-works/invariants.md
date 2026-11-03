@@ -83,7 +83,7 @@ Plan fields are schema-validated with no unknown fields, and query type must be 
 - `PlanModel.query_type: Literal["READ"]` in `nl2sql.pipeline.nodes.ast_planner.schemas`, which pydantic enforces before any node sees the plan (the plan cache re-validates on read, so a cached plan is covered too)
 
 ### Failure Behavior
-Pydantic validation errors for extra/invalid fields and for any `query_type` other than `READ`; the plan never reaches the validator. `LogicalValidatorNode` no longer re-checks it — the branch was unreachable.
+Pydantic validation errors for extra/invalid fields and for any `query_type` other than `READ`; the plan never reaches the validator. `LogicalValidatorNode` does not re-check it, because the branch cannot be reached.
 
 ### Why It Exists
 Prevents mutation or unknown plan constructs from entering execution.

@@ -1,8 +1,7 @@
 """The package boundaries, enforced by an AST scan of the source tree.
 
-Every rule here is written down in ``docs/how-it-works/invariants.md`` under
-"Package Boundaries Are One-Way" and "Dialect Knowledge Lives in the Adapter",
-and stated in short form in the repo's ``CLAUDE.md``. A failure message names
+Every rule here is written down in ``docs/how-it-works/invariants.md`` and
+stated in short form in the repo's ``CLAUDE.md``. A failure message names
 the rule and the file that broke it.
 
 This module is the one home for the boundary rules. Two neighbours stay where

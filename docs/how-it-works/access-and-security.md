@@ -40,7 +40,7 @@ Every app passes the caller on each such read; `test_boundaries.py` fails if one
 
 ## Approvals
 
-A hook can hold a run for a person's yes. The engine stores the pending request (`nl2sql/approvals/`), an approver holding a role the hook names grants or denies it by id, and the asker's re-run names the id. Deciding is limited to the hook's approver roles (`NotAuthorized` otherwise), and the approver never runs the question as the asker. Requests and grants expire after `settings.approvals.max_age_hours`.
+A hook can hold a run for a person's yes. The engine stores the pending request (`nl2sql/approvals/`), an approver holding a role the hook names grants or denies it by id, and the asker's re-run names the id. Deciding is limited to the hook's approver roles (`NotAuthorized` otherwise). A grant runs nothing itself. It is bound to the asker and to the SQL that was asked for, so only the asker's own re-run of that SQL can use it. Requests and grants expire after `settings.approvals.max_age_hours`.
 
 ## The hosted demo
 

@@ -1,6 +1,6 @@
 # Indexing, Chunking, and Retrieval Architecture
 
-This document describes **current indexing behavior** as implemented in code. Indexing transforms **schema snapshots** into **typed chunks** that the engine embeds and writes to the **index store** (`storage.index`, the built-in `chroma` store by default; see [Storage](../configuration/storage.md)). Retrieval uses these entries as candidates and then resolves authoritative schema details from the state store (`storage.state`; see `../schema/store.md` for schema contracts and store behavior).
+How a schema becomes index entries and how retrieval finds them, for operators tuning retrieval and contributors adding a chunk type. Indexing transforms **schema snapshots** into **typed chunks** that the engine embeds and writes to the **index store** (`storage.index`, the built-in `chroma` store by default; see [Storage](../configuration/storage.md)). Retrieval uses these entries as candidates and then resolves authoritative schema details from the state store (`storage.state`; see `../schema/store.md` for schema contracts and store behavior).
 
 ## Indexing flow
 
