@@ -8,7 +8,7 @@ and example questions. It is written in `glossary.yaml` and read by a
 
 !!! note "Release 0.8"
     The engine loads, merges, shows and exports knowledge from release 0.8,
-    and the planner and refiner read it (K2): descriptions, roles,
+    and the planner and refiner read it: descriptions, roles,
     units, grains, code values and glossary joins in the schema block, matched
     terms and rules in `[BUSINESS_CONTEXT]`. It reaches the index too: the
     chosen descriptions, the terms, the joins and the examples are index entries,

@@ -1,6 +1,6 @@
 """Saved answers in the engine.
 
-The engine is Q1's: a real engine on a small SQLite database, indexed with a fake embedder, so nothing is
+The engine is a real engine on a small SQLite database, indexed with a fake embedder, so nothing is
 downloaded and no model is called. A run is a trace written to the engine's trace store, and a conversation is
 stored by hand with one ``ask`` step, as a chat turn leaves it.
 """

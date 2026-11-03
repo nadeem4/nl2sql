@@ -1,5 +1,5 @@
 // Proposals as the review list shows them, and the bodies of Accept and Reject. The fixture is the API's own
-// `Proposal` (written by the A3 route test); the others are built from it so the shapes stay the real ones.
+// `Proposal` (written by the route test); the others are built from it so the shapes stay the real ones.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

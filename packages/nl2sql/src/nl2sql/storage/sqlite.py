@@ -2,8 +2,7 @@
 
 Schema snapshots and the diffs between them, the plan cache, answer feedback,
 the review queue's proposals, conversations, workspaces, dashboards with their
-stored chart results and API keys, the migrations that build them, and a lock
-.
+stored chart results and API keys, the migrations that build them, and a lock.
 
 * **Snapshots are immutable.** A row is keyed by ``(datasource_id,
   schema_version)`` and never updated: new content is a new version, and

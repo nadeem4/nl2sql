@@ -1,7 +1,6 @@
 """The event bus: ``nl2sql_sdk.events.Event`` and ``Observer``, and ``nl2sql.events.EventBus``.
 
-synchronous and in
-process, one bus per engine, subscribers fail open unless they ask to raise,
+The bus is synchronous and in-process, one bus per engine, subscribers fail open unless they ask to raise,
 and only catalogued names with valid data are published.
 """
 from __future__ import annotations

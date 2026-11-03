@@ -2,8 +2,7 @@
 
 They import nothing heavy, so ``from nl2sql import DatasourceInfo`` costs
 nothing at import (docs/architecture/invariants.md, the import rule).
-``Candidate`` and ``ApiKey`` are pydantic models as pydantic models
-: both are also JSON on the wire.
+``Candidate`` and ``ApiKey`` are pydantic models: both are also JSON on the wire.
 """
 from __future__ import annotations
 

@@ -62,7 +62,7 @@ Run events (they carry the run's `trace_id`):
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
 | `policy.decision` | a denial: `datasource_id`, `schema`, `table` (both None for a datasource), `rule`, `step` (`logical_validator`, `curated_matcher` or `datasource_resolver`) | no |
 | `hook.decision` | `hook`, `point`, `decision`, `reason`, ... | no |
-| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; not yet published (K2) |
+| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; not yet published |
 | `clarification.requested` | `sub_query_id`, `phrase`, `options` (how many) | no; published by the clarifier when a run ends `needs_clarification` |
 | `cost.estimated` | `datasource_id`, `sub_query_id`, `estimated_rows`, `cost`, `limit`, `decision` (`allow`, `confirm`, `refuse`; the audit observer writes `confirm` and `refuse`) | no; published by the `policy.cost` hook when a cost limit applies, once per sub-query's SQL (an approved re-run asks again) |
 

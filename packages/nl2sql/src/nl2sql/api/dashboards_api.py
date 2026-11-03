@@ -1,9 +1,9 @@
 """``engine.dashboards``: dashboards pinned whole into workspaces.
 
-The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; D2 ``open``,
-``refresh`` and ``run_scheduled``; D2b ``filter_values`` and the filters of ``refresh``; D3 the starter dashboard,
-``generate`` and ``suggest_questions``; D4 lets a conversation build and edit a draft (``create_draft``, and ``edit``
-with a conversation). Every method takes the caller keyword-only and required, except ``run_scheduled``, which
+The logic is ``nl2sql.dashboards.api``. It holds the store, the edits, ``pin`` and ``move``; ``open``,
+``refresh`` and ``run_scheduled``; ``filter_values`` and the filters of ``refresh``; the starter dashboard,
+``generate`` and ``suggest_questions``; and what lets a conversation build and edit a draft (``create_draft``, and
+``edit`` with a conversation). Every method takes the caller keyword-only and required, except ``run_scheduled``, which
 runs each dashboard as its stored owner.
 """
 from __future__ import annotations
@@ -15,7 +15,6 @@ from nl2sql.api.types import TileProgress
 from nl2sql.approvals.api import Approvals
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ApprovalNotFound, NotIndexed
-from nl2sql.common.planned import arrives_with
 from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.api import Dashboards
 from nl2sql.dashboards.builder import BuilderOptions, BuildReport, TileProposal
@@ -57,7 +56,7 @@ class DashboardsAPI:
         self._ctx = ctx
         self._service = Dashboards(ctx)
 
-    # ---- D1: the store and the manual edits
+    # ---- the store and the manual edits
 
     def get(self, dashboard_id: str, *, user_context: UserContext) -> Dashboard:
         """One of the caller's dashboards, draft or saved.
@@ -139,7 +138,7 @@ class DashboardsAPI:
     def set_schedule(self, dashboard_id: str, every_minutes: Optional[int], *,
                      user_context: UserContext) -> Dashboard:
         """Sets or (with None) removes the refresh schedule, saving the caller's identity. Nothing runs
-        until D2's scheduler does.
+        until the scheduler does.
 
         Raises:
             ScheduleTooFrequent: below ``dashboards.min_refresh_minutes``.
@@ -150,7 +149,7 @@ class DashboardsAPI:
         """Moves the dashboard to another of the caller's workspaces."""
         return self._service.move(dashboard_id, workspace_id, user_context=user_context)
 
-    # ---- D2: refresh, stored results, filters and schedules
+    # ---- refresh, stored results, filters and schedules
 
     def open(self, dashboard_id: str, *, user_context: UserContext, refresh_due: bool = True) -> DashboardView:
         """Checks access first, then returns the stored results of the charts that passed.
@@ -228,7 +227,7 @@ class DashboardsAPI:
         """
         return self._service.run_scheduled(now=now)
 
-    # ---- D3: the starter dashboard
+    # ---- the starter dashboard
 
     def generate(self, datasource_id: str, *, user_context: UserContext, title: Optional[str] = None,
                  workspace_id: Optional[str] = None,

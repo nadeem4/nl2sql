@@ -1,4 +1,4 @@
-"""The shapes tracks share, added before any of them.
+"""The shared shapes of knowledge, review and the profiler.
 
 The SDK's glossary models, ``KnowledgeSource``, ``Proposal``, ``Estimate`` and
 ``Overlap``; the state store's proposal methods; the config sections and

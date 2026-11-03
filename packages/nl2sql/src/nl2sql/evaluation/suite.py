@@ -15,7 +15,7 @@ Only ``status: approved`` cases run. A seeded or exported case is a
 The suites the package ships are in ``suites/``: ``chinook.yaml`` is the
 Chinook gold set, moved here unchanged from ``chinook_gold.yaml`` and
 ``chinook_gold_plans.yaml``; ``routing.yaml`` asks which of the demo's three
-databases a question belongs to (Phase R); ``clarify.yaml`` holds questions about "sales" that the demo glossary
+databases a question belongs to; ``clarify.yaml`` holds questions about "sales" that the demo glossary
 leaves open, each expecting ``clarify``.
 """
 from __future__ import annotations

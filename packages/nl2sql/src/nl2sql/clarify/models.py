@@ -54,7 +54,7 @@ class ClarificationRequest(BaseModel):
 
 
 class ClarificationChoice(BaseModel):
-    """The caller's pick, passed to ``run_query(choice=...)`` (from L2) to run that option's plan."""
+    """The caller's pick, passed to ``run_query(choice=...)`` to run that option's plan."""
 
     request: ClarificationRequest
     option_id: str

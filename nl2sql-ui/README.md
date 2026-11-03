@@ -1,8 +1,7 @@
 # nl2sql-ui
 
 The React source of the web app. It talks to `nl2sql-api` through `src/api/http.js` (JSON and Server-Sent
-Events, with the tab's API key and model keys). Until X1b, `nl2sql demo` still serves the older single page
-committed in the engine package.
+Events, with the tab's API key and model keys).
 
 ## Layout
 

@@ -207,7 +207,7 @@ def test_the_engine_has_no_sqlalchemy_base_of_its_own():
 
 
 def test_the_sdk_stores_module_imports_only_pydantic():
-    """A store plugin (Qdrant) installs the SDK for ``nl2sql_sdk.stores``, not the engine."""
+    """A store plugin (Qdrant, S3) installs the SDK for ``nl2sql_sdk.stores``, not the engine."""
     path = SDK / "stores.py"
     allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
     assert path.is_file(), "nl2sql_sdk/stores.py holds the four store interfaces."
@@ -406,10 +406,10 @@ def test_only_storage_imports_sqlite3():
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
                 "schema", "services", "datasources", "policies", "tracing", "storage", "runtime.py",
                 "public_api.py",
-                # the profiler's probe and the cost
+                # The profiler's probe and the cost
                 # estimate are adapter methods, so none of these names a dialect either.
                 "knowledge", "review", "profiler", "clarify", "explain",
-                # the conversation agent's prompt, the chart
+                # The conversation agent's prompt, the chart
                 # rules, the dashboard templates and the chat tools name no dialect either; a column's role
                 # and a chart's kind come from the plan and the result's types.
                 "conversations", "charts", "dashboards", "chat_tools"]
@@ -657,7 +657,7 @@ def test_the_cli_and_the_api_import_only_the_public_nl2sql():
 def test_still_imported_from_inside_is_gone():
     """The list of engine modules the playground and ``nl2sql demo`` still reached into was emptied and deleted."""
     assert "STILL_IMPORTED_FROM_INSIDE" not in globals()
-    assert not (CLI / "demo").exists(), "nl2sql_cli/demo/ (the old playground) was deleted in X1b"
+    assert not (CLI / "demo").exists(), "nl2sql_cli/demo/ (the old playground) was deleted"
 
 
 def test_mcp_uses_only_the_public_api():
@@ -987,7 +987,7 @@ def test_an_eval_name_loads_evaluation_on_demand():
 
 
 def test_gold_does_not_import_sqlite3():
-    """no evaluation module runs SQL with a driver of its own; regenerate goes through the adapter."""
+    """No evaluation module runs SQL with a driver of its own; regenerate goes through the adapter."""
     offenders = [f"{_where(path)}:{lineno} {name}"
                  for path in python_files(ENGINE / "evaluation")
                  for lineno, name, _ in imports(path) if name.partition(".")[0] == "sqlite3"]
@@ -1071,7 +1071,7 @@ def test_every_access_decision_goes_through_scope():
         "executor from disagreeing about a table.", offenders)
 
 
-# methods that show knowledge, proposals or schema, by file and
+# Methods that show knowledge, proposals or schema, by file and
 # class. Each takes the caller as a required keyword: no admin default, as the access rule made
 # ``datasources.schema()`` do.
 KNOWLEDGE_READ_METHODS = {
@@ -1107,7 +1107,7 @@ def test_knowledge_read_methods_require_a_caller():
         "keyword: an app that forgot the caller fails rather than seeing everything.", offenders)
 
 
-# methods that read or write something owned, scoped or privileged,
+# Methods that read or write something owned, scoped or privileged,
 # by file and class: the caller is a required keyword-only argument, `user_context` (or `by`, for a writer or a
 # manager of keys) with no default, so an app that forgot it fails closed. Every other public method of these
 # classes is listed in CONVERSATION_WITHOUT_A_CALLER, so a method added later must say which kind it is.
@@ -1217,8 +1217,7 @@ def test_only_accept_writes_a_persons_file():
                     offenders.append(f"{_where(path)}:{node.lineno} calls {name}")
     assert not offenders, _broke(
         "Only an accept writes a person's glossary or curated file (write_glossary is called from "
-        "nl2sql/review/accept.py alone, write_curated from there and from add_demo, under the hash check, "
-        "). write_project (new files only) and write_env_values are called from init_project, "
+        "nl2sql/review/accept.py alone, write_curated from there and from add_demo, under the hash check). write_project (new files only) and write_env_values are called from init_project, "
         "nl2sql launch and datasources.save, alone.", offenders)
 
 
@@ -1292,8 +1291,7 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
     "nl2sql-cli/src/nl2sql_cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
-    "nl2sql-cli/src/nl2sql_cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate "
-                                                "",
+    "nl2sql-cli/src/nl2sql_cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate",
     "api/src/nl2sql_api/serve.py": "NL2SQL_MODE, the mode of this process",
 }
 
@@ -1439,3 +1437,39 @@ def test_no_tracked_file_holds_a_merge_conflict_marker():
         if marker.search(text):
             found.append(name)
     assert not found, f"Merge conflict markers in: {found}"
+
+
+# The plan lives outside the repo (CLAUDE.md, "How to change things"): code, tests and docs describe what is, in the
+# present tense, and cite neither the design documents nor the plan's row and decision ids.
+_DESIGN_DOC = re.compile(r"\b(?:wave_[a-d]|phase2|configuration_v2)(?:\.md)?\b")
+_PLAN_ID = re.compile(
+    r"(?<![\w.])\((?:[A-D]-[A-Z]+\d+[a-z]?|DB\d[a-e]?|CL\d[ab]?|X1[ab]|[A-Z]{1,2}\d{1,2}[a-z]?|D\d{1,3}[a-z]?)"
+    r"(?:,\s*[A-Z]{0,2}\d+[a-z]?)*\)")
+_PLAN_ID_OK = {"(S3)"}  # S3 is the storage service, not a row
+_PLAN_ID_SCANNED = (".py", ".md", ".js", ".jsx")
+_PLAN_ID_SKIPPED = ("docs/releases/", "benchmarks/", ".claude/", "packages/nl2sql/tests/architecture/test_boundaries.py")
+
+
+def test_no_tracked_file_cites_a_design_doc_or_a_plan_id():
+    """A design document or a plan row is not in the repo, so a citation of one points at nothing."""
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    offenders = []
+    for name in tracked:
+        if (not name.endswith(_PLAN_ID_SCANNED) or name.startswith(_PLAN_ID_SKIPPED)
+                or "CHANGELOG" in name or "node_modules" in name):
+            continue
+        try:
+            lines = (REPO / name).read_text(encoding="utf-8").splitlines()
+        except (UnicodeDecodeError, OSError):
+            continue
+        for number, line in enumerate(lines, 1):
+            found = [m.group(0) for m in _PLAN_ID.finditer(line) if m.group(0) not in _PLAN_ID_OK]
+            found += [m.group(0) for m in _DESIGN_DOC.finditer(line)]
+            if found:
+                offenders.append(f"{name}:{number} {', '.join(found)}")
+    assert not offenders, _broke(
+        "Code, tests and docs cite no design document (wave_*.md, phase2.md, configuration_v2.md) and no plan "
+        "row or decision id such as (D15), (K1) or (C-W4): the plan is not in the repo. Say what the code does "
+        "instead.", offenders)

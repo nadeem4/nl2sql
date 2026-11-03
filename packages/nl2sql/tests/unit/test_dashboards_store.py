@@ -1,7 +1,7 @@
 """Workspaces, the dashboard store and manual edits.
 
-Nothing here runs a chart: D1 stores dashboards and edits them by hand. Dashboards are put straight into the
-state store (a draft comes from chat in D4, the starter from D3). The engine has a fake model server that
+Nothing here runs a chart: These tests store dashboards and edit them by hand. Dashboards are put straight into the
+state store (a draft comes from chat, the starter from ``generate``). The engine has a fake model server that
 records every call, so a test can say that an edit made none.
 """
 from __future__ import annotations
@@ -67,7 +67,7 @@ def tile(tid: str, *, x: int = 0, y: int = 0, w: int = 2, h: int = 2) -> Tile:
 
 def seed(engine: NL2SQL, did: str = "d1", *, user: UserContext = ANA, status: str = "draft", workspace: str = "ws",
          tiles: Any = None, days_ago: float = 0, **fields: Any) -> Dashboard:
-    """A dashboard in the state store, owned by ``user`` (not through the facade: D3 and D4 build them)."""
+    """A dashboard in the state store, owned by ``user`` (not through the facade: ``generate`` and a conversation build them)."""
     if tiles is None:
         tiles = [tile("t1"), tile("t2", x=2)]
     stamp = NOW - timedelta(days=days_ago)

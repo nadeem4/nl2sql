@@ -1,10 +1,10 @@
 """The dashboards service behind ``engine.dashboards``.
 
-D1 is the store and the manual edits: a dashboard is private to its owner, lives in one of their
-workspaces, is built as a draft and saved whole by ``pin``. D2 runs the charts: ``open`` serves the stored
+The store and the manual edits: a dashboard is private to its owner, lives in one of their
+workspaces, is built as a draft and saved whole by ``pin``. Running the charts: ``open`` serves the stored
 results after the access check, ``refresh`` re-runs the stored plans as the caller, ``run_scheduled`` does so for
-each due schedule as its owner. D3 is the starter dashboard: ``generate`` builds the template charts from the
-column roles, runs each as the caller and saves the ones that answered. D4 lets a conversation build a draft and add or
+each due schedule as its owner. The starter dashboard: ``generate`` builds the template charts from the
+column roles, runs each as the caller and saves the ones that answered. A conversation can build a draft and add or
 replace a chart from an answer it holds, after a no-execute check of the plan. None of it calls a model.
 """
 from __future__ import annotations

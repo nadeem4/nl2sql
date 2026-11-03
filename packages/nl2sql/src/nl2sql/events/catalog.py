@@ -2,7 +2,7 @@
 
 ``EventBus.publish`` refuses a name that is not here and validates ``data``
 against its model; ``engine.events.catalog()`` returns the list, so an
-observer author and the docs read the same thing. 
+observer author and the docs read the same thing.
 
 Events never carry result rows, sample values, keys or header values.
 The question and the answer text are carried and may contain values from the
@@ -529,8 +529,8 @@ CATALOG: Dict[str, EventSpec] = {
     "knowledge.loaded": _spec(KnowledgeLoaded, "The knowledge sources were loaded, at build or by "
                                                "engine.knowledge.reload().", run=False),
     "knowledge.used": _spec(KnowledgeUsedData, "A sub-query's prompts carried glossary terms and rules. "
-                                               "Published by the planner on the sub-query's first prompt "
-                                               "; a plan-cache hit sends none.", run=True),
+                                               "Published by the planner on the sub-query's first prompt; "
+                                               "a plan-cache hit sends none.", run=True),
     "clarification.requested": _spec(ClarificationRequested, "A run ended asking which reading was meant. "
                                                              "Published by the clarifier.", run=True),
     "cost.estimated": _spec(CostEstimated, "The database estimated a sub-query's rows read, and the cost rule "
@@ -561,8 +561,7 @@ CATALOG: Dict[str, EventSpec] = {
                                                  "of change, never values.", run=False),
     "dashboard.schedule_set": _spec(DashboardScheduleSet, "A refresh schedule was set; it saves a snapshot of "
                                                           "the caller's roles.", run=False, audit=True),
-    "dashboard.schedule_stopped": _spec(DashboardScheduleStopped, "A schedule stopped with a visible error "
-                                                                  ".", run=False, audit=True),
+    "dashboard.schedule_stopped": _spec(DashboardScheduleStopped, "A schedule stopped with a visible error.", run=False, audit=True),
     "workspace.changed": _spec(WorkspaceChanged, "A workspace was created, renamed or deleted.", run=False),
     "datasource.saved": _spec(DatasourceSaved, "One datasource's file was written "
                                                "(engine.datasources.save).", run=False, audit=True),

@@ -1,4 +1,4 @@
-"""The shapes tracks share, added before any of them.
+"""The shared shapes of run events and evals.
 
 The config sections and settings, the registry kinds, the error codes, the
 result fields, the engine's bus and the stub ``engine.events`` and
@@ -270,7 +270,7 @@ def test_two_engines_have_two_buses(tmp_path):
 
 
 def test_the_events_and_evals_namespaces_exist(tmp_path):
-    """Stubs: E1 fills ``engine.events``, V1 ``engine.evals``. Neither loads nl2sql.evaluation."""
+    """The ``engine.events`` and ``engine.evals`` namespaces. Neither loads nl2sql.evaluation."""
     from nl2sql.api.evals_api import EvalsAPI
     from nl2sql.api.events_api import EventsAPI
 

@@ -17,6 +17,7 @@ from nl2sql_sdk.knowledge import DatasourceKnowledge
 Origin = Literal["knowledge", "database", "derived"]
 """Where an item came from: a knowledge source, the database's own comment, or a fact the snapshot proves."""
 
+
 class TermMatch(BaseModel):
     """A glossary term sent with a sub-query: what it means, where it came from and how well it matched."""
 

@@ -9,8 +9,7 @@ index). The texts are every free text and every name an item carries: a rule
 id and an enum code count. So knowledge never names a hidden table by its
 exact name. A paraphrase ("the pay table"), a plural or singular ("salary"
 for ``salaries``) and a name inside a longer identifier (``salaries_history``)
-cannot be caught this way; the validator still refuses any plan on the table
-.
+cannot be caught this way; the validator still refuses any plan on the table.
 
 The check needs the datasource's snapshot, to know which tables are denied:
 without one, nothing is visible (fails closed).

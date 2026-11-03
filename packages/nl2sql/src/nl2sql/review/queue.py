@@ -155,8 +155,8 @@ def propose(ctx: Any, proposal: Proposal) -> Proposal:
     """File ``proposal`` in the queue, by its identity and the supersede rule; return the row as stored.
 
     ``tables`` is completed with every table the target and change name
-    (``named_tables``), so a caller who cannot read one of them never sees it
-. Publishes ``proposal.created`` when the row is new, or was
+    (``named_tables``), so a caller who cannot read one of them never sees it.
+    Publishes ``proposal.created`` when the row is new, or was
     superseded and is proposed again.
     """
     given = {t.lower() for t in proposal.tables}
@@ -187,7 +187,7 @@ def current_value(ctx: Any, user: "UserContext", proposal: Proposal) -> Optional
     """What ``proposal`` would replace, as ``user`` may see it; None when there is none or it is hidden.
 
     For a glossary kind, the item in the merged knowledge as ``user`` sees it
-    (K1's ``engine.knowledge.show``, which hides an item on or mentioning a
+    (``engine.knowledge.show``, which hides an item on or mentioning a
     denied table). For a verified query, the curated query with the same id,
     only when ``user``'s scope reaches every table its SQL reads.
     """

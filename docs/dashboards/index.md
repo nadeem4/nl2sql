@@ -10,13 +10,13 @@ private workspace. Opening one serves stored results after the access check; ref
 stored plans as the caller with no model call. The methods are in
 [Dashboards API](../api/core/dashboards.md).
 
-| Row | What it adds |
+| Part | What it covers |
 |---|---|
-| D1 | Workspaces, the dashboard store, `pin`, `move` and the manual edits |
-| D2 | `open`, `refresh`, stored results, schedules and `nl2sql dashboards refresh` |
-| D2b | Filters: `refresh(filters=...)` and `filter_values` |
-| D3 | The starter dashboard: `generate` and `suggest_questions`, with no model |
-| D4 | Building and editing a dashboard in a conversation (`dashboard_edit`, `dashboard_pin`) and `create_draft` |
+| Store | Workspaces, the dashboard store, `pin`, `move` and the manual edits |
+| Refresh | `open`, `refresh`, stored results, schedules and `nl2sql dashboards refresh` |
+| Filters | `refresh(filters=...)` and `filter_values` |
+| Starter | The starter dashboard: `generate` and `suggest_questions`, with no model |
+| In chat | Building and editing a dashboard in a conversation (`dashboard_edit`, `dashboard_pin`) and `create_draft` |
 
 ## Workspaces
 
@@ -257,8 +257,7 @@ least 1.
 
 **Where it lands.** The dashboard is saved, owned by you, in `workspace_id` or your "General" workspace (made on
 first use), titled "`<datasource>` overview" unless you pass `title`. It has a `between` filter on the time column
-the trends use and an `in` filter on each dimension the distributions use (their values are applied by refresh,
-D2b). Layout follows the charts that were drawn: big numbers first, one column wide on one row; then lines (the
+the trends use and an `in` filter on each dimension the distributions use (their values are applied by refresh). Layout follows the charts that were drawn: big numbers first, one column wide on one row; then lines (the
 first four wide); then bars (two wide); tables last. It is an ordinary dashboard: rename, rearrange, remove, set
 a schedule, refresh, all by hand, exactly as for one built in chat.
 

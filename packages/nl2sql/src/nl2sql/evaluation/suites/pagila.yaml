@@ -1,6 +1,6 @@
 # The Pagila table-recall suite: 11 hand-written cases over the test bed's Pagila database
 # (docs/testing/test-bed.md), a schema past full_snapshot_max_tables, where the retriever
-# has to choose tables.
+# has to choose tables (wave_c.md, section 17, C-W4).
 #
 # Each case is chosen so a table it needs is more than one join from the others, or the
 # question's words are not near the table's name ("revenue" is not near payment, "spent" is

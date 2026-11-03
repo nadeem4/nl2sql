@@ -1,5 +1,6 @@
 # The Chinook gold suite: 47 hand-written cases over the demo's Chinook database.
-# Moved unchanged from chinook_gold.yaml and chinook_gold_plans.yaml; test_chinook_suite_holds_the_gold_data_unchanged pins the data.
+# Moved unchanged from chinook_gold.yaml and chinook_gold_plans.yaml (wave_a.md,
+# section 8); test_chinook_suite_holds_the_gold_data_unchanged pins the data.
 #
 # rows and alt_rows are never typed by hand: engine.evals.regenerate writes them
 # by running sql and each alt_sql through the datasource's adapter. A new accepted

@@ -5,8 +5,7 @@
   cap (``max_cost_usd``), refuses to start if a model it would call has no
   price, and stops before a case that could pass the cap. Each config runs on
   its own derived runtime (``ctx.derive``) with the **plan cache off**, so a
-  second pass asks the planner again. Curated answers follow ``curated``
-: a case a verified query answered runs again with them off, and that
+  second pass asks the planner again. Curated answers follow ``curated``: a case a verified query answered runs again with them off, and that
   run is scored as its generated answer.
 * ``plans``: each case's hand-written plan through the validator, generator
   and executor, on the gold-plan fake LLM (:mod:`nl2sql.evaluation.gold_llm`).
@@ -26,7 +25,7 @@ question; every finished case publishes ``eval.case``, and the run
 ``eval.finished``, on the engine's bus.
 
 A case whose outcome for a role is ``clarify`` runs only with
-``clarify=True``. clarification turns the engine's clarification on
+``clarify=True``. ``clarify=True`` turns the engine's clarification on
 for such a run; until then it is off, and those role runs are counted in
 ``skipped``.
 """

@@ -434,7 +434,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument("--timeout", type=float, default=900,
                         help="seconds to wait for the web app to serve (default 900; the first run downloads a model)")
     parser.add_argument("--guided-turns", action="store_true",
-                        help="also ask every guided question and the follow-up as conversation turns (R1 turns this on "
+                        help="also ask every guided question and the follow-up as conversation turns (turn this on "
                              "once the answers are re-recorded)")
     parser.add_argument("--keep", action="store_true", help="keep the virtualenv and demo folder afterwards")
     args = parser.parse_args(argv)

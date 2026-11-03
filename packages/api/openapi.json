@@ -927,7 +927,7 @@
         "type": "object"
       },
       "ClarificationChoice": {
-        "description": "The caller's pick, passed to ``run_query(choice=...)`` (from L2) to run that option's plan.",
+        "description": "The caller's pick, passed to ``run_query(choice=...)`` to run that option's plan.",
         "properties": {
           "option_id": {
             "title": "Option Id",
@@ -5523,7 +5523,7 @@
       },
       "ScheduleIdentity": {
         "additionalProperties": false,
-        "description": "the owner, as they were when they set the schedule. Stored only on the schedule.",
+        "description": "The owner, as they were when they set the schedule. Stored only on the schedule.",
         "properties": {
           "roles": {
             "items": {

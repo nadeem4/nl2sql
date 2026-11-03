@@ -3,8 +3,7 @@
 ``DiscoverableAdapter`` is optional. An adapter without it is never found, only
 chosen by name; with it, the engine matches a connection URL's scheme, files by
 suffix and local ports against what each adapter declares, so the engine names
-no database itself and a plugin adapter is found the same way as a built-in one
-. The adapter interface stays at
+no database itself and a plugin adapter is found the same way as a built-in one. The adapter interface stays at
 version 2: the engine tests for these with ``isinstance``.
 
 This module imports only pydantic and the standard library.

@@ -15,7 +15,7 @@ from nl2sql.api.dashboards_api import DashboardsAPI
 from nl2sql_cli.main import app
 from nl2sql.dashboards.models import DashboardRun, TileRun
 from nl2sql.testing.config import make_config
-from test_dashboards_d2 import NOW, ROLES, Runs, failed, good, seed
+from test_dashboards_refresh import NOW, ROLES, Runs, failed, good, seed
 
 runner = CliRunner()
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")

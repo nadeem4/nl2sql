@@ -145,8 +145,8 @@ def canonical_yaml(glossary: Glossary) -> str:
 def write_glossary(path: Path, glossary: Glossary, expected_sha256: Optional[str]) -> str:
     """Rewrite ``path`` with ``glossary`` in canonical form; return the new file's SHA-256.
 
-    Engine-internal: only the review queue's accept calls it, under its lock
-. The real path is resolved first, so a symlinked file is written
+    Engine-internal: only the review queue's accept calls it, under its lock.
+    The real path is resolved first, so a symlinked file is written
     through and the link kept; the text goes to a temporary file beside it,
     flushed to disk and given the file's mode, which is renamed over it. The
     hash check and the rename are check-then-act against an editor outside

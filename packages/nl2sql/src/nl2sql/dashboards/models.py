@@ -1,7 +1,6 @@
-"""Dashboards: a titled set of charts in a workspace, each keeping the typed plan that produced it
-.
+"""Dashboards: a titled set of charts in a workspace, each keeping the typed plan that produced it.
 
-These are the shapes only; ``engine.workspaces`` and ``engine.dashboards`` arrive with D1 to D4. In the
+These are the shapes; ``engine.workspaces`` and ``engine.dashboards`` fill them. In the
 code a chart's slot is a ``Tile``: "chart" and "tile" mean the same thing.
 """
 from __future__ import annotations
@@ -108,7 +107,7 @@ class DashboardFilter(StrictModel):
 
 
 class ScheduleIdentity(StrictModel):
-    """the owner, as they were when they set the schedule. Stored only on the schedule."""
+    """The owner, as they were when they set the schedule. Stored only on the schedule."""
 
     user_id: Optional[str] = None
     tenant_id: Optional[str] = None
@@ -148,7 +147,7 @@ class TileRun(StrictModel):
     trace_id: Optional[str] = None
     chart: Optional[ChartSpec] = None  # holds the rows, at most charts.max_points
     explanation: Optional[str] = None  # explanation of the run, for "why"
-    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # the result's columns; D2 fills it
+    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # the result's columns; a refresh fills it
     filtered: bool = False  # every active filter applied to this chart
     error: Optional[Dict[str, Any]] = None  # the QueryResult's first error, client-safe
     # What a person must approve before this chart runs (status ``needs_approval``): pass an ``Approval`` for

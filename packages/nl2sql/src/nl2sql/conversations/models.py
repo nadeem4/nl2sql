@@ -1,7 +1,6 @@
 """A conversation: stored turns, each a bounded loop of tool calls.
 
-These are the shapes only; ``engine.conversations`` arrives with C1. A conversation is stored data
-: every call names it. A step holds a ``QueryResult`` that is stored without rows.
+These are the shapes; ``engine.conversations`` fills them. A conversation is stored data: every call names it. A step holds a ``QueryResult`` that is stored without rows.
 """
 from __future__ import annotations
 

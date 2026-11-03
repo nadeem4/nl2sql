@@ -33,6 +33,7 @@ class KeepsReferences:
     config, logs and errors only ever hold the reference.
     """
 
+
 KEEPS_REFERENCES = KeepsReferences()
 
 Secret = Annotated[str, KEEPS_REFERENCES]
@@ -105,6 +106,7 @@ AgentName = Literal[
 
 Mode = Literal["demo", "your_data", "hosted"]
 """What a project is for: the bundled demo, the owner's own data, or a hosted public demo."""
+
 
 class _Model(BaseModel):
     """Strict, frozen, and a secret never prints.
@@ -265,7 +267,7 @@ class CostRule(_Model):
     rows), each ``allow``, ``confirm`` (a person approves, through the
     approval) or ``refuse``. ``max_estimated_rows: null`` is no limit. On a
     role, the fields it sets replace the top-level ones for that role. Enforced
-    by the built-in ``policy.cost`` hook from C2.
+    by the built-in ``policy.cost`` hook.
     """
 
     max_estimated_rows: Optional[PositiveInt] = None
@@ -368,8 +370,10 @@ class _PluginBlock(BaseModel):
 class PolicyCheckConfig(_PluginBlock):
     """A policy check, by name: ``PolicyCheckConfig(type="corp_iam", url=...)``. The check's ``config_model`` checks the other keys."""
 
+
 class StoreConfig(_PluginBlock):
     """One store, by name: ``StoreConfig(type="files")``. The store's ``config_model`` checks the other keys."""
+
 
 STORE_SLOTS = ("index", "state", "traces", "results")
 
@@ -464,17 +468,17 @@ class PipelineSettings(_Model):
     strict_columns: bool = True
     today: Optional[date] = None  # pin the run date
     retries: RetrySettings = Field(default_factory=RetrySettings)
-    # Per-question caps (enforced from E3): model calls, parse retries
+    # Per-question caps: model calls, parse retries
     # included, and dollars. None turns a cap off.
     max_llm_calls: Optional[PositiveInt] = 60
     max_cost_usd: Optional[PositiveFloat] = None
-    # The answer sanity checks (read from S1).
+    # The answer sanity checks.
     sanity_checks: bool = True
 
 
 class RetrievalSettings(_Model):
     full_snapshot_max_tables: int = Field(15, ge=0)
-    # Read by the schema retriever and the resolver from R1: they were
+    # Read by the schema retriever and the resolver: they were
     # TABLE_K, PLANNING_K and MAX_DECOMPOSER_TABLES.
     table_k: PositiveInt = 8
     planning_k: PositiveInt = 12
@@ -488,7 +492,7 @@ class RetrievalSettings(_Model):
 
 
 class RoutingSettings(_Model):
-    """Cross-database routing (read from R1 and R2)."""
+    """Cross-database routing (read by the router)."""
 
     candidates: PositiveInt = 3  # datasources shown to the answerability check
     max_datasources: PositiveInt = 3  # datasources one question may use
@@ -522,7 +526,7 @@ class FeedbackSettings(_Model):
 
 
 class KnowledgeSettings(_Model):
-    """How much knowledge reaches a prompt (read from K1 and K2)."""
+    """How much knowledge reaches a prompt (read by the knowledge sources and the schema retriever)."""
 
     item_max_chars: PositiveInt = 500  # one glossary text; longer is a load error
     block_max_chars: PositiveInt = 4000  # the whole [BUSINESS_CONTEXT] block; cut by score, and traced
@@ -531,13 +535,13 @@ class KnowledgeSettings(_Model):
 
 
 class ClarifySettings(_Model):
-    """Clarify instead of guess (read from L1)."""
+    """Clarify instead of guess (read by the clarifier)."""
 
     enabled: bool = True
 
 
 class ProfilerSettings(_Model):
-    """The schema profiler's bounds (read from P1 and P2)."""
+    """The schema profiler's bounds (read by the profiler)."""
 
     sample_rows: PositiveInt = 1000  # distinct values one overlap probe reads
     max_probes: PositiveInt = 200  # overlap probes per datasource
@@ -548,7 +552,7 @@ class ProfilerSettings(_Model):
 
 
 class ReviewSettings(_Model):
-    """The review queue (read from Q1)."""
+    """The review queue (read by the review queue)."""
 
     max_age_days: PositiveInt = 365  # decided proposals are purged after this
 
@@ -595,8 +599,9 @@ class Settings(_Model):
 class ObserverConfig(_PluginBlock):
     """One observer, by name: ``ObserverConfig(type="log")``. The observer's ``config_model`` checks the other keys.
 
-    The engine builds its observers from the ``observers`` section from E2.
+    The engine builds its observers from the ``observers`` section.
     """
+
 
 HookPoint = Literal["run.before", "datasources.after", "plan.after", "execute.before", "execute.after",
                     "answer.after"]
@@ -622,8 +627,9 @@ class KnowledgeSourceConfig(_PluginBlock):
     """One knowledge source, by name: ``KnowledgeSourceConfig(type="yaml", path="glossary.yaml")``.
 
     The source's ``config_model`` checks the other keys. The engine builds and
-    loads its knowledge sources from K1.
+    loads its knowledge sources.
     """
+
 
 _EXAMPLE = {"an observer": "log", "a hook": "corp_sql_review", "a knowledge source": "yaml"}
 
@@ -649,12 +655,12 @@ HookEntry = Annotated[Union[HookConfig, Any], BeforeValidator(_entry(HookConfig,
 KnowledgeEntry = Annotated[Union[KnowledgeSourceConfig, Any],
                            BeforeValidator(_entry(KnowledgeSourceConfig, "a knowledge source", "load"))]
 
-# The built-in scorers (from V1): the default list.
+# The built-in scorers: the default list.
 DEFAULT_SCORERS = ("result_match", "outcome", "faithfulness", "retrieval_recall", "routing")
 
 
 class EvalGate(_Model):
-    """The regression gate (from V2): regressions, accuracy and cost against a baseline."""
+    """The regression gate regressions, accuracy and cost against a baseline."""
 
     max_regressions: NonNegativeInt = 2  # mode full: cases that passed in the baseline and fail now
     alpha: float = Field(0.05, gt=0.0, lt=1.0)  # mode full: McNemar's exact two-sided p, when more were lost
@@ -662,7 +668,7 @@ class EvalGate(_Model):
 
 
 class EvalsConfig(_Model):
-    """The ``evals`` section: the suites, the scorers and the gate. ``engine.evals`` reads it from V1.
+    """The ``evals`` section: the suites, the scorers and the gate. ``engine.evals`` reads it.
 
     A relative suite path is relative to the folder of ``nl2sql.yaml``. A
     suite file is data, read when a run asks for it, not when the engine
@@ -679,7 +685,7 @@ class EvalsConfig(_Model):
 # ---------------------------------------------------------------- Sections for conversations, dashboards and chat tools
 
 class Conversations(_Model):
-    """The ``conversations`` section: how a model-led turn is bounded and kept (read from C1)."""
+    """The ``conversations`` section: how a model-led turn is bounded and kept."""
 
     context_turns: PositiveInt = 3  # turns the model sees
     max_tool_calls: PositiveInt = 12  # tool calls per turn; the model then makes one last call, tools off
@@ -688,7 +694,7 @@ class Conversations(_Model):
 
 
 class Dashboards(_Model):
-    """The ``dashboards`` section (read from D1 to D3)."""
+    """The ``dashboards`` section (read by the dashboards service)."""
 
     max_tiles: PositiveInt = 10  # the starter dashboard's size
     min_refresh_minutes: PositiveInt = 15
@@ -718,7 +724,7 @@ class McpHttp(_Model):
 
 
 class Mcp(_Model):
-    """The ``mcp`` section: ``nl2sql mcp --http`` (read from M2)."""
+    """The ``mcp`` section: ``nl2sql mcp --http`` (read by the MCP server)."""
 
     http: McpHttp = Field(default_factory=McpHttp)
     auth: Literal["api_keys", "none"] = "api_keys"  # none: loopback only

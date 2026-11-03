@@ -6,13 +6,13 @@
 A chat tool turns something a conversation already has into something else, with no model call of its
 own. The five built-ins:
 
-| Tool | Does | Filled by |
-|---|---|---|
-| `chart` | Draws an answer's data as a line, bar, big number or table ([Charts](../charts/index.md)); args `turn`, `step`, `result_id`, `kind` | K1 (built) |
-| `diagram` | Draws the tables of an answer, or of a datasource, as Mermaid ([Diagrams](../charts/diagrams.md)); args `view` (`answer` or `schema`), `turn`, `step`, `datasource_id`, `tables` | K2 (built) |
-| `report` | Writes the conversation's answered turns up as Markdown; args `turns`, `title` | C2 (built) |
-| `dashboard_edit` | Builds or changes a dashboard ([Dashboards](../dashboards/index.md#building-in-chat)); args `edits`, `dashboard_id`, `title`, `workspace_id` | D4 (built) |
-| `dashboard_pin` | Saves the dashboard being built, whole; args `dashboard_id`, `workspace_id`, `title` | D4 (built) |
+| Tool | Does |
+|---|---|
+| `chart` | Draws an answer's data as a line, bar, big number or table ([Charts](../charts/index.md)); args `turn`, `step`, `result_id`, `kind` |
+| `diagram` | Draws the tables of an answer, or of a datasource, as Mermaid ([Diagrams](../charts/diagrams.md)); args `view` (`answer` or `schema`), `turn`, `step`, `datasource_id`, `tables` |
+| `report` | Writes the conversation's answered turns up as Markdown; args `turns`, `title` |
+| `dashboard_edit` | Builds or changes a dashboard ([Dashboards](../dashboards/index.md#building-in-chat)); args `edits`, `dashboard_id`, `title`, `workspace_id` |
+| `dashboard_pin` | Saves the dashboard being built, whole; args `dashboard_id`, `workspace_id`, `title` |
 
 ## Which tools are on
 

@@ -12,8 +12,8 @@ from typing import Any, Dict, List
 import pytest
 import yaml
 from langchain_core.embeddings import DeterministicFakeEmbedding
-from test_answers_db1a import answered, converse, keep_trace, save
-from test_dashboards_d3 import Runs, failed, good
+from test_saved_answers import answered, converse, keep_trace, save
+from test_dashboards_starter import Runs, failed, good
 from test_review_queue import ADMIN, ANALYST, ROLES
 
 from nl2sql import NL2SQL, CancellationToken, Embeddings, UserContext

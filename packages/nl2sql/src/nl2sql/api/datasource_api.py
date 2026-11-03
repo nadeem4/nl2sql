@@ -15,7 +15,6 @@ from pydantic import BaseModel, SecretStr
 from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.errors import DatasourceNotFound, NotAuthorized
-from nl2sql.common.planned import arrives_with
 from nl2sql.config import Datasource
 from nl2sql.config.models import is_secret_key
 from nl2sql.datasources.registry import mask_connection_args

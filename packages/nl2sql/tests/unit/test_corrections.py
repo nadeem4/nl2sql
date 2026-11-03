@@ -1,6 +1,6 @@
 """Corrections: a thumbs-down with a fix becomes a checked ``verified_query`` proposal.
 
-The engine is Q1's: a real
+The engine is a real
 engine on a small SQLite database, indexed with a fake embedder, so nothing is
 downloaded and no model is called. A run is a trace written to the engine's
 trace store, as a run with traces kept leaves one.

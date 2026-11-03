@@ -35,7 +35,7 @@ class SubgraphOutput(BaseModel):
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
     status: Optional[str] = None
     # the knowledge the prompts carried, the planner's
-    # other readings when the run did not ask (L1; the explanation lists them as assumptions) and
+    # other readings when the run did not ask (the explanation lists them as assumptions) and
     # the cost estimate the cost rule read.
     knowledge_used: Optional[KnowledgeUsed] = None
     ambiguous_phrase: Optional[str] = None

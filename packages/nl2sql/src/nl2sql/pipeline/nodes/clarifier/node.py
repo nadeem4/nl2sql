@@ -137,7 +137,7 @@ class ClarifierNode:
             return {"ast_planner_response": response.model_copy(update={"ambiguous_phrase": None,
                                                                         "alternatives": []})}
         kept = self._options(state, response)
-        # Only ``alternatives`` is cut: K2's ``alternatives_offered`` (every reading the planner gave) stays,
+        # Only ``alternatives`` is cut: ``alternatives_offered`` (every reading the planner gave) stays,
         # and the plan cache's "never cache an answer with readings" rule reads it.
         update: Dict[str, Any] = {"ast_planner_response": response.model_copy(update={"alternatives": kept})}
         # Never once an attempt executed (a sanity retry's re-plan): the default reading runs again, so the

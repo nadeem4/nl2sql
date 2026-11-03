@@ -48,8 +48,8 @@ def schema_knowledge(knowledge: Any, datasource_id: str, snapshot: SchemaSnapsho
     """The run's knowledge for one datasource, filtered to ``scope`` and resolved against ``snapshot``.
 
     A description is the glossary's, else the database's comment, and
-    either is dropped when its text mentions a table the caller cannot read
-. A role is the glossary's, else the one the snapshot proves.
+    either is dropped when its text mentions a table the caller cannot read.
+    A role is the glossary's, else the one the snapshot proves.
     A glossary join is a relationship only between two tables the caller may
     read, with comparable types.
     """
@@ -172,7 +172,7 @@ class SchemaRetrieverNode:
     def visible_tables(self, user_context: Any, datasource_id: str) -> List[Table]:
         """Every table of the datasource's live build the caller may read, as the planner is shown them.
 
-        For work that plans without a question (V3's seeding): the same tables,
+        For work that plans without a question (eval seeding): the same tables,
         columns, keys, descriptions and sample values a pinned plan's sub-query
         gets, and nothing the caller's scope hides. Empty before the first build.
         """

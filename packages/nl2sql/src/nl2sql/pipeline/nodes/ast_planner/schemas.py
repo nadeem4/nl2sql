@@ -237,7 +237,7 @@ class PlanAlternative(BaseModel):
 
 
 class PlannerAnswer(BaseModel):
-    """The planner's structured output (from K2, replacing a bare ``PlanModel``).
+    """The planner's structured output (more than a bare ``PlanModel``).
 
     ``plan`` is the most likely reading. When the question can reasonably be
     read more than one way that changes the result, ``ambiguous_phrase`` names

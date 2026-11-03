@@ -6,7 +6,7 @@ a null cost. ``max_llm_calls`` (60) and ``max_cost_usd`` (none) are
 checked before each model call, by a ``Budget`` that cancels the run's token
 with a ``RunStop`` reason, so the run ends ``stopped`` rather than retried as
 a planner error. A ``Budget`` also works outside a question, with caps
-of its own (profiler, V3's seeding).
+of its own (profiler, eval seeding).
 """
 from __future__ import annotations
 

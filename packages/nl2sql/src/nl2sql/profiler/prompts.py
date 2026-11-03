@@ -1,6 +1,6 @@
 """The ``profiler`` agent's prompt: it describes the tables and columns the evidence asks for, and nothing else.
 
-Derived from the prompt of the enrichment ``nl2sql index --enrich`` ran (deleted by K3). The datasource's
+Derived from the prompt of the enrichment ``nl2sql index --enrich`` ran (since deleted). The datasource's
 description, domains and sample questions are the operator's, so
 they are no longer asked for.
 """

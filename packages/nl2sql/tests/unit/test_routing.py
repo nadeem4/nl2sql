@@ -1,4 +1,4 @@
-"""Phase R routing.
+"""Routing.
 
 One index entry per example phrasing; five signals (the description, the
 example questions, the verified queries, the tables and the columns) each

@@ -175,7 +175,7 @@ Prevents invalid joins and enforces schema-authorized relationships.
 ## Knowledge Is Data: the Validator and Scope Decide
 
 ### Definition
-The glossary (knowledge) reaches a model only as JSON values: inside
+The glossary reaches a model only as JSON values: inside
 the schema block, and inside `[BUSINESS_CONTEXT]`, one JSON object on one line
 in the planner's and refiner's human messages, so a newline or a block marker
 in a definition stays inside one JSON string. Every item and the whole block

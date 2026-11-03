@@ -5,7 +5,7 @@
   "engine_version": "0.6.0",
   "git_commit": "653fa73c76eb2bc764795d19e9ee6e3c78e4617e",
   "git_dirty": false,
-  "note": "0.6 baseline before Phase R",
+  "note": "0.6 baseline before Phase R (R1)",
   "dataset": {
     "name": "chinook_gold.yaml",
     "sha256": "8be35a10ee06d980058ff2f19e7ea97582c035b2f261b7d8ef914423be8dc095"

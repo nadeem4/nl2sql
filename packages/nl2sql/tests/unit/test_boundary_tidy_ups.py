@@ -1,4 +1,4 @@
-"""Small boundary fixes from the architecture audit (F13, F16, F17, F18, F19, F20).
+"""Small boundary fixes from the architecture audit.
 
 The package boundaries themselves are enforced in
 ``packages/nl2sql/tests/architecture/test_boundaries.py``.

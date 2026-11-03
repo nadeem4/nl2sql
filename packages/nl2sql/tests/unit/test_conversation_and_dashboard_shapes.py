@@ -1,7 +1,7 @@
-"""shared shapes: models, config, codes, events, registry kind.
+"""The shared shapes: models, config, codes, events, registry kind.
 
-Nothing here runs a conversation, a chart or a dashboard: those arrive in later PRs. These tests hold the
-names and the strictness every later PR builds on.
+Nothing here runs a conversation, a chart or a dashboard: those are tested elsewhere. These tests hold the
+names and the strictness the rest builds on.
 """
 from __future__ import annotations
 

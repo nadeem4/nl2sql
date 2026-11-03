@@ -1,4 +1,4 @@
-"""The review fixes of C0b, end to end on the demo databases and the fake LLM.
+"""The review fixes, end to end on the demo databases and the fake LLM.
 
 ``answer=False`` still runs ``answer.after`` (a deny withholds the rows and the manifest); a supplied verified
 plan never falls back to a model run; a supplied multi-sub-query decomposition and a supplied verified plan run

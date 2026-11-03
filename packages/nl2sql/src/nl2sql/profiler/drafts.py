@@ -1,8 +1,8 @@
 """The profiler's drafted descriptions: the evidence a model is shown, the cleaning of its answer, and the run.
 
 ``profile(draft=True)`` calls :func:`draft_descriptions`. The evidence
-and cleaning functions were ``indexing/enrichment_service.py``'s, moved here unchanged by K3, which stopped the
-index from writing a model's text into the schema snapshot: a draft is a proposal in the review queue
+and cleaning functions were ``indexing/enrichment_service.py``'s, moved here unchanged. The
+index no longer writes a model's text into the schema snapshot: a draft is a proposal in the review queue
 and reaches nothing until a person accepts it.
 """
 from __future__ import annotations

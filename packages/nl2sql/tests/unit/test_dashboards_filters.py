@@ -1,7 +1,7 @@
 """Dashboard filters.
 
 A filter value becomes a typed predicate added to each stored plan that reads the filter's table, before ``plan.after``,
-the validator and the generator. The run itself is canned here (see ``test_dashboards_d2``); the real pipeline is held
+the validator and the generator. The run itself is canned here (see ``test_dashboards_refresh``); the real pipeline is held
 by ``tests/e2e/test_dashboards_fake_llm.py``.
 """
 from __future__ import annotations
@@ -26,8 +26,8 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
 from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
 from nl2sql_sdk import Limits
 
-# The service tests reuse D2's canned runs and engine fixtures (this directory is on ``sys.path``).
-from test_dashboards_d2 import (  # noqa: F401  (fixtures)
+# The service tests reuse the refresh tests' canned runs and engine fixtures (this directory is on ``sys.path``).
+from test_dashboards_refresh import (  # noqa: F401  (fixtures)
     ANA, BOB, chart_plan, engine, good, listen, make, put_run, runs, seed, server, stored, tile,
 )
 
@@ -393,7 +393,7 @@ def test_filter_values_of_an_empty_table_is_empty(engine, runs, paged):
 
 
 def test_filter_values_for_a_caller_without_access_raises_and_returns_nothing(engine, runs, paged):
-    from test_dashboards_d2 import failed
+    from test_dashboards_refresh import failed
 
     seed(engine, filters=[CITY])
     runs.respond = lambda call: failed("SECURITY_VIOLATION", node="logical_validator", message="No access to orders.")

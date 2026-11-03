@@ -1,4 +1,4 @@
-"""Policies, step 1: the ``PolicyCheck`` extension point (PR P2).
+"""Policies, step 1: the ``PolicyCheck`` extension point.
 
 A check is a plugin that grants allow and deny patterns per caller and
 datasource. Its ``Grant`` is intersected with the YAML roles, so neither can

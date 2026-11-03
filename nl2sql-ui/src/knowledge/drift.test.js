@@ -1,4 +1,4 @@
-// A drift check as the Drift panel reads it. The fixtures are the API's own `DriftReport`s (written by the A3 route test).
+// A drift check as the Drift panel reads it. The fixtures are the API's own `DriftReport`s (written by the route test).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

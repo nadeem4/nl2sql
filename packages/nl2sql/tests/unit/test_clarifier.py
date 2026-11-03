@@ -431,7 +431,7 @@ def test_the_clarifier_keeps_what_the_planner_offered(monkeypatch):
 
     response = state["ast_planner_response"]
     assert response.alternatives == []
-    # K2's plan cache reads alternatives_offered ("never cache an answer with readings"): the clarifier
+    # The plan cache reads alternatives_offered ("never cache an answer with readings"): the clarifier
     # cuts only alternatives, so the dropped readings still keep the plan out of the cache.
     assert response.alternatives_offered == offered
 

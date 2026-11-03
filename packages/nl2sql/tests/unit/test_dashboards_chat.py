@@ -31,7 +31,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 # The fixtures and helpers of the conversation and dashboard tests.
 from test_conversations import (ANA, BOB, _block, ask, engine, make, model, reply, server,  # noqa: F401
                                 started)
-from test_dashboards_d2 import NOW, chart_plan, seed, stored, tile
+from test_dashboards_refresh import NOW, chart_plan, seed, stored, tile
 
 
 def plan_json(table: str = "orders") -> Dict[str, Any]:
