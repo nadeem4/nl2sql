@@ -85,6 +85,39 @@ def test_every_recorded_question_replays_after_add_demo(tmp_path):
 
 
 @pytest.mark.e2e
+def test_every_recorded_question_streams_keyless_after_add_demo(tmp_path):
+    """The keyless demo streams: each recorded question ends in ``run.finished`` with its rows saved, no REPLAY_MISS.
+
+    The replay provider answers whole (D209), so no ``answer.delta`` chunks arrive; the old playground test that
+    counted chunks measured a fake server, not the product.
+    """
+    from nl2sql.config import Embeddings, default_llm, starter_config
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
+    from nl2sql.llm.replay import REPLAY
+
+    registry = Registry.default()
+    registry.add_llm("replay", REPLAY, replace=True)
+    config = starter_config(llm=default_llm("replay"), path=tmp_path / "store").model_copy(
+        update={"knowledge": [], "embeddings": Embeddings(provider="local")})
+    with NL2SQL(config, registry=registry) as engine:
+        engine.add_demo(user_context=ADMIN)
+        listed = engine.llm.recorded(DEMO_QUESTIONS)
+        assert listed
+        failed, no_manifest = {}, []
+        for question in listed:
+            events = list(engine.stream_query(question, user_context=ADMIN))
+            final = events[-1]
+            body = final.data.get("result", final.data)
+            if final.name != "run.finished" or body.get("status") != "success" or body.get("replay_miss"):
+                failed[question] = final.name
+            if "result.manifest" not in [e.name for e in events]:
+                no_manifest.append(question)
+
+    assert failed == {}
+    assert no_manifest == []
+
+
+@pytest.mark.e2e
 def test_every_recorded_question_still_replays_after_a_restart(tmp_path):
     """Try the demo on a project, then a new engine from the same folder: the queries and glossary came back (D237)."""
     from nl2sql.config import init_project, load_config

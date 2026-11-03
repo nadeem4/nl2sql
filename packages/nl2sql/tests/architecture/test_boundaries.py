@@ -517,15 +517,14 @@ def test_bundled_adapter_dialects(name, dialect):
 
 # --------------------------------------------------------------------------
 # 8. The CLI is a client, not a library (moved from
-#    tests/unit/test_cli_demo_boundaries.py)
+#    tests/unit/test_cli_demo_boundaries.py, long since folded in here)
 # --------------------------------------------------------------------------
 
 CLI = ENGINE / "cli"
-DEMO = CLI / "demo"
 
 
 def test_nothing_outside_the_cli_imports_the_cli():
-    """The engine is a library first: the CLI, the API and the playground are its callers."""
+    """The engine is a library first: the CLI, the API and the MCP server are its callers."""
     offenders = [
         f"{_where(path)}:{lineno} {name}"
         for path in python_files(*SOURCES)
@@ -539,24 +538,11 @@ def test_nothing_outside_the_cli_imports_the_cli():
         "with the CLI reading it from there.", offenders)
 
 
-def test_cli_demo_never_imports_cli_commands():
-    """A command is an entry point. Importing one makes its argument parsing a dependency."""
-    offenders = [
-        f"{_where(path)}:{lineno} {name}"
-        for path in python_files(DEMO)
-        for lineno, name, _ in imports(path)
-        if name == "nl2sql.cli.commands" or name.startswith("nl2sql.cli.commands.")
-    ]
-    assert not offenders, _broke(
-        "nl2sql.cli.demo never imports nl2sql.cli.commands: a helper the demo and a command "
-        "share lives in cli/demo/ or cli/common/.", offenders)
-
-
 MCP_SERVER = ENGINE / "mcp"
 
 
-def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
-    """The CLI, the playground, the MCP server and nl2sql-api are clients of the facade, like any SDK caller.
+def test_the_cli_the_mcp_server_and_the_api_use_only_the_public_api():
+    """The CLI, the MCP server and nl2sql-api are clients of the facade, like any SDK caller.
 
     None of them reaches the runtime behind it (``engine._runtime``, the
     removed ``engine.context``, a namespace's ``_ctx``): what one of them needs
@@ -573,24 +559,9 @@ def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
                   and node.args[1].value in hidden):
                 offenders.append(f"{_where(path)}:{node.lineno} getattr(..., {node.args[1].value!r})")
     assert not offenders, _broke(
-        "The CLI, the playground and nl2sql-api reach the engine only through NL2SQL's public "
+        "The CLI, the MCP server and nl2sql-api reach the engine only through NL2SQL's public "
         "methods and namespaces, never engine._runtime. Anything they need from the runtime is "
         "a facade method every caller can use.", offenders)
-
-
-# What the playground and ``nl2sql demo`` still import from inside the engine,
-# and why. Everything else comes from the top-level ``nl2sql``. The list only
-# shrinks: nl2sql-api gets none of it.
-STILL_IMPORTED_FROM_INSIDE = {
-    "nl2sql.llm.providers": "provider knowledge the CLI reads from the engine: labels, verified models, "
-                            "the key shape (CLAUDE.md)",
-    "nl2sql.llm.request_key": "the hosted demo's per-request keys, until Phase 4 moves the web app onto "
-                              "nl2sql-api",
-    "nl2sql.llm.replay": "nl2sql demo's recording proxy and replay store",
-    "nl2sql.testing.fake_llm": "nl2sql demo's keyless replay server",
-    "nl2sql.datasets.demo": "nl2sql demo's guided questions",
-    "nl2sql.config": "nl2sql demo writes its project with init_project, as nl2sql init does",
-}
 
 
 def _engine_imports(path: pathlib.Path):
@@ -603,30 +574,6 @@ def _engine_imports(path: pathlib.Path):
         else:
             continue
         yield from ((node.lineno, name) for name in names if name == "nl2sql" or name.startswith("nl2sql."))
-
-
-def test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql():
-    """They are clients of the facade: ``from nl2sql import ...``, never the engine's internals.
-
-    Feedback, traces, the pipeline's steps, the index's defaults and the
-    provider list are facade methods (``engine.feedback``, ``engine.traces``,
-    ``engine.about()``, ``engine.index``, ``engine.llm.providers()``), so
-    ``nl2sql.feedback``, ``nl2sql.tracing``, ``nl2sql.pipeline``,
-    ``nl2sql.indexing`` and ``PROVIDER_PRESETS`` are out of reach.
-    """
-    api = PACKAGES / "api" / "src" / "nl2sql_api"
-    offenders = []
-    for path in python_files(DEMO / "playground", api) + (CLI / "commands" / "demo.py",):
-        in_api = path.is_relative_to(api)
-        for lineno, name in _engine_imports(path):
-            allowed = name == "nl2sql" or (not in_api and (
-                name.startswith("nl2sql.cli.") or name in STILL_IMPORTED_FROM_INSIDE))
-            if not allowed:
-                offenders.append(f"{_where(path)}:{lineno} {name}")
-    assert not offenders, _broke(
-        "The playground, nl2sql demo and nl2sql-api import only the top-level nl2sql (plus, for "
-        "the first two, their own CLI package and STILL_IMPORTED_FROM_INSIDE). What they need from "
-        "the engine is a facade method every caller can use.", offenders)
 
 
 def _outside_the_cli(path):
@@ -643,25 +590,33 @@ def _outside_the_cli(path):
             and not (lineno in facade_lines and name.count(".") == 1)]
 
 
-def test_the_cli_imports_only_the_public_nl2sql():
-    """The CLI is a client of the facade, like the API: ``from nl2sql import ...``, never the engine's internals.
+def test_the_cli_and_the_api_import_only_the_public_nl2sql():
+    """They are clients of the facade: ``from nl2sql import ...``, never the engine's internals, with no exception.
 
-    The old playground, ``cli/demo/``, is held to the older rule above until X1b
-    deletes it (they are in ``STILL_IMPORTED_FROM_INSIDE``); nothing else is excepted.
+    Feedback, traces, the pipeline's steps, the index's defaults and the
+    provider list are facade methods (``engine.feedback``, ``engine.traces``,
+    ``engine.about()``, ``engine.index``, ``engine.llm.providers()``), so
+    ``nl2sql.feedback``, ``nl2sql.tracing``, ``nl2sql.pipeline``,
+    ``nl2sql.indexing`` and ``PROVIDER_PRESETS`` are out of reach. The CLI
+    also keeps to its own ``nl2sql.cli`` package and never names ``nl2sql_sdk``.
     """
-    offenders = []
+    api = PACKAGES / "api" / "src" / "nl2sql_api"
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(api) for lineno, name in _engine_imports(path) if name != "nl2sql"]
     for path in python_files(CLI):
-        relative = path.relative_to(CLI).as_posix()
-        # X1b deletes demo/ (the old playground) before the CLI moves (CL1).
-        if relative.startswith("demo/"):
-            continue
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name in _outside_the_cli(path)]
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
                       if name.partition(".")[0] == "nl2sql_sdk"]
     assert not offenders, _broke(
-        "The CLI imports only the top-level nl2sql (and its own nl2sql.cli package), never the engine's "
-        "internals or nl2sql_sdk. What a command needs is a facade method or export every caller can use.",
-        offenders)
+        "The CLI and nl2sql-api import only the top-level nl2sql (the CLI also its own nl2sql.cli package), never "
+        "the engine's internals, and the CLI never nl2sql_sdk. There is no list of exceptions: what a command or a "
+        "route needs is a facade method or export every caller can use.", offenders)
+
+
+def test_still_imported_from_inside_is_gone():
+    """The list of engine modules the playground and ``nl2sql demo`` still reached into was emptied and deleted (X1b)."""
+    assert "STILL_IMPORTED_FROM_INSIDE" not in globals()
+    assert not (CLI / "demo").exists(), "nl2sql/cli/demo/ (the old playground) was deleted in X1b"
 
 
 def test_mcp_uses_only_the_public_api():
@@ -679,6 +634,45 @@ def test_mcp_uses_only_the_public_api():
     assert not offenders, _broke(
         "nl2sql/mcp/ imports only the top-level nl2sql: what the server needs is a facade method "
         "every caller can use. Nothing outside it imports mcp, the mcp extra.", offenders)
+
+
+# The apps, and the engine's reads that name an asker (wave_d.md, D204). `engine.results.<method>` and
+# `engine.traces.get` return a run's rows or trace only to the caller who asked it; a call without
+# `user_context=` reads as the trusted operator. An app passes the caller on every call, so the CLI, the one
+# operator, says `user_context=None` where it means it.
+APPS = (PACKAGES / "api" / "src" / "nl2sql_api", MCP_SERVER, CLI)
+RESULT_READS = {"manifest", "page", "csv", "chart"}
+
+
+def test_apps_always_pass_the_caller():
+    offenders = []
+    for path in python_files(*APPS):
+        for node in ast.walk(_tree(path)):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Attribute)):
+                continue
+            owner, method = node.func.value.attr, node.func.attr
+            if (owner == "results" and method in RESULT_READS) or (owner == "traces" and method == "get"):
+                if "user_context" not in {k.arg for k in node.keywords}:
+                    offenders.append(f"{_where(path)}:{node.lineno} {owner}.{method}(...) names no user_context")
+    assert not offenders, _broke(
+        "Every app passes the caller to a read of a run's results or trace (D204): a call without user_context= "
+        "is the trusted operator, who sees every run. The CLI says user_context=None where it means that.",
+        offenders)
+
+
+def test_the_rest_api_and_mcp_never_act_as_the_operator():
+    """``as_operator`` is the CLI's (``nl2sql feedback correct``): a REST or MCP caller is always a scoped user."""
+    offenders = []
+    for path in python_files(PACKAGES / "api" / "src" / "nl2sql_api", MCP_SERVER):
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, ast.keyword) and node.arg == "as_operator":
+                offenders.append(f"{_where(path)}:{node.value.lineno} as_operator=")
+            elif isinstance(node, ast.Name) and node.id == "as_operator":
+                offenders.append(f"{_where(path)}:{node.lineno} as_operator")
+    assert not offenders, _broke(
+        "nl2sql_api and nl2sql/mcp never pass as_operator: it reads any run and may correct it as no one in "
+        "particular, which only the CLI (the operator at a terminal) is.", offenders)
 
 
 CHAT_TOOLS = ENGINE / "chat_tools"
@@ -810,17 +804,16 @@ def test_every_entry_point_reaches_data_through_run_query():
 
 # Only these serve HTTP, and so only these import a web framework or server.
 WEB_SERVER_LIBRARIES = {"starlette", "uvicorn", "fastapi"}
-WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/")
+WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/",)
 
 
-def test_only_mcp_and_the_demo_import_starlette_or_uvicorn():
+def test_only_mcp_imports_starlette_or_uvicorn():
     offenders = [f"{_where(path)}:{lineno} {name}"
                  for path in python_files(ENGINE, SDK) if not _where(path).startswith(WEB_SERVER_MODULES)
                  for lineno, name, _ in imports(path) if name.partition(".")[0] in WEB_SERVER_LIBRARIES]
     assert not offenders, _broke(
-        "Only nl2sql/mcp/ (MCP over HTTP) and nl2sql/cli/demo/ (the old playground, until X1b) import Starlette, "
-        "FastAPI or Uvicorn: the engine and the SDK stay free of a web framework. nl2sql-api is its own "
-        "package.", offenders)
+        "Only nl2sql/mcp/ (MCP over HTTP) imports Starlette, FastAPI or Uvicorn: the engine and the SDK "
+        "stay free of a web framework. nl2sql-api is its own package.", offenders)
 
 
 def test_engine_never_imports_the_api():

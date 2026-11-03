@@ -144,7 +144,7 @@ the one raised card, with a 44px Pause / Play button. It follows
 reduced motion it holds the poster until Play. A clip with no video yet (the
 request fails) shows its poster alone, with no button. The files are served by
 the app at `/clips/<name>` from
-`packages/nl2sql/src/nl2sql/cli/demo/playground/assets/clips/`, outside the
+`packages/api/src/nl2sql_api/web/assets/clips/`, outside the
 bundle (which `npm run build` rewrites and which should not carry video) and
 named `<feature>[-dark].webm|jpg` for `ask`, `pipeline` and `retrieval`.
 
@@ -395,9 +395,8 @@ steps, a typed plan in outline. Its one copy is
 and `#e2e9e5` in dark). `index.html` inlines it as a `data:` URI, so the icon
 costs no request either; the docs site names the file as `theme.favicon`, and
 `scripts/social_card.html` draws the same shapes at card scale. If you change
-the mark, change all three and run `npm run build`; a test in
-`tests/unit/test_playground_app.py` fails if any of them, or the built page,
-drifts from the file.
+the mark, change all three and run `npm run build`; the favicon tests in
+`packages/api/tests/test_web_routes.py` cover how the API serves the file.
 
 ## Develop
 

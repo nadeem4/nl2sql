@@ -25,7 +25,6 @@ def test_chinook_lives_in_the_neutral_datasets_package():
 def test_the_wheel_carries_the_chinook_database():
     package_data = _pyproject()["tool"]["setuptools"]["package-data"]
     assert "*.sqlite" in package_data["nl2sql.datasets"]
-    assert not any(p.startswith("data/") and p.endswith(".sqlite") for p in package_data.get("nl2sql.cli.demo", []))
 
 
 # F18: the DAG models are neutral, so the aggregation service need not import

@@ -37,8 +37,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - **Project:** Schibsted Grotesk
 - **URL:** https://github.com/schibsted/schibsted-grotesk
 - **Package:** `@fontsource-variable/schibsted-grotesk` 5.3.0 (Latin subset, variable weight)
-- **Vendored in:** `packages/nl2sql/src/nl2sql/cli/demo/playground/static/index.html`
-  (inlined into the built page)
+- **Vendored in:** `nl2sql-ui/` (bundled by `npm run build` into `packages/api/src/nl2sql_api/web/static/`)
 - **License:** SIL Open Font License 1.1
 
 ### License text
@@ -146,8 +145,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 - **Project:** Fragment Mono
 - **URL:** https://github.com/weiweihuanghuang/fragment-mono
 - **Package:** `@fontsource/fragment-mono` 5.3.0 (Latin subset, regular)
-- **Vendored in:** `packages/nl2sql/src/nl2sql/cli/demo/playground/static/index.html`
-  (inlined into the built page)
+- **Vendored in:** `nl2sql-ui/` (bundled by `npm run build` into `packages/api/src/nl2sql_api/web/static/`)
 - **License:** SIL Open Font License 1.1
 
 ### License text

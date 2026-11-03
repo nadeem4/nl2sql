@@ -39,7 +39,7 @@ def test_engine_dependencies_name_what_the_code_imports():
     names = [d.split(">")[0].split("=")[0].split("<")[0].split("~")[0].strip() for d in deps]
     # typer dropped the [all] extra; installing it only warns.
     assert "typer" in names and not any(d.startswith("typer[") for d in deps)
-    # cli/demo/ (until X1b) and nl2sql.config.load_env_file import dotenv.
+    # nl2sql.config.load_env_file imports dotenv.
     assert "python-dotenv" in names
 
 

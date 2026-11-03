@@ -604,7 +604,7 @@ Space, so it works before the Space has built and while it is asleep.
 ### Regenerating the card
 
 The card is rendered from `scripts/social_card.html`, which uses the
-playground's own colours and both of its typefaces. Edit that file, then:
+web app's own colours and both of its typefaces. Edit that file, then:
 
 ```bash
 cd nl2sql-ui && npm ci && cd ..   # the fonts the card borrows
@@ -614,7 +614,7 @@ python scripts/render_social_card.py
 Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
 both places that need them: `docs/assets/social-card.png`, which the Space's
 `thumbnail` reads, and
-`packages/nl2sql/src/nl2sql/cli/demo/playground/assets/social-card.png`, which
+`packages/api/src/nl2sql_api/web/assets/social-card.png`, which
 the app serves. A test holds the two byte-identical, so regenerating into only
 one of them fails rather than going out half-changed.
 
@@ -647,7 +647,7 @@ nl2sql demo
 See [Demo](../getting_started/demo.md).
 
 [key-module]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py
-[preview]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/cli/demo/playground/preview.py
+[preview]: https://github.com/nadeem4/nl2sql/blob/main/packages/api/src/nl2sql_api/preview.py
 [space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md
 [workflow]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml
 [publish]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_pypi.yaml

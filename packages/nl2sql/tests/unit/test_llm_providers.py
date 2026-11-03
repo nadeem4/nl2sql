@@ -40,14 +40,6 @@ def test_verified_models_name_known_providers():
     assert set(VERIFIED_MODELS) <= set(PROVIDER_PRESETS)
 
 
-def test_the_cli_and_demo_reuse_the_llm_tables():
-    from nl2sql.cli.demo import llm_config
-    from nl2sql.cli.demo.playground import settings
-
-    assert llm_config.PROVIDER_KEYS is PROVIDER_KEYS
-    assert [node["agent"] for node in settings.LLM_NODES] == list(LLM_AGENTS.values())
-
-
 def test_feedback_names_each_node_by_its_agent():
     from nl2sql.feedback.record import models_by_node
 

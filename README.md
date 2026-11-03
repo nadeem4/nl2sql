@@ -505,7 +505,7 @@ inspect_defaults), `engine.llm` (list, get, providers, prices, replace, set_mode
 (validate, test), `engine.results` (manifest, page, csv), `engine.feedback`
 (record, list, stats, export, clear), `engine.traces` (get, replay) and
 `engine.evals` (load, run, regenerate, scorers); `engine.about()` describes the engine and each step of a
-run. The CLI, the playground and `nl2sql-api` use nothing else. See
+run. The CLI, the MCP server and `nl2sql-api` use nothing else. See
 [the public facade](docs/api/core/public-facade.md) and
 [`examples/`](examples/).
 
@@ -569,8 +569,8 @@ environment is written in the YAML as `${env:VAR}`, for example
   read-only at the driver level (SQLite's `mode=ro` URI), so a write is refused
   by SQLite itself. No other dialect opens read-only yet, so on PostgreSQL, MySQL, SQL Server
   or DuckDB, **give the engine a read-only database user.**
-- **No authentication** in the CLI, playground or REST API. The CLI and
-  playground take the role from the caller. The REST API takes it from a trusted
+- **No authentication** in the CLI or REST API. The CLI
+  takes the role from the caller. The REST API takes it from a trusted
   proxy header or a static setting, never from the body unless a dev flag is
   on; put your own auth in the proxy and derive the role from it.
 - `settings.pipeline.timeout_s` bounds how long the caller waits, not how long the work

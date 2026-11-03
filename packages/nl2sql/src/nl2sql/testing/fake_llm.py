@@ -86,9 +86,6 @@ def classify_request(body: Dict[str, Any]) -> tuple:
     ``"json_schema"`` or ``"plain"``, ``name`` is the structured-output name the
     client asked for (``"plain"`` for a free-text call), and ``prompt_text`` is
     every message's content joined by newlines.
-
-    Shared with ``nl2sql.llm.replay.RecordingProxy`` so a recording is keyed
-    exactly the way the replay server later dispatches on it.
     """
     tools = body.get("tools") or []
     rf = body.get("response_format") or {}

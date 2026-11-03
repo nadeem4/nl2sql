@@ -3,11 +3,11 @@ import json
 import pytest
 from langchain_core.prompts import ChatPromptTemplate
 
-from nl2sql.llm.replay import Recording, RecordingProxy, ReplayStore, extract_question
+from nl2sql.llm.replay import Recording, ReplayStore, extract_question
 from nl2sql.pipeline.nodes.answer_synthesizer.prompts import ANSWER_SYNTHESIZER_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_EXAMPLES, PLANNER_PROMPT
 from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
-from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.fake_llm import FakeLLMServer
 
 QUESTION = "Which artist has the most albums?"
 
@@ -90,26 +90,6 @@ def test_extract_question_from_each_prompt_shape(rendered_prompts):
         assert extract_question(text) == "Which artist has the most albums?"
 
 
-def test_proxy_records_what_the_upstream_answered():
-    upstream = FakeLLMServer([Rule("PlannerAnswer", {"plan": {"tables": []}})]).start()
-    store = ReplayStore()
-    proxy = RecordingProxy(upstream.base_url, "sk-upstream", store).start()
-    try:
-        import urllib.request
-        body = {"model": "m", "messages": [{"role": "user", "content": "User Query:\nWhich artist has the most albums?"}],
-                "tools": [{"type": "function", "function": {"name": "PlannerAnswer"}}]}
-        req = urllib.request.Request(proxy.base_url + "/chat/completions", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"}, method="POST")
-        with urllib.request.urlopen(req) as r:
-            assert r.status == 200
-    finally:
-        proxy.stop()
-        upstream.stop()
-    rule = store.rules()[0]
-    assert rule.name == "PlannerAnswer" and rule.when == "Which artist has the most albums?"
-    assert rule.payload == {"plan": {"tables": []}}
-
-
 def _post(url, body, headers=None):
     import urllib.request
 
@@ -117,29 +97,6 @@ def _post(url, body, headers=None):
                                  headers={"Content-Type": "application/json", **(headers or {})}, method="POST")
     with urllib.request.urlopen(req) as r:
         return r.status, json.loads(r.read())
-
-
-def test_proxy_records_an_anthropic_upstream_with_the_key_in_x_api_key():
-    """The demo's answers are recorded with a Claude model, on Anthropic's own wire."""
-    upstream = FakeLLMServer([Rule("PlannerAnswer", {"plan": {"tables": []}}), Rule("plain", "Fifty-nine.")]).start()
-    store = ReplayStore()
-    proxy = RecordingProxy(upstream.anthropic_base_url, "sk-ant-upstream", store, wire="anthropic").start()
-    try:
-        tool = {"model": "claude", "max_tokens": 10, "tools": [{"name": "PlannerAnswer", "input_schema": {}}],
-                "messages": [{"role": "user", "content": "User Query:\nWhich artist has the most albums?"}]}
-        status, answer = _post(proxy.anthropic_base_url + "/v1/messages", tool, {"anthropic-version": "2023-06-01"})
-        plain = {"model": "claude", "max_tokens": 10,
-                 "messages": [{"role": "user", "content": [{"type": "text", "text": "User Query: How many?"}]}]}
-        _post(proxy.anthropic_base_url + "/v1/messages", plain)
-    finally:
-        proxy.stop()
-        upstream.stop()
-
-    assert status == 200 and answer["content"][0]["type"] == "tool_use"
-    assert all(call["api_key"] == "sk-ant-upstream" for call in upstream.calls)
-    rules = {(r.name, r.when): r.payload for r in store.rules()}
-    assert rules[("PlannerAnswer", "Which artist has the most albums?")] == {"plan": {"tables": []}}
-    assert rules[("plain", "How many?")] == "Fifty-nine."
 
 
 def test_a_recording_made_on_the_anthropic_wire_replays_on_the_openai_wire():
@@ -154,11 +111,6 @@ def test_a_recording_made_on_the_anthropic_wire_replays_on_the_openai_wire():
 
     assert status == 200
     assert json.loads(answer["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]) == {"plan": {"tables": []}}
-
-
-def test_the_proxy_refuses_a_wire_it_cannot_speak():
-    with pytest.raises(ValueError):
-        RecordingProxy("http://127.0.0.1:9", "k", ReplayStore(), wire="gemini")
 
 
 # --- which model made the recordings --------------------------------------------
@@ -186,36 +138,6 @@ def test_a_recordings_file_from_before_the_model_was_recorded_still_loads(tmp_pa
 
     assert [r.name for r in loaded.rules()] == ["plain"]
     assert loaded.recorded_with is None
-
-
-def test_the_proxy_records_the_model_it_was_asked_for_and_its_provider():
-    upstream = FakeLLMServer([Rule("PlannerAnswer", {"plan": {"tables": []}})]).start()
-    store = ReplayStore()
-    proxy = RecordingProxy(upstream.base_url, "sk-upstream", store, provider="openrouter").start()
-    try:
-        body = {"model": "openai/gpt-5.4", "messages": [{"role": "user", "content": "User Query:\nQ?"}],
-                "tools": [{"type": "function", "function": {"name": "PlannerAnswer"}}]}
-        _post(proxy.base_url + "/chat/completions", body)
-    finally:
-        proxy.stop()
-        upstream.stop()
-
-    assert store.recorded_with == {"provider": "openrouter", "model": "openai/gpt-5.4"}
-
-
-def test_the_anthropic_proxy_records_the_claude_model_it_was_asked_for():
-    upstream = FakeLLMServer([Rule("plain", "Fifty-nine.")]).start()
-    store = ReplayStore()
-    proxy = RecordingProxy(upstream.anthropic_base_url, "sk-ant-upstream", store, wire="anthropic").start()
-    try:
-        plain = {"model": "claude-opus-5", "max_tokens": 10,
-                 "messages": [{"role": "user", "content": [{"type": "text", "text": "User Query: How many?"}]}]}
-        _post(proxy.anthropic_base_url + "/v1/messages", plain)
-    finally:
-        proxy.stop()
-        upstream.stop()
-
-    assert store.recorded_with == {"provider": "anthropic", "model": "claude-opus-5"}
 
 
 def test_the_shipped_recordings_name_the_model_that_made_them():

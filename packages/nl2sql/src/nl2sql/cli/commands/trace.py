@@ -27,7 +27,7 @@ def _load(ctx: typer.Context, target: str) -> Dict[str, Any]:
             return load_trace(path)
         engine = build_engine(ctx, check=False)
         try:
-            doc = engine.traces.get(target)
+            doc = engine.traces.get(target, user_context=None)  # the operator at a terminal reads any run
         finally:
             engine.close()
     except ValueError as exc:
