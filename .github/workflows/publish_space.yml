@@ -190,21 +190,28 @@ jobs:
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          for attempt in $(seq 1 20); do
-            if curl -fsSL \
-                -H 'Accept: application/vnd.pypi.simple.v1+json' \
-                -H 'Cache-Control: no-cache' \
-                https://pypi.org/simple/nl2sql-engine/ \
-              | python -c 'import json, sys; sys.exit(sys.argv[1] not in json.load(sys.stdin)["versions"])' "$version"
-            then
-              echo "PyPI's index lists nl2sql-engine $version."
-              exit 0
+          # The Space installs nl2sql-cli[web], which needs the engine and the API at this version too.
+          for package in nl2sql-engine nl2sql-api nl2sql-cli; do
+            listed=false
+            for attempt in $(seq 1 20); do
+              if curl -fsSL \
+                  -H 'Accept: application/vnd.pypi.simple.v1+json' \
+                  -H 'Cache-Control: no-cache' \
+                  "https://pypi.org/simple/$package/" \
+                | python -c 'import json, sys; sys.exit(sys.argv[1] not in json.load(sys.stdin)["versions"])' "$version"
+              then
+                echo "PyPI's index lists $package $version."
+                listed=true
+                break
+              fi
+              echo "Attempt $attempt of 20: PyPI's index does not list $package $version yet; retrying in 30s."
+              sleep 30
+            done
+            if [ "$listed" != true ]; then
+              echo "PyPI's index never listed $package $version; not pushing a Space that cannot install it."
+              exit 1
             fi
-            echo "Attempt $attempt of 20: PyPI's index does not list nl2sql-engine $version yet; retrying in 30s."
-            sleep 30
           done
-          echo "PyPI's index never listed nl2sql-engine $version; not pushing a Space that cannot install it."
-          exit 1
 
       # Why a fresh working copy of the Space rather than `git subtree split`:
       # a split rewrites this repository's history for the prefix into a

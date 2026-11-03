@@ -34,6 +34,10 @@
         {
           "type": "generic",
           "path": "packages/api/pyproject.toml"
+        },
+        {
+          "type": "generic",
+          "path": "nl2sql-cli/pyproject.toml"
         }
       ]
     }

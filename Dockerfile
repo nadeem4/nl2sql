@@ -1,4 +1,4 @@
-# The API image: nl2sql-api with its web app, all five adapters and the SQL Server ODBC driver (D213, D226, D233).
+# The API image: nl2sql-api with its web app, the `nl2sql` command, all five adapters and the SQL Server ODBC driver (D213, D226, D233).
 #
 # Build context is the repository root:
 #   docker build -t nl2sql-api .
@@ -40,6 +40,7 @@ RUN apt-get update \
 COPY ./packages/sdk /app/packages/sdk
 COPY ./packages/nl2sql /app/packages/nl2sql
 COPY ./packages/api /app/packages/api
+# The `nl2sql` command (D230): `docker compose run --rm api nl2sql index`, and this build below.
 COPY ./nl2sql-cli /app/nl2sql-cli
 # The page nl2sql-api serves, built in stage one.
 COPY --from=ui /build/packages/api/src/nl2sql_api/web/static /app/packages/api/src/nl2sql_api/web/static

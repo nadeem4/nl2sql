@@ -114,8 +114,18 @@ def test_api_image_installs_the_five_adapters_and_the_sql_server_driver():
 
     for needle in ("msodbcsql18", "unixodbc", "ACCEPT_EULA=Y", "postgres", "mysql", "mssql", "duckdb"):
         assert needle in text
-    # The image runs `nl2sql init --demo` and `nl2sql index`, so it installs the CLI.
-    assert "COPY ./nl2sql-cli" in text and "./nl2sql-cli" in text.split("pip install")[-1]
+
+
+def test_api_image_installs_the_cli():
+    """D230: the image carries `nl2sql`, so `docker compose run --rm api nl2sql index` works; its build uses it too."""
+    text = _image_text()
+
+    assert "COPY ./nl2sql-cli /app/nl2sql-cli" in text
+    assert "./nl2sql-cli" in text.split("RUN pip install", 1)[1].split("# Non-root", 1)[0]
+    # Installed before the build step that runs `nl2sql init --demo` and `nl2sql index`.
+    assert text.index("RUN pip install") < text.index("nl2sql init --demo")
+    steps = str(yaml.safe_load(TEST_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["api-image"]["steps"])
+    assert "nl2sql-api:ci nl2sql --help" in steps
 
 
 def test_api_image_runs_one_worker():
