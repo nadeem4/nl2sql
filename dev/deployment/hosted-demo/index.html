@@ -3005,11 +3005,11 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="hosted-demo">Hosted demo</h1>
-<p><code>nl2sql demo --hosted</code> serves the playground as a <strong>public demo of the sample
+<p><code>nl2sql-api serve --demo --hosted</code> serves the web app as a <strong>public demo of the sample
 databases</strong>, where the server holds no API key and every visitor brings their
 own.</p>
-<p>It is a third state, not a loosened <code>--allow-settings</code>. Locally, <code>nl2sql demo</code>
-saves your key to the demo project's <code>.env</code> and spends it on your
+<p>It is a third state, not a loosened local server. Locally, <code>nl2sql demo</code>
+(the launcher for <code>nl2sql-api serve --demo</code>) saves your key to the demo project's <code>.env</code> and spends it on your
 questions; that is right on your own machine and wrong on a shared address.
 Hosted mode removes the key from the server entirely instead of relaxing the
 gate that protects it.</p>
@@ -3018,7 +3018,7 @@ gate that protects it.</p>
 <tr>
 <th></th>
 <th>local (<code>nl2sql demo</code>)</th>
-<th>hosted (<code>nl2sql demo --hosted</code>)</th>
+<th>hosted (<code>nl2sql-api serve --demo --hosted</code>)</th>
 </tr>
 </thead>
 <tbody>
@@ -3039,17 +3039,17 @@ gate that protects it.</p>
 </tr>
 <tr>
 <td>Rebuild</td>
-<td>on (loopback, or <code>--allow-settings</code>)</td>
+<td>on for an admin</td>
 <td>refused</td>
 </tr>
 <tr>
 <td>Answer ratings</td>
-<td>on (loopback, or <code>--allow-settings</code>)</td>
+<td>on</td>
 <td>off</td>
 </tr>
 <tr>
 <td>Retrieval inspector</td>
-<td>on (loopback, or <code>--allow-settings</code>)</td>
+<td>on</td>
 <td>on, read only, at the hosted rate</td>
 </tr>
 <tr>
@@ -3058,9 +3058,9 @@ gate that protects it.</p>
 <td>on, read only: it names the steps and their models, never a key</td>
 </tr>
 <tr>
-<td><code>--record</code></td>
-<td>supported</td>
-<td>refused before the server starts</td>
+<td>recording answers</td>
+<td><code>scripts/record_demo_answers.py</code> (a maintainer's script)</td>
+<td>not offered</td>
 </tr>
 <tr>
 <td>a visitor with no key</td>
@@ -3079,7 +3079,7 @@ gate that protects it.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>nl2sql<span class="w"> </span>demo<span class="w"> </span>--hosted<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">7860</span><span class="w"> </span>--questions-per-minute<span class="w"> </span><span class="m">6</span><span class="w"> </span>--questions-per-session<span class="w"> </span><span class="m">30</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>nl2sql-api<span class="w"> </span>serve<span class="w"> </span>--demo<span class="w"> </span>--hosted<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">7860</span><span class="w"> </span>--questions-per-minute<span class="w"> </span><span class="m">6</span><span class="w"> </span>--questions-per-session<span class="w"> </span><span class="m">30</span>
 </code></pre></div>
 <p>There is no environment variable for it: hosted mode and its limits are flags
 on the command, and the container's <code>CMD</code> passes them.</p>
@@ -3143,7 +3143,7 @@ deliberate act, never part of CI. Either:</p>
 <p>It reads <code>ANTHROPIC_API_KEY</code> from the environment or, failing that, from the
   repository root's <code>.env</code> (read with python-dotenv, never loaded into the
   environment; nothing prints the key), builds a fresh demo project, and runs
-  <code>nl2sql demo --record</code> with that key passed as <code>--api-key</code> would pass it, so
+  the recorder with that key passed explicitly, so
   an exported OpenAI or OpenRouter key never wins. The script writes nothing to
   the environment. The demo records through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
@@ -3156,7 +3156,7 @@ deliberate act, never part of CI. Either:</p>
   failed). The file is written with the runs that succeeded, and every question
   that was not recorded is listed with its error. It exits <code>0</code>
   when every guided question was recorded, <code>1</code> when some were not or when the
-  demo stopped before recording (its indexing failed: <code>nl2sql demo --record</code>
+  demo stopped before recording (its indexing failed: the recorder
   refuses to record answers given against no index, and nothing is written),
   <code>2</code> with no key or without <code>langchain-anthropic</code>
   (<code>pip install "nl2sql-engine[anthropic]"</code>). Its output is safe to redirect
@@ -3214,7 +3214,7 @@ mode.</p>
    in a response.</li>
 </ol>
 <p>A key sent without naming a provider has its provider read from its shape,
-exactly as <code>--api-key</code> does: <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter,
+by the engine's own rule: <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter,
 anything else is OpenAI. Such a key also moves the model to that provider's
 default when it differs from the server's configured one, since a <code>gpt-</code> model
 means nothing to Anthropic.</p>
@@ -3283,8 +3283,8 @@ a visitor chose or changed, gets a new session, so no one can fix the token anot
 session may have one job (a start reserves the slot at once, so parallel starts cannot pass it) and two open streams
 at a time, besides the limits below; going over any of them
 is <code>429 LIMIT_REACHED</code> with a <code>Retry-After</code> header. <code>GET /api/v1/meta</code> tells a visitor the limits and how many
-questions the session has asked (<code>limits</code>). The old <code>nl2sql demo --hosted</code> flags below stay until the CLI moves
-onto the API.</p>
+questions the session has asked (<code>limits</code>). <code>nl2sql demo</code> is only a launcher for <code>nl2sql-api serve --demo</code> and takes <code>--dir</code>, <code>--host</code>, <code>--port</code> and <code>--no-browser</code>;
+the public variant, with its limits, is <code>nl2sql-api serve --demo --hosted</code>.</p>
 <p><code>nl2sql-api serve</code> loads the <code>.env</code> beside the config (before it looks at the environment for a model key), except
 for a hosted server, which never loads one: it holds no model key, and a <code>.env</code> with one beside a hosted config is
 left alone. <code>uvicorn nl2sql_api.main:app</code> loads no <code>.env</code> at all, so export what it needs first, and it refuses to
@@ -3360,8 +3360,7 @@ volume that is wiped, the key is made again and every visitor starts a new sessi
 environment and is not part of any response or log.</p>
 <h2 id="what-is-off-and-what-is-on">What is off, and what is on</h2>
 <p><strong>Off:</strong> Settings <em>persistence</em> (choosing a model is on; it is only the saving
-that is off), Rebuild, answer ratings, and <code>--record</code> (refused
-before the server starts). <code>--api-key</code> is refused too: a server-side key is the
+that is off), Rebuild, and answer ratings. A server-side key is refused: it is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.</p>
 <p>Rebuild being off is said on the page rather than left as a gap: the index
@@ -3405,11 +3404,11 @@ time and the first question is answered at once:</p>
 </ul>
 <p>The container runs as uid 1000 (not root), listens on <code>$PORT</code> (7860 by
 default, which is what a Space routes to), and carries a healthcheck that polls
-<code>/api/health</code>. That route reads nothing but process state and answers
-<code>{"status": "ok", "version": "X.Y.Z"}</code>, the installed <code>nl2sql-engine</code>
-version, in every mode; the release pipeline polls it on the live Space to
+<code>/api/v1/health</code>. That route reads nothing but process state and answers
+<code>{"status": "ok", "version": {"engine": "X.Y.Z", "api": "X.Y.Z"}}</code>, the installed
+<code>nl2sql-engine</code> and <code>nl2sql-api</code> versions, in every mode; the release pipeline polls it on the live Space to
 know the new version is the one being served. Its <code>CMD</code> runs
-<code>nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30</code>;
+<code>nl2sql-api serve --demo --hosted --questions-per-minute 6 --questions-per-session 30</code>;
 a public demo must never be started without <code>--hosted</code>.</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
 <a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
@@ -3458,8 +3457,8 @@ with nothing to do by hand. Merging the release pull request tags <code>vX.Y.Z</
     SP --&gt; SS[space-smoke: the live URL&lt;br/&gt;reports X.Y.Z]</code></pre>
 <ol>
 <li><strong><code>pypi-smoke</code></strong> installs <code>nl2sql-engine[demo]==X.Y.Z</code> from PyPI into an
-   empty virtualenv on a fresh runner, boots this same <code>nl2sql demo --hosted</code>
-   with no key and checks it serves. The Space is never built on a version
+   empty virtualenv on a fresh runner, boots this same <code>nl2sql-api serve --demo --hosted</code>
+   with no key, asks every recorded guided question and its scripted follow-up, and checks it serves. The Space is never built on a version
    that does not install from PyPI.</li>
 <li><strong><code>space</code></strong> calls <a href="https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml"><code>publish_space.yml</code></a> with the tag. It mirrors
    <code>deploy/huggingface/</code> onto the Space's root, pins the image to the release,
@@ -3656,6 +3655,7 @@ your own data, with no limits and a key that never leaves your machine:</p>
 <a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>
+<p>The hosted server always answers on the <code>replay</code> provider, whatever its project file names: <code>nl2sql-api serve --demo --hosted</code> replaces the <code>llm</code> section at start, and the Space image is built with <code>nl2sql init --demo --provider replay</code>. A keyed provider with no key ends a turn with a <code>MISSING_LLM</code> error, never a 500.</p>
 </article>
 </div>
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>

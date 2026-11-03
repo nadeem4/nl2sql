@@ -2929,10 +2929,11 @@ release. Its <code>realdb-gate</code> job always runs and is the required check.
 <li>
 <p><strong><code>fresh-install</code></strong> takes those wheels and installs them the way a user
   does, <code>pip install "nl2sql-engine[demo]"</code>, into an empty virtualenv outside
-  the checkout. It then boots <code>nl2sql demo --hosted</code> (the command the Hugging
-  Face Space runs) with no API key, and passes only when the playground page,
-  <code>/api/meta</code>, <code>/api/schema</code> and <code>/api/index</code> all answer from that install. It
-  is what catches a wheel that imports but ships without the built playground,
+  the checkout. It then boots <code>nl2sql-api serve --demo --hosted</code> (the command the Hugging
+  Face Space runs) with no API key, and passes only when the web app page,
+  <code>/api/v1/meta</code>, each datasource's schema, <code>/api/v1/index</code>, the recorded guided questions
+  and their scripted follow-up all answer from that install. It
+  is what catches a wheel that imports but ships without the built web app,
   the sample databases or a dependency the demo extra forgot.
   <code>scripts/fresh_install_check.py</code> is the whole check, so it runs the same on a
   laptop:</p>

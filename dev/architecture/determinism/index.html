@@ -6704,7 +6704,7 @@ executed is therefore <strong>pinned</strong> and reused
   a schema snapshot deletes the plans cached on it.</li>
 <li><strong>Controls.</strong> <code>PLAN_CACHE_ENABLED=false</code> turns reads and writes off
   (<a href="../../configuration/system/">System configuration</a>); <code>nl2sql cache clear</code>
-  empties it. <code>nl2sql demo --record</code> turns it off so every planner answer is
+  empties it. <code>scripts/record_demo_answers.py</code> turns it off so every planner answer is
   recorded, and <code>nl2sql trace replay</code> uses it only when the recorded run did.</li>
 <li><strong>Visible.</strong> <code>QueryResult.sub_queries[].plan_source</code> is <code>"cache"</code> or <code>"llm"</code>,
   <code>QueryResult.usage.plan_cache_hits</code> counts hits (a hit adds no planner

@@ -7187,7 +7187,7 @@ below adds variables. The architecture tests enforce both
 <code>nl2sql demo</code> load the <code>.env</code> <strong>next to <code>nl2sql.yaml</code></strong> into the process
 environment at startup. A variable that is already set always wins; the file
 never overrides it. Each loads the <code>.env</code> before it configures logging, so a
-<code>NL2SQL_LOG_LEVEL</code> written there applies (<code>nl2sql demo</code> reads the demo
+<code>NL2SQL_LOG_LEVEL</code> written there applies (<code>nl2sql-api serve --demo</code> reads the demo
 project's <code>.env</code>, except with <code>--hosted</code>, which reads none).</p>
 <p>The library itself never reads a <code>.env</code> file. A Python caller that wants one
 loads it before building the engine:</p>
@@ -7534,11 +7534,11 @@ start from.</p>
 </tr>
 <tr>
 <td><code>NL2SQL_DEMO_HOSTED</code></td>
-<td><code>nl2sql demo --hosted</code></td>
+<td><code>nl2sql-api serve --demo --hosted</code></td>
 </tr>
 <tr>
 <td><code>NL2SQL_DEMO_QUESTIONS_PER_MINUTE</code>, <code>NL2SQL_DEMO_QUESTIONS_PER_SESSION</code></td>
-<td><code>nl2sql demo --questions-per-minute N --questions-per-session N</code></td>
+<td><code>nl2sql-api serve --questions-per-minute N --questions-per-session N</code></td>
 </tr>
 <tr>
 <td><code>VAULT_ADDR</code>, <code>VAULT_TOKEN</code></td>

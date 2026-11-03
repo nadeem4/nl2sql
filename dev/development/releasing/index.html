@@ -3412,9 +3412,13 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
    the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
 <li><strong><code>pypi-smoke</code></strong> — <code>needs: pypi</code>. On a fresh runner, installs the release
    from PyPI itself, <code>pip install "nl2sql-engine[demo]==X.Y.Z"</code>, into an empty
-   virtualenv, boots <code>nl2sql demo --hosted</code> with no API key and checks the
-   page, <code>/api/health</code> (which must report <code>X.Y.Z</code>), <code>/api/meta</code>,
-   <code>/api/schema</code> and <code>/api/index</code>. This is
+   virtualenv, boots <code>nl2sql-api serve --demo --hosted</code> with no API key and
+   checks the page, <code>/api/v1/health</code> (which must report <code>X.Y.Z</code> for the engine and
+   the API), <code>/api/v1/meta</code>, each datasource's schema and <code>/api/v1/index</code>, then asks
+   the advertised questions through <code>POST /api/v1/query</code> (no server error, one
+   answered) and one turn that must end typed. Once the answers are
+   re-recorded (R1), add <code>--guided-turns</code>: every guided question and its scripted
+   follow-up as turns. This is
    <code>python scripts/fresh_install_check.py --pypi X.Y.Z</code>, the same check the
    <code>fresh-install</code> PR job runs on the wheels. PyPI accepts an upload at once,
    but the CDN in front of its index serves a new version a little later, so

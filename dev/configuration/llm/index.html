@@ -7049,7 +7049,7 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   the engine asks for): the price table's Claude rows say so, and an
   <code>llm.prices</code> row without its own <code>cache_write</code> gets it from the wire.</li>
 </ul>
-<p><code>nl2sql demo --record</code> records Claude too: with an Anthropic key the recording
+<p><code>scripts/record_demo_answers.py</code> records Claude too: with an Anthropic key the recording
 proxy speaks Anthropic's Messages API to <code>https://api.anthropic.com</code>, and stores
 each answer under the same name and question an OpenAI one would get, so replay
 (which answers on the OpenAI wire) serves it unchanged. The hosted demo's shipped
@@ -7236,7 +7236,7 @@ model it is set to use, then what it actually spent once a question has been
 asked. It is served by <code>GET /api/pipeline</code> from <code>engine.about()</code>, whose steps
 (<code>nl2sql.pipeline.steps</code>) take their seven model steps from <code>LLM_AGENTS</code> rather
 than repeating the table above. See <a href="../../getting_started/demo/#the-pipeline-page">the Pipeline page</a>.</p>
-<p>On the <strong>hosted demo</strong> (<code>nl2sql demo --hosted</code>) the same choice is offered and
+<p>On the <strong>hosted demo</strong> (<code>nl2sql-api serve --demo --hosted</code>) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
 per step in their own browser tab, and both travel with each question: a key
 per provider in a header of its own, and the choices in one compact
@@ -7598,7 +7598,7 @@ rates, <code>verified</code>, <code>source</code> (<code>table</code> or <code>c
   read from the database or a description in the glossary.</li>
 <li><code>nl2sql init --provider</code> takes <code>openai</code>, <code>anthropic</code> or <code>openrouter</code>, the
   providers with a default model, and writes no key. For <code>openai_compatible</code>
-  or <code>ollama</code>, edit <code>llm.yaml</code> as shown above. <code>nl2sql demo --api-key</code>
+  or <code>ollama</code>, edit <code>llm.yaml</code> as shown above. The demo's key box
   picks the provider from the key's shape (<code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is
   OpenRouter, anything else is OpenAI).</li>
 </ul>

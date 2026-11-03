@@ -6712,10 +6712,22 @@ The tables, columns and row counts are in
 <p>To see it before installing anything, the same playground runs at
 <a href="https://nl2sql.codewithnk.com">https://nl2sql.codewithnk.com</a>, where you bring your own model key.</p>
 <h2 id="what-to-expect">What to expect</h2>
+<div class="admonition note">
+<p class="admonition-title"><code>nl2sql demo</code> is a launcher</p>
+<p>Since the web app moved into <code>nl2sql-api</code>, <code>nl2sql demo</code> only starts
+<code>nl2sql-api serve --demo</code> in a child process, waits until it answers and
+opens your browser (Ctrl+C stops both). Its flags are <code>--dir</code>, <code>--host</code>,
+<code>--port</code> and <code>--no-browser</code>. The command takes no key,
+recording or hosting options: put a key in the
+environment or the project's <code>.env</code> (or paste it into Settings), and run the
+public variant with <code>nl2sql-api serve --demo --hosted</code>. Parts of this page
+below still describe the old playground; the web app guide is
+<a href="../../apps/web/">Web app</a>.</p>
+</div>
 <p>After <code>pip install "nl2sql-engine[demo]"</code> and <code>nl2sql demo</code>:</p>
 <ol>
 <li><strong>No questions at the terminal.</strong> The command does not prompt. It looks for
-   a model key -- <code>--api-key</code>, then <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or
+   a model key -- <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or
    <code>ANTHROPIC_API_KEY</code>, then a key saved in the project's <code>.env</code>, then an Ollama daemon
    on <code>localhost:11434</code> -- and says which mode it chose: <strong>Live mode</strong> with
    the provider, or <strong>Replay mode</strong> when it finds none.</li>
@@ -6922,8 +6934,7 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   repair and the playground's Rebuild) reads the schema and the glossary and
   embeds them, with the local embedding model by default. Descriptions a model
   drafts are proposals for review, not part of the index.</li>
-<li><code>nl2sql demo --api-key &lt;key&gt;</code> takes the key on the command line and writes it
-  into the project's <code>.env</code>, never into a YAML file. The provider follows the
+<li>A key pasted into Settings is written into the project's <code>.env</code>, never into a YAML file. The provider follows the
   key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored as
   <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; a key beginning <code>sk-ant-</code>
   is Anthropic and is stored as <code>ANTHROPIC_API_KEY</code> with <code>provider: anthropic</code>,
@@ -6945,7 +6956,7 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   <a href="../../configuration/llm/#ollama">LLM configuration â†’ Ollama</a>.</li>
 </ul>
 <p>Sharing the demo with other people is the one case where none of this applies:
-<code>nl2sql demo --hosted</code> serves the playground with <strong>no key on the server at
+<code>nl2sql-api serve --demo --hosted</code> serves the web app with <strong>no key on the server at
 all</strong>, and each visitor pastes their own into the page; a visitor without one
 can replay the guided questions from recorded runs. It refuses to start when
 <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> is set. See
@@ -7011,8 +7022,8 @@ demand.</p>
 <li><strong>Write descriptions with the LLM</strong> is off by default because it spends
   tokens on your key; it is unavailable in replay mode.</li>
 <li>It has the Settings page's guardrails (so does the
-  <a href="#the-retrieval-inspector">Retrieval inspector</a>): local only unless <code>--allow-settings</code>,
-  and only from the playground page itself.</li>
+  <a href="#the-retrieval-inspector">Retrieval inspector</a>): local only (on a non-loopback host it is off),
+  and only from the page itself.</li>
 <li>On the <a href="../../deployment/hosted-demo/">hosted demo</a> there is no button at all.
   The panel says instead that the index was built before the demo started and
   which databases it covers, and prints the server's own reason where the
@@ -7147,7 +7158,7 @@ nav. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.</p>
 <ul>
 <li><strong>API keys, one per provider.</strong> Paste a key and press <strong>Save key</strong>. The
-  provider follows the key's shape by the same rule as <code>--api-key</code> (<code>sk-ant-</code>
+  provider follows the key's shape by the engine's own rule (<code>sk-ant-</code>
   is Anthropic, <code>sk-or-</code> is OpenRouter, anything else OpenAI). The key is
   written to the demo project's <code>.env</code>, replacing that provider's previous
   key and keeping the others, and the default moves to that provider. The
@@ -7158,7 +7169,7 @@ second settings store, and the browser keeps nothing but UI conveniences.</p>
   the environment. Keys are
   write-only: no response, log line, trace or error carries one, only a masked
   form such as <code>sk-...4f2a</code> per provider. On a later start the precedence above
-  still holds, so <code>--api-key</code> or a key exported in your shell wins over a saved
+  still holds, so a key exported in your shell wins over a saved
   one, and every saved key is loaded so each step finds its own.</li>
 <li>
 <p><strong>A provider and a model for each LLM step.</strong> One selector each for the
@@ -7225,11 +7236,10 @@ saved.
   a loopback address (<code>127.0.0.1</code>, <code>localhost</code>, <code>::1</code>). On <code>0.0.0.0</code> or any
   other address the panel says why it is off and the settings routes answer
   <code>403</code>, because the playground has no login: a stranger who can reach it could
-  swap in their own key, or spend on yours. <code>nl2sql demo --allow-settings</code> turns
-  it on anyway, for a network you trust. Changes are also refused from another
+  swap in their own key, or spend on yours. Changes are also refused from another
   site's page (a foreign <code>Origin</code>), through a hostname that is not a loopback
   name, or in anything but JSON.
-- <strong>Hosted mode is a third state.</strong> With <code>nl2sql demo --hosted</code> the page shows a
+- <strong>Hosted mode is a third state.</strong> With <code>nl2sql-api serve --demo --hosted</code> the page shows a
   key form and a <strong>Model for each step</strong> section that write only to this
   browser tab's <code>sessionStorage</code>; the settings routes stay refused because
   there is nothing on the server to save. Choosing a model needs nothing
@@ -7272,8 +7282,7 @@ re-ranking model; the "re-ranking" is MMR, explained in
   page sends; it does not verify who is asking.</li>
 <li><strong>Local only</strong>, like Settings and Rebuild, because it shows the index entries
   the role reaches, column statistics and sample values included: on a
-  non-loopback <code>--host</code> it is off (<code>POST /api/retrieval</code> answers <code>403</code>) unless
-  <code>--allow-settings</code> is given, and it refuses another site's page, a
+  non-loopback <code>--host</code> it is off (<code>POST /api/retrieval</code> answers <code>403</code>), and it refuses another site's page, a
   non-loopback hostname and anything but JSON.</li>
 </ul>
 <p>A run's own retrieval is under <strong>Debug</strong>: open the <code>datasource_resolver</code> or
@@ -7284,7 +7293,7 @@ or <strong>ðŸ‘Ž Wrong</strong>, with an optional note (<strong>Wrong number
 <strong>Wrong filter</strong>, <strong>Missing rows</strong>, or your own words). The rating is saved in
 the demo's state store (<code>.nl2sql/state.db</code>) with the question, role, SQL, the model per
 step and the engine version; never the rows. It is local only, like Settings:
-on a non-loopback <code>--host</code> it is off unless <code>--allow-settings</code>.
+on a non-loopback <code>--host</code> it is off.
 <code>settings.feedback.enabled: false</code> in the project's config turns it off. Read the ratings back, with
 the refusal, retry, error and plan-cache rates, from the CLI (below). See
 <a href="../../observability/feedback/">Feedback and Signals</a>.</p>
@@ -7342,7 +7351,7 @@ kept trace:</p>
 person must review each draft, approve it and run <code>engine.evals.regenerate</code>
 before it runs; see
 <a href="../../observability/feedback/#growing-an-eval-suite-nl2sql-feedback-export-good">Feedback and Signals</a>.</p>
-<p><code>nl2sql demo --record</code> turns the cache off while recording
+<p>Recording (<code>scripts/record_demo_answers.py</code>) turns the cache off
 (<code>settings.pipeline.plan_cache</code> is off in the engine it builds; the files are
 not changed), so every planner
 answer is captured. It also stops with exit <code>1</code>, recording nothing, when the
