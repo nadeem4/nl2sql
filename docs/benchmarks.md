@@ -41,6 +41,7 @@ CI's eval-gates job gates on the newest run here.
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Roles | Cases | Accuracy (execution, 95% CI) | Δ vs previous | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-03 20:52:09 | c6ac88e | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/41716007121 | chinook @c19a8835 | @ceed80fe | all | 141 | 100.0% [97.4-100.0] | new series (suite changed) | complete |
 | 2026-10-15 16:26:08 | 1099c15 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38767715412 | chinook @dc1e8456 | @ceed80fe | all | 141 | 100.0% [97.4-100.0] | first run | complete |
 
 ## Retrieval recall: chinook (sqlite, 11 tables / 64 columns)
@@ -53,6 +54,7 @@ are all among those it keeps. CI's eval-gates job gates on the newest run of eac
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-03 20:53:43 | c6ac88e | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/41716007121 | chinook @c19a8835 | @ceed80fe | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 96 | 99.2% | 91.2% | 100.0% / 100.0% | new series (suite changed) | 8.6 / 30.4 |
 | 2026-10-26 19:55:43 | 7c7c915 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40389660090. Re-recorded for K3 (owner approved): 32.6% -> 36.9%; chinook_024/viewer, chinook_046/admin and chinook_046/analyst were 12th of 12 picks and glossary-described entries pushed them out. | chinook @dc1e8456 | @ceed80fe | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 96 | 98.8% | 80.5% | 100.0% / 100.0% | tables +0.8 pp, columns +4.0 pp, top-1 +0.0 pp, shortlist +0.0 pp | 8.1 / 22.7 |
 | 2026-10-15 17:44:47 | a33c8ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38778183715 | chinook @dc1e8456 | @ceed80fe | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 96 | 97.9% | 76.5% | 100.0% / 100.0% | tables +0.0 pp, columns +0.0 pp | 8.0 / 22.2 |
 | 2026-10-15 16:27:15 | 1099c15 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38767715412 | chinook @dc1e8456 | @ceed80fe | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 96 | 97.9% | 76.5% | - | new series (suite changed) | 8.0 / 22.2 |
@@ -82,6 +84,7 @@ are all among those it keeps. CI's eval-gates job gates on the newest run of eac
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-03 20:53:16 | c6ac88e | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/41716007186 | pagila @e9a0fe02 | @d63caeb0 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 11 | 85.5% | 68.2% | 100.0% / 100.0% | new series (suite changed) | 10.2 / 32.0 |
 | 2026-10-30 02:04:05 | 631c77a | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40989212254 | pagila @5a1bdbc1 | @d63caeb0 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 11 | 85.5% | 68.2% | 100.0% / 100.0% | new series (suite changed) | 10.2 / 32.0 |
 | 2026-10-29 21:06:45 | 526ff53 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40954475050 | pagila @5f03ba7a | @d63caeb0 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 11 | 85.5% | 68.2% | 100.0% / 100.0% | new series (suite changed) | 10.2 / 32.0 |
 | 2026-10-29 18:41:46 | c6144f5 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40932743821 | pagila @0332fb60 | @d63caeb0 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 11 | 85.5% | 68.2% | 100.0% / 100.0% | new series (schema changed) | 10.2 / 32.0 |

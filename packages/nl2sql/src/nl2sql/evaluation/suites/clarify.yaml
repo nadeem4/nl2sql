@@ -1,7 +1,7 @@
 # The clarify suite: questions about "sales", which the demo glossary (datasources.chinook.terms)
 # leaves open. Two terms list it as a synonym, `revenue` (the sum of invoice lines) and
 # `invoiced total` (the invoice total, tax included), so a planner that sees both flags the phrase and
-# the run ends needs_clarification (docs/architecture/wave_b.md, section 7).
+# the run ends needs_clarification.
 #
 # Each case expects `clarify`, which runs only with clarification on:
 #   engine.evals.run(suites=["evals/clarify.yaml"], clarify=True)
