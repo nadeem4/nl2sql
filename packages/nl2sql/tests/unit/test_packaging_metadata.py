@@ -19,8 +19,12 @@ ENGINE = ROOT / "packages" / "nl2sql"
 NOTICES = ("LICENSE", "THIRD_PARTY_NOTICES.md")
 
 
+def _dir(package: str) -> Path:
+    return ROOT / "nl2sql-cli" if package == "nl2sql-cli" else ROOT / "packages" / package
+
+
 def _project(package: str) -> dict:
-    return tomllib.loads((ROOT / "packages" / package / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    return tomllib.loads((_dir(package) / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
 
 @pytest.mark.parametrize("package", ["nl2sql", "api", "sdk"])
@@ -90,7 +94,7 @@ def test_the_engine_declares_no_cli_dependencies():
     assert {"rich", "typer"} <= {Requirement(d).name for d in _cli()["dependencies"]}
 
 
-PACKAGES = ["nl2sql", "api", "sdk"]
+PACKAGES = ["nl2sql", "api", "sdk", "nl2sql-cli"]
 PROJECT_URLS = {"Homepage", "Documentation", "Source", "Issues", "Demo"}
 
 
@@ -98,7 +102,7 @@ PROJECT_URLS = {"Homepage", "Documentation", "Source", "Issues", "Demo"}
 def test_every_distribution_has_a_readme_pypi_can_render(package):
     readme = _project(package).get("readme")
     assert readme, f"{package} declares no readme, so PyPI shows an empty page"
-    assert (ROOT / "packages" / package / readme).is_file()
+    assert (_dir(package) / readme).is_file()
 
 
 @pytest.mark.parametrize("package", PACKAGES)

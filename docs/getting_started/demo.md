@@ -62,13 +62,12 @@ web app. From a clone, install
 ## 1. Install the CLI
 
 ```bash
-# Install from PyPI. Add the `demo` extra if you also want the browser
-# playground that `nl2sql demo` serves; `[all]` covers drivers only.
-pip install nl2sql-engine
+# Install from PyPI. The `web` extra brings the browser app that
+# `nl2sql demo` serves.
 pip install "nl2sql-cli[web]"
 
 # Or install from source (dev)
-pip install -e "packages/nl2sql[all,demo]"
+pip install -e packages/sdk -e "packages/nl2sql[all]" -e packages/api -e "nl2sql-cli[web]"
 ```
 
 ## 2. Write the demo project

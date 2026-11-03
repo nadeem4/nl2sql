@@ -39,7 +39,7 @@ test("three features, each opening its own page, each with a light and dark clip
 
 test("the more band: run it locally, the docs and the source", () => {
   assert.deepEqual(MORE.map((m) => m.label), ["Run it on your machine", "Read the docs", "Source on GitHub"]);
-  assert.match(MORE[0].code.join(" "), /pip install "nl2sql-engine\[demo\]"/);
+  assert.match(MORE[0].code.join(" "), /pip install "nl2sql-cli\[web\]"/);
   assert.ok(MORE[0].code.includes("nl2sql demo"));
   assert.equal(MORE[1].href, "https://nadeem4.github.io/nl2sql/");
   assert.equal(MORE[2].href, "https://github.com/nadeem4/nl2sql");

@@ -35,7 +35,7 @@ Example (PowerShell), using a 3.13 interpreter:
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install `
-    -e packages/sdk -e "packages/nl2sql[postgres,duckdb]" -e packages/api -e nl2sql-cli
+    -e packages/sdk -e "packages/nl2sql[postgres,duckdb]" -e packages/api -e "nl2sql-cli[web]"
 .\.venv\Scripts\python.exe -m pip install --group dev
 ```
 
@@ -108,8 +108,8 @@ npm run build
 
 The build writes `index.html` and its chunks under
 `packages/api/src/nl2sql_api/web/static/`, which version control ignores: the
-API image and the wheel build it fresh. `nl2sql demo` still serves the single
-page committed in the engine package until X1b removes it.
+API image and the wheel build it fresh. `nl2sql demo` (with `nl2sql-cli[web]`)
+starts `nl2sql-api`, which serves that build.
 
 ### Real databases
 
