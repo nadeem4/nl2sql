@@ -262,6 +262,9 @@ jobs:
           cp -R "$GITHUB_WORKSPACE/deploy/huggingface/." .
           if [ -z "$TAG" ]; then
             cp "$RUNNER_TEMP"/api_wheel/*.whl wheels/
+            # The Hub refuses binaries pushed as plain git; LFS carries the wheel.
+            git lfs install --local
+            echo "wheels/*.whl filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
             api_spec="nl2sql-api @ file:///tmp/wheels/$(basename "$RUNNER_TEMP"/api_wheel/*.whl)"
           fi
 
