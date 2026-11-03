@@ -39,7 +39,7 @@ class EditEnv:
     # ``ValueError`` when its plan is refused. Absent, ``add_tile`` and ``replace_plan`` are refused.
     step: Optional[Callable[[StepRef], Tuple[str, ChartPlan]]] = None
     check: Optional[Callable[[Tile], None]] = None
-    # No conversation needed (DB1b): a verified query by datasource, id and params, and a saved answer of the caller
+    # No conversation needed: a verified query by datasource, id and params, and a saved answer of the caller
     # by id, each as ``(question, plan, chart)``; they raise when there is no such thing for this caller.
     verified: Optional[Callable[[str, str, Dict[str, Any]], Tuple[str, ChartPlan]]] = None
     saved: Optional[Callable[[str], Tuple[str, ChartPlan, ChartChoice]]] = None

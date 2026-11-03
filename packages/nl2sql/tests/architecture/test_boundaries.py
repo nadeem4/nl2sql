@@ -524,7 +524,7 @@ def test_bundled_adapter_dialects(name, dialect):
 # --------------------------------------------------------------------------
 
 def test_the_engine_has_no_cli_package():
-    """The CLI moved out of the engine to ``nl2sql-cli/`` (CL1); nothing is left behind, and no alias."""
+    """The CLI moved out of the engine to ``nl2sql-cli/``; nothing is left behind, and no alias."""
     assert not (ENGINE / "cli").exists(), "nl2sql/cli/ moved to nl2sql-cli/src/nl2sql_cli/"
     assert CLI.is_dir() and (CLI / "main.py").is_file()
 
@@ -561,6 +561,23 @@ def test_nl2sql_cli_imports_only_the_engine():
         offenders)
     assert {n for n in named if n.startswith("nl2sql")} == {"nl2sql-engine"}, named
     assert project["optional-dependencies"]["web"][0].startswith("nl2sql-api~="), project["optional-dependencies"]
+
+
+def test_only_the_chat_package_imports_textual():
+    """The terminal app (``nl2sql chat``) is the one user of ``textual``, and the rest of the CLI loads it lazily.
+
+    ``textual`` is a normal dependency of ``nl2sql-cli``, but every other command starts without paying
+    for it: ``commands/chat.py`` imports the app inside its function, never at module scope.
+    """
+    chat = CLI / "chat"
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(*SOURCES, CLI) if not path.is_relative_to(chat)
+                 for lineno, name, module_scope in imports(path)
+                 if name.partition(".")[0] == "textual"
+                 or (module_scope and name.startswith("nl2sql_cli.chat"))]
+    assert not offenders, _broke(
+        "Only nl2sql_cli/chat/ imports textual, and nothing outside it imports nl2sql_cli.chat at module scope, so "
+        "`import nl2sql_cli` and every other command load no terminal-UI library.", offenders)
 
 
 MCP_SERVER = ENGINE / "mcp"
@@ -761,7 +778,7 @@ def test_registry_tools_and_the_report_make_no_model_call():
 DASHBOARDS = ENGINE / "dashboards"
 # The one shape from the model-side packages a dashboard may import: QuestionUsage, a pydantic model of tokens.
 DASHBOARDS_MAY_IMPORT = {"nl2sql.services.callbacks.token_handler"}
-# The guided builder (DB1b) is the one dashboards module that asks the model, once, for new question text when the
+# The guided builder is the one dashboards module that asks the model, once, for new question text when the
 # caller types what matters; a refresh, an edit and a pin never reach it. It still runs no plan itself: new
 # questions go through the conversation's ask step.
 DASHBOARDS_MODEL_MODULES = {"builder.py"}
@@ -1285,6 +1302,7 @@ LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
 ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql-cli/src/nl2sql_cli/main.py",
     "nl2sql-cli/src/nl2sql_cli/commands/launch.py",  # reloads the .env it has just written
+    "nl2sql-cli/src/nl2sql_cli/commands/chat.py",  # --demo: the demo folder's own .env, read before the engine is built
     "api/src/nl2sql_api/serve.py",  # the demo's own .env, read before it picks the demo's model
 }
 

@@ -696,7 +696,7 @@ class Dashboards(_Model):
 
 
 class Answers(_Model):
-    """The ``answers`` section: saved answers (DB1a)."""
+    """The ``answers`` section: saved answers."""
 
     max_per_user: PositiveInt = 100  # saved answers one person may keep; the next save is refused by name
 

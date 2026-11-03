@@ -126,7 +126,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
   saved dashboards are never purged.
 
-## Guided builder (DB1b)
+## Guided builder
 
 `engine.dashboards.builder_options`, `propose_tiles` and `build` build a dashboard from choices, not from a
 description. All take `user_context`, and the ids

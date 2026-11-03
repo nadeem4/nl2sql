@@ -235,6 +235,7 @@ command has `--help`.
 
 | Command | Purpose | Key options |
 | --- | --- | --- |
+| `nl2sql chat` | A terminal chat over your data (Textual): ask, follow up, `F2` why this answer, `F3` the SQL, `/chart`, `/report`, approve. Keyboard only | `--demo`, `--dir` (default `nl2sql-demo`), `--as ROLE`, `--user NAME`, `--datasource ID` |
 | `nl2sql demo` | Start `nl2sql-api serve --demo` (it writes the demo project, indexes it and serves the web app) and open the browser | `--dir` (default `nl2sql-demo`), `--host` (default `127.0.0.1`), `--port` (default 8765), `--no-browser` |
 | `nl2sql init [DIR]` | Write a new config into `DIR` (default `.`): `nl2sql.yaml` plus one file per section, checked with `load_config`. Never writes a key and never overwrites a file without `--force` | `--demo` (the three sample databases, their roles, verified queries, sample questions and settings), `--provider` (`openai`, `anthropic` or `openrouter`; default `openai`), `--force` |
 | `nl2sql run "QUESTION"` | Ask a question and print the plan, checks, SQL, rows and answer | `--role` (default `admin`), `--no-exec` (plan and validate only), `--ds-id`, `--verbose`/`-v`, `--show-perf` |

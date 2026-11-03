@@ -58,7 +58,7 @@ class Dashboards:
 
     @property
     def builder(self) -> Any:
-        """The guided builder (DB1b), made on first use: a refresh or an edit never loads the model layer."""
+        """The guided builder, made on first use: a refresh or an edit never loads the model layer."""
         if self._builder is None:
             from nl2sql.dashboards.builder import Builder
 

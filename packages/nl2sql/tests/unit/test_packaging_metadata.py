@@ -76,7 +76,7 @@ def test_the_cli_depends_on_the_engine_and_textual_and_the_api_is_its_web_extra(
     assert not {name for name in requirements if name.startswith("nl2sql")} - {"nl2sql-engine"}
     assert set(cli["optional-dependencies"]) == {"web"}
     assert cli["optional-dependencies"]["web"] == [f"nl2sql-api~={engine}"]
-    # The release-please marker on each of the CLI's version and pins, so CL2's updater bumps them.
+    # The release-please marker on each of the CLI's version and pins, so the release updater bumps them.
     marked = [line for line in CLI_PROJECT.read_text(encoding="utf-8").splitlines() if "x-release-please-version" in line]
     assert len(marked) == 3 and any("nl2sql-engine" in line for line in marked) and any("nl2sql-api" in line for line in marked)
     assert cli["version"] == str(engine)

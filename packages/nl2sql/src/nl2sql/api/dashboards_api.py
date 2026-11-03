@@ -270,7 +270,7 @@ class DashboardsAPI:
         """
         return self._service.suggest_questions(self._source(datasource_id, user_context), n=n)
 
-    # ---- DB1b: the guided builder
+    # ---- the guided builder
 
     def builder_options(self, datasource_id: str, *, user_context: UserContext) -> BuilderOptions:
         """What the guided builder offers this caller on one datasource, with no model call and nothing run.
