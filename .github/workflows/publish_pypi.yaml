@@ -18,7 +18,7 @@
 # pushes never fires the `push: tags` trigger - `release_please.yml` therefore
 # calls this workflow directly (`workflow_call`) off its own outputs. The tag
 # trigger is kept for a human-pushed tag and `workflow_dispatch` is the manual
-# escape hatch. See docs/development/releasing.md.
+# escape hatch. See docs/contribute/releasing.md.
 #
 # The tag every job works from is `${{ inputs.tag || github.ref_name }}`:
 # `inputs.tag` on a dispatched or called run, and the pushed tag otherwise.
@@ -111,7 +111,7 @@ jobs:
   # Trusted publishing (OIDC): the `id-token: write` permission is the whole
   # credential. There is no API token secret to configure or rotate - PyPI is
   # told which repository, workflow file and environment it will accept, once,
-  # by hand. See docs/development/releasing.md.
+  # by hand. See docs/contribute/releasing.md.
   #
   # One leg per package, each in its own GitHub Environment. PyPI requires a
   # pending trusted publisher to be unique on (owner, repository, workflow,
@@ -212,7 +212,7 @@ jobs:
       #
       # Trusted publishing itself is unaffected - no API token is introduced.
       # The cost is that released artifacts carry no PEP 740 provenance.
-      # See docs/development/releasing.md and
+      # See docs/contribute/releasing.md and
       # https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
       - name: Publish ${{ matrix.package }} to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

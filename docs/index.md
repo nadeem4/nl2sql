@@ -24,6 +24,43 @@ Model output itself is not reproducible; see [Determinism](architecture/determin
 - Cost awareness (a row limit is baked into every generated statement; `max_bytes` is reported, not enforced).
 - Authorization at planning time (RBAC policy-based table access). The role is supplied by the caller, so the deployer owns authentication; see [Security Model](security/model.md).
 
+## Packages
+
+Four packages share one version. Each arrow points at what the package imports; the SDK sits at the base, and the engine's `import nl2sql` facade is the only door the API and the CLI use. Third-party adapters compile against the SDK alone and are found through the `nl2sql.adapters` entry points.
+
+```mermaid
+flowchart TB
+    people["People"]
+    apps["Apps and MCP clients"]
+    devs["Python developers"]
+    thirdparty["Third-party adapters"]
+
+    subgraph packages["Packages"]
+        direction TB
+        web["nl2sql-api<br/>REST API, serves the web UI<br/>(built from nl2sql-ui/)"]
+        cli["nl2sql-cli<br/>nl2sql command, nl2sql chat<br/>(web extra = nl2sql-api)"]
+        engine["nl2sql-engine<br/>import nl2sql facade, pipeline,<br/>MCP server, adapters via entry points"]
+        sdk["nl2sql-sdk<br/>adapter and extension interfaces<br/>(pydantic only)"]
+    end
+
+    people -->|"browser"| web
+    people -->|"terminal"| cli
+    apps -->|"REST"| web
+    apps -->|"MCP: nl2sql mcp"| cli
+    devs -->|"import nl2sql"| engine
+    web --> engine
+    cli --> engine
+    engine --> sdk
+    thirdparty --> sdk
+```
+
+| Package | Import | What it is |
+| --- | --- | --- |
+| `nl2sql-sdk` | `nl2sql_sdk` | The interfaces an extension implements (adapters, secrets, stores, policy checks). Depends on pydantic only. |
+| `nl2sql-engine` | `nl2sql` | The facade, the pipeline, the built-in adapters and the MCP server (`mcp` extra). |
+| `nl2sql-api` | `nl2sql_api` | The REST API, and the web UI built from `nl2sql-ui/`. |
+| `nl2sql-cli` | `nl2sql_cli` | The `nl2sql` command and the `nl2sql chat` terminal app. |
+
 ## High-level flow
 
 ```mermaid

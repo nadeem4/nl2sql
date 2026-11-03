@@ -23,7 +23,7 @@ pip install "nl2sql-cli[web]"
 ```
 
 Running a query needs an LLM key; only indexing is key-free. See
-[Known limitations](https://github.com/nadeem4/nl2sql#known-limitations).
+[Known limitations](../reference/limitations.md).
 
 ## Configure
 
@@ -293,3 +293,47 @@ pip install "nl2sql-engine[hashicorp]"
 
 See [Configuration](../configuration/system.md) for the whole config, the
 environment variables it reads, and where each 0.4 file and variable went.
+
+## Use the engine from Python
+
+```python
+from nl2sql import NL2SQL, UserContext
+
+engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
+engine.index.build()                 # once: builds the index under .nl2sql-demo/
+# Your own config instead:  engine = NL2SQL.from_config("nl2sql.yaml")
+result = engine.run_query(
+    "How many customers are there?",
+    user_context=UserContext(roles=["admin"]),
+)
+
+print(result.status)                  # "success", "error", "plan_only", or "" if nothing ran
+for sq in result.sub_queries:
+    print(sq.sql)
+    print([c.name for c in sq.validation if c.passed])
+    print(sq.rows.rows[:5] if sq.rows else "plan only")
+print(result.final_answer["summary"] if result.final_answer else result.errors)
+```
+
+Building an engine never connects; `engine.check()` connects to each
+datasource and reports, and `with NL2SQL.from_config(...) as engine:` closes it.
+`run_query` also takes `datasource_id` and
+`execute=False` (plan and validate only). Pass a `user_context` with a role: with
+none the call currently raises a validation error, and a role the policy does
+not know is refused. `QueryResult` carries per sub-query the plan, checks, SQL,
+a capped row sample with the true total, status and retry count, and per run
+the status, errors, warnings, per-node timings, `usage` (LLM calls and tokens,
+and cost when `llm.prices` covers the model) and `trace_path`. Asking the same question
+again reuses the validated plan from the plan cache (`sq.plan_source == "cache"`),
+still validated for the caller's role.
+
+Everything else on `NL2SQL` is a namespace: `engine.datasources` (list, get,
+add, remove, schema, test), `engine.index` (build, health, clear, inspect,
+inspect_defaults), `engine.llm` (list, get, providers, prices, replace, set_models),
+`engine.policies` (roles, allows, allowed, validate), `engine.curated`
+(validate, test), `engine.results` (manifest, page, csv), `engine.feedback`
+(record, list, stats, export, clear), `engine.traces` (get, replay) and
+`engine.evals` (load, run, regenerate, scorers); `engine.about()` describes the engine and each step of a
+run. The CLI, the MCP server and `nl2sql-api` use nothing else. See
+[the public facade](../api/core/public-facade.md) and
+[`examples/`](https://github.com/nadeem4/nl2sql/tree/main/examples/).

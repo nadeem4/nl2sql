@@ -211,3 +211,43 @@ recording comes back as a `REPLAY_MISS` error, and Chat then points to Settings 
 | `src/api/evals.js`, `src/pages/Evals.jsx`, `src/evals/report.js` | Run a suite and read the report |
 | `src/api/settings.js`, `src/pages/Settings.jsx`, `src/lib/settings.js` | The tab's keys and models, the server's model, API keys |
 
+## Screenshots
+
+Captured from the playground on the demo project, asking about Chinook, with
+recorded model responses (so token counts are placeholders).
+
+**An answer:** the question, the plan the model wrote, the validator's checks,
+the generated SQL and the rows.
+
+![The question, plan, checks, SQL and rows for "Which artist has the most albums?"](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-answer.png)
+
+**Debug:** LLM calls, tokens and time per node in execution order. Open a node
+to see what it read and returned, the retrieval it ran, and each prompt and raw
+model response.
+
+![The per-node cost table with the datasource resolver opened on its model call](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-debug.png)
+
+**Pipeline:** every step of a run in order, with the six a model decides
+marked and the deterministic ones left quiet. Before a question it shows the
+model each step is set to use; after one, the model that answered, that step's
+tokens and its time.
+
+![The Pipeline page listing each step of a run, the five marked as decided by a model, with tokens and time from the last run](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-pipeline.png)
+
+**Settings:** save an API key per provider and choose a provider and model for
+each LLM step. Written to the demo project's `.env` and `llm.yaml`.
+
+![The Settings page with the key form and a model per step](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-settings.png)
+
+**Retrieval inspector:** run the engine's vector search for any text against the
+live index, with k, lambda, entry types and datasource as knobs, and see what
+MMR picked and what it dropped, as the role you chose, so entries it may not
+read are not shown. No LLM call.
+
+![The Retrieval inspector page showing picks, similarity and MMR scores](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-retrieval.png)
+
+**Feedback:** rate an answer right or wrong, with an optional note. Stored in the
+project with the question, role and SQL, never the rows;
+`nl2sql feedback stats` reports the rates.
+
+![The "Was this answer right?" control after a thumbs-up](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-feedback.png)

@@ -278,7 +278,7 @@ What the project is for: the bundled `demo`, your own data, or a `hosted` public
 ### Strict keys and errors
 
 Every section forbids unknown keys and suggests the closest known one. Names
-resolved through the [registry](../development/index.md) (`type:`,
+resolved through the [registry](../extend/index.md) (`type:`,
 `provider:`) suggest from the installed names. `load_config` and `NL2SQL(...)`
 collect every problem before raising one `ConfigError`, each naming the file
 it is in (an included file, not `nl2sql.yaml`):

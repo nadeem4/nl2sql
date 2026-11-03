@@ -19,7 +19,7 @@ from nl2sql.pipeline.state import SubgraphExecutionState
 
 
 # The node under test builds an LLM client in its constructor, so these cannot
-# run without a real key. See docs/testing/architecture.md.
+# run without a real key. See docs/contribute/testing.md.
 pytestmark = pytest.mark.llm
 
 

@@ -95,7 +95,7 @@ The tenant id for requests that name none. Result files are kept per tenant.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `timeout_s` | `60` | Timeout in seconds for one question. The caller is answered within about a second of the limit; the run's worker thread winds down in the background (see [isolation](../execution/isolation.md)). |
+| `timeout_s` | `60` | Timeout in seconds for one question. The caller is answered within about a second of the limit; the run's worker thread winds down in the background (see [isolation](../architecture/isolation.md)). |
 | `plan_cache` | `true` | Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version on the same run date, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in `<storage.path>/state.db`; `nl2sql cache clear` empties it. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `strict_columns` | `true` | Treat a column the plan names but the retrieved schema does not have as a blocking, retryable `COLUMN_NOT_FOUND` error, so the planner is asked again instead of the plan reaching the database. `false` downgrades it to a warning that lets the plan through once retries are spent. |
 | `today` | none | The date the planner and refiner are told it is, as an ISO date (`2013-12-31`). Unset, it is the real date in UTC. Pin it for tests and gold runs whose questions say "this year" or "the last 30 days". A trace records the date its run used, and `nl2sql trace replay` pins it. It is part of the plan cache key, so a plan made on another date is not reused. |

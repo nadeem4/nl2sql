@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/nadeem4/nl2sql/discussions
+    about: Ask how something works or float an idea in Discussions.
+  - name: Documentation
+    url: https://nadeem4.github.io/nl2sql/
+    about: Read the docs before opening an issue.
+  - name: Report a security vulnerability
+    url: https://github.com/nadeem4/nl2sql/security/advisories/new
+    about: Report it privately; never in a public issue.

@@ -750,7 +750,7 @@ the resolver tells the three apart (see
 (`nl2sql index`) after editing them.
 
 Whether a given question is answered correctly depends on the model; see
-[Known limitations](https://github.com/nadeem4/nl2sql#known-limitations).
+[Known limitations](../reference/limitations.md).
 
 ## Regenerating the demo
 

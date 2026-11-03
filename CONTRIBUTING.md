@@ -131,9 +131,9 @@ several minutes; later ones reuse the data volumes. Without the test bed the
 `realdb` workflow when a pull request changes database-facing code. The
 owner can also run them on the test bed's GCP VM with
 `python scripts/testbed.py run -- pytest -m realdb`, which always stops the
-VM afterwards. See `docs/testing/test-bed.md`.
+VM afterwards. See `docs/contribute/test-bed.md`.
 
-See `docs/testing/architecture.md` for what each marker means.
+See `docs/contribute/testing.md` for what each marker means.
 
 ### Checking a config
 
@@ -190,7 +190,7 @@ Docs describe what is built, in the present tense. Design and planning documents
 
 All four packages share one version and are released together. The checklist --
 bumping the versions and what publishing a GitHub release triggers -- is in
-`docs/development/releasing.md`.
+`docs/contribute/releasing.md`.
 
 Every release needs a page at `docs/releases/X.Y.Z.md`. When the release-please
 PR is open, run the `release-notes` skill (`.claude/skills/release-notes/`). It

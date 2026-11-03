@@ -678,7 +678,7 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
             "size a few points either way is noise, so read the flips and the p-value, not the headline.\n"
             "Runs on another suite (`@digest`), another schema or, for mode full, other roles or curated\n"
             "answers on are not comparable and start a new series. See\n"
-            "[the Chinook suite](testing/evaluation-dataset.md) and\n"
+            "[the Chinook suite](evals/chinook-suite.md) and\n"
             "[the routing suite](evals/cases.md#the-routing-suite).\n")
     if not recs:
         return f"{head}\n{EMPTY}\n"
