@@ -3453,7 +3453,7 @@ spent by every visitor.</p>
 with nothing to do by hand. Merging the release pull request tags <code>vX.Y.Z</code>, and
 <a href="https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_pypi.yaml"><code>publish_pypi.yaml</code></a> then runs, in order:</p>
 <pre class="mermaid"><code>flowchart LR
-    PY[pypi: the three packages&lt;br/&gt;reach PyPI] --&gt; PS[pypi-smoke: install X.Y.Z&lt;br/&gt;from PyPI, boot the demo]
+    PY[pypi: the four packages&lt;br/&gt;reach PyPI] --&gt; PS[pypi-smoke: install X.Y.Z&lt;br/&gt;from PyPI, boot the demo]
     PS --&gt; SP[space: publish_space.yml&lt;br/&gt;pins and pushes the Space]
     SP --&gt; SS[space-smoke: the live URL&lt;br/&gt;reports X.Y.Z]</code></pre>
 <ol>

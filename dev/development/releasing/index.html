@@ -3147,7 +3147,7 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="releasing">Releasing</h1>
-<p>The monorepo publishes three distributions to PyPI under <strong>unified versioning</strong>:
+<p>The monorepo publishes four distributions to PyPI under <strong>unified versioning</strong>:
 they all carry the same version and are released together. Internal
 dependencies use compatible-release constraints (<code>~=0.1</code>), so a release only
 resolves for users if every package declares the same version.</p>
@@ -3157,7 +3157,7 @@ owns both. Two steps are manual. First, the release page
 <code>docs/releases/X.Y.Z.md</code> is written with the release-notes skill and merged.
 A status check on the release PR stays red until it is. Second, the owner
 <strong>merges the release pull request</strong>.
-Everything after that runs on its own: the three packages go to PyPI, the API
+Everything after that runs on its own: the four packages go to PyPI, the API
 image to GHCR, the versioned docs to <code>gh-pages</code>, and the hosted demo on Hugging
 Face is rebuilt on the version just published. Each of those is checked from
 the outside before the release counts as done.</p>
@@ -3169,14 +3169,14 @@ the outside before the release counts as done.</p>
     RN --&gt;|release-notes status turns green| PR2[Release PR refreshed]
     PR2 --&gt;|the owner merges it| TAG[Tag vX.Y.Z + GitHub Release]
     TAG --&gt; NOTES[release-notes job: page summary&lt;br/&gt;above the generated changelog]
-    TAG --&gt;|release_please.yml calls it with tag_name&lt;br/&gt;the tag itself cannot trigger it| B[publish_pypi.yaml: build 3 dists]
+    TAG --&gt;|release_please.yml calls it with tag_name&lt;br/&gt;the tag itself cannot trigger it| B[publish_pypi.yaml: build 4 dists]
     B --&gt; S{wheels install and import?}
     S --&gt;|no| STOP[Nothing is published]
     S --&gt;|yes| PY[PyPI via trusted publishing:&lt;br/&gt;one job per package,&lt;br/&gt;one environment each]
     PY --&gt; GH[ghcr.io/nadeem4/nl2sql-api]
     PY --&gt; D[mike deploy: versioned docs]
     PY --&gt; PS[pypi-smoke: pip install the release&lt;br/&gt;from PyPI, boot the demo]
-    PS --&gt; SP[publish_space.yml: Space pinned to&lt;br/&gt;nl2sql-engine demo == X.Y.Z]
+    PS --&gt; SP[publish_space.yml: Space pinned to&lt;br/&gt;nl2sql-cli[web] == X.Y.Z]
     SP --&gt; SS[space-smoke: the live Space&lt;br/&gt;reports version X.Y.Z]</code></pre>
 <p>The same chain runs on every pull request up to the point of publishing: the
 <code>build</code> and <code>fresh-install</code> jobs in <code>test.yml</code> build the wheels, install them
@@ -3275,12 +3275,16 @@ version bump applied everywhere it appears:</p>
 <td>an <code>extra-files</code> <code>generic</code> updater</td>
 </tr>
 <tr>
+<td><code>nl2sql-cli/pyproject.toml</code></td>
+<td>an <code>extra-files</code> <code>generic</code> updater (its version, and its <code>nl2sql-engine</code> and <code>nl2sql-api</code> pins)</td>
+</tr>
+<tr>
 <td><code>.release-please-manifest.json</code></td>
 <td>release-please</td>
 </tr>
 </tbody>
 </table>
-<p>The three package manifests carry a marker comment on their version line:</p>
+<p>The four package manifests carry a marker comment on their version line:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span><span class="w"> </span><span class="c1"># x-release-please-version</span>
 </code></pre></div>
 <p>The <code>generic</code> updater replaces the semver-looking value on any line carrying
@@ -3365,7 +3369,7 @@ the release decision.</p>
 <h3 id="5-the-release-publishes-everything">5. The release publishes everything</h3>
 <p><code>publish_pypi.yaml</code> runs a chain of seven jobs:</p>
 <ol>
-<li><strong><code>build</code></strong> — builds sdists and wheels for all three packages, then
+<li><strong><code>build</code></strong> — builds sdists and wheels for all four packages, then
    smoke-installs them into a clean virtualenv and runs <code>import nl2sql</code> and
    <code>nl2sql --help</code>. These are the same commands as the <code>build</code> job in
    <code>test.yml</code>. The <code>nl2sql-engine</code> wheel carries <code>LICENSE</code> and
@@ -3376,7 +3380,7 @@ the release decision.</p>
 <li><strong><code>pypi</code></strong> — <code>needs: build</code>, so a wheel that does not install or import
    fails the gate and this never runs. It is a matrix job with one leg per
    package: each leg runs in its own GitHub Environment
-   (<code>pypi-nl2sql-engine</code>, <code>pypi-nl2sql-api</code>, <code>pypi-nl2sql-sdk</code>),
+   (<code>pypi-nl2sql-engine</code>, <code>pypi-nl2sql-api</code>, <code>pypi-nl2sql-sdk</code>, <code>pypi-nl2sql-cli</code>),
    stages only that package's sdist and wheel into an <code>upload/</code> directory and
    points <code>pypa/gh-action-pypi-publish</code> at it. One environment per package is
    what makes each PyPI trusted-publisher registration unique — see
@@ -3386,7 +3390,7 @@ the release decision.</p>
    the root <code>Dockerfile</code> and pushes <code>ghcr.io/nadeem4/nl2sql-api</code> at both the
    tag and <code>latest</code>. The build context is the <strong>repository root</strong> (<code>context: .</code>)
    with the Dockerfile named explicitly (<code>file: Dockerfile</code>),
-   because the Dockerfile installs the three packages from their local sources
+   because the Dockerfile installs the SDK, engine, API and CLI from their local sources
    and its <code>COPY ./packages/...</code> paths resolve against the build context. A
    context of <code>packages/api</code> makes them resolve to
    <code>packages/api/packages/sdk</code>, which does not exist — that is what
@@ -3407,7 +3411,7 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
 <code>ghcr.io/nadeem4/nl2sql-api:latest</code> onto it.</p>
 </div>
 <ol>
-<li><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all three uploads.
+<li><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all four uploads.
    <code>mike deploy --push --update-aliases $TAG latest</code> adds a versioned copy of
    the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
 <li><strong><code>pypi-smoke</code></strong> — <code>needs: pypi</code>. On a fresh runner, installs the release
@@ -3477,8 +3481,8 @@ upload</code>. This is what broke <code>v0.1.1</code>. Trusted publishing is una
 cost is that released artifacts carry no PEP 740 provenance. See
 <a href="https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github">PyPI's note on reusable workflows</a>.</p>
 </div>
-<p>The three <code>pypi</code> legs run with <code>fail-fast: false</code>, so one package failing no
-longer cancels the other two and skips <code>ghcr</code> and <code>docs</code>.</p>
+<p>The four <code>pypi</code> legs run with <code>fail-fast: false</code>, so one package failing no
+longer cancels the others and skips <code>ghcr</code> and <code>docs</code>.</p>
 <h3 id="why-the-publish-is-chained-to-release-please-not-to-the-tag">Why the publish is chained to release-please, not to the tag</h3>
 <p><strong>GitHub does not trigger workflows from events created with the default
 <code>GITHUB_TOKEN</code>.</strong> This is a deliberate recursion guard, and it has no opt-out
@@ -3697,17 +3701,17 @@ last involves a secret, and it is not a PyPI one.</p>
 workflow it will accept uploads from. For a project that does not exist on PyPI
 yet this is a <strong>pending publisher</strong>, created at
 <a href="https://pypi.org/manage/account/publishing/">pypi.org/manage/account/publishing</a>.</p>
-<p>Add one for each of the three names — <code>nl2sql-engine</code>, <code>nl2sql-api</code> and
-<code>nl2sql-sdk</code>. The engine publishes as <code>nl2sql-engine</code> because the
+<p>Add one for each of the four names — <code>nl2sql-engine</code>, <code>nl2sql-api</code>,
+<code>nl2sql-sdk</code> and <code>nl2sql-cli</code>. The engine publishes as <code>nl2sql-engine</code> because the
 <code>nl2sql</code> name on PyPI is already taken by an unrelated project; the import
 package is still <code>nl2sql</code>.</p>
 <div class="admonition warning">
 <p class="admonition-title">The environment name is required and differs per package</p>
 <p>PyPI keys a pending publisher on the tuple <strong>(owner, repository, workflow,
-environment)</strong> and requires that tuple to be unique. All three of our
+environment)</strong> and requires that tuple to be unique. All four of our
 projects publish from the same owner, the same repository and the same
-workflow file, so with the environment left blank all three tuples are
-identical: the first registration succeeds and the next two are rejected
+workflow file, so with the environment left blank all four tuples are
+identical: the first registration succeeds and the others are rejected
 with <em>"A pending trusted publisher matching this configuration has already
 been registered for a different project name."</em></p>
 <p>The environment is therefore the only field that can distinguish them, and
@@ -3716,7 +3720,7 @@ below</strong> — these strings are the contract between the workflow and PyPI,
 a mismatch fails the upload with an OIDC error rather than a helpful one.</p>
 </div>
 <p>Owner <code>nadeem4</code>, repository <code>nl2sql</code> and workflow <code>publish_pypi.yaml</code> are the
-same on all three entries. Only the project name and the environment differ:</p>
+same on all four entries. Only the project name and the environment differ:</p>
 <table>
 <thead>
 <tr>
@@ -3736,6 +3740,10 @@ same on all three entries. Only the project name and the environment differ:</p>
 <tr>
 <td><code>nl2sql-sdk</code></td>
 <td><code>pypi-nl2sql-sdk</code></td>
+</tr>
+<tr>
+<td><code>nl2sql-cli</code></td>
+<td><code>pypi-nl2sql-cli</code></td>
 </tr>
 </tbody>
 </table>
@@ -3811,19 +3819,21 @@ PyPI, GHCR and the docs; the <code>space</code> job logs that the secret is miss
 finishes green, and <code>space-smoke</code> is skipped. See
 <a href="../../deployment/hosted-demo/#deployed-by-the-release">Hosted demo</a>.</p>
 <h2 id="package-order">Package order</h2>
-<p>The three matrix legs run in parallel, so ordering is not something the
-workflow manages. It matters when one leg fails and you re-publish by hand:
+<p>The matrix legs upload one at a time in the order below (<code>max-parallel: 1</code>). It matters when one leg fails and you re-publish by hand:
 release in dependency order so no package is ever on PyPI referencing a version
 of its dependency that is not.</p>
 <pre class="mermaid"><code>flowchart TD
     SDK[nl2sql-sdk] --&gt; CORE[nl2sql-engine]
-    CORE --&gt; API[nl2sql-api]</code></pre>
+    CORE --&gt; API[nl2sql-api]
+    CORE --&gt; CLI[nl2sql-cli]
+    API -.-&gt;|web extra| CLI</code></pre>
 <ol>
 <li><code>nl2sql-sdk</code> — no internal dependencies.</li>
-<li><code>nl2sql-engine</code> — needs the SDK. Carries the engine, the CLI and all four dialect
+<li><code>nl2sql-engine</code> — needs the SDK. Carries the engine and the dialect
    adapters, so its extras (<code>nl2sql-engine[postgres]</code> and friends) add only database
-   drivers from PyPI and cannot be broken by publish order.</li>
-<li><code>nl2sql-api</code> — needs <code>nl2sql-engine</code>.</li>
+   drivers from PyPI and cannot be broken by publish order. It does not depend on the API.</li>
+<li><code>nl2sql-api</code> — needs <code>nl2sql-engine</code>; its leg first checks the engine is on PyPI at the same version.</li>
+<li><code>nl2sql-cli</code> — needs <code>nl2sql-engine</code>, and <code>nl2sql-api</code> for its <code>web</code> extra. It uploads last, after a step that checks the other two are on PyPI.</li>
 </ol>
 <p>PyPI never lets a version be re-uploaded. If a release goes out broken, yank it
 and ship the next patch version; do not try to replace it.</p>

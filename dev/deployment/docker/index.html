@@ -6362,7 +6362,8 @@
 visitor brings their own API key, see <a href="../hosted-demo/">Hosted demo</a>.</p>
 <h2 id="container-requirements">Container requirements</h2>
 <ul>
-<li>Install <code>nl2sql-engine</code> and add adapters via extras (e.g. <code>nl2sql-engine[postgres]</code>).</li>
+<li>Install <code>nl2sql-engine</code> and add adapters via extras (e.g. <code>nl2sql-engine[postgres]</code>). The repository's <code>Dockerfile</code>
+  also installs <code>nl2sql-cli</code>, so <code>docker compose run --rm api nl2sql index</code> works in the image.</li>
 <li>Provide the config: <code>nl2sql.yaml</code> and the files it includes, at the path
   <code>NL2SQL_CONFIG</code> names. The <code>Dockerfile</code> at the repository root sets
   <code>NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml</code>, so mount a config folder there.</li>
