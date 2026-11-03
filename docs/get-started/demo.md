@@ -482,8 +482,7 @@ Whether a given question is answered correctly depends on the model; see
 databases under `data/` with fresh copies; without `--force` it names the files
 that exist and writes nothing. It never touches `.env`, so a saved key
 survives, and it leaves the index under `.nl2sql/` alone: run `nl2sql index`
-afterwards. `nl2sql demo` never rewrites an existing project's config (only
-`llm.yaml`, to point it at the mode it starts in); start a new `--dir` for a
+afterwards. `nl2sql demo` never rewrites an existing project's config; start a new `--dir` for a
 fresh one.
 
 ## The datasets that are not here

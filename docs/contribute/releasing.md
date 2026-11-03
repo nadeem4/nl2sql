@@ -268,7 +268,7 @@ the release decision.
    report `RUNNING` on its new build while the router still sends visitors
    to the old one, so this checks where visitors are: it polls
    `https://nadeem4nk-nl2sql-demo.hf.space/api/health` until it reports
-   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/meta`; then
+   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/v1/meta`; then
    the same on the Space's custom domain, `SPACE_CUSTOM_DOMAIN` in the
    workflow (`https://nl2sql.codewithnk.com`; empty skips it).
 

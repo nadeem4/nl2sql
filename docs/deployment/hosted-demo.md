@@ -52,7 +52,7 @@ mode uses) and, for a question that carries no key:
   live."; the page shows that with an **Add a key in Settings** button.
 
 With a key, every question -- guided or not -- runs live on that key, exactly as
-before. `/api/meta` lists the questions that replay as `recorded`, and the page
+before. `/api/v1/meta` lists the questions that replay as `recorded`, and the page
 marks those chips with a dot.
 
 **The model a replayed run names is the one that recorded it.** The recordings
@@ -443,7 +443,7 @@ flowchart LR
    (10 attempts, 30 seconds apart): the index the Hub's builder sees can lag
    a fresh upload, which is what failed `v0.2.0`'s first Space build.
 3. **`space-smoke`** polls `https://nadeem4nk-nl2sql-demo.hf.space/api/health`
-   until it reports `X.Y.Z`, then checks the page and `/api/meta`. A Space goes
+   until it reports `X.Y.Z`, then checks the page and `/api/v1/meta`. A Space goes
    on serving its previous image while the new one builds, so a build that
    finished is not yet proof that visitors see it. It then runs the same check
    against the custom domain, `SPACE_CUSTOM_DOMAIN` at the top of

@@ -186,7 +186,8 @@ nothing to ask yet, shows the **start screen** above that story. `GET /meta` dec
 
 **Try a sample question** asks the first guided question that has a recorded answer, so it works without a key. The
 guided questions and the recordings come from each datasource in `GET /meta` (`sample_questions`, `recorded`); the
-recording's model is `recorded_with`.
+recording's model is `recorded_with`. Chat labels a recorded answer **Recorded run** when every model call in its usage
+reports no token count and names the recording's model.
 
 **Pipeline** (`#/pipeline`) lists every step of a run from `GET /about`, and marks which a model decides. A page answers
 from recordings (it says so on each model step) when the visitor is on the hosted demo with no key, or when every model

@@ -218,7 +218,7 @@ rated; the default keeps only failed runs' traces.
 
 ## Turning it off and clearing it
 
-- `settings.feedback.enabled: false` stops the web app recording ratings.
+- `settings.feedback.enabled` is reserved: it is accepted and nothing reads it.
 - `nl2sql feedback clear` deletes every rating (`--yes` skips the prompt).
   Schema snapshots and the plan cache are kept, and `nl2sql cache clear`
   never touches the ratings.
