@@ -1447,7 +1447,11 @@ _PLAN_ID = re.compile(
     r"(?:,\s*[A-Z]{0,2}\d+[a-z]?)*\)")
 _PLAN_ID_OK = {"(S3)"}  # S3 is the storage service, not a row
 _PLAN_ID_SCANNED = (".py", ".md", ".js", ".jsx")
-_PLAN_ID_SKIPPED = ("docs/releases/", "benchmarks/", ".claude/", "packages/nl2sql/tests/architecture/test_boundaries.py")
+# docs/benchmarks.md mirrors recorded runs; CLAUDE.md states the rule with examples.
+_PLAN_ID_SKIPPED = (
+    "docs/releases/", "benchmarks/", "docs/benchmarks.md", "CLAUDE.md", ".claude/",
+    "packages/nl2sql/tests/architecture/test_boundaries.py",
+)
 
 
 def test_no_tracked_file_cites_a_design_doc_or_a_plan_id():

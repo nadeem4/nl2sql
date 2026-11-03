@@ -203,8 +203,8 @@ test("the nav indicator sits under the current tab: moved and scaled, never resi
   assert.equal(indicatorTransform(null, nav), null);
 });
 
-// pages. Each is a stub until it is built.
-const PAGES = ["chat", "dashboards", "approvals", "evals", "trace"];
+// Pages that start as stubs until they are built.
+const STUB_PAGES = ["chat", "dashboards", "approvals", "evals", "trace"];
 // Pages filled: real routes in the nav.
 const FILLED = ["connect", "knowledge"];
 
@@ -212,14 +212,14 @@ const FILLED = ["connect", "knowledge"];
 const SHIPPED = ["chat", "dashboards", "approvals", "evals"];
 
 test("routes are all there; the shipped ones are in the nav, the rest are stubs", () => {
-  for (const id of PAGES) {
+  for (const id of STUB_PAGES) {
     const page = PAGES.find((p) => p.id === id);
     assert.ok(page, `${id} has no route`);
     assert.equal(Boolean(page.stub), !SHIPPED.includes(id), `${id} stub flag is wrong`);
     assert.equal(pageFromHash(hashFor(id)), id === "trace" ? DEFAULT_PAGE : id);
   }
   const listed = navItems("home").map((item) => item.id);
-  for (const id of PAGES) assert.equal(listed.includes(id), SHIPPED.includes(id), `${id} nav listing`);
+  for (const id of STUB_PAGES) assert.equal(listed.includes(id), SHIPPED.includes(id), `${id} nav listing`);
   for (const id of ["home", "chat", "pipeline", "settings", "retrieval", ...FILLED]) assert.ok(listed.includes(id));
   for (const id of FILLED) {
     assert.ok(!PAGES.find((p) => p.id === id).stub);
