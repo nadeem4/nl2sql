@@ -38,7 +38,7 @@ The dev server serves the page only. To exercise the real API, run `npm run buil
 | `src/lib/` | Pure helpers: settings, hosted keys, run state, SQL highlighting. |
 | `src/styles/` | The stylesheet, split by area and listed in cascade order in `index.css`. |
 
-Logic lives in plain `.js` files next to the `.jsx` that uses it, and each has a `*.test.js` beside it, so tests run under Node without a browser.
+Logic lives in plain `.js` files next to the `.jsx` that uses it, and most have a `*.test.js` beside them, so tests run under Node without a browser.
 
 ## Related
 

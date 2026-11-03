@@ -18,4 +18,4 @@ Each rule has a one-line reason, because a rule without one gets argued every ti
 DISABLE_MKDOCS_2_WARNING=true mkdocs build --strict
 ```
 
-The build fails on a broken link or a missing page. The boundary test (`packages/nl2sql/tests/architecture/test_boundaries.py`) rejects plan ids in parentheses (`(K1)`, or inside a sentence such as `(read from K1 and K2)`) and the names of planning documents in source, tests and docs.
+The build fails on a broken link or a missing page. The boundary test (`packages/nl2sql/tests/architecture/test_boundaries.py`) rejects plan ids in parentheses, alone or inside a sentence, and the names of planning documents in source, tests and docs.
