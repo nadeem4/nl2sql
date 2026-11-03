@@ -171,7 +171,7 @@ jobs:
           wheel="$(ls upload/*.whl | head -n 1)"
           version="${wheel#upload/nl2sql_engine-}"
           version="${version%%-*}"
-          curl -fsS "https://pypi.org/pypi/nl2sql-api/$version/json" > /dev/null \
+          curl -fsS --retry 10 --retry-delay 15 --retry-all-errors "https://pypi.org/pypi/nl2sql-api/$version/json" > /dev/null \
             || { echo "nl2sql-api $version is not on PyPI; not uploading an engine that cannot install its demo extra."; exit 1; }
 
       # `attestations` defaults to true in the action, and that is what broke

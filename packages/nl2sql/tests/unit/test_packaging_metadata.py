@@ -188,4 +188,6 @@ def test_the_engine_upload_waits_for_the_api_to_be_on_pypi():
 
     assert "matrix.package == 'nl2sql-engine'" in workflow[check - 200:check + 400]
     assert "https://pypi.org/pypi/nl2sql-api/" in workflow[check:check + 1200]
+    # PyPI's JSON API can lag a fresh upload: the check retries before it fails the release.
+    assert "--retry-all-errors" in workflow[check:check + 1200]
     assert check < workflow.index("Publish ${{ matrix.package }} to PyPI")
