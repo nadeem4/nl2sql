@@ -2146,6 +2146,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#home-pipeline-and-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home, Pipeline and Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-map" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6371,6 +6382,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#home-pipeline-and-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Home, Pipeline and Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-map" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6568,6 +6590,46 @@ and one waiting for an approval offers <strong>Run again</strong> once it is gra
 <li><strong>API keys for this server</strong> (administrators) lists the keys the server issues, and creates one from a user id, roles, an optional tenant and an optional label (<code>POST /api-keys</code>). The new key's token is shown once and never again. <strong>Revoke</strong> ends a key (<code>DELETE /api-keys/{id}</code>).</li>
 </ul>
 <p>A caller who is not an administrator, on a server that does not take a key with a question, sees that there is nothing to set.</p>
+<h2 id="home-pipeline-and-retrieval">Home, Pipeline and Retrieval</h2>
+<p><strong>Home</strong> says what the engine does (the five steps a question travels, a clip of each page) and, while the project has
+nothing to ask yet, shows the <strong>start screen</strong> above that story. <code>GET /meta</code> decides it with <code>start</code>:</p>
+<table>
+<thead>
+<tr>
+<th><code>start</code></th>
+<th>When</th>
+<th>What Home shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>choose</code></td>
+<td>The served project has no datasource and the caller is an administrator</td>
+<td>Two cards. <strong>Try the demo</strong> (administrators) runs <code>POST /jobs/demo</code>, shows its progress, then opens Chat on a sample question. <strong>Connect your database</strong> opens the Connect page. Anyone else gets no <code>start</code> at all.</td>
+</tr>
+<tr>
+<td><code>hosted</code></td>
+<td>The hosted demo</td>
+<td><strong>Ask a sample question</strong> opens Chat. <strong>Connect your database</strong> only explains: the hosted server connects nothing, so it shows the steps to run nl2sql yourself (install and <code>nl2sql demo</code>, or Docker Compose) and links the <a href="../../deployment/compose/">self-hosting guide</a>. No route is called.</td>
+</tr>
+<tr>
+<td><code>null</code></td>
+<td>A datasource exists</td>
+<td>No start screen.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Try a sample question</strong> asks the first guided question that has a recorded answer, so it works without a key. The
+guided questions and the recordings come from each datasource in <code>GET /meta</code> (<code>sample_questions</code>, <code>recorded</code>); the
+recording's model is <code>recorded_with</code>.</p>
+<p><strong>Pipeline</strong> (<code>#/pipeline</code>) lists every step of a run from <code>GET /about</code>, and marks which a model decides. A page answers
+from recordings (it says so on each model step) when the visitor is on the hosted demo with no key, or when every model
+step in <code>/about</code> runs on the <code>replay</code> provider.</p>
+<p><strong>Retrieval</strong> (<code>#/retrieval</code>) searches the live index with no model and no key: <code>GET /index/inspect</code> gives the defaults
+(k, lambda, the entry types) and <code>POST /index/inspect</code> runs one search as the caller, so it shows only what the caller's
+scope reaches. The datasource list comes from <code>/meta</code>. With no datasource it says there is nothing to search yet.</p>
+<p><strong>Hosted first run.</strong> A hosted visitor without a key sees the guided questions replay recorded runs. A question with no
+recording comes back as a <code>REPLAY_MISS</code> error, and Chat then points to Settings to add a key. Chat labels a recorded answer <strong>Recorded run</strong> when every model call in its usage reports no token count and names the recording's model.</p>
 <h2 id="source-map">Source map</h2>
 <table>
 <thead>

@@ -6364,7 +6364,9 @@ each failing datasource and its stage, each agent whose key does not resolve and
 API starts even when a required datasource cannot connect; this route says so.</p>
 <h3 id="get-apiv1meta"><code>GET /api/v1/meta</code></h3>
 <p>Without a caller: <code>{"mode": "demo" | "your_data" | "hosted", "auth": "api_keys" | "proxy" | "static" | "none",
-"request_llm": false}</code>, what a page needs before it has an identity. With a caller, also <code>datasources</code>, each one the
+"request_llm": false, "start": "choose" | "hosted" | null}</code>, what a page needs before it has an identity. <code>start</code> tells the
+web app which start screen to show: <code>choose</code> when the project has no datasource yet and the caller is an administrator (try the demo or connect a database; anyone else gets <code>null</code>, so the route does not tell them the project is empty),
+<code>hosted</code> on the hosted demo, and <code>null</code> once a datasource exists. With a caller, also <code>datasources</code>, each one the
 caller may reach as <code>{id, description, sample_questions, recorded}</code> (<code>recorded</code> is the sample questions the <code>replay</code>
 provider can answer with no key), and <code>recorded_with</code>, the provider and model those recordings came from, or <code>null</code>.
 It also names the caller as <code>caller: {"user_id": "...", "admin": true | false}</code>. <code>admin</code> is whether the caller holds a role
