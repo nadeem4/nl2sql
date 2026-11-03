@@ -119,7 +119,8 @@ class LLMAPI:
         ``headers``, ``prices``, temperatures and the rest stay. Where an
         entry's provider changes, its ``api_key`` and ``base_url`` are cleared,
         since they belonged to the old provider; a cleared key is the new
-        provider's standard variable. Then it is :meth:`replace`: validated,
+        provider's standard variable. An agent with no provider of its own follows a
+        new default provider and keeps its model name, key and ``base_url``. Then it is :meth:`replace`: validated,
         atomic, logged, audited and in memory only.
 
         Raises:
@@ -130,6 +131,7 @@ class LLMAPI:
 
         names = set(self.list())
         llm = self._ctx.config.llm.model_copy(deep=True)
+        was = llm.provider  # the default's provider before any change: the order of ``changes`` does not matter
         for agent, choice in changes.items():
             if agent not in names:
                 raise ValueError(f"Unknown agent '{agent}'. The agents are: {', '.join(sorted(names))}.")
@@ -140,7 +142,7 @@ class LLMAPI:
                 continue
             entry = llm if agent == "default" else llm.agents.get(agent) or AgentLLM()
             update = {"provider": choice["provider"], "model": choice["model"]}
-            if choice["provider"] != (entry.provider or llm.provider):
+            if choice["provider"] != (entry.provider or was):
                 update.update(api_key=None, base_url=None)
             if agent == "default":
                 llm = llm.model_copy(update=update)

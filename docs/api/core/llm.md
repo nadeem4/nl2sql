@@ -158,7 +158,7 @@ Changes the model of some agents and keeps every other `llm` setting. `changes` 
 `llm.list`, `default` included) to `{"provider", "model"}`, or to `None` to drop that agent's override so it
 inherits `default` (`default` itself cannot be dropped). Only `provider` and `model` change: `base_url`, `headers`,
 `prices`, temperatures and the rest stay. Where an entry's provider changes, its `api_key` and `base_url` are
-cleared (a cleared key is the new provider's standard variable). The result goes through `llm.replace`, so it is
+cleared (a cleared key is the new provider's standard variable). An agent with no provider of its own follows a new `default` provider and keeps its own model name, key and `base_url`; change that agent too if they belong to the old provider. Whether a provider changed is judged against the old `default`, whatever the order of `changes`. The result goes through `llm.replace`, so it is
 validated, atomic, logged, audited, in memory only and per process.
 
 Returns: `LLMChange`, as `llm.replace`.
