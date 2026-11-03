@@ -103,8 +103,8 @@ tracebacks of the config show `**********` instead. A `${provider:key}`
 reference is not a secret and is shown as written. This covers:
 
 - `api_key` in `llm`, in each of `llm.agents`, and in `embeddings`, including
-  a key the demo gives the engine in memory (`nl2sql demo --api-key`, or one
-  saved in the playground's settings panel): `repr(engine.config)` never
+  a key the demo gives the engine in memory (a key typed into the web app's Settings page, or one
+  sent with a request): `repr(engine.config)` never
   shows it;
 - in the `secrets` section, every provider setting whose name contains
   `password`, `secret`, `token` or `api_key` (`client_secret` for Azure,

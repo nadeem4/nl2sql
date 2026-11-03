@@ -22,9 +22,8 @@ To see it before installing anything, the same playground runs at
     Since the web app moved into `nl2sql-api`, `nl2sql demo` only starts
     `nl2sql-api serve --demo` in a child process, waits until it answers and
     opens your browser (Ctrl+C stops both). Its flags are `--dir`, `--host`,
-    `--port` and `--no-browser`. The old `--api-key`, `--record`,
-    `--allow-settings`, `--hosted`, `--questions-per-minute` and
-    `--questions-per-session` flags are gone from the command: put a key in the
+    `--port` and `--no-browser`. The command takes no key,
+    recording or hosting options: put a key in the
     environment or the project's `.env` (or paste it into Settings), and run the
     public variant with `nl2sql-api serve --demo --hosted`. Parts of this page
     below still describe the old playground; the web app guide is
@@ -346,8 +345,8 @@ demand.
 - **Write descriptions with the LLM** is off by default because it spends
   tokens on your key; it is unavailable in replay mode.
 - It has the Settings page's guardrails (so does the
-  [Retrieval inspector](#the-retrieval-inspector)): local only unless `--allow-settings`,
-  and only from the playground page itself.
+  [Retrieval inspector](#the-retrieval-inspector)): local only (on a non-loopback host it is off),
+  and only from the page itself.
 - On the [hosted demo](../deployment/hosted-demo.md) there is no button at all.
   The panel says instead that the index was built before the demo started and
   which databases it covers, and prints the server's own reason where the
@@ -495,7 +494,7 @@ nav. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.
 
 - **API keys, one per provider.** Paste a key and press **Save key**. The
-  provider follows the key's shape by the same rule as `--api-key` (`sk-ant-`
+  provider follows the key's shape by the engine's own rule (`sk-ant-`
   is Anthropic, `sk-or-` is OpenRouter, anything else OpenAI). The key is
   written to the demo project's `.env`, replacing that provider's previous
   key and keeping the others, and the default moves to that provider. The
@@ -506,7 +505,7 @@ second settings store, and the browser keeps nothing but UI conveniences.
   the environment. Keys are
   write-only: no response, log line, trace or error carries one, only a masked
   form such as `sk-...4f2a` per provider. On a later start the precedence above
-  still holds, so `--api-key` or a key exported in your shell wins over a saved
+  still holds, so a key exported in your shell wins over a saved
   one, and every saved key is loaded so each step finds its own.
 - **A provider and a model for each LLM step.** One selector each for the
   answerability check (`datasource_resolver`), question splitter (`decomposer`),
@@ -594,8 +593,7 @@ re-ranking model; the "re-ranking" is MMR, explained in
   page sends; it does not verify who is asking.
 - **Local only**, like Settings and Rebuild, because it shows the index entries
   the role reaches, column statistics and sample values included: on a
-  non-loopback `--host` it is off (`POST /api/retrieval` answers `403`) unless
-  `--allow-settings` is given, and it refuses another site's page, a
+  non-loopback `--host` it is off (`POST /api/retrieval` answers `403`), and it refuses another site's page, a
   non-loopback hostname and anything but JSON.
 
 A run's own retrieval is under **Debug**: open the `datasource_resolver` or
@@ -608,7 +606,7 @@ or **ðŸ‘Ž Wrong**, with an optional note (**Wrong number**, **Wrong table**
 **Wrong filter**, **Missing rows**, or your own words). The rating is saved in
 the demo's state store (`.nl2sql/state.db`) with the question, role, SQL, the model per
 step and the engine version; never the rows. It is local only, like Settings:
-on a non-loopback `--host` it is off unless `--allow-settings`.
+on a non-loopback `--host` it is off.
 `settings.feedback.enabled: false` in the project's config turns it off. Read the ratings back, with
 the refusal, retry, error and plan-cache rates, from the CLI (below). See
 [Feedback and Signals](../observability/feedback.md).

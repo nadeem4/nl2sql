@@ -177,3 +177,15 @@ def test_pypi_uploads_the_sdk_then_the_api_then_the_engine_one_at_a_time():
     assert "max-parallel: 1" in workflow
     order = re.findall(r"- package: (nl2sql-[a-z]+)", workflow)
     assert order == ["nl2sql-sdk", "nl2sql-api", "nl2sql-engine"]
+
+
+def test_the_engine_upload_waits_for_the_api_to_be_on_pypi():
+    """The legs are independent (fail-fast is off), so the engine leg checks for its API itself."""
+    from pathlib import Path
+
+    workflow = (Path(__file__).resolve().parents[4] / ".github" / "workflows" / "publish_pypi.yaml").read_text(encoding="utf-8")
+    check = workflow.index("Check the API is on PyPI")
+
+    assert "matrix.package == 'nl2sql-engine'" in workflow[check - 200:check + 400]
+    assert "https://pypi.org/pypi/nl2sql-api/" in workflow[check:check + 1200]
+    assert check < workflow.index("Publish ${{ matrix.package }} to PyPI")

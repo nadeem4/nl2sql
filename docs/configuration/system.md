@@ -324,7 +324,7 @@ Only the entry points load a `.env` file: the CLI, `nl2sql-api` and
 `nl2sql demo` load the `.env` **next to `nl2sql.yaml`** into the process
 environment at startup. A variable that is already set always wins; the file
 never overrides it. Each loads the `.env` before it configures logging, so a
-`NL2SQL_LOG_LEVEL` written there applies (`nl2sql demo` reads the demo
+`NL2SQL_LOG_LEVEL` written there applies (`nl2sql-api serve --demo` reads the demo
 project's `.env`, except with `--hosted`, which reads none).
 
 The library itself never reads a `.env` file. A Python caller that wants one
@@ -513,8 +513,8 @@ start from.
 | `NL2SQL_API_TRUST_BODY_ROLE` | removed in 0.10: a request body never carries the caller |
 | `NL2SQL_API_CORS_ORIGINS` (comma-separated) | `api.cors_origins` (a list) |
 | `NL2SQL_API_ADMIN_ROLES` | `policies.admin_roles` |
-| `NL2SQL_DEMO_HOSTED` | `nl2sql demo --hosted` |
-| `NL2SQL_DEMO_QUESTIONS_PER_MINUTE`, `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `nl2sql demo --questions-per-minute N --questions-per-session N` |
+| `NL2SQL_DEMO_HOSTED` | `nl2sql-api serve --demo --hosted` |
+| `NL2SQL_DEMO_QUESTIONS_PER_MINUTE`, `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `nl2sql-api serve --questions-per-minute N --questions-per-session N` |
 | `VAULT_ADDR`, `VAULT_TOKEN` | `secrets.providers[].url` / `.token` (write `${env:VAULT_TOKEN}` to keep reading the variable) |
 | `AZURE_KEYVAULT_URL` | `secrets.providers[].vault_url` |
 | `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unchanged: the fallback key variables |

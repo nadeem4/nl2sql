@@ -302,9 +302,11 @@ class Client:
                 with self.opener.open(request, timeout=timeout) as response:
                     return json.loads(response.read().decode("utf-8", "replace"))
             except urllib.error.HTTPError as error:
-                if error.code != 429 or attempt == 11:
+                # A rate limit asks for seconds; the session cap asks for an hour and is never waited out.
+                wait = int(error.headers.get("Retry-After") or 10) if error.headers else 10
+                if error.code != 429 or wait > 120 or attempt == 11:
                     raise
-                time.sleep(10)
+                time.sleep(wait + 1)
 
 
 # The scripted follow-up that scripts/record_demo_answers.py records after its question (FOLLOW_UPS there).
@@ -352,7 +354,8 @@ def check_queries(client: Client, meta: Mapping) -> List[str]:
 def check_answers(client: Client, meta: Mapping, guided_turns: bool = False) -> List[str]:
     problems = check_queries(client, meta)
     if guided_turns:
-        problems += check_conversation(client, meta)
+        # A session of its own: the queries above already spent part of this one's cap.
+        problems += check_conversation(Client(client.base), meta)
     return problems
 
 

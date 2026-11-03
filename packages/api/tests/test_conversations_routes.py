@@ -299,6 +299,22 @@ def test_closing_the_stream_cancels_the_turn(world):
     assert closed.wait(10), "the disconnect closed the facade's iterator once its step returned"
 
 
+def test_a_turn_with_no_model_key_answers_200_with_a_typed_error_not_a_500(world, monkeypatch):
+    from nl2sql.conversations.agent import ConversationAgent
+    from nl2sql.llm.registry import MissingApiKey
+
+    def keyless(self, *args, **kwargs):
+        raise MissingApiKey("LLM agent 'conversation' uses provider 'openai', which requires an API key")
+
+    monkeypatch.setattr(ConversationAgent, "decide", keyless)
+    cid = world.start(datasource_id="ds1")
+
+    response = world.client.post(f"{URL}/{cid}/turns", json={"text": "How many customers?"})
+
+    assert response.status_code == 200, response.text
+    assert (response.json()["status"], response.json()["error"]["code"]) == ("error", "MISSING_LLM")
+
+
 def test_a_failure_after_the_settle_wait_is_a_final_run_failed_frame(world, monkeypatch):
     """The route has answered 200 by then, so the failure is the stream's last frame, not a cut-off body."""
     monkeypatch.setattr("nl2sql_api.routes.conversations.SETTLE_S", 0.05)

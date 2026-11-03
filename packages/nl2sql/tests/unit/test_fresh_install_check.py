@@ -321,7 +321,7 @@ def test_a_post_waits_out_the_hosted_rate_limit_and_tries_again(check, monkeypat
         def open(self, request, timeout=None):
             calls.append(1)
             if len(calls) < 3:
-                raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, io.BytesIO(b"{}"))
+                raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {"Retry-After": "7"}, io.BytesIO(b"{}"))
             return _Response()
 
     waits = []
@@ -379,10 +379,33 @@ def test_check_queries_reports_a_server_error_and_an_untyped_turn(check):
 
 def test_guided_turns_are_checked_only_when_asked(check, monkeypatch):
     calls = []
-    monkeypatch.setattr(check, "check_conversation", lambda client, meta: calls.append("turns") or [])
-    monkeypatch.setattr(check, "check_queries", lambda client, meta: calls.append("queries") or [])
+    sessions = []
+    monkeypatch.setattr(check, "check_conversation", lambda client, meta: calls.append("turns") or sessions.append(client) or [])
+    monkeypatch.setattr(check, "check_queries", lambda client, meta: calls.append("queries") or sessions.append(client) or [])
+    asking = check.Client("http://x")
 
-    check.check_answers(None, {}, guided_turns=False)
-    check.check_answers(None, {}, guided_turns=True)
+    check.check_answers(asking, {}, guided_turns=False)
+    check.check_answers(asking, {}, guided_turns=True)
 
     assert calls == ["queries", "queries", "turns"]
+    # The guided turns use a session of their own: the queries already spent part of the per-session cap.
+    assert sessions[0] is asking and sessions[1] is asking and sessions[2] is not asking
+    assert sessions[2].base == asking.base
+
+
+def test_a_session_cap_429_is_not_retried(check, monkeypatch):
+    import io
+    import urllib.error
+
+    class _Opener:
+        def open(self, request, timeout=None):
+            raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {"Retry-After": "3600"}, io.BytesIO(b"{}"))
+
+    waits = []
+    monkeypatch.setattr(check.time, "sleep", waits.append)
+    client = check.Client("http://x")
+    client.opener = _Opener()
+
+    with pytest.raises(urllib.error.HTTPError):
+        client.post("/p", {})
+    assert waits == []

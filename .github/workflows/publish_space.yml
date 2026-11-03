@@ -221,6 +221,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          # An untagged run is a rehearsal of this branch; the public Space only ever gets a release.
+          if [ -z "$TAG" ] && [ "$SPACE_ID" = "nadeem4nk/nl2sql-demo" ]; then
+            echo "Refusing to push an untagged build to the public Space; pass a scratch space_id."
+            exit 1
+          fi
+
           source_sha="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
           if [ -n "$TAG" ]; then
             spec="nl2sql-engine[demo]==${TAG#v}"
@@ -264,7 +270,8 @@ jobs:
             cp "$RUNNER_TEMP"/api_wheel/*.whl wheels/
             # The Hub refuses binaries pushed as plain git; LFS carries the wheel.
             git lfs install --local
-            echo "wheels/*.whl filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
+            rule="wheels/*.whl filter=lfs diff=lfs merge=lfs -text"
+            grep -qxF "$rule" .gitattributes || echo "$rule" >> .gitattributes
             api_spec="nl2sql-api @ file:///tmp/wheels/$(basename "$RUNNER_TEMP"/api_wheel/*.whl)"
           fi
 

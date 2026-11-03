@@ -46,8 +46,10 @@ def demo_command(directory: pathlib.Path, host: str, port: int, no_browser: bool
 
     argv = [sys.executable, "-m", "nl2sql_api", "serve", "--demo", "--dir", str(directory),
             "--host", host, "--port", str(port)]
-    # On Windows the child gets its own process group, so Ctrl+C reaches only this launcher, which forwards it.
-    child = subprocess.Popen(argv, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
+    # The child gets its own process group (Windows) or session (POSIX), so Ctrl+C reaches only this launcher,
+    # which forwards it once.
+    own = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+    child = subprocess.Popen(argv, **own)
     url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{port}/"
     try:
         if not no_browser and _wait_until_up(url, child):
@@ -56,4 +58,8 @@ def demo_command(directory: pathlib.Path, host: str, port: int, no_browser: bool
     except KeyboardInterrupt:
         child.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
         code = child.wait()
+    finally:
+        if child.poll() is None:  # the launcher is leaving by any other road: never leave the server behind
+            child.terminate()
+            child.wait()
     raise SystemExit(code)

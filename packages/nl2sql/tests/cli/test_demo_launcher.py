@@ -17,16 +17,21 @@ class _Child:
     def __init__(self, argv, flags, interrupts=0, code=0):
         self.argv, self.flags, self.code = argv, flags, code
         self.interrupts = interrupts
-        self.signals = []
+        self.signals, self.finished, self.terminated, self.kwargs = [], False, False, {}
 
     def poll(self):
-        return None
+        return 0 if self.finished else None
 
     def wait(self):
         if self.interrupts:
             self.interrupts -= 1
             raise KeyboardInterrupt
+        self.finished = True
         return self.code
+
+    def terminate(self):
+        self.terminated = True
+        self.finished = True
 
     def send_signal(self, number):
         self.signals.append(number)
@@ -44,6 +49,7 @@ def started(monkeypatch):
 
     def popen(argv, creationflags=0, **kwargs):
         child = _Child(argv, creationflags, interrupts=children.interrupts, code=children.code)
+        child.kwargs = kwargs
         children.append(child)
         return child
 
@@ -108,3 +114,23 @@ def test_without_nl2sql_api_it_prints_the_install_line(monkeypatch):
     assert result.exit_code == 1
     assert 'pip install "nl2sql-engine[demo]"' in result.output.replace("\n", " ")
     assert started == []
+
+
+def test_on_posix_the_child_gets_its_own_session_and_one_sigint(started, monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.os", SimpleNamespace(name="posix"))
+    started.interrupts = 1
+
+    assert runner.invoke(app, ["demo", "--no-browser"]).exit_code == 0
+
+    assert started[0].kwargs == {"start_new_session": True}
+    assert started[0].signals == [signal.SIGINT]
+
+
+def test_the_child_is_terminated_when_the_launcher_is_left_early(started, monkeypatch):
+    monkeypatch.setattr("webbrowser.open", lambda url: (_ for _ in ()).throw(RuntimeError("no browser")))
+
+    runner.invoke(app, ["demo"])
+
+    assert started[0].terminated

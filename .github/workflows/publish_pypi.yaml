@@ -163,6 +163,17 @@ jobs:
           cp dist/${{ matrix.stem }}-*.tar.gz dist/${{ matrix.stem }}-*.whl upload/
           ls -1 upload/
 
+      # The legs are independent (fail-fast is off), so the engine leg looks for
+      # its own dependency: its `demo` extra needs the same version of nl2sql-api.
+      - name: Check the API is on PyPI
+        if: matrix.package == 'nl2sql-engine'
+        run: |
+          wheel="$(ls upload/*.whl | head -n 1)"
+          version="${wheel#upload/nl2sql_engine-}"
+          version="${version%%-*}"
+          curl -fsS "https://pypi.org/pypi/nl2sql-api/$version/json" > /dev/null \
+            || { echo "nl2sql-api $version is not on PyPI; not uploading an engine that cannot install its demo extra."; exit 1; }
+
       # `attestations` defaults to true in the action, and that is what broke
       # v0.1.1. Do not re-enable it while this workflow is reached through
       # `workflow_call`.
