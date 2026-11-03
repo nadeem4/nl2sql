@@ -239,3 +239,18 @@ def test_the_api_is_pinned_beside_the_engine_by_the_publish_workflow():
     assert dockerfile.count("\nARG NL2SQL_API_SPEC=") == 1
     assert "^ARG NL2SQL_API_SPEC=" in workflow
     assert 'api_spec="nl2sql-api==${TAG#v}"' in workflow
+
+
+def test_a_rehearsal_ships_the_api_wheel_it_built_because_a_git_archive_has_no_web_app():
+    """The web app is built, not committed: an archive of a commit has no `static/`, so the page would be a 503.
+
+    A no-tag dispatch builds the UI and the API wheel on the runner, puts the wheel in the Space root's
+    `wheels/` and points `NL2SQL_API_SPEC` at it; a release installs the PyPI wheel, which carries the page.
+    """
+    dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+    workflow = (SPACE.parents[1] / ".github" / "workflows" / "publish_space.yml").read_text(encoding="utf-8")
+
+    assert (SPACE / "wheels" / ".gitkeep").is_file()
+    assert "COPY wheels/ /tmp/wheels/" in dockerfile
+    assert "npm run build" in workflow and "python -m build --wheel packages/api" in workflow
+    assert "file:///tmp/wheels/" in workflow

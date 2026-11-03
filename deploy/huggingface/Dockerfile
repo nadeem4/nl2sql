@@ -41,6 +41,11 @@ ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive
 # resolves to.
 ARG NL2SQL_API_SPEC="nl2sql-api @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/api"
 
+# Empty on a release. A rehearsal (a dispatch with no tag) puts the API wheel it
+# built here, because the web app is built, not committed: a git archive of the
+# commit has no page to serve, and the wheel does.
+COPY wheels/ /tmp/wheels/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

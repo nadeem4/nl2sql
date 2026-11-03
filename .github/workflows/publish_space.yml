@@ -129,6 +129,25 @@ jobs:
         with:
           python-version: "3.12"
 
+      # A rehearsal installs the commit, and the web app is built rather than
+      # committed, so the API wheel is built here (UI first, as the release
+      # does) and shipped in the Space root; see deploy/huggingface/Dockerfile.
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.present == 'true' && inputs.tag == ''
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: nl2sql-ui/package-lock.json
+
+      - name: Build the API wheel with the web app (rehearsal only)
+        if: steps.token.outputs.present == 'true' && inputs.tag == ''
+        run: |
+          set -euo pipefail
+          (cd nl2sql-ui && npm ci && npm run build)
+          pip install build
+          python -m build --wheel packages/api --outdir "$RUNNER_TEMP/api_wheel"
+          ls -1 "$RUNNER_TEMP/api_wheel"
+
       - name: Install the Hugging Face hub client
         if: steps.token.outputs.present == 'true'
         run: |
@@ -241,6 +260,10 @@ jobs:
           # there. `.gitattributes` is the Hub's own (its LFS rules) and stays.
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitattributes -exec rm -rf {} +
           cp -R "$GITHUB_WORKSPACE/deploy/huggingface/." .
+          if [ -z "$TAG" ]; then
+            cp "$RUNNER_TEMP"/api_wheel/*.whl wheels/
+            api_spec="nl2sql-api @ file:///tmp/wheels/$(basename "$RUNNER_TEMP"/api_wheel/*.whl)"
+          fi
 
           # Pin what the image installs, by rewriting the default in the pushed
           # copy -- a Space build takes no --build-arg from us. A release pins
