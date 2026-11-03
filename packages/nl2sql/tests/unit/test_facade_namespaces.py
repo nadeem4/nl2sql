@@ -266,6 +266,34 @@ def test_llm_set_models_clears_key_and_base_url_only_where_the_provider_changes(
         assert engine.config.llm.agents["ast_planner"].model == "gpt-x"
 
 
+def test_llm_set_models_result_does_not_depend_on_the_order_of_changes(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-oai-test")  # the agent keeps no key of the new default
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    default = {"provider": "anthropic", "model": "claude-x"}
+    planner = {"provider": "openai", "model": "gpt-plan2"}  # the old default's provider: nothing to clear
+    results = []
+    for changes in ({"default": default, "ast_planner": planner}, {"ast_planner": planner, "default": default}):
+        with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
+            engine.llm.set_models(changes)
+            results.append(engine.config.llm.model_dump())
+
+    assert results[0] == results[1]
+    assert results[0]["agents"]["ast_planner"]["base_url"] == "http://p.local"
+
+
+def test_llm_set_models_switching_an_agents_provider_clears_its_key_and_base_url(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    llm = {**SETTINGS_RICH, "agents": {"refiner": {"provider": "openai", "model": "gpt-refine",
+                                                   "api_key": "sk-refine", "base_url": "http://r.local"}}}
+    with _engine(tmp_path, llm=llm) as engine:
+        engine.llm.set_models({"refiner": {"provider": "anthropic", "model": "claude-x"}})
+        refiner = engine.config.llm.agents["refiner"]
+
+    assert (refiner.provider, refiner.model) == ("anthropic", "claude-x")
+    assert refiner.api_key is None and refiner.base_url is None
+    assert engine.config.llm.base_url == "http://gw.local/v1"
+
+
 def test_llm_set_models_rejects_an_unknown_agent_or_a_removed_default(tmp_path):
     with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
         with pytest.raises(ValueError, match="Unknown agent 'planner'"):
