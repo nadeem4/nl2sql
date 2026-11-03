@@ -1,5 +1,7 @@
 # Datasources API
 
+The request and response models of the datasource routes, for developers calling them over HTTP.
+
 ## Request/Response Models
 
 Source: `packages/api/src/nl2sql_api/models/datasources.py`

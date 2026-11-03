@@ -124,5 +124,5 @@ The real value is read only where it is used: building the LLM or embeddings
 client, a database connection, the artifact store's storage options or a
 secret provider's client. `nl2sql init` never writes a key: a key belongs in
 the environment or the `.env` next to `nl2sql.yaml`. The demo and the
-playground's Settings page save a key to that `.env` only, with its real
+web app's Settings page save a key to that `.env` only, with its real
 value.

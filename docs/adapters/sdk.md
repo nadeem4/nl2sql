@@ -258,7 +258,7 @@ without it needs no change.
 
 ### Optional hooks: `estimate` and `probe_overlap`
 
-Two optional protocols in `nl2sql_sdk.protocols`, added for release 0.8, found with `isinstance`
+Two optional protocols in `nl2sql_sdk.protocols`, found with `isinstance`
 as the two hooks above are. The adapter interface stays at version 2.
 
 | Protocol | Method | Contract |
@@ -443,11 +443,6 @@ Declare it in the `nl2sql.stores` entry point group
 `registry.add_store("bucket", BucketResults)`. Then `results: {type: bucket,
 bucket: nl2sql-results}`.
 
-!!! note "Built-ins only, for now"
-    The engine moves onto these interfaces one slot at a time during 0.6
-    (the index, then the state, then the traces and results). Until a slot's
-    move lands, the engine refuses a plugin store in that slot.
-
 ---
 
 ## Interface: `PolicyCheck`
@@ -494,8 +489,7 @@ Every glossary text is at most 500 characters (the engine passes
 `item_max_chars`); a longer one is a load error naming the item. Declare a
 source in the `nl2sql.knowledge_sources` entry point group, or register it
 in code with `registry.add_knowledge_source(name, cls)` or
-`@registry.knowledge_source(name)`. The built-in `yaml` source arrives
-with release 0.8.
+`@registry.knowledge_source(name)`. The built-in `yaml` source reads `glossary.yaml`.
 
 ---
 

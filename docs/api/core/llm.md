@@ -1,6 +1,5 @@
 # LLM API
 
-## Purpose
 `engine.llm`: the model each agent runs on, and replacing them at runtime.
 
 ## Responsibilities
@@ -180,7 +179,7 @@ Parameters:
 | --- | --- | --- | --- |
 | `llm` | `LLM` or a mapping | yes | The whole `llm` section: an `LLM`, or the section as written in `nl2sql.yaml` (a mapping, such as a request body). A mapping is checked exactly as the file is: strict keys with "did you mean", the model's validators, references kept in secret fields. A `${...}` reference outside a secret field is an error rather than read, since the data did not come from the operator's file. |
 | `by` | `Optional[UserContext]` | no | Who is making the change; its `user_id` and `roles` are logged. |
-| `via` | `str` | no | The entry point making the change (`python`, `api`, `playground`). |
+| `via` | `str` | no | The entry point making the change (`python`, `api`). |
 
 Returns:
 `LLMChange` (exported from `nl2sql`): `by` (`via`, and `user_id` and `roles`

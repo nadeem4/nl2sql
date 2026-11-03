@@ -344,7 +344,7 @@ similarity, the store's distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see [Debugging a run](../observability/debugging.md#retrieval)),
-and the playground's Retrieval inspector (`engine.index.inspect`) runs the same
+and the web app's Retrieval inspector (`engine.index.inspect`) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the **Copy as text** output. It is run as a

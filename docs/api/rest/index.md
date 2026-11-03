@@ -81,8 +81,7 @@ nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000   # one worker, 12
 | [Dashboards](dashboards.md) | `routes/dashboards.py`, `routes/workspaces.py` | Dashboards and workspaces: open, refresh, edit, pin, move, delete; the starter questions. |
 | [Errors](errors.md) | `errors.py` | The one error envelope and the request id. |
 
-The router `web` is empty
-for now: a later row fills it. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
+The built web app is served at `/` and is not an API route. The committed contract is `packages/api/openapi.json`; `test_openapi_snapshot_is_current`
 fails when a route changes without it (rewrite it with `python packages/api/tests/test_openapi_snapshot.py`).
 
 ## Error Handling

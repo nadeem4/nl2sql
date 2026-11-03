@@ -122,7 +122,7 @@ deliberate act, never part of CI. Either:
   (`.github/workflows/record_demo.yml`). It runs the same script with the
   repository secret **`ANTHROPIC_API_KEY`** and opens a pull request with the new
   recordings. It only ever runs by hand. The same workflow with `record: clips`
-  re-records the playground home page's clips, which needs no key: Ask's clip is
+  re-records the web app home page's clips, which needs no key: Ask's clip is
   made from these recordings, so record the answers first.
 
 The recordings ship inside the `nl2sql-engine` wheel, and the public Space runs
@@ -164,7 +164,7 @@ The visitor pastes a key on the **Settings** page, one per provider. From there:
    a header with anything else and nothing that parses or quotes a header can
    expose two at once. With exactly one key the older `X-NL2SQL-Api-Key` is
    sent as well, and on its own it still means what it always did. The
-   playground is served over plain HTTP locally and over the host's TLS when it
+   web app is served over plain HTTP locally and over the host's TLS when it
    is published, so deploy it behind HTTPS.
 3. **The server uses it for that one request.** It is bound to the request with
    [`nl2sql.llm.request_key`][key-module] and the LLM registry builds each
@@ -217,7 +217,7 @@ What it does **not** do:
 - It is not stored, so it cannot be reused for anyone else's question, and there
   is nothing to leak if the container is compromised later.
 - It does not reach a trace. Run traces are written as usual (that is what the
-  playground's **Debug** drill-down reads), and the trace redactor is told about
+  web app's **Debug** drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
   reaches a prompt or an error. The demo project's `settings.yaml` sets
   `traces: { mode: always }`, so every question leaves a file on the
@@ -343,7 +343,7 @@ read-only everywhere.
 
 ## The container
 
-`deploy/huggingface/Dockerfile` builds the playground as a hosted demo. It is a
+`deploy/huggingface/Dockerfile` builds the web app as a hosted demo. It is a
 Space root rather than a repository build: it needs no build context, so the
 whole deploy is that one folder, copied to the Space's root.
 
@@ -458,11 +458,9 @@ flowchart LR
 
 The whole release flow is in [Releasing](../contribute/releasing.md).
 
-**A push to `main` does not deploy the Space.** It used to: every merge that
-touched the engine, the playground or this folder rebuilt the public demo from
-that commit, so the demo ran code no release contained, and a broken merge
-reached visitors before anyone had decided to ship it. Now a merge reaches the
-Space with the next release. Nothing is lost by waiting: the `fresh-install`
+**A push to `main` does not deploy the Space.** A merge reaches the Space with
+the next release, so the public demo never runs code no release contains and a
+broken merge cannot reach visitors before anyone has decided to ship it. Nothing is lost by waiting: the `fresh-install`
 job on every pull request builds the wheels, installs them as a user would and
 boots this exact command, so a change that would break the Space fails its PR.
 To see a change running on a Space before it is released, deploy it to a
@@ -545,7 +543,7 @@ survives a deploy.
 **Rolling back.** Run it by hand with the earlier tag,
 `gh workflow run publish_space.yml -f tag=v0.1.9`. It checks that tag out,
 pins the image to that version on PyPI and rebuilds, so the engine and the
-playground both go back. PyPI keeps every version, so any earlier release can
+web app both go back. PyPI keeps every version, so any earlier release can
 be redeployed this way.
 
 The workflow adds a commit on top of whatever the Space's `main` already is, so
@@ -583,7 +581,7 @@ Two different links go around, and each unfurls from a different place:
 
 Both show the same 1200x630 card:
 
-![The link preview card: the nl2sql playground wordmark, the line "Ask a database in plain English, the model plans, the code writes the SQL", and a fragment of a plan turning into SQL](../assets/social-card.png)
+![The link preview card: the nl2sql web app wordmark, the line "Ask a database in plain English, the model plans, the code writes the SQL", and a fragment of a plan turning into SQL](../assets/social-card.png)
 
 **The app's tags** are added to the built page's `<head>` by
 [`preview.py`][preview] as each request goes out, not baked into the bundle. A
@@ -627,13 +625,13 @@ as `image/png`.
 
 ### The mark
 
-The wordmark's icon on the card is the playground's favicon, the plan spine: a
+The wordmark's icon on the card is the web app's favicon, the plan spine: a
 root bar and stem with two indented steps, the typed plan the model writes, in
-outline. Its one copy is `docs/assets/favicon.svg`; the playground inlines it,
+outline. Its one copy is `docs/assets/favicon.svg`; the web app inlines it,
 this site uses it as its favicon, and the card redraws it in the light colours.
-See [the playground README][playground-readme] for where each copy lives.
+See [the web app README][web-readme] for where each copy lives.
 
-[playground-readme]: https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the-mark
+[web-readme]: https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the-mark
 
 ## Running it locally instead
 

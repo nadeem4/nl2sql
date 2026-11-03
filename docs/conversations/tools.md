@@ -1,8 +1,5 @@
 # Chat tools
 
-!!! note "Release 0.9: the runner and the five tools are built"
-    
-
 A chat tool turns something a conversation already has into something else, with no model call of its
 own. The five built-ins:
 

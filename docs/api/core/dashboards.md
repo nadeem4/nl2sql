@@ -1,13 +1,6 @@
 # Dashboards API
 
-!!! note "Partly built"
-    The workspaces, the dashboard store, `pin`, `move` and the manual edits work, and so do `open`,
-    `refresh` and `run_scheduled`, `generate` and `suggest_questions`, and `filter_values` and
-    `refresh(filters=...)`. A conversation builds and edits a draft with the `dashboard_edit` and
-    `dashboard_pin` chat tools.
-
-## Purpose
-`engine.workspaces` and `engine.dashboards` ([Dashboards](../../dashboards/index.md)).
+`engine.workspaces` and `engine.dashboards` store, open, refresh and generate dashboards, for applications that embed the engine ([Dashboards](../../dashboards/index.md)). A conversation builds and edits a draft with the `dashboard_edit` and `dashboard_pin` chat tools.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/workspaces_api.py` (`WorkspacesAPI`, internal)

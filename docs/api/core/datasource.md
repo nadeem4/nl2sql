@@ -1,6 +1,5 @@
 # Datasource API
 
-## Purpose
 `engine.datasources`: the engine's datasources, listed with their status,
 added and removed at runtime, tested, and their indexed schema; and the
 methods behind Connect a database: the adapter types with their connection

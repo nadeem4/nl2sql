@@ -369,7 +369,7 @@ cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in `QueryResult.usage.calls` and
 in a run trace's `llm.by_node` (see [Debugging](../observability/debugging.md)).
 
-In the demo, the playground's **Settings** page writes exactly these entries
+In the demo, the web app's **Settings** page writes exactly these entries
 into the demo folder's `llm.yaml`. Choosing a provider and a model for a step adds
 an `agents:` entry with `provider`, `model` and the temperature that model
 takes: `0.0`, or `null` for `gpt-5.5`, `gpt-5-mini`, `claude-opus-5` and
@@ -381,14 +381,14 @@ reloads its `llm` section from `nl2sql.yaml`, so the change applies to the
 next question. The page offers the providers and models in
 `VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
-[the Settings page](../get-started/demo.md#the-settings-page).
+[the Settings page](../apps/web.md#settings).
 
-The playground's **Pipeline** page reads the same configuration back: it lists
+The web app's **Pipeline** page reads the same configuration back: it lists
 every step of a run and, for each of the seven a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by `GET /api/pipeline` from `engine.about()`, whose steps
 (`nl2sql.pipeline.steps`) take their seven model steps from `LLM_AGENTS` rather
-than repeating the table above. See [the Pipeline page](../get-started/demo.md#the-pipeline-page).
+than repeating the table above. See [the Pipeline page](../apps/web.md#home-pipeline-and-retrieval).
 
 On the **hosted demo** (`nl2sql-api serve --demo --hosted`) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
@@ -613,7 +613,7 @@ field (`api_key`, a `headers` value) and is an error anywhere else, so data that
 from your files never reads the environment. `nl2sql-api` serves it as the
 admin-only [`PUT /api/v1/settings/llm`](../api/rest/settings.md): the body is the
 section as JSON, and a bad one is HTTP 422 with the `ConfigError` text. The
-playground's model switch calls `replace` too. `engine.llm.list()` shows the
+web app's model switch calls `replace` too. `engine.llm.list()` shows the
 model each agent runs on.
 
 ## Embeddings are a separate path

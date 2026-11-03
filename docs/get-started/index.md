@@ -22,8 +22,7 @@ to use the platform:
 Every path reads the same config, `nl2sql.yaml`, and the files it includes. The
 CLI takes it from `--config PATH`, then the `NL2SQL_CONFIG` variable, then
 `./nl2sql.yaml`; `nl2sql-api` from `NL2SQL_CONFIG`, then `./nl2sql.yaml`; Python
-from `NL2SQL.from_config(path)`. The sections, their fields and every 0.4 file
-and variable they replace are in [Configuration](../configuration/system.md).
+from `NL2SQL.from_config(path)`. The sections and their fields are in [Configuration](../configuration/system.md).
 
 ## Or let `nl2sql launch` do it
 

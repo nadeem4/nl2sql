@@ -1,6 +1,5 @@
 # Conversations API
 
-## Purpose
 `engine.conversations`: model-led conversations over the database ([Conversations](../../conversations/index.md)),
 and `engine.chat_tools` ([Chat tools](../../conversations/tools.md)).
 

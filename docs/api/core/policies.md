@@ -1,6 +1,5 @@
 # Policies API
 
-## Purpose
 `engine.policies`: who may read what. The roles, what a caller may read in a
 datasource, whether a caller may read a table, and whether the patterns match
 the datasources.

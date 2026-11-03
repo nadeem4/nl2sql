@@ -37,7 +37,7 @@ Combine groups with `compare` or `join` operations must include a role for every
 Raises `ValueError` when roles, join keys or their types are missing or cannot meet; parse-and-retry sends it back to the model.
 
 ### Why It Exists
-Ensures combine operations are well-defined and deterministic for aggregation. A text key from one database joined to an integer from another used to fail in the aggregator, terminally, or match nothing.
+Ensures combine operations are well-defined and deterministic for aggregation. A text key joined to an integer key would fail in the aggregator or match nothing, so the types must agree.
 
 ---
 
@@ -441,7 +441,7 @@ A failing test naming the rule and the file, line and import that broke it. Each
 Each rule keeps one thing replaceable. The SDK is what a third-party adapter compiles against, so a dependency there is a dependency every adapter author inherits; an adapter that imported the engine would close the circle and make the split meaningless. Engine code that imports an adapter, or SQLAlchemy, is a second way to reach a database that no new adapter can plug into. And `import nl2sql` loading `nl2sql.evaluation` cost every SDK user the YAML loaders, the eval suites and the fake LLM before anyone asked a question.
 
 ### Example
-The playground once read `engine.context.ds_registry`, `engine.context.schema_store` and `engine.context.vector_store` through `getattr`, so the schema view, the retrieval inspector and index health existed only in the playground; `nl2sql-api` had a placeholder where index status should be. The fix was facade methods that both callers use. Later the CLI's `run`, `index` and `trace replay` built on the runtime too; they now use `stream_query`'s events, `engine.index.build`'s `IndexProgress` callback and `engine.traces.replay`. The playground then still imported the feedback store, the trace reader, the pipeline's step list and the provider presets; those are `engine.feedback`, `engine.traces.get`, `engine.about()` and `engine.llm.providers()` now, which `nl2sql feedback` uses too. The rule stops the shortcut being taken again, which is what keeps a second client cheap.
+The schema view, the retrieval inspector, index health, feedback, traces, the pipeline's step list and the provider presets are facade methods (`engine.index.inspect`, `engine.index.health`, `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.llm.providers()`), and the CLI's `run`, `index` and `trace replay` use `stream_query`'s events, `engine.index.build`'s `IndexProgress` callback and `engine.traces.replay`. The rule stops a client taking a shortcut into the runtime, which is what keeps a second client cheap.
 
 ---
 
@@ -466,7 +466,7 @@ Concretely:
 A failing test naming the heavy libraries that were loaded, or the import time against the budget.
 
 ### Why It Exists
-Code that only needs a name — a type hint, `nl2sql --help`, a config check in CI, a REST client building a request — should not pay for a vector store, a database driver and a tracing stack. `import nl2sql` used to load chromadb, duckdb, opentelemetry, langgraph, langchain_openai and polars and took about 2.2 seconds; it now takes about 15 ms. The cost moves to `NL2SQL(...)`, which needs the runtime anyway.
+Code that only needs a name — a type hint, `nl2sql --help`, a config check in CI, a REST client building a request — should not pay for a vector store, a database driver and a tracing stack. Loading the runtime eagerly would pull in chromadb, duckdb, opentelemetry, langgraph, langchain_openai and polars and cost about 2 seconds; `import nl2sql` takes about 15 ms. The cost moves to `NL2SQL(...)`, which needs the runtime anyway.
 
 ---
 
@@ -492,7 +492,7 @@ Concretely:
 A failing test naming the file, line and the write or read that broke the rule.
 
 ### Why It Exists
-0.4 kept its settings in a process-global object that every module imported, and carried keys and options through `os.environ`. Two engines in one process (a test, a server with two configs, an evaluation run beside live traffic) then read each other's values, an evaluation that pinned a setting raced every other query, and a key set for one engine leaked into every other engine and child process.
+A process-global settings object that every module imports, or keys and options carried through `os.environ`, break isolation. Two engines in one process (a test, a server with two configs, an evaluation run beside live traffic) then read each other's values, an evaluation that pinned a setting raced every other query, and a key set for one engine leaked into every other engine and child process.
 
 ---
 

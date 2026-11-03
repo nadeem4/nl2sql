@@ -1,5 +1,7 @@
 # Query API
 
+The request and response models of the query routes, for developers calling them over HTTP.
+
 ## Request/Response Models
 
 Source: `packages/api/src/nl2sql_api/models/query.py`

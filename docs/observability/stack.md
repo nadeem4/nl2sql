@@ -9,7 +9,7 @@ telemetry** on every run, and **events** that observers turn into logs, an
   `QueryResult.timings`) and `TokenUsageCallback` (LLM calls, input / cached /
   output / reasoning tokens and model seconds per node and per question, into
   `QueryResult.usage`). That covers the Python API, the REST API, the CLI and
-  the demo playground. Every call is priced from the dated price table and
+  the demo web app. Every call is priced from the dated price table and
   `llm.prices` ([Prices](../configuration/llm.md#prices)), so `usage.cost` is
   the question's cost whenever every model it called has a price. See
   [the query API](../api/core/query.md#usage-tokens-calls-and-model-time).
@@ -65,9 +65,8 @@ The `otel` observer records:
 - `nl2sql.run.cost` (histogram, USD), attribute `status`, from
   `run.finished` when the run was priced.
 
-The 0.6 `datasource_id` attribute on `nl2sql.token.usage` is gone: `llm.call`
-does not carry it. Token usage is not kept in a process-wide list; read it
-from `QueryResult.usage`.
+Token usage is not kept in a process-wide list; read it from
+`QueryResult.usage`.
 
 ## Audit logging
 

@@ -6,15 +6,13 @@ code values, joins the database does not declare, business terms, prose rules
 and example questions. It is written in `glossary.yaml` and read by a
 *knowledge source*; the `knowledge` section lists the sources.
 
-!!! note "Release 0.8"
-    The engine loads, merges, shows and exports knowledge from release 0.8,
-    and the planner and refiner read it: descriptions, roles,
-    units, grains, code values and glossary joins in the schema block, matched
-    terms and rules in `[BUSINESS_CONTEXT]`. It reaches the index too: the
-    chosen descriptions, the terms, the joins and the examples are index entries,
-    and `nl2sql index --refresh` brings them up to date after an edit without
-    reading the schema, and
-    [the schema retriever](../how-it-works/nodes/schema_retriever_node.md#knowledge).
+The engine loads, merges, shows and exports knowledge, and the planner and
+refiner read it: descriptions, roles, units, grains, code values and glossary
+joins in the schema block, matched terms and rules in `[BUSINESS_CONTEXT]`. It
+reaches the index too: the chosen descriptions, the terms, the joins and the
+examples are index entries, and `nl2sql index --refresh` brings them up to date
+after an edit without reading the schema. See
+[the schema retriever](../how-it-works/nodes/schema_retriever_node.md#knowledge).
 
 ## The section
 

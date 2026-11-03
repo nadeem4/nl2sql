@@ -1,6 +1,5 @@
 # Saved answers API
 
-## Purpose
 `engine.answers`: a person's own record of "this answered my question". It stores the typed plan behind an
 answer, not SQL and not rows, and runs it again on request. 
 

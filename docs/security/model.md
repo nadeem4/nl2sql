@@ -1,36 +1,37 @@
 # Security Model
 
-## At a glance
-
-- **What reaches the LLM provider:** the question; the schema the planner needs
-  (table and column names, types, keys, relationships, descriptions); **sample
-  column values** for tables the role may read; and the **result rows**, which
-  the answer writer summarises. With `settings.traces.mode` on, run traces store prompts,
-  responses and sample rows on disk.
-- **RBAC is strict.** A plan that touches a table the role may not read is
-  refused before any SQL exists, never answered from the tables the role can
-  see. Sample values and statistics of forbidden tables are stripped from the
-  prompt and the trace. An unknown role grants nothing. There is no column
-  masking and no row-level security.
-- **Read-only is a database setting, not something the executor checks.** The
-  plan type only allows `SELECT` and the generator only builds one, but the
-  executor does not inspect the SQL. A SQLite datasource is always opened
-  read-only at the driver level (SQLite's `mode=ro` URI), so a write is refused
-  by SQLite itself. No other dialect opens read-only yet, so on PostgreSQL, MySQL, SQL Server
-  or DuckDB, **give the engine a read-only database user.**
-- **No authentication** in the CLI or REST API. The CLI
-  takes the role from the caller. The REST API takes it from a trusted
-  proxy header or a static setting, never from the body unless a dev flag is
-  on; put your own auth in the proxy and derive the role from it.
-- `settings.pipeline.timeout_s` bounds how long the caller waits, not how long the work
-  runs; the graph runs in-process with no sandbox.
-
-Details are below and in [Execution Isolation](../how-it-works/isolation.md).
+What the engine protects, what it does not, and what you must add before exposing it, for operators and security reviewers.
 
 Authorization is enforced at **planning time**, by the logical validator, before
 any SQL exists. That is the one security property this engine provides. It is
 not authentication, it is not containment, and it is not row- or column-level
 security.
+
+**What reaches the LLM provider:** the question; the schema the planner needs
+(table and column names, types, keys, relationships, descriptions); **sample
+column values** for tables the role may read; and the **result rows**, which
+the answer writer summarises. With `settings.traces.mode` on, run traces store
+prompts, responses and sample rows on disk.
+
+**RBAC is strict.** A plan that touches a table the role may not read is
+refused before any SQL exists, never answered from the tables the role can see.
+Sample values and statistics of forbidden tables are stripped from the prompt
+and the trace. An unknown role grants nothing. There is no column masking and
+no row-level security.
+
+**Read-only is a database setting.** The plan type only allows `SELECT` and the
+generator only builds one, but the executor does not inspect the SQL. Each
+built-in adapter that can makes its session read-only (see
+[What keeps the SQL read-only](#what-keeps-the-sql-read-only)); on the others,
+**give the engine a read-only database user.**
+
+**The engine does not authenticate callers in the query path.** The REST API
+resolves the caller from an API key, a trusted proxy's headers, a static role
+or the local operator; the CLI takes the role from the command line.
+
+`settings.pipeline.timeout_s` bounds how long the caller waits, not how long the
+work runs; the graph runs in-process with no sandbox
+([Execution Isolation](../how-it-works/isolation.md)).
 
 ## The role is supplied by the caller
 
@@ -41,43 +42,21 @@ depends on the client:
 
 - CLI: `nl2sql run --role <id>`, defaulting to `admin`.
 - Python API: `UserContext(roles=[...])`, whatever the calling code passes.
-- REST API: the `identity.caller` dependency
-  (`packages/api/src/nl2sql_api/identity.py`) resolves one `UserContext` from the
-  source `api.auth` names: an API key (`api_keys`), the user, tenant and roles
-  headers of a proxy that connects from `api.proxy.trusted_from` (`proxy`), one
-  role for everyone (`static`) or the local operator (`none`, the default). It
-  answers `HTTP 401` when there is no identity, and never reads the request
-  body. Headers from a peer outside `trusted_from` are ignored. With
-  `auth: none` the request must be made straight to localhost (a connecting peer
-  that is not loopback, such as a published container port, a `Host` that is
-  not loopback, or an `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header, is a
-  `403`, so a same-host proxy or a DNS-rebinding page is not the operator), and
-  `nl2sql-api serve` refuses to bind a non-loopback host. The routes that change
-  datasources, LLMs or the index also need one of the roles in
-  `policies.admin_roles` (default `[admin]`), else `HTTP 403`. See
+- REST API and the web app: one `UserContext` per request from the source
+  `api.auth` names (an API key, a trusted proxy's headers, a static role or the
+  local operator), never from the request body. The routes, the `401` and
+  `403` cases and the admin check are in
   [Identity](../api/rest/index.md#identity) and
   [Admin routes](../api/rest/index.md#admin-routes).
+- MCP over HTTP (`nl2sql mcp --http`): every request needs a valid
+  [API key](api-keys.md) and runs as that key's user, tenant and roles
+  ([MCP over HTTP](../get-started/mcp.md#over-http)).
 
-- API keys: `engine.api_keys` makes bearer tokens that each carry the user,
-  tenant and roles their holder runs as, and `verify(token)` turns a token
-  back into that `UserContext`. This is the one place the engine itself
-  checks who is asking; MCP over HTTP (`nl2sql mcp --http`) is the first
-  transport to use it, and the other clients above still do not. Every
-  request there needs a valid key, and runs as that key's user, tenant and
-  roles. See [API keys](api-keys.md) and
-  [MCP over HTTP](../get-started/mcp.md#over-http).
-
-- Playground: the page sends the role chosen in "Ask as" with each request
-  (`/api/ask`, and `/api/retrieval` for the Retrieval inspector), and the
-  server believes it. The inspector shows a role only the entries that role may
-  read, but anyone who can reach the playground can ask as any role; it is a
-  local demo, off beyond loopback unless `--allow-settings`.
-
-The REST API still does not verify who the caller is. **If you expose this
-service, put your own authentication in a proxy in front of it, derive the role
-from that, and have the proxy overwrite the role header on every request**;
-otherwise any client can send the header itself. An empty `roles` list
-denies everything, which is the correct default for an unauthenticated caller.
+**If you expose this service behind a proxy, derive the role from your own
+authentication and have the proxy overwrite the role header on every
+request**; otherwise any client can send the header itself. An empty `roles`
+list denies everything, which is the correct default for an unauthenticated
+caller.
 
 A role name that is not present in the policy file grants nothing, exactly like
 an empty `roles` list. It grants nothing, so the caller is refused with a normal
@@ -139,7 +118,7 @@ still refuses a plan on the table. See
 This is **table-level** access control. It is not column masking and not
 row-level security: a role that may read a table reads every column and every
 row of it. A downloaded trace of a *permitted* run holds real rows, and the
-playground serves any trace by id with no login, so restricting a trace to the
+web app serves any trace by id with no login, so restricting a trace to the
 user who produced it is left to a multi-user deployment.
 
 ## Security controls
@@ -191,7 +170,7 @@ user who produced it is left to a multi-user deployment.
   [Query API → Approval](../api/core/query.md#approval).
 - **Results belong to their asker**: a run's manifest and its trace record who asked,
   `(tenant_id, user_id)`, plus the sorted roles of an anonymous asker, and every read of its rows (`engine.results`, the
-  REST and playground results routes, a conversation's report and `chart`
+  REST and web app results routes, a conversation's report and `chart`
   tool, a dashboard's charts) needs the caller and answers only that asker.
   `engine.traces.get` and `engine.feedback.record` take the caller too: another user's trace is `None` (and
   rating it is `TraceNotFound`); only the in-process operator (`user_context=None`, as `nl2sql trace`) reads any run.
@@ -200,10 +179,8 @@ user who produced it is left to a multi-user deployment.
   reads nothing; no caller is a `TypeError`, and a manifest that records no
   asker is refused. Callers with no `user_id` are anonymous: their runs are
   bound to the tenant and the same set of roles, so a `viewer` cannot read an
-  `admin` run, but anonymous callers with the same roles share results. The
-  REST API has no per-user identity yet (its role settings carry roles only,
-  and API keys are MCP-only), so REST runs are readable by REST callers of the
-  same tenant with the same roles. See
+  `admin` run, but anonymous callers with the same roles share results (the
+  `static` source gives every caller no user id). See
   [Who can read a run](../api/core/results.md#who-can-read-a-run).
 - **A supplied plan** (`run_query(plan=...)`) skips planning, not checking:
   its datasource is scope-checked, and the plan passes `plan.after` and the
@@ -223,11 +200,11 @@ user who produced it is left to a multi-user deployment.
   address with it. The server speaks plain HTTP: put a reverse proxy or a
   tunnel in front for TLS, since a bearer token sent in the clear is readable.
   See [API keys](api-keys.md).
-- **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
-  (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
-  with who made it and each agent's old and new model, never a key. Queries
-  are not audited. See `../observability/stack.md`.
-- **Bounded execution**: a global timeout and a per-run cancellation token cap each run. There is **no process sandbox** — the engine runs in-process (see `../execution/isolation.md`).
+- **Audit logging** writes the events the catalog marks for audit (a run's
+  outcome, policy and hook decisions, cost refusals, index swaps and each
+  `engine.llm.replace` with who made it and each agent's old and new model,
+  never a key). See [Observers](../configuration/observers.md#audit).
+- **Bounded execution**: a global timeout and a per-run cancellation token cap each run. There is **no process sandbox**: the engine runs in-process ([Execution Isolation](../how-it-works/isolation.md)).
 
 ## What keeps the SQL read-only
 
@@ -290,7 +267,7 @@ flowchart TD
 
 ## Validation gates
 
-Validation rules are enforced by `LogicalValidatorNode` and documented in `../how-it-works/invariants.md` and `../how-it-works/nodes/logical_validator_node.md`.
+`LogicalValidatorNode` enforces the validation rules; they are in [Invariants](../how-it-works/invariants.md) and [the validator node](../how-it-works/nodes/logical_validator_node.md).
 
 ## Source references
 

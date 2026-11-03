@@ -7,7 +7,7 @@ index builds, purges and LLM swaps. Two readers see them:
 
 - **The caller who asked the question** sees their own run's events on
   `engine.stream_query`, from a caller-safe allow-list. `nl2sql-api`'s
-  `POST /query/stream`, the playground and `nl2sql run` all read this stream.
+  `POST /query/stream`, the web app and `nl2sql run` all read this stream.
 - **An operator** sees every event of every run, and the engine's own, through
   `engine.events.subscribe`.
 
@@ -62,7 +62,7 @@ Run events (they carry the run's `trace_id`):
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
 | `policy.decision` | a denial: `datasource_id`, `schema`, `table` (both None for a datasource), `rule`, `step` (`logical_validator`, `curated_matcher` or `datasource_resolver`) | no |
 | `hook.decision` | `hook`, `point`, `decision`, `reason`, ... | no |
-| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; not yet published |
+| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; published by the planner on a sub-query's first prompt (a plan-cache hit sends none) |
 | `clarification.requested` | `sub_query_id`, `phrase`, `options` (how many) | no; published by the clarifier when a run ends `needs_clarification` |
 | `cost.estimated` | `datasource_id`, `sub_query_id`, `estimated_rows`, `cost`, `limit`, `decision` (`allow`, `confirm`, `refuse`; the audit observer writes `confirm` and `refuse`) | no; published by the `policy.cost` hook when a cost limit applies, once per sub-query's SQL (an approved re-run asks again) |
 
@@ -85,8 +85,7 @@ on the engine's bus directly.
 | `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | a new proposal entered the review queue (a thumbs-up, or another track's finding) |
 | `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | `engine.proposals.accept` or `reject` decided one (audited) |
 
-Release 0.9 adds the events below. They are catalogued now; the change named
-with each publishes it. None is on `stream_query`'s allow-list: `conversations.stream` adds the two conversation
+The events below belong to conversations, dashboards, workspaces, datasources, API keys and MCP. None is on `stream_query`'s allow-list: `conversations.stream` adds the two conversation
 events to its own. The three marked *turn* belong to a conversation turn, which opens a scope of its own and so has a
 `trace_id`; none carries rows, a value of an argument, or a token.
 
@@ -119,9 +118,7 @@ datasource it was asked about). The validator publishes a refused table
 once per check, even when the plan names it twice. A scope asked only to filter (routing that
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
-nobody asked for. Every catalogued event is published today except
-`run.limit_reached`, whose
-PR is named in its description. While a
+nobody asked for. While a
 [hook](../configuration/hooks.md) is attached at `answer.after`, a run
 publishes no `answer.delta` and sends `result.manifest` only after the hooks
 allowed the answer (never, on a deny).
@@ -170,10 +167,10 @@ then exactly one of `run.finished` or `run.failed`.
 As Server-Sent Events, each event is `event: <name>` and one `data:` line
 holding the whole event as JSON. That is what `nl2sql-api`'s
 `POST /api/v1/query/stream` ([REST](../api/rest/query.md)) and the
-playground's `/api/ask/stream` send.
+web app's `/api/ask/stream` send.
 
 The allow-list is one definition: the catalog entries marked `stream`
-(`nl2sql.events.STREAM_EVENTS`). An event a later release adds joins the
+(`nl2sql.events.STREAM_EVENTS`). An event added to the catalog joins the
 stream by its catalog entry alone.
 
 ## Subscribing: the operator's view

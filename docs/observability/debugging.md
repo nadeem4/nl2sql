@@ -14,8 +14,7 @@ the model again.
 ## When a trace is written
 
 Each engine reads these from the `settings.traces` section of its config, so
-two engines in one process trace by their own settings. The 0.4 variable each
-one is still set from by the CLI and the playground is in brackets.
+two engines in one process trace by their own settings.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -39,10 +38,10 @@ sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
 A run that recovered on retry therefore still leaves a trace.
 
 The demo's config (`nl2sql init --demo`) sets `settings.traces.mode: always`
-in its `settings.yaml`, so every playground question is traced.
+in its `settings.yaml`, so every web app question is traced.
 
 The trace is recorded by a callback that `run_with_graph` attaches to every
-run, so the CLI, the Python API, the REST API and the playground all produce it.
+run, so the CLI, the Python API, the REST API and the web app all produce it.
 Writing a trace never fails a run; a write error is logged as a warning.
 
 Where the file went is reported back:
@@ -53,7 +52,7 @@ Where the file went is reported back:
   `engine.traces.get(trace_id)` reads the trace from any store. A trace records its asker (`owner`); with a
   `user_context` only that asker reads it, and with none the caller is the in-process operator (`nl2sql trace`).
 - `nl2sql run` prints `Trace written to <path>`.
-- The playground shows a **Download trace** link under Cost & time when Debug is on.
+- The web app shows a **Download trace** link under Cost & time when Debug is on.
 
 File names are `<UTC timestamp>_<trace_id>.json`, so a directory listing sorts
 by time.
@@ -343,7 +342,7 @@ served. It then compares the replayed `QueryResult` with the recorded one
 - Redaction applies to the recorded answers too: a model answer that
   contained something secret-shaped is replayed redacted.
 
-## The playground
+## The web app
 
 With **Debug** on, the per-node table under **Cost & time** puts a bar beside
 each node's time, sized to the slowest node, so the slow step stands out. Each
@@ -355,7 +354,7 @@ record as a table: the pool nearest first, picks marked with their MMR order,
 dropped entries greyed, the picks in order as a row of chips, and a second row
 naming the entries MMR passed over because they repeat an earlier pick. The **Retrieval** inspector at the top of the page
 runs the same search for any text (see the
-[demo guide](../get-started/demo.md#the-retrieval-inspector)). The page
+[demo guide](../apps/web.md#home-pipeline-and-retrieval)). The page
 fetches the trace from `GET /api/trace/{trace_id}`, which reads it with
 `engine.traces.get`: any id that is not a plain token is rejected before the
 trace store sees it, and the `files` store reads only files directly inside its

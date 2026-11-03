@@ -13,7 +13,7 @@ project by the CLI, so no data is downloaded or built when you set the demo up.
 The tables, columns and row counts are in
 [Demo datasets](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/datasets/README.md).
 
-To see it before installing anything, the same playground runs at
+To see it before installing anything, the same web app runs at
 <https://nl2sql.codewithnk.com>, where you bring your own model key.
 
 ## What to expect
@@ -25,8 +25,7 @@ To see it before installing anything, the same playground runs at
     `--port` and `--no-browser`. The command takes no key,
     recording or hosting options: put a key in the
     environment or the project's `.env` (or paste it into Settings), and run the
-    public variant with `nl2sql-api serve --demo --hosted`. Parts of this page
-    below still describe the old playground; the web app guide is
+    public variant with `nl2sql-api serve --demo --hosted`. The web app guide is
     [Web app](../apps/web.md).
 
 After `pip install "nl2sql-cli[web]"` and `nl2sql demo`:
@@ -42,17 +41,17 @@ After `pip install "nl2sql-cli[web]"` and `nl2sql demo`:
    `engine.check()`, and indexes the schemas on your machine when the index is
    missing, empty or out of date. The first run downloads a ~79 MB embedding model; indexing
    needs no key.
-3. **A local page.** It prints `Playground ready at http://127.0.0.1:8765/` and
+3. **A local page.** It prints `Web app ready at http://127.0.0.1:8765/` and
    opens that address in your browser (`--no-browser` skips it, `--port`
    changes it). Ctrl+C stops it.
 4. **No key yet?** Paste an OpenAI or Anthropic key (or an OpenRouter one) into
-   [the Settings page](#the-settings-page); the running demo switches to live
+   [the Settings page](../apps/web.md#settings); the running demo switches to live
    without a restart.
 5. **Ask.** Pick one of twenty guided questions or type your own, as `admin`,
    `analyst` or `viewer`. A run shows the answer first, then the plan the model
    wrote, the checks, the generated SQL, the rows, and cost and time.
    **Debug** opens each step's model calls, prompts and responses, and
-   [the Pipeline page](#the-pipeline-page) lists every step and which a model
+   [the Pipeline page](../apps/web.md#home-pipeline-and-retrieval) lists every step and which a model
    decides.
 
 The `nl2sql` command is the `nl2sql-cli` package and its `web` extra brings the
@@ -115,12 +114,12 @@ Each item is labelled with its origin (`knowledge`, `database` or
 datasource fails. See
 [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init).
 
-For the browser playground instead of the CLI, `nl2sql demo` does both steps in
+For the browser web app instead of the CLI, `nl2sql demo` does both steps in
 `./nl2sql-demo` the first time (and adds a `nl2sql-demo.json` stamp recording
 which engine version wrote the folder; see [Old demo folders](#old-demo-folders)),
 then serves a page over it. See the
 [CLI reference](../reference/cli.md) for its flags, and
-[the Settings page](#the-settings-page) for entering a key and choosing
+[the Settings page](../apps/web.md#settings) for entering a key and choosing
 models from the page.
 
 ### The schemas
@@ -160,7 +159,7 @@ year, sales by country, best-selling genres, top artists by tracks sold).
 `nl2sql.yaml` includes it as the `curated` section, so curated answers are
 on, and indexing embeds their questions
 beside the schema. A question one of them answers runs its SQL with the values
-bound instead of a generated plan, and the playground labels the answer
+bound instead of a generated plan, and the web app labels the answer
 **Verified ·** and the query's id. "What is the total revenue per year?" and
 "Which genre sells the most tracks?" among the guided questions are two of
 them. See [Curated answers](../configuration/curated.md#in-the-demo).
@@ -188,7 +187,7 @@ true`, so the demo's refusal names the role and table; outside the demo the
 message is the generic "You do not have permission to see the data this
 question requires." See
 [Security Model](../security/model.md#hidden-tables-and-strict-refusal).
-The playground's schema panel follows the **Ask as** role too: it lists only
+The web app's schema panel follows the **Ask as** role too: it lists only
 the tables that role may read (`engine.datasources.schema(..., user_context=)`).
 
 ### Recorded answers, no key
@@ -239,16 +238,13 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   `provider: openrouter`). Keep it in the environment, or in a `.env` file next
   to `nl2sql.yaml`, which the CLI loads without overriding a variable already
   set.
-- The demo's model is `gpt-5.4` with `temperature: 0.0`. It replaced `gpt-4o`,
-  whose 30,000 tokens-per-minute limit on the owner's account was below one
-  question with a single retry; `gpt-5.4` had 500,000 and accepts
-  `temperature: 0`. To use a model that rejects it (`gpt-5.5`, `gpt-5-mini`),
+- The demo's model is `gpt-5.4` with `temperature: 0.0`, which it accepts. To use a model that rejects it (`gpt-5.5`, `gpt-5-mini`),
   set `temperature: null` in `llm.yaml` - see
   [LLM configuration â†’ Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
 - Indexing calls no model: the demo's own indexing (the first run, the startup
-  repair and the playground's Rebuild) reads the schema and the glossary and
+  repair and the web app's Rebuild) reads the schema and the glossary and
   embeds them, with the local embedding model by default. Descriptions a model
   drafts are proposals for review, not part of the index.
 - A key pasted into Settings is written into the project's `.env`, never into a YAML file. The provider follows the
@@ -287,15 +283,14 @@ the new model's namespace starts empty, and the old one stays until
 
 Column statistics are read when a datasource is indexed, so a change to what
 indexing records reaches an existing demo folder only when it is indexed again.
-After 0.2.2, a text column with at most 50 distinct values keeps all of them
-rather than five. `nl2sql demo` does not re-index a folder whose index is
+A text column with at most 50 distinct values keeps all of them. `nl2sql demo` does not re-index a folder whose index is
 healthy, so run `nl2sql index` in the folder, or start a fresh one with
 `nl2sql demo --dir <new folder>`. The hosted image builds its index with
 `nl2sql init --demo` and `nl2sql index`, so a new image picks the change up.
 
 ### Index health and repair
 
-The playground's schema panel reads the schema snapshot, for whichever database
+The web app's schema panel reads the schema snapshot, for whichever database
 its **Showing** switcher names; the resolver, which
 picks the database for every question when more than one is registered, reads
 the separate vector index, and with three registered it searches on every
@@ -307,7 +302,7 @@ so the page looked fine while every question failed with
 - **Startup repair.** Every `nl2sql demo` start calls `engine.check()`, which
   reports what the index *contains*: the demo rebuilds it when it is missing or
   empty, or a datasource has no live build. A failed rebuild is
-  reported (the playground still starts, and offers Rebuild) rather than
+  reported (the web app still starts, and offers Rebuild) rather than
   ignored.
 - **Rebuilds never leave an empty index.** A datasource's new entries are
   written beside its current ones and switched in only when all are written;
@@ -319,7 +314,7 @@ so the page looked fine while every question failed with
 
 ### The search index panel
 
-The playground's left rail opens with the **Database** panel, and with the
+The web app's left rail opens with the **Database** panel, and with the
 demo's three databases it carries a switcher for which of them to read: a
 segmented control while there are four or fewer, a **Showing** select beyond
 that. At the foot of the rail, **Search index** is one line when all is well --
@@ -344,7 +339,7 @@ demand.
 - **Write descriptions with the LLM** is off by default because it spends
   tokens on your key; it is unavailable in replay mode.
 - It has the Settings page's guardrails (so does the
-  [Retrieval inspector](#the-retrieval-inspector)): local only (on a non-loopback host it is off),
+  [Retrieval inspector](../apps/web.md#home-pipeline-and-retrieval)): local only (on a non-loopback host it is off),
   and only from the page itself.
 - On the [hosted demo](../deployment/hosted-demo.md) there is no button at all.
   The panel says instead that the index was built before the demo started and
@@ -354,260 +349,19 @@ demand.
 
 ### Old demo folders
 
-Demo folders are not upgraded in place: a folder written by an older engine
-keeps that engine's defaults (for example an older default model). A folder
-written by a 0.4 engine (`configs/`, `.env.demo`) has no `nl2sql.yaml` and
-cannot be read by 0.5: start a new `--dir`. New folders get a `nl2sql-demo.json` stamp; when `nl2sql demo`
-starts in a folder stamped by an older engine, or in one with no stamp at all,
-it warns and suggests a fresh `--dir`. The playground's index panel repeats the
+Demo folders are not upgraded in place: a folder keeps the defaults of the
+engine that wrote it (for example its default model). A new folder gets a
+`nl2sql-demo.json` stamp; when `nl2sql demo` starts in a folder stamped by an
+older engine, or in one with no stamp at all, it warns and suggests a fresh
+`--dir`. The web app's index panel repeats the
 warning.
 
-### Pages
+### The web app
 
-The playground is five pages, named across the top of every one of them:
-**Home**, **Ask**, **Pipeline**, **Settings** and **Retrieval**. Each is a
-route in the address bar -- `#/`, `#/ask`, `#/pipeline`, `#/settings` and
-`#/retrieval` -- so a reload stays where you were, a
-link can be pasted to someone else, and Back and Forward walk the pages you
-visited. A route nobody serves lands on Home.
-
-**Home** says what the engine does and shows it: the five steps a question
-travels (Question, Plan, Check, SQL, Rows, marked by whether a model or code
-decides each), then a short clip of Ask, Pipeline and Retrieval with a link
-into each. On a project with no datasource yet, Home also shows a start screen
-with two choices, **Try the demo** (adds the sample databases and builds their index) and
-**Connect your database**; on the hosted demo the second one shows how to run nl2sql
-yourself. **Try a sample question** opens Ask and asks a guided question; on
-the hosted demo it picks one with a recorded answer, so it works before you
-add a key. The nav marks the page you are on,
-and marks Settings or Retrieval when the server has it off; the page itself
-then says why. Moving between pages keeps the question, the answer and the
-Debug choice: they belong to the visit, not to the page.
-
-At the right of the top bar a status pill says which mode the page is in --
-**Live**, **Replay mode** with how many guided questions it has recordings for,
-or on the hosted demo whether this tab has a key yet. Hover it, or let a screen
-reader read it, for the full sentence: how replay answers, or whose key answers
-and the hosted limits.
-
-### The Ask page
-
-Ask is the question box, then the run, answer first:
-
-- **Suggestions.** Under the question box, a row of chips offers three or four
-  guided questions for the database the rail is showing, and **N more** opens
-  every pile, one per database. On a phone the row is a strip you swipe
-  sideways. The run sits right below the box.
-- **The answer leads.** Once a run is back, its first block is the answer: the
-  question and the role it was asked as, the answer sentence in the largest
-  type on the page, and a strip such as `10 rows / 3 of 3 checks / 2 plans /
-  5.04 s / $0.0187`. Each item in the strip moves the keyboard to its station
-  below. A refusal gets the same block: **Refused at the checks. No SQL was
-  written.**
-- **The stations.** Plan, Checks, SQL, Rows and Cost & time follow, each with a
-  small heading, a tag for who decides it (**Model Â· gpt-5.4**, from the run's
-  usage, or **Code**) and the step's time. On the spine a round mark is a model
-  step and a square one is code; filled with a tick is done, an outline is
-  waiting and a dashed outline was not reached.
-- **Every sub-query.** When a question is split into several sub-queries, the
-  Plan and SQL stations show each one under its own head (**Sub-query 1 of 2**,
-  its intent and its database).
-- **Rows, at any size.** The Rows station reads the run's saved results, not
-  the sample the answer model saw. Its head gives the whole result's row count,
-  and a result cut at its row ceiling says so: **Cut at 1,000 rows, so some are
-  missing. Narrow the question to get them all.** The table shows 100 rows at a
-  time, fetched from the server, with **Previous**, **Next** and **Rows
-  101â€“200 of 3,340**. A run with several results gets one tab per result.
-  **Download CSV** streams the whole result from the server, every row.
-- **The gate.** The Checks station shows the plans the checks saw (**Plan 1
-  refused**, then **Plan 2 passed** when the first was sent back), why, in one
-  sentence, and each check as a tile with a tick or a cross.
-- **While it runs.** The run streams (`POST /api/ask/stream`, Server-Sent
-  Events): each station lights as its step finishes, with its time, and the
-  next one goes live; the rest wait, faded. The Rows station loads its first
-  page as soon as the result is saved, before the answer is written. The answer
-  sentence then appears as the model writes it, a shade lighter until the run
-  is back, when the plan, the checks and the SQL fill in. A recorded run on
-  the hosted demo streams its recorded answer the same way, a word at a time.
-  Where the stream cannot be used (an older server, a proxy that cuts it, a
-  browser that cannot read a streamed reply), the page asks `POST /api/ask`
-  instead and the first station stays lit until the whole run is back.
-  A counter beside the button reads **Running Â· 3.4 s**, and after a
-  moment **Ask** becomes **Stop**, which cancels the request: the run then says
-  **Stopped** and every station is marked not reached. The server notices the
-  dropped request within a quarter of a second and cancels the run: no further
-  step starts and no further model call is sent, though the one already in
-  flight finishes (and is billed by the provider). On the hosted demo a stopped
-  question still counts toward both limits, because it is charged when it
-  arrives, before it runs.
-- **When it fails.** A provider's refusal is said in words with the next step,
-  for example **OpenAI rejected this key.** with **Replace the key**, which
-  opens Settings. The provider's own reply is folded under **Provider
-  response**.
-- **On a phone**, once a run is on the page, a bar at the bottom, **Ask another
-  question**, takes you back to the question box. It hides while the box is in
-  view.
-
-### The Pipeline page
-
-**Pipeline** lists every step a question passes through, in the order a run
-takes them, and marks which of them a model decides. Five do: the answerability
-check, the question splitter, the query planner, the plan repair and the answer
-writer. The other eight are ordinary code -- the layer router, the SQL agent,
-the schema search, the plan checks, the retry bookkeeping, the SQL writer, the
-executor and the result combiner -- which is the point: the model plans, and
-deterministic code writes the SQL, checks it against the real schema and this
-role's policy, and runs it.
-
-The steps are grouped into three phases: **Understand the question**, **Answer
-each sub-query** (the SQL agent and its own steps, in a bracket, because they
-repeat per sub-query and again when the checks refuse a plan) and **Combine and
-explain**. A step a model decides is a raised row with a round mark and its
-model in a chip; a code step is a compact row with a square mark. A legend
-reads: asks a model, code, did not run, skipped.
-
-Each step gives its name in plain words, the graph node name the Debug ledger
-uses, and one sentence on what it decides. Before any question, each model step
-names the model it is set to use, so the page is worth reading on arrival.
-Without a key, where the guided questions replay recordings, it names instead
-the model the recordings were made with, tagged **recorded**.
-After a question, each row gets a time bar and its time, so the page doubles as
-the run's waterfall, and a model step names the model that answered it and its
-input, cached and output tokens. The timings record how long each step took,
-not when it started, so the bars are laid end to end in pipeline order, and a
-step that ran more than once is drawn for its longest run. A step passed over
-while a later one ran (the plan repair, when no retry was needed) is marked
-skipped; a step the run never reached is marked did not run.
-
-The list is not written by hand on the page: it comes from `GET /api/pipeline`,
-which reads it from the graph's own node names, and a test fails when a node is
-added, renamed or removed and the description does not follow. The per-node
-drill-down under **Debug** on the Ask page is unchanged; this page is the
-overview. The long version is in
-[Pipeline architecture](../how-it-works/pipeline.md).
-
-### The Settings page
-
-The playground that `nl2sql demo` serves has a **Settings** page in the header
-nav. It edits the same two files the CLI reads, and nothing else: there is no
-second settings store, and the browser keeps nothing but UI conveniences.
-
-- **API keys, one per provider.** Paste a key and press **Save key**. The
-  provider follows the key's shape by the engine's own rule (`sk-ant-`
-  is Anthropic, `sk-or-` is OpenRouter, anything else OpenAI). The key is
-  written to the demo project's `.env`, replacing that provider's previous
-  key and keeping the others, and the default moves to that provider. The
-  running demo switches from replay to live **without a restart**: questions
-  already running finish on the model client they started with, then the
-  engine's LLM clients are rebuilt from the project's `nl2sql.yaml` (its
-  `llm.yaml`), with the saved key given to them in memory rather than through
-  the environment. Keys are
-  write-only: no response, log line, trace or error carries one, only a masked
-  form such as `sk-...4f2a` per provider. On a later start the precedence above
-  still holds, so a key exported in your shell wins over a saved
-  one, and every saved key is loaded so each step finds its own.
-- **A provider and a model for each LLM step.** One selector each for the
-  answerability check (`datasource_resolver`), question splitter (`decomposer`),
-  query planner (`ast_planner`), plan repair (`refiner`) and answer writer
-  (`answer_synthesizer`). Each has a "Default" option that uses the top-level
-  provider and model, then one group of models per provider. A provider with no saved key is
-  listed but cannot be chosen, and a step already on a provider whose key is
-  gone says so under its selector. A choice is written to
-  `llm.yaml` under `agents:` with its `provider`, `model` and temperature. It
-  takes the top level's endpoint and key when it is on the same provider, and
-  names no key otherwise, so its own provider's variable is read. It takes effect on the next question, and a step put on another
-  provider stays there when the default moves. The list is short on purpose. On
-  2026-09-20 each OpenAI model was sent the engine's parameters of the time
-  (`temperature=0`, `seed=42`, strict `json_schema`) and worked with them, two
-  of them only once the temperature was left out. The engine now asks every
-  model for a tool call instead, as it already did for every node but the
-  planner. That says the model accepts the engine's calls, not how well it
-  plans, which is the evaluation's question:
-
-    | Model | Written with |
-    | --- | --- |
-    | `gpt-5.4` (the default), `gpt-5.4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4o` | `temperature: 0.0` |
-    | `gpt-5.5`, `gpt-5-mini` | `temperature: null`: they reject temperature 0, so a step on one runs at the model's default temperature and its answers vary more from run to run |
-
-    Claude's list was not probed on a real account; its temperatures follow
-    Anthropic's documented rules:
-
-    | Model | Written with |
-    | --- | --- |
-    | `claude-opus-5` (the default), `claude-sonnet-5` | `temperature: null`: both reject any temperature |
-    | `claude-haiku-4-5` | `temperature: 0.0` |
-
-    The list lives in one place, `VERIFIED_MODELS` in
-    `nl2sql/llm/providers.py`. It covers OpenAI and Anthropic for now:
-    with an OpenRouter key or Ollama as the default the panel says the default
-    has no model list, and offers only the other providers whose keys are
-    saved.
-- **Local only by default.** Settings work only when the playground is bound to
-  a loopback address (`127.0.0.1`, `localhost`, `::1`). On `0.0.0.0` or any
-  other address the panel says why it is off and the settings routes answer
-  `403`, because the playground has no login: a stranger who can reach it could
-  swap in their own key, or spend on yours. Changes are also refused from another
-  site's page (a foreign `Origin`), through a hostname that is not a loopback
-  name, or in anything but JSON.
-- **Hosted mode is a third state.** With `nl2sql-api serve --demo --hosted` the page shows a
-  key form and a **Model for each step** section that write only to this
-  browser tab's `sessionStorage`; the settings routes stay refused because
-  there is nothing on the server to save. Choosing a model needs nothing
-  saved, so hosted mode keeps it: one key per provider and the model each step
-  runs on travel with each question, in a header each. The Ask page there opens
-  with the key form itself: pick a provider, paste the key and **Use this key**,
-  under three facts about it -- **Stored** in this browser tab only, **Sent**
-  with each question in a request header, **Never** written to disk, logs or
-  traces. Nothing is held closed without a key: the guided questions the
-  server has recordings for are marked and answer from a recorded run,
-  labelled **Recorded run**, and any other question answers with a button to
-  Settings to add a key. With recordings the key form is folded under **Use
-  your own key**. Locally there is nothing to announce, and nothing is shown. See
-  [Hosted demo](../deployment/hosted-demo.md).
-
-### The Retrieval inspector
-
-**Retrieval** is the third page in the header nav. It embeds any text with the
-local model and runs the engine's own vector search against the live index: the pool of nearest entries with their similarity, the entries MMR picks
-in order, the score each won with, and what was dropped. There is no
-re-ranking model; the "re-ranking" is MMR, explained in
-[Indexing](../how-it-works/indexing.md#retrieval-mmr-not-a-re-ranking-model).
-
-- **Knobs.** Picks (`k`, the pool is `4 * k`), lambda (the engine uses 0.7; 1
-  is plain nearest-neighbour order, 0 favours entries unlike earlier picks),
-  which entry types to include, and a datasource filter. After the first
-  search, each change searches again. Each entry shows the text that was
-  embedded for it.
-- **Reading it.** The picks in order, and the entries MMR passed over, sit above
-  the pool as rows of chips. Each similarity has a bar placed within the
-  pool's own range, nearest full and farthest empty: raw cosine scores bunch
-  together, so this is what shows which entries are actually nearer.
-- **Free.** The embedder is local; nothing here calls the LLM.
-- **For chunking experiments.** Change the chunking, press Rebuild, search the
-  same text, and diff the **Copy as text** output of the two runs: one
-  fixed-width line per entry (rank, pick or drop, similarity, MMR score, type,
-  name).
-- **As a role.** The search is made as the role chosen in **Ask as**, so the pool
-  holds only the entries that role may read. The playground trusts the role the
-  page sends; it does not verify who is asking.
-- **Local only**, like Settings and Rebuild, because it shows the index entries
-  the role reaches, column statistics and sample values included: on a
-  non-loopback `--host` it is off (`POST /api/retrieval` answers `403`), and it refuses another site's page, a
-  non-loopback hostname and anything but JSON.
-
-A run's own retrieval is under **Debug**: open the `datasource_resolver` or
-`schema_retriever` row in the per-node table.
-
-### Rating answers
-
-Below **Cost & time**, each answer asks **Was this answer right?**: **ðŸ‘ Right**
-or **ðŸ‘Ž Wrong**, with an optional note (**Wrong number**, **Wrong table**,
-**Wrong filter**, **Missing rows**, or your own words). The rating is saved in
-the demo's state store (`.nl2sql/state.db`) with the question, role, SQL, the model per
-step and the engine version; never the rows. It is local only, like Settings:
-on a non-loopback `--host` it is off.
-`settings.feedback.enabled: false` in the project's config turns it off. Read the ratings back, with
-the refusal, retry, error and plan-cache rates, from the CLI (below). See
+Asking, the pipeline view, Settings, the retrieval inspector and answer ratings
+are pages of the web app, described in [Web app](../apps/web.md). Ratings are
+stored in the demo's state store (`.nl2sql/state.db`) with the question, role,
+SQL, the model per step and the engine version, never the rows; see
 [Feedback and Signals](../observability/feedback.md).
 
 ## 3. Use the demo from the CLI
@@ -655,14 +409,14 @@ answers with `nl2sql trace replay <file>`. See
 
 Asking a question a second time on the same day reuses the first run's validated plan from the
 plan cache (in `.nl2sql/state.db`), so the SQL and rows are the same and the
-planner is not called; the playground's Debug view says "Plan from the plan
+planner is not called; the web app's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:
 
 ```bash
 nl2sql cache clear
 ```
 
-The playground's ratings, and the guardrail rates over every rated run and
+The web app's ratings, and the guardrail rates over every rated run and
 kept trace:
 
 ```bash
@@ -703,7 +457,7 @@ other one that fails is printed and left out of routing.
 ## Sample questions
 
 The demo's datasource files carry twenty questions (`sample_questions`), the same
-ones the playground offers as guided questions -- a few as chips for the
+ones the web app offers as guided questions -- a few as chips for the
 database the rail is showing, and all twenty behind **N more**, in one pile per
 database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
 ground:
@@ -737,7 +491,7 @@ And four on `webanalytics`:
 
 None of them spans two databases, deliberately: the engine cannot answer such a
 question yet. The rail says so too, under the database switcher: each question
-is answered from one database, and joining across them is planned. Clicking a
+is answered from one database, and joining across them is not supported. Clicking a
 question from another pile moves the switcher to that database, so the schema
 on the left is the one the question is about.
 

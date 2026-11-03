@@ -5,17 +5,17 @@ The `curated` section of [`nl2sql.yaml`](system.md), usually its own
 have already written and reviewed, with typed parameters, and the questions
 each query answers.
 
-!!! note "What works today"
-    The section is loaded and checked (at startup and with
-    `nl2sql curated validate`), every query can be run once with
-    `nl2sql curated test`, its questions are indexed with `nl2sql index`, a
-    question is matched to a verified query and answered by it (see
-    [What happens at question time](#what-happens-at-question-time)), and the
-    playground badges such an answer *Verified*. The demo ships six verified
-    queries ([In the demo](#in-the-demo)). Preferred tables
-    ([below](#preferred-tables)) and proposals from thumbs-up feedback
-    ([From feedback to verified queries](#from-feedback-to-verified-queries))
-    are built too. Business metrics are parsed but not used yet.
+The section is loaded and checked at startup and with
+`nl2sql curated validate`. `nl2sql curated test` runs every query once, and
+`nl2sql index` indexes their questions. A question is matched to a verified
+query and answered by it (see
+[What happens at question time](#what-happens-at-question-time)), and the web
+app badges such an answer *Verified*. The demo ships six verified queries
+([In the demo](#in-the-demo)). Preferred tables ([below](#preferred-tables))
+and proposals from thumbs-up feedback
+([From feedback to verified queries](#from-feedback-to-verified-queries))
+belong to the same section. Business metrics are parsed but not used to answer
+questions.
 
 ## Where it lives
 
@@ -28,7 +28,7 @@ The section is optional. **Present, curated answers are on; absent, they are
 off**, and nothing else changes. To turn them off, remove the line from
 `nl2sql.yaml` (the file can stay). A `file:` that does not exist is an error,
 and so is a section that is broken: building the engine (`NL2SQL(config)`,
-`nl2sql run`, the REST API, the playground) fails with a `ConfigError` that
+`nl2sql run`, the REST API, the web app) fails with a `ConfigError` that
 names every problem, as a broken datasource does.
 
 The matching knobs are in the [`settings` section](settings.md):
@@ -108,7 +108,7 @@ datasources:
 ### Metrics
 
 `metrics:` (a list of `name`, `description`, `expression`, `table`) is
-accepted and checked for shape so the format is fixed, but nothing uses it yet.
+accepted and checked for shape, but not used to answer questions.
 
 Every key is checked: a misspelt one (`descripton:`) is an error, not ignored.
 
@@ -271,7 +271,7 @@ or `{"type": "generated", ...}` with the other fields `null`. The sub-query of
 a verified answer has `plan_source: "verified"`, its `sql` is your SQL with
 its `:name` placeholders, and its `plan` is `null`.
 
-In the playground a verified answer carries a green **Verified ·
+In the web app a verified answer carries a green **Verified ·
 top_customers_by_revenue** label beside the question, with the bound values
 in its tooltip. The Plan station says no plan was written and lists the query
 and its values, the Checks station shows the matcher's three checks (read-only,
@@ -400,7 +400,7 @@ written: export the proposals and edit by hand. See
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `nl2sql-cli/src/nl2sql_cli/commands/curated.py`
 - The demo's verified queries: `CHINOOK_VERIFIED_QUERIES` in `packages/nl2sql/src/nl2sql/datasets/chinook.py`
-- The playground badge: `verifiedSource()` in `nl2sql-ui/src/outputs/results.js`
+- The web app badge: `verifiedSource()` in `nl2sql-ui/src/outputs/results.js`
 - Matching and running: `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/`
 - Proposals from feedback: `packages/nl2sql/src/nl2sql/feedback/proposals.py`; the review queue and the
   canonical writer: `packages/nl2sql/src/nl2sql/review/`

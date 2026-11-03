@@ -524,9 +524,9 @@ verified queries, and a new guided question would have no recording.
 
 The keyless demo replays recorded model answers, keyed on the structured-output
 name and the question. The matcher's call is a new name
-(`VerifiedQueryChoice`), recorded for every guided question since the
-recordings in `cli/demo/recordings/chinook.json` were made again for 0.4.0
-(`python scripts/record_demo_answers.py`, which needs the owner's key). A
+(`VerifiedQueryChoice`), recorded for every guided question from the
+recordings in `cli/demo/recordings/chinook.json`
+(`python scripts/record_demo_answers.py` makes them and needs a model key). A
 guided question that matches a verified query replays verified, badge and all;
 the others replay the model's `none_of_these` and then their generated answer.
 A verified run never reaches the decomposer, so `ReplayStore.covered()` counts
@@ -536,9 +536,9 @@ a question whose recorded choice picked a query as covered too.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| the `curated` section | absent | Present: curated answers are on. Absent: off. (0.4's `CURATED_CONFIG` and `CURATED_ENABLED`.) |
-| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked (0.4's `CURATED_MATCH_FLOOR`). |
-| `settings.curated.match_top_k` | `5` | Candidates shown to the model (0.4's `CURATED_MATCH_TOP_K`). |
+| the `curated` section | absent | Present: curated answers are on. Absent: off. |
+| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked. |
+| `settings.curated.match_top_k` | `5` | Candidates shown to the model. |
 
 The floor is a similarity in the configured embedding model's space, and
 models spread their scores differently. It was calibrated on the local ONNX
@@ -576,39 +576,3 @@ No invariant is weakened. These changes are recorded in
 - [`determinism.md`](determinism.md)'s "the AST is checked ... before any SQL
   exists, on every path" becomes "on every generated path"; a verified path
   has no AST, and its checks are the matcher's.
-
-## Not built yet
-
-### Business metrics (deferred)
-
-The format is fixed (`metrics:` in `curated.yaml`, parsed
-and validated), but nothing uses it yet. The sketch:
-
-- Each metric is indexed as the existing, so far unused, `schema.metric`
-  chunk (`MetricChunk` in `nl2sql/indexing/models.py`), so schema retrieval
-  returns the metrics a sub-query is about.
-- The planner refers to a metric by name: a new `Expr` kind `metric` with a
-  `metric_name`, which, like `func_name`, is model text, so the logical
-  validator must check it against the datasource's metrics before anything
-  else reads it.
-- The validator also requires the metric's `table` in the plan and allowed for
-  the role; the generator parses `expression` with sqlglot in the adapter's
-  dialect and splices the expression tree in place of the reference.
-
-This is the hardest part of the feature, which is why it waits. A metric is
-an aggregate, so it cannot be nested in another aggregate or used in a
-`WHERE`; its table must be joined at the right grain or the sum fans out
-across a one-to-many join; and the decomposer already has a `MetricSpec`
-(`SubQuery.metrics`) with a different meaning, so the names need sorting out
-first. Every rule the generator would need, the validator has to enforce
-first, so the planner gets a retry rather than a dead end.
-
-### Also out of scope
-
-- **An MCP server** exposing `ask`, plus one tool per verified query. The typed
-  params are already a tool's input schema, so this is close to free once
-  verified queries exist.
-- **Per-sub-query matching**, so one part of a multi-part question can be
-  verified and the rest generated.
-- **Asking a follow-up question** for a missing value, instead of falling
-  back; that is conversations.

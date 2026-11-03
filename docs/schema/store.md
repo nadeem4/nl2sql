@@ -34,7 +34,7 @@ Snapshots are kept by the engine's **state store**, the `storage.state` slot
 (see [Storage](../configuration/storage.md)). The built-in one is `sqlite`, a
 file at `<storage.path>/state.db`; any store implementing
 `nl2sql_sdk.stores.StateStore` can take its place. The same store holds the
-plan cache, the playground's answer ratings, the review queue, conversations,
+plan cache, the web app's answer ratings, the review queue, conversations,
 workspaces, dashboards with their last chart results, API keys and the index
 build lock. The interface is version 6.
 
@@ -88,7 +88,7 @@ schema_version)`
 `nl2sql cache clear` (`engine.clear_plan_cache()`) deletes them all and keeps
 the snapshots. See [Determinism → The plan cache](../how-it-works/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
-The playground's **answer ratings** are kept too (`add_feedback`,
+The web app's **answer ratings** are kept too (`add_feedback`,
 `list_feedback`, `clear_feedback`): one row per rated run, questions and SQL,
 never rows. `nl2sql feedback clear` empties them and nothing else. See
 [Feedback and Signals](../observability/feedback.md).
@@ -97,18 +97,16 @@ never rows. `nl2sql feedback clear` empties them and nothing else. See
 
 The `sqlite` store records each migration it has applied in a `nl2sql_meta`
 table, and the engine applies the pending ones when it starts
-(`StateStore.migrate()`). Migration 1 creates 0.5's three tables
-(`schema_snapshots`, `plan_cache`, `feedback`) if they are missing, so a 0.5
-`state.db` is adopted as it is; migration 2 adds the feedback columns that
+(`StateStore.migrate()`). Migration 1 creates the three base tables
+(`schema_snapshots`, `plan_cache`, `feedback`) if they are missing; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the `locks` table;
 migration 4 adds the `schema_diffs` table; migration 5 adds the `proposals`
 table, the review queue;
-migration 6 adds five tables, below; migration 7 adds the `approvals` table and migration 8 the `saved_answers` table, below. A 0.8 `state.db` is migrated in
+migration 6 adds five tables, below; migration 7 adds the `approvals` table and migration 8 the `saved_answers` table, below. An older `state.db` is migrated in
 place and keeps its rows.
 
 ### Conversations, dashboards and API keys
 
-Release 0.9.
 `StateStore` version 4 adds these methods. Each takes and returns a plain JSON
 document (`dict`), because the SDK holds none of the engine's models; the
 document carries the fields the store filters on. The engine methods that use

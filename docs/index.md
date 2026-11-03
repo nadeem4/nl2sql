@@ -1,6 +1,6 @@
 # NL2SQL Platform Documentation
 
-This documentation describes the **current runtime behavior** of NL2SQL as implemented in code, including the parts that are not implemented yet. It is written for engineers and contributors who need a precise mental model of the architecture, contracts, and operational behavior. Where a page states a limitation, the limitation is the fact; nothing here describes intent.
+These docs describe the shipped behaviour of NL2SQL, for engineers who use it, run it or contribute to it. Where a page states a limitation, the limitation is the fact; known gaps are listed in [Status and limitations](reference/limitations.md).
 
 ## Problem this system solves
 
@@ -82,11 +82,9 @@ flowchart TD
 
 ## Navigate the docs
 
-- `how-it-works/overview.md` for end-to-end system architecture and subsystem boundaries.
-- `how-it-works/pipeline.md` for LangGraph pipeline flow, routing, and execution DAG behavior.
-- `how-it-works/graph_state.md`, `how-it-works/determinism.md`, and `how-it-works/invariants.md` for state, determinism, and enforced rules.
-- `how-it-works/failure_recovery.md` for failure domains and retry scope.
-- `schema/store.md` and `how-it-works/indexing.md` for schema contracts, chunking, and retrieval.
-- `execution/isolation.md` for what the runtime bounds, and what it does not.
-- `adapters/architecture.md` for plugin discovery and capability-based routing.
-- `observability/stack.md` and `observability/error-handling.md` for metrics, logging, and error contracts.
+- [Get started](get-started/index.md) to install and ask a first question.
+- [How it works](how-it-works/overview.md): the [pipeline](how-it-works/pipeline.md), [state](how-it-works/graph_state.md), [determinism](how-it-works/determinism.md), [invariants](how-it-works/invariants.md), [failure and recovery](how-it-works/failure_recovery.md) and [indexing](how-it-works/indexing.md).
+- [Schema store](schema/store.md) for schema contracts and retrieval.
+- [Execution isolation](how-it-works/isolation.md) for what the runtime bounds, and what it does not.
+- [Adapters](adapters/architecture.md) for plugin discovery and capability-based routing.
+- [Observability](observability/stack.md) and [error handling](observability/error-handling.md) for metrics, logging and error contracts.
