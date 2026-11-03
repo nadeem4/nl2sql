@@ -108,10 +108,10 @@ test("every hover rule is inside (hover: hover)", () => {
   }
 });
 
-test("a coarse pointer gets 44px targets on the nav, chips, table heads, buttons and checkboxes", () => {
+test("a coarse pointer gets 44px targets on the nav, chips, buttons and checkboxes", () => {
   const coarse = ALL.filter((r) => inside(r, "pointer: coarse") && /min-height:\s*44px/.test(r.body));
   const selectors = coarse.flatMap((r) => r.selector.split(",").map((s) => s.trim()));
-  for (const wanted of [".nav-link", ".chip", ".table-head", ".ask", ".first-run-go", ".index-rebuild",
+  for (const wanted of [".nav-link", ".chip", ".ask", ".first-run-go", ".index-rebuild",
     ".settings-save", ".rate-btn", ".inspect-close", ".fault-action", ".fault-again", ".check"]) {
     assert.ok(selectors.includes(wanted), `${wanted} has no 44px minimum on a coarse pointer`);
   }

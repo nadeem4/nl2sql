@@ -284,7 +284,6 @@ def test_settings_defaults():
     assert (s.traces.mode, s.traces.sample_rows, s.traces.max_field_chars) == ("on_failure", 50, 20000)
     assert s.schema_.max_versions == 3
     assert (s.curated.match_top_k, s.curated.match_floor) == (5, 0.6)
-    assert s.feedback.enabled is True
     assert "observability" not in s.model_dump()
 
 

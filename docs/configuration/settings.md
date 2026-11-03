@@ -43,8 +43,6 @@ schema:
 curated:
   match_top_k: 5
   match_floor: 0.6
-feedback:
-  enabled: true
 knowledge:
   item_max_chars: 500
   block_max_chars: 4000
@@ -77,7 +75,7 @@ trace).
 
 In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
 `RetrievalSettings`, `RoutingSettings`, `ResultSettings`, `TraceSettings`,
-`SchemaSettings`, `CuratedSettings`, `FeedbackSettings`, `KnowledgeSettings`,
+`SchemaSettings`, `CuratedSettings`, `KnowledgeSettings`,
 `ClarifySettings`, `ProfilerSettings`, `ReviewSettings` and `ChartSettings` in `nl2sql.config`.
 
 Where the engine's events, logs and metrics go is not a setting: it is the
@@ -190,12 +188,6 @@ the decomposer reads `max_sub_queries`.
 
 Whether curated answers are on is not a setting: the
 [`curated` section](curated.md) is present or absent.
-
-## `feedback`
-
-| Key | Default | Description |
-| --- | --- | --- |
-| `enabled` | `true` | Reserved: the key is accepted and validated, and nothing reads it. Ratings of a run (**Yes** or **Not quite** in the web app) are stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
 
 ## `knowledge`, `clarify`, `profiler` and `review`
 

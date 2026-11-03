@@ -218,6 +218,7 @@ button:disabled { cursor: default; }
   background: transparent; color: var(--ink); border-color: var(--rule-strong); font-weight: var(--fw-medium);
 }
 .index-rebuild.is-primary { font-weight: var(--fw-bold); }
+.index-rebuild { margin-top: var(--sp-1); }
 
 /* ghost */
 .inspect-close {

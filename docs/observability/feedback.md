@@ -216,9 +216,8 @@ reaches every table in `tables` sees the proposal. Keep traces
 (`settings.traces.mode: always`) to correct runs that succeeded and were not
 rated; the default keeps only failed runs' traces.
 
-## Turning it off and clearing it
+## Clearing it
 
-- `settings.feedback.enabled` is reserved: it is accepted and nothing reads it.
 - `nl2sql feedback clear` deletes every rating (`--yes` skips the prompt).
   Schema snapshots and the plan cache are kept, and `nl2sql cache clear`
   never touches the ratings.
