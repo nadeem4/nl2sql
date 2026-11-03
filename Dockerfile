@@ -48,7 +48,8 @@ RUN pip install -U pip setuptools wheel \
     && pip install \
         ./packages/sdk \
         "./packages/nl2sql[postgres,mysql,mssql,duckdb,anthropic,otel]" \
-        ./packages/api \n        ./nl2sql-cli
+        ./packages/api \
+        ./nl2sql-cli
 
 # Non-root. /data is the volume for storage.path (docs/deployment/compose.md).
 RUN useradd --create-home --uid 1000 nl2sql \
