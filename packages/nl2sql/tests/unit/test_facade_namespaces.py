@@ -272,8 +272,10 @@ def test_llm_set_models_result_does_not_depend_on_the_order_of_changes(tmp_path,
     default = {"provider": "anthropic", "model": "claude-x"}
     planner = {"provider": "openai", "model": "gpt-plan2"}  # the old default's provider: nothing to clear
     results = []
-    for changes in ({"default": default, "ast_planner": planner}, {"ast_planner": planner, "default": default}):
-        with _engine(tmp_path, llm=SETTINGS_RICH) as engine:
+    orders = ({"default": default, "ast_planner": planner}, {"ast_planner": planner, "default": default})
+    for number, changes in enumerate(orders):
+        (tmp_path / str(number)).mkdir()
+        with _engine(tmp_path / str(number), llm=SETTINGS_RICH) as engine:
             engine.llm.set_models(changes)
             results.append(engine.config.llm.model_dump())
 
