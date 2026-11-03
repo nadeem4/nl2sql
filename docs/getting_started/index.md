@@ -14,6 +14,7 @@ to use the platform:
 - [From Source (Development)](source.md)
 - [Demo Data (CLI-first)](demo.md)
 - [Launch](launch.md): connect your own database in one sitting with `nl2sql launch`
+- [Terminal app](../apps/terminal.md): chat with your data from a terminal with `nl2sql chat`
 - [MCP server](mcp.md): serve the engine to a desktop assistant or an IDE with `nl2sql mcp`
 
 ## One config: `nl2sql.yaml`
