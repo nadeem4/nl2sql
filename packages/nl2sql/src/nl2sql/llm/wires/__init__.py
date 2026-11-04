@@ -152,8 +152,9 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
               streamed: Optional[tuple] = None) -> Any:
     """Asks ``model``, then again with what was wrong, up to the agent's ``parse_retries`` times.
 
-    ``streamed`` is ``(streaming model, repair)``: the first answer is asked
-    of that model and passed through ``repair``. Each retry adds the model's
+    ``streamed`` is ``(streaming model, repair, checks)``: the first answer is
+    asked of that model, passed through ``repair`` and then the ``checks``
+    (the steps between the model and the parser). Each retry adds the model's
     answer and the errors to the messages. The model and the parser run under
     the caller's config, directly under this step, so every call reaches the
     usage and trace callbacks and the trace records this step's parsed answer
@@ -175,6 +176,8 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
         for attempt in range(retries + 1):
             if attempt == 0 and streamed is not None:
                 answer = streamed[1](streamed[0].invoke(messages, config))
+                for check in streamed[2]:
+                    answer = check.invoke(answer, config)
             else:  # a retry is never streamed
                 answer = model.invoke(messages, config)
             try:
@@ -263,7 +266,10 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
 
     method = _method(llm)
     chain = llm.with_structured_output(schema, method=method)
-    model, parser = _split(chain)
+    pair = _split(chain)
+    if pair is None:  # not a model and a parser: nothing to stream or send back
+        return chain
+    model, parser = pair
     tools = getattr(chain.first, "kwargs", {}).get("tools")
     repair = getattr(wire_of(llm), "repair_tool_calls", None)
 
@@ -273,4 +279,4 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
         return repair(ChatResult(generations=[ChatGeneration(message=message)]), tools).generations[0].message
 
     streaming = chain.first.bind(stream=True, stream_usage=True)
-    return _retrying(llm, schema, model, parser, method == "json_mode", streamed=(streaming, repaired))
+    return _retrying(llm, schema, model, parser, method == "json_mode", streamed=(streaming, repaired, chain.steps[1:-1]))
