@@ -184,3 +184,92 @@ def test_retries_are_in_the_trace_with_the_parsed_answer(wire):
     assert [call["key"]["call_index"] for call in calls] == [1, 2]
     assert RETRY in calls[1]["messages"][-1]["content"]
     assert calls[1]["parsed"] == GOOD
+
+
+# -- a chain of model, checks, parser -------------------------------------
+# langchain-openai 1.7 puts a refusal check between the model and the parser;
+# these build that shape by hand so they hold on any library version.
+
+def _chat(answers, middle=(), steps_seen=None):
+    """A client whose ``with_structured_output`` is ``model | *middle | parser``."""
+    from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+    from langchain_core.messages import AIMessage
+    from langchain_core.runnables import RunnableLambda, RunnableSequence
+
+    model = GenericFakeChatModel(messages=iter([AIMessage(content=a) for a in answers]))
+    parser = RunnableLambda(lambda message: Pick.model_validate_json(message.content))
+
+    class Chat:
+        def with_structured_output(self, schema, method):
+            return RunnableSequence(model, *[RunnableLambda(step) for step in middle], parser)
+
+    return Chat()
+
+
+def test_a_three_step_chain_is_retried_and_its_middle_step_runs_every_attempt():
+    ran = []
+
+    def check(message):
+        ran.append(message.content)
+        return message
+
+    chat = _chat(['{"tabel": "orders"}', '{"table": "orders"}'], middle=[check])
+    assert _ask(PROMPT | structured(chat, Pick)) == Pick(table="orders")
+    assert ran == ['{"tabel": "orders"}', '{"table": "orders"}']
+
+
+def test_a_two_step_chain_is_still_retried():
+    chat = _chat(['{"tabel": "orders"}', '{"table": "orders"}'])
+    assert _ask(PROMPT | structured(chat, Pick)) == Pick(table="orders")
+
+
+@pytest.mark.parametrize("wire", [structured, streaming_structured], ids=["plain", "streamed"])
+def test_a_refusal_raised_by_a_middle_step_is_not_retried(wire):
+    from langchain_core.exceptions import LangChainException
+
+    class Refusal(LangChainException):
+        pass
+
+    calls = []
+
+    def check(message):
+        calls.append(message)
+        raise Refusal("the model refused")
+
+    chat = _chat(['{"table": "orders"}', '{"table": "orders"}'], middle=[check])
+    with pytest.raises(Refusal):
+        _ask(PROMPT | wire(chat, Pick))
+    assert len(calls) == 1
+
+
+def test_a_streamed_answer_goes_through_the_middle_steps():
+    ran = []
+    chat = _chat(['{"table": "orders"}'], middle=[lambda m: (ran.append(1), m)[1]])
+    assert _ask(PROMPT | streaming_structured(chat, Pick)) == Pick(table="orders")
+    assert ran == [1]
+
+
+@pytest.mark.parametrize("wire", [structured, streaming_structured], ids=["plain", "streamed"])
+def test_the_parsed_answer_is_attached_to_the_structured_step_with_a_middle_step(wire):
+    from langchain_core.runnables import RunnableLambda
+
+    from nl2sql.tracing.recorder import TraceRecorder
+
+    recorder = TraceRecorder()
+    chat = _chat(['{"tabel": "orders"}', '{"table": "orders"}'], middle=[lambda m: m])
+    chain = PROMPT | wire(chat, Pick)
+    node = RunnableLambda(lambda question, config: chain.invoke(question, config), name="ast_planner")
+    _ask(node, callbacks=[recorder])
+
+    calls = [call for execution in recorder.node_executions() for call in execution["llm_calls"]]
+    assert len(calls) == 2 and calls[1]["parsed"] == GOOD
+
+
+def test_streaming_a_chain_that_is_not_a_model_and_a_parser_falls_back_to_it():
+    from langchain_core.runnables import RunnableLambda
+
+    class Chat:
+        def with_structured_output(self, schema, method):
+            return RunnableLambda(lambda _m: Pick(table="orders"))
+
+    assert _ask(PROMPT | streaming_structured(Chat(), Pick)) == Pick(table="orders")

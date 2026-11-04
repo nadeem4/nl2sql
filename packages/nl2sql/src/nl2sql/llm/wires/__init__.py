@@ -152,8 +152,9 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
               streamed: Optional[tuple] = None) -> Any:
     """Asks ``model``, then again with what was wrong, up to the agent's ``parse_retries`` times.
 
-    ``streamed`` is ``(streaming model, repair)``: the first answer is asked
-    of that model and passed through ``repair``. Each retry adds the model's
+    ``streamed`` is ``(streaming model, repair, checks)``: the first answer is
+    asked of that model, passed through ``repair`` and then the ``checks``
+    (the steps between the model and the parser). Each retry adds the model's
     answer and the errors to the messages. The model and the parser run under
     the caller's config, directly under this step, so every call reaches the
     usage and trace callbacks and the trace records this step's parsed answer
@@ -175,6 +176,8 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
         for attempt in range(retries + 1):
             if attempt == 0 and streamed is not None:
                 answer = streamed[1](streamed[0].invoke(messages, config))
+                for check in streamed[2]:
+                    answer = check.invoke(answer, config)
             else:  # a retry is never streamed
                 answer = model.invoke(messages, config)
             try:
@@ -199,12 +202,33 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
 
 
 def _split(chain: Any) -> Optional[tuple]:
-    """``(model, parser)`` of what ``with_structured_output`` returned, or None when it is not that pair."""
+    """``(model, parser)`` of what ``with_structured_output`` returned, or None when it is not a model and a parser.
+
+    Everything before the parser is the model: langchain-openai 1.7 puts a
+    refusal check between the two, so the chain is not always a pair.
+    """
     from langchain_core.runnables import RunnableSequence
 
-    if isinstance(chain, RunnableSequence) and len(chain.steps) == 2:
-        return chain.first, chain.last
+    if isinstance(chain, RunnableSequence) and len(chain.steps) >= 2:
+        steps = chain.steps
+        return (steps[0] if len(steps) == 2 else _Steps(steps[:-1])), chain.last
     return None
+
+
+class _Steps:
+    """Runs steps one after another, each directly under the caller's run, as a model and its checks.
+
+    A nested ``RunnableSequence`` would put the model call under a run of its
+    own, and the trace attaches the parsed answer to the call's parent run.
+    """
+
+    def __init__(self, steps: Any) -> None:
+        self._steps = list(steps)
+
+    def invoke(self, value: Any, config: Any = None) -> Any:
+        for step in self._steps:
+            value = step.invoke(value, config)
+        return value
 
 
 def structured(llm: Any, schema: Any) -> Any:
@@ -242,8 +266,11 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
 
     method = _method(llm)
     chain = llm.with_structured_output(schema, method=method)
-    model, parser = chain.first, chain.last
-    tools = getattr(model, "kwargs", {}).get("tools")
+    pair = _split(chain)
+    if pair is None:  # not a model and a parser: nothing to stream or send back
+        return chain
+    model, parser = pair
+    tools = getattr(chain.first, "kwargs", {}).get("tools")
     repair = getattr(wire_of(llm), "repair_tool_calls", None)
 
     def repaired(message: Any) -> Any:
@@ -251,5 +278,5 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
             return message
         return repair(ChatResult(generations=[ChatGeneration(message=message)]), tools).generations[0].message
 
-    streaming = model.bind(stream=True, stream_usage=True)
-    return _retrying(llm, schema, model, parser, method == "json_mode", streamed=(streaming, repaired))
+    streaming = chain.first.bind(stream=True, stream_usage=True)
+    return _retrying(llm, schema, model, parser, method == "json_mode", streamed=(streaming, repaired, chain.steps[1:-1]))
