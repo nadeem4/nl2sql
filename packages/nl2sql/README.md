@@ -33,15 +33,15 @@ Your own config instead: `NL2SQL.from_config("nl2sql.yaml")`. Database drivers a
 
 ## Security
 
-The model returns a typed plan and never SQL; the plan is checked against the schema and the caller's role before any SQL is generated. The provider sees the question, the schema it needs and the result rows. Read the [security model](https://nadeem4.github.io/nl2sql/security/model/) before pointing it at real data.
+The model returns a typed plan and never SQL; the plan is checked against the schema and the caller's role before any SQL is generated. The provider sees the question, the schema it needs and the result rows. Read the [security model](https://nadeem4.github.io/nl2sql/latest/security/model/) before pointing it at real data.
 
 ## Documentation
 
 Full documentation: <https://nadeem4.github.io/nl2sql/>
 
-- [Get started](https://nadeem4.github.io/nl2sql/get-started/)
-- [How it works](https://nadeem4.github.io/nl2sql/how-it-works/overview/)
-- [Security model](https://nadeem4.github.io/nl2sql/security/model/)
-- [Known limitations](https://nadeem4.github.io/nl2sql/reference/limitations/)
+- [Get started](https://nadeem4.github.io/nl2sql/latest/get-started/)
+- [How it works](https://nadeem4.github.io/nl2sql/latest/how-it-works/overview/)
+- [Security model](https://nadeem4.github.io/nl2sql/latest/security/model/)
+- [Known limitations](https://nadeem4.github.io/nl2sql/latest/reference/limitations/)
 
 `nl2sql-sdk`, `nl2sql-engine`, `nl2sql-api` and `nl2sql-cli` are released together. MIT licensed.

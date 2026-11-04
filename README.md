@@ -68,7 +68,7 @@ databases, indexes them on your machine, starts the web app on
 environment (`OPENAI_API_KEY`, `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`) it
 answers live; without one it replays recorded answers and says so, and you can
 paste a key into Settings. The first run downloads a ~79 MB embedding model.
-Full guide: [Demo](https://nadeem4.github.io/nl2sql/get-started/demo/).
+Full guide: [Demo](https://nadeem4.github.io/nl2sql/latest/get-started/demo/).
 
 From a clone: `pip install -e packages/sdk -e packages/nl2sql -e packages/api -e "nl2sql-cli[web]"`.
 
