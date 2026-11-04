@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-api"
-version = "0.9.1" # x-release-please-version
+version = "0.10.0" # x-release-please-version
 description = "FastAPI REST service for the nl2sql engine: ask a database questions in English over HTTP"
 readme = "README.md"
 license = "MIT"
@@ -22,7 +22,7 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "nl2sql-engine~=0.9.1", # x-release-please-version
+    "nl2sql-engine~=0.10.0", # x-release-please-version
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
     "pydantic>=2.0",
