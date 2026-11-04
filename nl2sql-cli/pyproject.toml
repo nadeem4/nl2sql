@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-cli"
-version = "0.9.1" # x-release-please-version
+version = "0.10.0" # x-release-please-version
 description = "The nl2sql command line: index, ask, review, evaluate and serve a database you query in English"
 readme = "README.md"
 license = "MIT"
@@ -24,7 +24,7 @@ requires-python = ">=3.12"
 # It sits on the engine's facade and nothing else of this repository: the SDK is for adapter
 # authors and the API is a separate process that `nl2sql demo` and `serve` start, so neither is a dependency.
 dependencies = [
-    "nl2sql-engine~=0.9.1", # x-release-please-version
+    "nl2sql-engine~=0.10.0", # x-release-please-version
     "rich>=13.0.0",
     # typer no longer has an [all] extra; asking for it only warns.
     "typer>=0.9.0",
@@ -36,7 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 # `nl2sql demo` and `nl2sql serve` start the web server as a child process (`python -m nl2sql_api serve`), so this
 # package never imports the API; without the extra they print the install line.
-web = ["nl2sql-api~=0.9.1"] # x-release-please-version
+web = ["nl2sql-api~=0.10.0"] # x-release-please-version
 
 [project.urls]
 Homepage = "https://github.com/nadeem4/nl2sql"
