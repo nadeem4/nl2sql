@@ -11,6 +11,7 @@ Each rule has a one-line reason, because a rule without one gets argued every ti
 5. **Diagrams are Mermaid with no forced colours on anything GitHub or the docs site renders.** *Why: the reader picks the theme, and a forced colour can be unreadable on a dark canvas. Carry emphasis in shape and layout.*
 6. **Docs change in the same PR as the code.** *Why: a doc that lags is worse than no doc.*
 7. **Moved pages keep their old URLs working, through `mkdocs-redirects`.** Add an entry to `redirect_maps` in `mkdocs.yml` for every page you move or rename. *Why: people bookmark, link and search for pages; a move should not break them.*
+   A link to the docs site from outside `docs/` (a README, `SECURITY.md`, code) names a version, usually `https://nadeem4.github.io/nl2sql/latest/<page>/`: the site keeps one copy per release, and only its front page redirects. `packages/nl2sql/tests/unit/test_docs_site_links.py` checks it.
 
 ## Checking a change
 
